@@ -1,0 +1,30 @@
+/*
+  This file holds scan message types, for sending the results of individual
+  scans between afspm nodes.
+*/
+
+syntax = "proto3";
+
+import "geometry.proto";
+
+/*
+  ScanParameters contains the physical coordinates of the scan, as well as
+  the shape of the 3D data array captured.
+*/
+message ScanParameters2d {
+  optional Point2d top_left = 1;
+  optional Size2d size = 2;
+  optional string spatial_units = 3; // Units for y- and x- dimensions
+
+  // Data parameters
+  optional Size2u data_shape = 4;
+  optional string data_units = 5;
+
+  optional string name = 6; // Name to attribute to this data array
+}
+
+/* Scan contains the parameters and data array from an individual scan. */
+message Scan2d {
+  optional ScanParameters2d parameters = 1;
+  repeated double data_array = 2; // Expect [y][x]
+}

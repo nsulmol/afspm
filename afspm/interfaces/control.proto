@@ -1,0 +1,39 @@
+/*
+  This file holds information tied to afspm control (e.g. control mode,
+  any experimental problem that has arisen).
+*/
+
+syntax = "proto3";
+
+/* Enum holding the current control mode of afspm. */
+enum ControlMode {
+  CM_UNDEFINED = 0;
+  CM_MANUAL = 1;  // Under manual control
+  CM_AUTOMATED = 2;  // Under (standard) automated control
+  CM_PROBLEM = 3;  // There is an issue/problem!
+}
+
+/*
+  Enum holding potential experiment issue/problems. When a given problem
+  arises, the user (or some automation) must resolve the item and remove it
+  from our 'problem map' to allow the experiment to continue.
+*/
+enum ExperimentProblem {
+  EP_NONE = 0;
+  EP_TIP_SHAPE_CHANGED = 1;
+}
+
+/* Enum indicating the current state of scanning */
+enum ScanState {
+  SS_UNDEFINED = 0;
+  SS_MOVING = 1;  // Moving, not scanning
+  SS_SCANNING = 2;
+  SS_FREE = 3; // Neither scanning nor moving, free to do something else
+}
+
+/* Contains the current overall SPM status. */
+message SPMStatus {
+  optional ControlMode control_mode = 1;
+  repeated ExperimentProblem problems_list = 2;
+  optional ScanState scan_state = 3;
+}

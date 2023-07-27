@@ -1,0 +1,36 @@
+/*
+This file holds general geometric types, for more complex messages.
+*/
+
+syntax = "proto3";
+
+/* 2D unsigned integer point. */
+message Point2u {
+  optional uint32 x = 1;
+  optional uint32 y = 2;
+}
+
+/* 2D double point */
+message Point2d {
+  optional double x = 1;
+  optional double y = 2;
+}
+
+/* 2D unsigned integer size. */
+message Size2u {
+  optional uint32 x = 1;
+  optional uint32 y = 2;
+}
+
+/* 2D double size. */
+message Size2d {
+  optional double x = 1;
+  optional double y = 2;
+}
+
+/* 3D unsigned integer size. */
+message Size3u {
+  optional uint32 x = 1;
+  optional uint32 y = 2;
+  optional uint32 z = 3;
+}
