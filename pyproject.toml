@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "afspm"
+version = "0.1.0"
+description = "Automation Framework for SPM"
+authors = ["Nick Sullivan <nsulmol@gmail.com>"]
+license = "MIT"
+readme = "README.org"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+xarray = "^2023.7.0"
+pyzmq = "^25.1.0"
+numpy = "^1.25.1"
+protobuf = "^4.23.4"
+
+[tool.poetry.group.dev.dependencies]
+debugpy = "^1.6.7"
+pytest = "^7.4.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
