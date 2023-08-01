@@ -9,18 +9,16 @@ import "geometry.proto";
 
 /*
   ScanParameters contains the physical coordinates of the scan, as well as
-  the shape of the 3D data array captured.
+  the shape of the 2D data array captured.
 */
 message ScanParameters2d {
-  optional Point2d top_left = 1;
-  optional Size2d size = 2;
-  optional string spatial_units = 3; // Units for y- and x- dimensions
+  optional Rect2d spatial_roi = 1;
 
   // Data parameters
-  optional Size2u data_shape = 4;
-  optional string data_units = 5;
+  optional Size2u data_shape = 2;
+  optional string data_units = 3;
 
-  optional string name = 6; // Name to attribute to this data array
+  optional string name = 4; // Name to attribute to this data array
 }
 
 /* Scan contains the parameters and data array from an individual scan. */

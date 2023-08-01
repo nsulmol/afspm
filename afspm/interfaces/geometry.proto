@@ -34,3 +34,10 @@ message Size3u {
   optional uint32 y = 2;
   optional uint32 z = 3;
 }
+
+/* ROI Rectangle. */
+message Rect2d {
+  optional Point2d top_left = 1;
+  optional Size2d size = 2;
+  optional string units = 3; // Units for y- and x- dimensions
+}
