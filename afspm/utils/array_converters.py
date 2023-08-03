@@ -2,8 +2,8 @@
 
 import xarray as xr
 import numpy as np
-from ..generated.python import scan_pb2
-from ..generated.python import geometry_pb2
+from ..io.protos.generated import scan_pb2
+from ..io.protos.generated import geometry_pb2
 
 try:
     import sidpy

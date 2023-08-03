@@ -3,9 +3,11 @@
 import copy
 import pytest
 from collections import deque
-from afspm.io import cache_logic as cl
-from afspm.generated.python import scan_pb2
-from afspm.generated.python import control_pb2
+
+from afspm.io.cache import cache_logic as cl
+from afspm.io.cache import pbc_logic as pbc
+from afspm.io.protos.generated import scan_pb2
+from afspm.io.protos.generated import control_pb2
 
 
 @pytest.fixture
@@ -29,7 +31,7 @@ def proto_10nm():
 
 @pytest.fixture
 def pbc_logic():
-    return cl.ProtoBasedCacheLogic()  # LVC is default
+    return pbc.ProtoBasedCacheLogic()  # LVC is default
 
 
 @pytest.fixture
@@ -38,12 +40,12 @@ def pbc_long_history_logic():
     # Create list from our global variable (due to conversion, new object).
     proto_history_list = list(cl.DEFAULT_PROTO_WITH_HIST_SEQ)
     proto_history_list[0] = (scan_pb2.Scan2d(), max_len)
-    return cl.ProtoBasedCacheLogic(proto_history_list)
+    return pbc.ProtoBasedCacheLogic(proto_history_list)
 
 
 @pytest.fixture
 def pbc_with_roi_logic():
-    return cl.PBCWithROILogic()  # LVC is default
+    return pbc.PBCWithROILogic()  # LVC is default
 
 
 def test_extract_proto(proto_5nm, pbc_logic, pbc_long_history_logic):

@@ -7,13 +7,14 @@ import threading
 
 from google.protobuf.message import Message
 
-from afspm.io import cache_logic as cl
-from afspm.io import publisher
-from afspm.io import subscriber
-from afspm.io import pubsubcache
+from afspm.io.cache import cache_logic as cl
+from afspm.io.cache import pbc_logic as pbc
+from afspm.io.pubsub import publisher
+from afspm.io.pubsub import subscriber
+from afspm.io.pubsub import pubsubcache
 
-from afspm.generated.python import scan_pb2
-from afspm.generated.python import control_pb2
+from afspm.io.protos.generated import scan_pb2
+from afspm.io.protos.generated import control_pb2
 
 
 # Fixtures!
@@ -35,7 +36,7 @@ def psc_url():
 
 @pytest.fixture
 def cache_kwargs():
-    return {"cache_logic": cl.ProtoBasedCacheLogic()}
+    return {"cache_logic": pbc.ProtoBasedCacheLogic()}
 
 
 @pytest.fixture
@@ -150,7 +151,7 @@ def test_pubsub_simple(pub_url, cache_kwargs, ctx, pub, topics_scan2d,
 
 def pubsubcache_routine(psc_url, pub_url, ctx):
     """Routine to create and run a pubsubcache."""
-    cache_kwargs = {'cache_logic': cl.ProtoBasedCacheLogic()}
+    cache_kwargs = {'cache_logic': pbc.ProtoBasedCacheLogic()}
     psc = pubsubcache.PubSubCache(psc_url, pub_url,
                                   cl.extract_proto,
                                   cl.CacheLogic.create_envelope_from_proto,

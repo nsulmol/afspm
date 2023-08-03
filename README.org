@@ -23,8 +23,7 @@ We will assume you are dealing in Python by default, since this whole project is
 
 #+begin_src bash
   cd /path/to/afspm/afspm/
-  mkdir -p ./generated/python/
-  protoc -I=./interfaces --python_out=./generated/python/ ./interfaces/*.proto
+  protoc -I=./io/protos/src --python_out=./io/protos/generated/ ./io/protos/src/*.proto
   # Fix absolute to relative imports
-  sed -i ./generated/python/*_pb2.py -e 's/^import [^ ]*_pb2/from . \0/'
+  sed -i ./io/protos/generated/*_pb2.py -e 's/^import [^ ]*_pb2/from . \0/'
 #+end_src
