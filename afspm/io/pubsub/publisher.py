@@ -20,10 +20,11 @@ class Publisher:
     def __init__(self, url: str,
                  get_envelope_given_proto: Callable[[Message], str],
                  ctx: zmq.Context = None,
-                 get_envelope_kwargs: dict = {}):
+                 get_envelope_kwargs: dict = None):
         """ Initializes the publisher.
 
         Args:
+            url: our publishing address, in zmq format.
             get_envelope_given_proto: method that maps from proto message to
                 our desired publisher 'envelope' string.
             ctx: zmq Context; if not provided, we will create a new instance.
@@ -31,7 +32,8 @@ class Publisher:
                 get_envelope_given_proto.
         """
         self.get_envelope_given_proto = get_envelope_given_proto
-        self.get_envelope_kwargs = get_envelope_kwargs
+        self.get_envelope_kwargs = (get_envelope_kwargs if get_envelope_kwargs
+                                    else {})
 
         if not ctx:
             ctx = zmq.Context.instance()

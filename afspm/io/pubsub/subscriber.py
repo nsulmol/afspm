@@ -26,6 +26,18 @@ class Subscriber:
     - values that are iterables. So, even if only storing 1 object, make sure
     it is in an iterable format.
 
+    Attributes:
+        sub_extract_proto: method which extracts the proto message from a
+            message received from the sub. It must therefore know the
+            topic-to-proto mapping.
+        extract_proto_kwargs: any additional arguments to be fed to
+            sub_extract_proto.
+        update_cache: method that updates our cache based on
+            the provided 'topic' and proto.
+        update_cache_kwargs: any additional arguments to be fed to
+            update_cache.
+        subscriber: the zmq SUB socket for connecting to the publisher.
+        cache: the cache, where we store results according to update_cache.
     """
 
     def __init__(self, sub_url: str,
@@ -35,8 +47,8 @@ class Subscriber:
                                          dict[str, Iterable]],
                                         dict[str, Iterable]],
                  ctx: zmq.Context = None,
-                 extract_proto_kwargs: dict = {},
-                 update_cache_kwargs: dict = {}):
+                 extract_proto_kwargs: dict = None,
+                 update_cache_kwargs: dict = None):
         """Initializes the caching logic and subscribes.
 
         Args:
@@ -55,9 +67,11 @@ class Subscriber:
                 update_cache.
         """
         self.sub_extract_proto = sub_extract_proto
-        self.extract_proto_kwargs = extract_proto_kwargs
+        self.extract_proto_kwargs = (extract_proto_kwargs if
+                                     extract_proto_kwargs else {})
         self.update_cache = update_cache
-        self.update_cache_kwargs = update_cache_kwargs
+        self.update_cache_kwargs = (update_cache_kwargs if
+                                    update_cache_kwargs else {})
 
         if not ctx:
             ctx = zmq.Context.instance()
@@ -72,8 +86,8 @@ class Subscriber:
         # Initialize our cache
         self.cache = {}
 
-    def recv(self, timeout_ms: int = 1000) -> bool:
-        """Receive message and handle in cache.
+    def poll_and_store(self, timeout_ms: int = 1000) -> bool:
+        """Receive message and store in cache.
 
         We use a poll() first, to ensure there is a message to receive.
         To do a blocking receive, simply set timeout_ms to None.
@@ -83,7 +97,7 @@ class Subscriber:
 
         Args:
             timeout_ms: the poll timeout, in milliseconds. If None,
-                we do not poll and do a blocking receive.
+                we do not poll and do a blocking receive instead.
 
         Returns:
             whether a message was received and processed in the cache.

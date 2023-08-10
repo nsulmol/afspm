@@ -47,6 +47,24 @@ class PubSubCache:
 
     Note: this implementation was inspired by the lvcache example in the zeromq
     guide (Chapter 5).
+
+    Attributes:
+        sub_extract_proto: method which extracts the proto message from a
+            message received from the sub. It must therefore know the
+            envelope-to-proto mapping.
+        extract_proto_kwargs: any additional arguments to be fed to
+            sub_extract_proto.
+        pub_get_envelope_given_proto: method that maps from proto message to
+            our desired publisher 'envelope' string.
+        get_envelope_kwargs: any additional arguments to be fed to
+            pub_get_envelope_given_proto.
+        update_cache: method that updates our cache.
+        update_cache_kwargs: any additional arguments to be fed to
+            update_cache.
+        frontend: SUB socket connected to the publisher.
+        backend: XPUB socket, the publisher end
+        cache: the cache, where we store data according to update_cache.
+        poller: zmq Poller, to poll frontend and backend.
     """
 
     def __init__(self, url: str, sub_url: str,
@@ -56,9 +74,9 @@ class PubSubCache:
                                          dict[str, Iterable], ...],
                                         dict[str, Iterable]],
                  ctx: zmq.Context = None,
-                 extract_proto_kwargs: dict = {},
-                 get_envelope_kwargs: dict = {},
-                 update_cache_kwargs: dict = {}):
+                 extract_proto_kwargs: dict = None,
+                 get_envelope_kwargs: dict = None,
+                 update_cache_kwargs: dict = None):
         """Initializes the caching logic and connects our nodes.
 
         Args:
@@ -81,11 +99,14 @@ class PubSubCache:
 
         """
         self.sub_extract_proto = sub_extract_proto
-        self.extract_proto_kwargs = extract_proto_kwargs
+        self.extract_proto_kwargs = (extract_proto_kwargs if
+                                     extract_proto_kwargs else {})
         self.pub_get_envelope_given_proto = pub_get_envelope_given_proto
-        self.get_envelope_kwargs = get_envelope_kwargs
+        self.get_envelope_kwargs = (get_envelope_kwargs if
+                                    get_envelope_kwargs else {})
         self.update_cache = update_cache
-        self.update_cache_kwargs = update_cache_kwargs
+        self.update_cache_kwargs = (update_cache_kwargs if
+                                    update_cache_kwargs else {})
 
         if not ctx:
             ctx = zmq.Context.instance()
