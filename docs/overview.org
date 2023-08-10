@@ -1,0 +1,193 @@
+#+title: afspm Overview
+#+startup: beamer
+#+latex_class: beamer
+#+latex_class_options: [presentation]
+#+options: h:1 toc:nil
+#+beamer_theme: boxes
+#+beamer_color_theme: rose
+#+beamer_font_theme: structurebold
+#+beamer_header:\documentclass[xcolor=SeaGreen]{beamer}
+#+beamer_header:\hypersetup{ colorlinks, allcolors=., urlcolor=blue }
+#+beamer_header:\definecolor{carmine}{rgb}{0.59, 0.0, 0.09}
+#+beamer_header:\setbeamercolor{alerted text}{fg=carmine}
+#+property: header-args :mkdirp yes :results value drawer
+
+#+name: attr_fit_width
+#+begin_src bash :var data="" :var org_percent=50 :var latex_percent=80 :results output :exports none
+  echo "#+attr_org: :width $org_percent%"
+  echo "#+attr_latex: :width $(bc <<< "scale=2; $latex_percent/100")\linewidth"
+  echo "$data"
+#+end_src
+
+
+* Introduction
+afspm is a Framework for the Automation of Scanning Probe Microscopy, developed using ZeroMQ as the communications/concurrency framework and protobuffers as the serialization layer.
+
+** What is ZeroMQ?
+A cross-platform, cross-language communication library that *abstracts away* protocols used, allowing easy switching of how 'nodes' communicate in a system.
+** What are protobuffers?
+A cross-platform, cross-language mechanism for serializing structured data. Serialization is the process of translating a data structure into a format that can be stored/communicated.
+* Introduction (ii)
+
+#+header: :post attr_fit_width(data=*this*, org_percent=50, latex_percent=75)
+#+begin_src plantuml :file images/network_framework.png
+  skinparam componentStyle rectangle
+
+  component "Component A" as comp_a {
+    component REQ as node_a
+    component proto_a [
+    message info
+    {
+        int num
+        str name
+    }
+    ]
+
+    component "list[bytes]" as bytes_a
+    proto_a .u.> bytes_a: serialize
+    bytes_a .u.> node_a
+  }
+
+  component "Component B" as comp_b {
+    component REP as node_b
+    component proto_b [
+    message info
+    {
+        int num
+        str name
+    }
+    ]
+
+    component "list[bytes]" as bytes_b
+    node_b .d.> bytes_b
+    bytes_b .d.> proto_b: deserialize
+  }
+
+  node_a --r-- node_b: "//zmq communication protocol//"
+  #+end_src
+
+  #+RESULTS:
+  :results:
+  #+attr_org: :width 50%
+  #+attr_latex: :width .50\linewidth
+  [[file:images/network_framework.png]]
+  :end:
+
+* Introduction (iii)
+With afspm, the user designs 'computation' components that correspond to nodes in a network. Each component subscribes to data from the afspm device, and can optionally send requests to it to perform actions.
+
+All the nodes for an experiment can be spawned:
+- on a single device, in a single process (inproc);
+- on a single device, decoupled into different processes (ipc);
+- over multiple devices, communicating over a network connection (tcp);
+- in any combination of the above.
+* A Basic Experiment
+
+#+header: :post attr_fit_width(data=*this*, org_percent=50, latex_percent=90)
+#+begin_src plantuml :file images/basic_experiment.png
+  skinparam componentStyle rectangle
+
+  component Device as dev
+  component "Device Controller" as devcon {
+    component PUB as dc_pub
+    component REP as dc_rep
+  }
+  dev <-r-> devcon
+
+  note as note_devcon
+    Abstract class:
+    - Base class handles generic communication/polling.
+    - Each implementation handles SPM controller specifics.
+  end note
+  devcon -[hidden]r- note_devcon
+
+  component Experiment as exp {
+    component SUB as exp_sub
+    component REQ as exp_req
+  }
+
+  note as note_exp
+    Script defining what to scan in what order.
+    - A given experiment can be run with any SPM controller.
+    - Minimally requires:
+        - REQ to send scan requests/parameters.
+        - SUB to know when a scan has ended.
+  end note
+  exp .[hidden]r. note_exp
+
+  dc_pub ---> exp_sub: data, \nstatus
+  exp_req ---> dc_rep: control\nrequests
+  #+end_src
+* A Basic Experiment (ii)
+Limitations:
+- How do we tell the automation to stop/pause?
+- What happens if a node crashes mid-experiment? How do we continue?
+* afspm Control
+
+#+header: :post attr_fit_width(data=*this*, org_percent=50, latex_percent=90)
+#+begin_src plantuml :file images/afspm_control.png
+  skinparam componentStyle rectangle
+
+  component Device as dev
+  component "Device Controller" as devcon {
+    component PUB as dc_pub
+    component REP as dc_rep
+  }
+  dev <-r-> devcon
+
+  component "afspm Controller" as afspm_con {
+    component SUB as afspm_sub
+    component XPUB as afspm_pub
+    component Cache as afspm_cache
+    afspm_sub .d. afspm_cache
+    afspm_cache .d. afspm_pub
+
+    component REQ as afspm_req
+    component ROUTER as afspm_rou
+    component Control as afspm_ctrl
+    afspm_req .d. afspm_ctrl
+    afspm_ctrl .d. afspm_rou
+  }
+
+  dc_pub -d-> afspm_sub: data, \nstatus
+  dc_rep <-d- afspm_req: control\nrequests
+
+  component Experiment as experiment {
+    component SUB as exp_sub
+    component REQ as exp_req
+  }
+
+  afspm_pub --> exp_sub: scan_state
+  afspm_rou <-- exp_req: scan_params\nstart_scan\nstop_scan
+
+  note as note_cache
+    Cache stores data/state passed to subscribers.
+    When a new subsciption occurs, we send from the cache.
+    If a node crashes, on reconnection it gets this prior history.
+  end note
+  note_cache -[hidden]l- afspm_con
+
+  note as note_control
+    Control handles routing data from 1 or more REQs to the Device Controller.
+    It also allows turning OFF/pausing (for manual control).
+    It also can receive "Problems" (e.g. bad tip state).
+    Upon a problem, automated control pauses until a node states it is fixed.
+  end note
+  note_control -[hidden]u- note_cache
+
+  component "Tip State Detector" as tip_classifier {
+    component SUB as tip_sub
+    component REQ as tip_req
+  }
+  afspm_pub --> tip_sub: scans
+  afspm_rou <-r- tip_req: tip_state
+
+  'tip_classifier -[hidden]r- experiment
+  #+end_src
+
+  #+RESULTS:
+  :results:
+  #+attr_org: :width 50%
+  #+attr_latex: :width .90\linewidth
+  [[file:images/afspm_control.png]]
+  :end:
