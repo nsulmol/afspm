@@ -26,17 +26,17 @@ class Heartbeater:
 
     Attributes:
         publisher: zmq PUB socket, used to send our heartbeats.
-        beat_period_ms: how frequently we should send a heartbeat.
-        last_beat_ms: a time snapshot since the last time we sent a
+        beat_period_s: how frequently we should send a heartbeat.
+        last_beat_ts: a timestamp of the last time we sent a
             heartbeat.
     """
-    def __init__(self, url: str, beat_period_ms: int,
+    def __init__(self, url: str, beat_period_s: int,
                  ctx: zmq.Context = None):
         """Init heartbeater.
 
         Args:
             url: address we will bind to, to send hearbeats.
-            beat_period_ms: how frequently we should send a hearbeat.
+            beat_period_s: how frequently we should send a hearbeat.
             ctx: zmq context.
         """
         if not ctx:
@@ -44,17 +44,17 @@ class Heartbeater:
 
         self.publisher = ctx.socket(zmq.PUB)
         self.publisher.bind(url)
-        self.beat_period_ms = beat_period_ms
+        self.beat_period_s = beat_period_s
 
-        self.last_beat_ms = time.time() * 1000
+        self.last_beat_ts = time.time()
 
     def handle_beat(self):
         """Send a beat if sufficient time has elapsed."""
-        curr_time_ms = time.time() * 1000
+        curr_ts = time.time()
 
-        if curr_time_ms - self.last_beat_ms >= self.beat_period_ms:
+        if curr_ts - self.last_beat_ts >= self.beat_period_s:
             self.publisher.send(HBMessage.HEARTBEAT.value.to_bytes(1, 'big'))
-            self.last_beat_ms = curr_time_ms
+            self.last_beat_ts = curr_ts
 
     def handle_closing(self):
         """Inform any listeners that we are closing.
@@ -76,16 +76,21 @@ class HeartbeatListener:
     appears to have died but *did not* tell us it planned to.
 
     Attributes:
-
+        subscriber: zmq SUB socket, used to listen for heartbeats.
+        time_before_dead_s: how long we will allow before we consider the
+            Heartbeater dead.
+        last_beat_ts: the timestamp of the last beat.
+        received_kill_signal: whether we received a KILL signal from the
+            Heartbeater (implying they died on purpose).
     """
-    def __init__(self, url: str, beat_period_ms: int,
+    def __init__(self, url: str, beat_period_s: int,
                  missed_beats_before_dead: int,
                  ctx: zmq.Context = None):
         """Init listener.
 
         Args:
             url: address we will listen for heartbeats on.
-            beat_period_ms: how frequently we expect to receive a heartbeat.
+            beat_period_s: how frequently we expect to receive a heartbeat.
             missed_beats_before_dead: how many missed beats we will allow
                 before we consider the Heartbeater dead.
             ctx: zmq.Context.
@@ -97,8 +102,8 @@ class HeartbeatListener:
         self.subscriber.connect(url)
         self.subscriber.setsockopt(zmq.SUBSCRIBE, b"")  # Subscribe to all
 
-        self.time_before_dead_ms = missed_beats_before_dead * beat_period_ms
-        self.last_beat_ms = time.time() * 1000
+        self.time_before_dead_s = missed_beats_before_dead * beat_period_s
+        self.last_beat_ts = time.time()
         self.received_kill_signal = False
 
     def check_if_dead(self, timeout_ms: int = 1000) -> bool:
@@ -113,18 +118,18 @@ class HeartbeatListener:
         Returns:
             whether or not the Hearbeater is dead.
         """
-        curr_time_ms = time.time() * 1000
+        curr_ts = time.time()
         if self.subscriber.poll(timeout_ms, zmq.POLLIN):
             msg = self.subscriber.recv(zmq.NOBLOCK)
             msg_enum = HBMessage(int.from_bytes(msg, 'big'))
             if msg_enum == HBMessage.HEARTBEAT:
-                self.last_beat_ms = curr_time_ms
+                self.last_beat_ts = curr_ts
             elif msg_enum == HBMessage.KILL:
                 self.received_kill_signal = True
             else:
                 logger.warning("Received non-HBMessage message. Ignoring.")
 
-        if curr_time_ms - self.last_beat_ms >= self.time_before_dead_ms:
+        if curr_ts - self.last_beat_ts >= self.time_before_dead_s:
             return True
         return False
 
