@@ -57,8 +57,7 @@ class Heartbeater:
             self.last_beat_ts = curr_ts
 
     def handle_closing(self):
-        """Inform any listeners that we are closing.
-        """
+        """Inform any listeners that we are closing."""
         self.publisher.send(HBMessage.KILL.value.to_bytes(1, 'big'))
 
 
@@ -106,7 +105,7 @@ class HeartbeatListener:
         self.last_beat_ts = time.time()
         self.received_kill_signal = False
 
-    def check_if_dead(self, timeout_ms: int = 1000) -> bool:
+    def check_if_dead(self, timeout_ms: int = 10) -> bool:
         """Checks if the Hearbeater is dead.
 
         If self.time_before_dead_ms has already been met, we do not even poll.
@@ -133,10 +132,8 @@ class HeartbeatListener:
             return True
         return False
 
-    def reset_received_kill_signal(self):
-        """Reset our internal received_kill_signal bool.
-
-        Useful if we are reusing HeartbeatListener, and restarting a
-        Heartbeater (e.g. if we detect a crash and restart the component).
-        """
+    def reset(self):
+        """Reset internal logic following a restart of Heartbeater."""
+        self.last_beat_ts = time.time()
+        self.curr_ts = self.last_beat_ts
         self.received_kill_signal = False
