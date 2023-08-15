@@ -6,7 +6,7 @@ from abc import ABCMeta, abstractmethod
 from typing import Callable
 import multiprocessing as mp
 import zmq
-from afspm.io.heartbeat.heartbeat import Heartbeater, HeartbeatListener
+from ..io.heartbeat.heartbeat import Heartbeater, HeartbeatListener
 
 
 logger = logging.getLogger(__name__)
@@ -49,9 +49,8 @@ class AfspmComponent(metaclass=ABCMeta):
             ctx = zmq.Context.instance()
 
         self.name = name
-        self.hb_url = get_heartbeat_url(self.name)
-        self.hb_period_s = hb_period_s
-        self.heartbeater = Heartbeater(self.hb_url, self.hb_period_s, ctx)
+        hb_url = get_heartbeat_url(self.name)
+        self.heartbeater = Heartbeater(hb_url, hb_period_s, ctx)
         self.loop_sleep_s = loop_sleep_s
 
     def run(self):
