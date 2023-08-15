@@ -29,7 +29,7 @@ class TestConverters:
 
         assert (da == da2).all()
 
-    @pytest.mark.skipif(not sidpy, reason="sidpy not installed")
+    #@pytest.mark.skipif(not sidpy, reason="sidpy not installed")
     def test_convert_sidpy(self):
         dset = sidpy.Dataset.from_array(self.data)
         dset.data_type = 'image'
@@ -45,4 +45,4 @@ class TestConverters:
         scan = conv.convert_sidpy_to_scan_pb2(dset)
         dset2 = conv.convert_scan_pb2_to_sidpy(scan)
 
-        assert (dset == dset2).all()
+        assert dset == dset2

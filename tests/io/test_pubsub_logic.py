@@ -72,7 +72,7 @@ def test_pub(ctx, pub):
     messages or error.
     """
     scan = scan_pb2.Scan2d()
-    scan.parameters.name = 'john doe'
+    scan.params.name = 'john doe'
     pub.send_msg(scan)
 
 
@@ -113,7 +113,7 @@ def test_pubsub_simple(pub_url, cache_kwargs, ctx, pub, topics_scan2d,
     time.sleep(wait_ms / 1000)  # ms to s
 
     scan = scan_pb2.Scan2d()
-    scan.parameters.name = 'john doe'
+    scan.params.name = 'john doe'
     pub.send_msg(scan)
 
     assert not sub_control_state.poll_and_store(wait_ms)
@@ -200,7 +200,7 @@ def test_pubsubcache(pub_url, psc_url, cache_kwargs, ctx, pub, topics_scan2d,
     time.sleep(wait_ms / 1000)  # ms to s
 
     scan = scan_pb2.Scan2d()
-    scan.parameters.name = 'john doe'
+    scan.params.name = 'john doe'
     pub.send_msg(scan)
 
     assert not sub_control_state.poll_and_store(wait_ms)

@@ -17,15 +17,15 @@ def cache():
 @pytest.fixture
 def proto_5nm():
     proto = scan_pb2.Scan2d()
-    proto.parameters.name = 'banana'
-    proto.parameters.spatial_roi.size.x = 5
+    proto.params.name = 'banana'
+    proto.params.spatial_roi.size.x = 5
     return proto
 
 @pytest.fixture
 def proto_10nm():
     proto = scan_pb2.Scan2d()
-    proto.parameters.name = 'hammock'
-    proto.parameters.spatial_roi.size.x = 10
+    proto.params.name = 'hammock'
+    proto.params.spatial_roi.size.x = 10
     return proto
 
 
@@ -77,15 +77,15 @@ def test_update_cache_longer_history(cache, proto_5nm, pbc_long_history_logic):
 
     # Test up to/before popping
     names = ['a', 'b', 'c', 'd']
-    expected_cache_names = deque([proto_5nm.parameters.name],
+    expected_cache_names = deque([proto_5nm.params.name],
                                  maxlen=max_len)
     for name in names:
         proto = copy.deepcopy(proto_5nm)
-        proto.parameters.name = name
+        proto.params.name = name
         expected_cache_names.append(name)
         cache = logic.update_cache(envelope, proto, cache)
 
-        cache_names = [x.parameters.name for x in cache[envelope]]
+        cache_names = [x.params.name for x in cache[envelope]]
         for cn in expected_cache_names:
             assert cn in cache_names
 
@@ -94,11 +94,11 @@ def test_update_cache_longer_history(cache, proto_5nm, pbc_long_history_logic):
     expected_cache_names = []
     for name in names:
         proto = copy.deepcopy(proto_5nm)
-        proto.parameters.name = name
+        proto.params.name = name
         expected_cache_names.append(name)
         cache = logic.update_cache(envelope, proto, cache)
 
-        cache_names = [x.parameters.name for x in cache[envelope]]
+        cache_names = [x.params.name for x in cache[envelope]]
         for cn in expected_cache_names:
             assert cn in cache_names
 
