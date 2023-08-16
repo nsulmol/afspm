@@ -42,8 +42,10 @@ class ControlRouter:
             ControlClient can only gain control if they request under
             the current control_mode (and no other client is currently
             under control).
-        client_under_control: a uuid for the client currently under control.
+        client_in_control_id: a uuid for the client currently under control.
         server_timeout_ms: delay to wait for a reply from the ControlServer.
+        shutdown_was_requested: boolean indicating whether a request to end the
+            experiment has been sent.
     """
 
     def __init__(self, server_url: str, router_url: str,
@@ -73,10 +75,11 @@ class ControlRouter:
         self.problems_set = set()
 
         self.control_mode = ctrl.ControlMode.CM_AUTOMATED
-        self.client_under_control = None
+        self.client_in_control_id = None
         self.server_timeout_ms = server_timeout_ms
+        self.shutdown_was_requested = False
 
-    def _handle_control_request(self, client: int,
+    def _handle_control_request(self, client: str,
                                 control_mode: ctrl.ControlMode,
                                 ) -> ctrl.ControlResponse:
         """Set client in control if possible.
@@ -97,14 +100,14 @@ class ControlRouter:
                 control_mode of request and the one the ControlClient is
                 currently under.
         """
-        if self.client_under_control:
+        if self.client_in_control_id:
             return ctrl.ControlResponse.REP_ALREADY_UNDER_CONTROL
         if self.control_mode == control_mode:
-            self.client_under_control = client
+            self.client_in_control_id = client
             return ctrl.ControlResponse.REP_SUCCESS
         return ctrl.ControlResponse.REP_WRONG_CONTROL_MODE
 
-    def _handle_control_release(self, client: int) -> ctrl.ControlResponse:
+    def _handle_control_release(self, client: str) -> ctrl.ControlResponse:
         """Release client control if applicable.
 
         Control can only be released by the client who currently has control.
@@ -117,8 +120,8 @@ class ControlRouter:
             - REP_FAILUREif the client releasing was not under
                 control to begin with (or no one was under control).
         """
-        if self.client_under_control and self.client_under_control == client:
-            self.client_under_control = None
+        if self.client_in_control_id and self.client_in_control_id == client:
+            self.client_in_control_id = None
             return ctrl.ControlResponse.REP_SUCCESS
         return ctrl.ControlResponse.REP_FAILURE
 
@@ -142,10 +145,10 @@ class ControlRouter:
 
         if not old_problems_set and self.problems_set:
             self.control_mode = ctrl.ControlMode.CM_PROBLEM
-            self.client_under_control = None
+            self.client_in_control_id = None
         elif old_problems_set and not self.problems_set:
             self.control_mode = ctrl.ControlMode.CM_AUTOMATED
-            self.client_under_control = None
+            self.client_in_control_id = None
 
         # Return success always for now...
         return ctrl.ControlResponse.REP_SUCCESS
@@ -174,7 +177,31 @@ class ControlRouter:
             return cmd.parse_response(self.backend.recv())
         return ctrl.ControlResponse.REP_NO_RESPONSE
 
-    def _on_request(self, client: int, req: ctrl.ControlRequest,
+    def _handle_set_control_mode(self, control_mode: ctrl.ControlMode
+                                 ) -> ctrl.ControlResponse:
+        """Change the control mode.
+
+        Args:
+            control_mode: ControlMode to change to.
+
+        Returns:
+            ControlResponse indicating success/failure.
+        """
+        self.control_mode = control_mode
+        self.client_in_control_id = None
+        return ctrl.ControlResponse.REP_SUCCESS
+
+    def _handle_end_experiment(self) -> ctrl.ControlResponse:
+        """Ends the experiment.
+
+        This call will update internal logic indicating a shutdown was
+        requested. It may be used externally to shutdown/pass the request
+        on, etc.
+        """
+        self.shutdown_was_requested = True
+        return ctrl.ControlResponse.REP_SUCCESS
+
+    def _on_request(self, client: str, req: ctrl.ControlRequest,
                     obj: Message | int) -> ctrl.ControlResponse:
         """Handle a request received by a ControlClient.
 
@@ -195,8 +222,12 @@ class ControlRouter:
                    ctrl.ControlRequest.REQ_RMV_EXP_PRBLM]:
             return self._handle_experiment_problem(
                 req == ctrl.ControlRequest.REQ_ADD_EXP_PRBLM, obj)
-        if (self.client_under_control
-                and client == self.client_under_control):
+        if req == ctrl.ControlRequest.REQ_SET_CONTROL_MODE:
+            return self._handle_set_control_mode(obj)
+        if req == ctrl.ControlRequest.REQ_END_EXPERIMENT:
+            return self._handle_end_experiment()
+        if (self.client_in_control_id
+                and client == self.client_in_control_id):
             return self._handle_send_req(req, obj)
         return ctrl.ControlResponse.REP_NOT_IN_CONTROL
 
@@ -222,23 +253,18 @@ class ControlRouter:
             self.frontend.send_multipart([client, b"",
                                           cmd.serialize_response(rep)])
 
-    def set_control_mode(self, control_mode: ctrl.ControlMode):
-        """Change the control mode.
+    # TODO: Test me
+    def get_control_state(self):
+        """Creates and returns a ControState instance from current state."""
+        state = ctrl.ControlState()
+        state.control_mode = self.control_mode
+        state.client_in_control_id = self.client_in_control_id
+        state.problems_set.extend(self.problems_set)
+        return state
 
-        Args:
-            control_mode: ControlMode to change to.
-        """
-        self.control_mode = control_mode
-        self.client_under_control = None
-
-    def remove_problem(self, exp_problem: ctrl.ExperimentProblem):
-        """Remove an ExperimentProblem.
-
-        Args:
-            exp_problem ExperimentProblem to remove.
-        """
-        if exp_problem in self.problems_set:
-            self.problems_set.remove(exp_problem)
+    def was_shutdown_requested(self):
+        """Returns if a shutdown was requested."""
+        return self.shutdown_was_requested
 
     @staticmethod
     def _parse_client_id(msg: list[bytes]) -> str:
@@ -257,4 +283,4 @@ class ControlRouter:
         try:
             return msg.decode()  # zmq.IDENTITY used
         except UnicodeDecodeError:
-            return int.from_bytes(msg, 'big')
+            return str(int.from_bytes(msg, 'big'))

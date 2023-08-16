@@ -206,3 +206,38 @@ class ControlClient:
         msg = cmd.serialize_req_obj(ctrl.ControlRequest.REQ_RMV_EXP_PRBLM,
                                     problem)
         return self._try_send_req(msg)
+
+
+class AdminControlClient(ControlClient):
+    """Encapsulates logic for extra Administrator AFSPM requests.
+
+    More specifically, this client is used to add a couple extra controls:
+    - Setting the control mode.
+    - Ending the experiment.
+
+    The former should only really be done by the UI; the latter by the UI
+    and/or the higher-level experiment class. We still allow this via the
+    same control protocol for ease/development convenience. Put another way:
+    we are allowing the user of this tool to break this tool; be caferul!
+    """
+    def set_control_mode(self, mode: ctrl.ControlMode) -> ctrl.ControlResponse:
+        """Try to change the current control mode of the afspm system.
+
+        Args:
+            mode: desired ControlMode.
+
+        Returns:
+            Response received from the server.
+        """
+        msg = cmd.serialize_req_obj(ctrl.ControlRequests.REQ_SET_CONTROL_MODE,
+                                    mode)
+        return self._try_send_req(msg)
+
+    def end_experiment(self) -> ctrl.ControlResponse:
+       """Indicate the experiment should end.
+
+       The AFSPM Controller should receive this request and notify all
+       connected components to close.
+       """
+       msg = cmd.serialize_req_obj(ctrl.ControlRequests.REQ_END_EXPERIMENT)
+       return self._try_send_req(msg)

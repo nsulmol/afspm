@@ -16,6 +16,9 @@ enum ControlRequest {
     REQ_RELEASE_CTRL = 5;
     REQ_ADD_EXP_PRBLM = 6;
     REQ_RMV_EXP_PRBLM = 7;
+    // Admin requests
+    REQ_SET_CONTROL_MODE = 8;
+    REQ_END_EXPERIMENT = 9;
 }
 
 /* Responses expected from control requests. */
@@ -52,6 +55,6 @@ enum ExperimentProblem {
 /* Contains the current overall SPM status. */
 message ControlState {
     optional ControlMode control_mode = 1;
-    optional bool under_control = 2;
-    repeated ExperimentProblem problems_list = 3;
+    optional string client_in_control_id = 2;
+    repeated ExperimentProblem problems_set = 3;
 }

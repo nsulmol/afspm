@@ -16,7 +16,9 @@ REQ_TO_OBJ_MAP = MappingProxyType({
     ctrl.ControlRequest.REQ_REQUEST_CTRL: ctrl.ControlMode.CM_UNDEFINED,
     ctrl.ControlRequest.REQ_RELEASE_CTRL: None,
     ctrl.ControlRequest.REQ_ADD_EXP_PRBLM: ctrl.ExperimentProblem.EP_NONE,
-    ctrl.ControlRequest.REQ_RMV_EXP_PRBLM: ctrl.ExperimentProblem.EP_NONE
+    ctrl.ControlRequest.REQ_RMV_EXP_PRBLM: ctrl.ExperimentProblem.EP_NONE,
+    ctrl.ControlRequest.REQ_SET_CONTROL_MODE: ctrl.ControlMode.CM_UNDEFINED,
+    ctrl.ControlRequest.REQ_END_EXPERIMENT: None
 })
 
 
