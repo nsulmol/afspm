@@ -8,7 +8,6 @@ from google.protobuf.message import Message
 
 logger = logging.getLogger(__name__)
 
-
 class Subscriber:
     """Encapsulates subscriber node logic.
 
@@ -26,6 +25,10 @@ class Subscriber:
     - values that are iterables. So, even if only storing 1 object, make sure
     it is in an iterable format.
 
+    Lastly: we have a hardcoded KILL_SIGNAL which we check for. If this signal
+    is received, we set a member variable to hold this state, and a getter
+    method will return True.
+
     Attributes:
         sub_extract_proto: method which extracts the proto message from a
             message received from the sub. It must therefore know the
@@ -38,7 +41,12 @@ class Subscriber:
             update_cache.
         subscriber: the zmq SUB socket for connecting to the publisher.
         cache: the cache, where we store results according to update_cache.
+        shutdown_was_requested: bool, indicating whether or not a kill signal
+            has been received.
     """
+
+    # Kill signal, provided as an envelope.
+    KILL_SIGNAL = "KILL"
 
     def __init__(self, sub_url: str,
                  sub_extract_proto: Callable[[list[bytes]], Message],
@@ -83,8 +91,8 @@ class Subscriber:
         for topic in topics_to_sub:
             self.subscriber.setsockopt(zmq.SUBSCRIBE, topic.encode())
 
-        # Initialize our cache
         self.cache = {}
+        self.shutdown_was_requested = False
 
     def poll_and_store(self, timeout_ms: int = 1000) -> bool:
         """Receive message and store in cache.
@@ -122,6 +130,14 @@ class Subscriber:
                 frontend.
         """
         envelope = msg[0].decode()
-        proto = self.sub_extract_proto(msg, **self.extract_proto_kwargs)
-        self.cache = self.update_cache(envelope, proto, self.cache,
-                                       **self.update_cache_kwargs)
+
+        if envelope == self.KILL_SIGNAL:
+            self.shutdown_was_requested = True
+        else:
+            proto = self.sub_extract_proto(msg, **self.extract_proto_kwargs)
+            self.cache = self.update_cache(envelope, proto, self.cache,
+                                           **self.update_cache_kwargs)
+
+    def was_shutdown_requested(self):
+        """Returns if a shutdown was requested."""
+        return self.shutdown_was_requested

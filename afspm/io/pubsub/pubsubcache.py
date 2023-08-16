@@ -152,7 +152,7 @@ class PubSubCache:
         if self.backend in events:
             event = self.backend.recv()
             # Event is one byte 0=unsub or 1=sub, followed by envelope
-            if event[0] == 1:  # b'\x01':
+            if event[0] == 1:
                 envelope = event[1:].decode()
                 self.on_new_subscription(envelope)
 
@@ -186,3 +186,14 @@ class PubSubCache:
             for proto in self.cache[envelope]:
                 self.backend.send_multipart([envelope.encode(),
                                              proto.SerializeToString()])
+
+    def send_message(self, msg: list[list[bytes]]):
+        """Send a message, already converted to list-of-list of bytes.
+
+        This is used to insert a message not from the publisher. It assumes the
+        message has already been converted to the final bytes-list format
+        needed to send it out.
+        Args:
+            proto: protobuf Message.
+        """
+        self.backend.send_multipart(msg)
