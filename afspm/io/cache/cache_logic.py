@@ -21,9 +21,6 @@ class CacheLogic(metaclass=ABCMeta):
     This class defines the 3 expected methods for a CacheLogic class, which
     can be used by the equivalently named non-class methods.
     """
-    def __init__(self):
-        pass
-
     @abstractmethod
     def extract_proto(self, msg: list[bytes]) -> Message:
         """Extract protobuf structure from provided message.
@@ -35,7 +32,6 @@ class CacheLogic(metaclass=ABCMeta):
         Returns:
             A protobuf structure extracted from the message.
         """
-        pass
 
     @abstractmethod
     def update_cache(self, envelope: str, proto: Message,
@@ -46,12 +42,13 @@ class CacheLogic(metaclass=ABCMeta):
             envelope: envelope used to pass this proto.
             proto: protobuf structure linked to the envelope.
             cache: mapping for storing the messages received. of the form:
-                envelope: list[proto] (for key:val).
+                envelope: list[proto] (for key:val). Note that the suggested
+                'list' type here is a dequeue, as it allows a size definition
+                (and will pop elements from the back if you exceed the size).
 
         Returns:
             updated mapping.
         """
-        pass
 
     @staticmethod
     def create_envelope_from_proto(proto: Message) -> str:
