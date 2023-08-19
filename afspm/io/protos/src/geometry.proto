@@ -39,5 +39,4 @@ message Size3u {
 message Rect2d {
   optional Point2d top_left = 1;
   optional Size2d size = 2;
-  optional string units = 3; // Units for y- and x- dimensions
 }

@@ -18,14 +18,14 @@ def cache():
 def proto_5nm():
     proto = scan_pb2.Scan2d()
     proto.params.name = 'banana'
-    proto.params.spatial_roi.size.x = 5
+    proto.params.spatial.roi.size.x = 5
     return proto
 
 @pytest.fixture
 def proto_10nm():
     proto = scan_pb2.Scan2d()
     proto.params.name = 'hammock'
-    proto.params.spatial_roi.size.x = 10
+    proto.params.spatial.roi.size.x = 10
     return proto
 
 

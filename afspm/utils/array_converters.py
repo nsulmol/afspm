@@ -28,20 +28,20 @@ def convert_scan_pb2_to_xarray(scan: scan_pb2.Scan2d) -> xr.DataArray:
     Raises:
         None.
     """
-    roi = scan.params.spatial_roi
+    roi = scan.params.spatial.roi
     x = np.linspace(roi.top_left.x, roi.top_left.x + roi.size.x,
-                    scan.data.shape.x)
+                    scan.params.data.shape.x)
     y = np.linspace(roi.top_left.y, roi.top_left.y + roi.size.y,
-                    scan.data.shape.y)
-    data = np.array(scan.data.values, dtype=np.float64)
-    data = data.reshape((scan.data.shape.x,
-                         scan.data.shape.y))
+                    scan.params.data.shape.y)
+    data = np.array(scan.values, dtype=np.float64)
+    data = data.reshape((scan.params.data.shape.x,
+                         scan.params.data.shape.y))
 
     da = xr.DataArray(data=data, dims=['y', 'x'],
                       coords={'y': y, 'x': x},
-                      attrs={'units': scan.data.units})
-    da.x.attrs['units'] = roi.units
-    da.y.attrs['units'] = roi.units
+                      attrs={'units': scan.params.data.units})
+    da.x.attrs['units'] = scan.params.spatial.units
+    da.y.attrs['units'] = scan.params.spatial.units
     return da
 
 
@@ -69,14 +69,15 @@ def convert_xarray_to_scan_pb2(da: xr.DataArray) -> scan_pb2.Scan2d:
         size[key] = da[dim].max().item() - da[dim].min().item()
     top_left = geometry_pb2.Point2d(**tl)
     size = geometry_pb2.Size2d(**size)
-    roi = geometry_pb2.Rect2d(top_left=top_left, size=size,
-                              units=da[da.dims[0]].units)
-    data = scan_pb2.ScanData(shape=da_shape, units=da.units,
-                             values=da.values.ravel().tolist())
-    scan_params = scan_pb2.ScanParameters2d(spatial_roi=roi,
+    roi = geometry_pb2.Rect2d(top_left=top_left, size=size)
+    spatial_aspects = scan_pb2.SpatialAspects(roi=roi,
+                                              units=da[da.dims[0]].units)
+    data_aspects = scan_pb2.DataAspects(shape=da_shape, units=da.units)
+    scan_params = scan_pb2.ScanParameters2d(spatial=spatial_aspects,
+                                            data=data_aspects,
                                             name=da.name)
     scan = scan_pb2.Scan2d(params=scan_params,
-                           data=data)
+                           values=da.values.ravel().tolist())
     return scan
 
 
@@ -95,19 +96,18 @@ def convert_scan_pb2_to_sidpy(scan: scan_pb2.Scan2d) -> Dataset:
     if not sidpy:
         raise ModuleNotFoundError("sidpy is required for this method.")
 
-    roi = scan.params.spatial_roi
+    roi = scan.params.spatial.roi
     x = np.linspace(roi.top_left.x, roi.top_left.x + roi.size.x,
-                    scan.data.shape.x)
+                    scan.params.data.shape.x)
     y = np.linspace(roi.top_left.y, roi.top_left.y + roi.size.y,
-                    scan.data.shape.y)
-
-    data = np.array(scan.data.values, dtype=np.float64)
-    data = data.reshape((scan.data.shape.x,
-                         scan.data.shape.y))
+                    scan.params.data.shape.y)
+    data = np.array(scan.values, dtype=np.float64)
+    data = data.reshape((scan.params.data.shape.x,
+                         scan.params.data.shape.y))
 
     dset = sidpy.Dataset.from_array(data)
     dset.data_type = 'image'
-    dset.units = scan.data.units
+    dset.units = scan.params.data.units
 
     dset.set_dimension(0, sidpy.Dimension(x, 'x'))
     dset.set_dimension(1, sidpy.Dimension(y, 'y'))
@@ -115,7 +115,7 @@ def convert_scan_pb2_to_sidpy(scan: scan_pb2.Scan2d) -> Dataset:
     for dim in [dset.x, dset.y]:
         dim.dimension_type = 'spatial'
         dim.quantity = 'distance'
-        dim.units = roi.units
+        dim.units = scan.params.spatial.units
 
     return dset
 
@@ -144,13 +144,14 @@ def convert_sidpy_to_scan_pb2(ds: Dataset) -> scan_pb2.Scan2d:
         size[key] = dim.max().item() - dim.min().item()
     top_left = geometry_pb2.Point2d(**tl)
     size = geometry_pb2.Size2d(**size)
-    roi = geometry_pb2.Rect2d(top_left=top_left, size=size,
-                              units=ds.x.units)
-    data = scan_pb2.ScanData(shape=da_shape, units=ds.units,
-                             values=ds.compute().ravel().tolist())
-    scan_params = scan_pb2.ScanParameters2d(spatial_roi=roi,
+    roi = geometry_pb2.Rect2d(top_left=top_left, size=size)
+    spatial_aspects = scan_pb2.SpatialAspects(roi=roi,
+                                              units=ds.x.units)
+    data_aspects = scan_pb2.DataAspects(shape=da_shape, units=ds.units)
+    scan_params = scan_pb2.ScanParameters2d(spatial=spatial_aspects,
+                                            data=data_aspects,
                                             name=ds.name)
 
     scan = scan_pb2.Scan2d(params=scan_params,
-                           data=data)
+                           values=ds.compute().ravel().tolist())
     return scan

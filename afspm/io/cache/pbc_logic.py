@@ -98,7 +98,7 @@ class PBCWithROILogic(ProtoBasedCacheLogic):
         if (type(proto).__name__ == PBCWithROILogic.scan_id and
                 not internal_use):
             return (PBCWithROILogic.scan_id + '_'
-                    + str(proto.params.spatial_roi.size.x))
+                    + str(proto.params.spatial.roi.size.x))
         return ProtoBasedCacheLogic.create_envelope_from_proto(proto)
 
     def extract_proto(self, msg: list[bytes]) -> Message:

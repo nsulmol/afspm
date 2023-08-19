@@ -16,26 +16,40 @@ enum ScanState {
   SS_FREE = 3; // Neither scanning nor moving, free to do something else
 }
 
+/* Message to hold ScanState. Remember, any message 'published' by the
+ * DeviceController *must* be a protobuf Message, so we have to package in
+ * this format.
+ */
+message ScanStateMsg {
+  ScanState scan_state = 1;
+}
 
-/* Holds data, shape, and units. */
-message ScanData{
+
+/* Holds data shape and units. */
+message DataAspects {
   optional Size2u shape = 1;
   optional string units = 2;
-  repeated double values = 3; // Expect [y][x]
 }
 
-/*
-  ScanParameters contains the physical coordinates of the scan, as well as
-  the shape of the 2D data array captured.
-*/
+/* Holds spatial roi and units. */
+message SpatialAspects {
+  optional Rect2d roi = 1;
+  optional string units = 2; // Units for y- and x- dimensions
+}
+
+/* ScanParameters contains the parameters of the scan that can be set
+  * externally. */
 message ScanParameters2d {
-  optional Rect2d spatial_roi = 1;
-  optional google.protobuf.Timestamp timestamp = 2;
-  optional string name = 3; // Name to attribute to this data array
+  optional SpatialAspects spatial = 1;
+  optional DataAspects data = 2;
+  optional string name = 3; // Channel to save
 }
 
-/* Scan contains the parameters and data array from an individual scan. */
+/* Scan contains the parameters, data array from an individual scan, and
+ * any additional data tied to the scan. */
 message Scan2d {
   optional ScanParameters2d params = 1;
-  optional ScanData data = 2;
+  optional google.protobuf.Timestamp timestamp = 2;
+
+  repeated double values = 3; // Expect [y][x]
 }
