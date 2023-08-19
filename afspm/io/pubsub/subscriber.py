@@ -6,6 +6,8 @@ import logging
 import zmq
 from google.protobuf.message import Message
 
+from . import kill
+
 logger = logging.getLogger(__name__)
 
 class Subscriber:
@@ -44,9 +46,6 @@ class Subscriber:
         shutdown_was_requested: bool, indicating whether or not a kill signal
             has been received.
     """
-
-    # Kill signal, provided as an envelope.
-    KILL_SIGNAL = "KILL"
 
     def __init__(self, sub_url: str,
                  sub_extract_proto: Callable[[list[bytes]], Message],
@@ -90,11 +89,13 @@ class Subscriber:
         # Subscribe to all our topics
         for topic in topics_to_sub:
             self.subscriber.setsockopt(zmq.SUBSCRIBE, topic.encode())
+        # Everyone *must* subscribe to the kill signal
+        self.subscriber.setsockopt(zmq.SUBSCRIBE, kill.KILL_SIGNAL.encode())
 
         self.cache = {}
         self.shutdown_was_requested = False
 
-    def poll_and_store(self, timeout_ms: int = 1000) -> bool:
+    def poll_and_store(self, timeout_ms: int = 1000) -> (str, Message):
         """Receive message and store in cache.
 
         We use a poll() first, to ensure there is a message to receive.
@@ -108,7 +109,9 @@ class Subscriber:
                 we do not poll and do a blocking receive instead.
 
         Returns:
-            whether a message was received and processed in the cache.
+            - a tuple containing the envelope/cache key of the message and
+                the protobuf.Message received; or
+            - None, if no message received.
         """
         msg = None
         if timeout_ms:
@@ -118,25 +121,33 @@ class Subscriber:
             msg = self.subscriber.recv_multipart()
 
         if msg:
-            self.on_message_received(msg)
-            return True
-        return False
+            return self.on_message_received(msg)
+        return None
 
-    def on_message_received(self, msg: list[bytes]):
+    def on_message_received(self, msg: list[bytes]) -> (str, Message):
         """Decode message and update cache.
 
         Args:
             msg: list of bytes corresponding to the message received by the
                 frontend.
+
+        Returns:
+            a tuple containing the envelope/cache key of the message and
+                the protobuf.Message received. In the case of a KILL signal,
+                we return None.
         """
         envelope = msg[0].decode()
-
-        if envelope == self.KILL_SIGNAL:
+        if envelope == kill.KILL_SIGNAL:
+            logger.info("Shutdown was requested!")
             self.shutdown_was_requested = True
-        else:
-            proto = self.sub_extract_proto(msg, **self.extract_proto_kwargs)
-            self.cache = self.update_cache(envelope, proto, self.cache,
-                                           **self.update_cache_kwargs)
+            return None
+
+        proto = self.sub_extract_proto(msg, **self.extract_proto_kwargs)
+        logger.debug("Message received: %s, %s", envelope, proto)
+        self.cache = self.update_cache(envelope, proto, self.cache,
+                                       **self.update_cache_kwargs)
+        return envelope, proto
+
 
     def was_shutdown_requested(self):
         """Returns if a shutdown was requested."""

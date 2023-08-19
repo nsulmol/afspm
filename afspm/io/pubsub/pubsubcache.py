@@ -6,6 +6,8 @@ import logging
 import zmq
 from google.protobuf.message import Message
 
+from . import kill
+
 logger = logging.getLogger(__name__)
 
 
@@ -144,7 +146,7 @@ class PubSubCache:
         # Any new envelope data we cache and then forward
         if self.frontend in events:
             msg = self.frontend.recv_multipart()
-            self.on_message_received(msg)
+            self._on_message_received(msg)
 
         # Handle subscriptions
         # (when we get a subscription, we pull data from the cache)
@@ -154,24 +156,20 @@ class PubSubCache:
             # Event is one byte 0=unsub or 1=sub, followed by envelope
             if event[0] == 1:
                 envelope = event[1:].decode()
-                self.on_new_subscription(envelope)
+                self._on_new_subscription(envelope)
 
-    def on_message_received(self, msg: list[bytes]):
+    def _on_message_received(self, msg: list[bytes]):
         """Decode message, cache it, and pass on to subscribers.
 
         Args:
             msg: list of bytes corresponding to the message received by the
                 frontend.
         """
+        logger.debug("Message received: %s", msg)
         proto = self.sub_extract_proto(msg, **self.extract_proto_kwargs)
-        envelope = self.pub_get_envelope_given_proto(
-            proto, **self.get_envelope_kwargs)
-        self.cache = self.update_cache(envelope, proto, self.cache,
-                                       **self.update_cache_kwargs)
-        self.backend.send_multipart([envelope.encode(),
-                                     proto.SerializeToString()])
+        return self.send_message(proto)
 
-    def on_new_subscription(self, envelope: str):
+    def _on_new_subscription(self, envelope: str):
         """Send associated cache (if envelope exists).
 
         If envelope exists in cache, send back the items associated with it
@@ -180,6 +178,7 @@ class PubSubCache:
         Args:
             envelope: the subscribed envelope.
         """
+        logger.debug("New subscription to %s.", envelope)
         if envelope in self.cache:
             logger.info("Subscription: cache for %s being sent out.",
                         envelope)
@@ -187,13 +186,21 @@ class PubSubCache:
                 self.backend.send_multipart([envelope.encode(),
                                              proto.SerializeToString()])
 
-    def send_message(self, msg: list[list[bytes]]):
-        """Send a message, already converted to list-of-list of bytes.
+    def send_message(self, proto: Message):
+        """Cache message and pass on to subscribers.
 
-        This is used to insert a message not from the publisher. It assumes the
-        message has already been converted to the final bytes-list format
-        needed to send it out.
         Args:
             proto: protobuf Message.
         """
-        self.backend.send_multipart(msg)
+        envelope = self.pub_get_envelope_given_proto(
+            proto, **self.get_envelope_kwargs)
+        self.cache = self.update_cache(envelope, proto, self.cache,
+                                       **self.update_cache_kwargs)
+        logger.debug("Sending message: %s, %s", envelope, proto)
+        self.backend.send_multipart([envelope.encode(),
+                                     proto.SerializeToString()])
+
+    def send_kill_signal(self):
+        """Send a kill signal to subscribers."""
+        logger.debug("Sending kill signal.")
+        self.backend.send_multipart([kill.KILL_SIGNAL.encode()])

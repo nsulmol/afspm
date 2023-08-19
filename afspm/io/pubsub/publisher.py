@@ -53,5 +53,6 @@ class Publisher:
 
         envelope = self.get_envelope_given_proto(proto,
                                                  **self.get_envelope_kwargs)
+        logger.debug("Sending message: %s, %s", envelope, proto)
         self.publisher.send_multipart([envelope.encode(),
                                        proto.SerializeToString()])

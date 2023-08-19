@@ -101,10 +101,17 @@ class ControlRouter:
                 currently under.
         """
         if self.client_in_control_id:
+            logger.debug("%s requested control, but already under control",
+                         client)
             return ctrl.ControlResponse.REP_ALREADY_UNDER_CONTROL
+
         if self.control_mode == control_mode:
+            logger.info("%s gaining control", client)
             self.client_in_control_id = client
             return ctrl.ControlResponse.REP_SUCCESS
+
+        logger.debug("%s requested control, but sent control mode %s, when" +
+                     "under %s", client, control_mode, self.control_mode)
         return ctrl.ControlResponse.REP_WRONG_CONTROL_MODE
 
     def _handle_control_release(self, client: str) -> ctrl.ControlResponse:
@@ -117,12 +124,15 @@ class ControlRouter:
 
         Returns:
             - REP_SUCCESS if the client was under control; we release.
-            - REP_FAILUREif the client releasing was not under
+            - REP_FAILURE if the client releasing was not under
                 control to begin with (or no one was under control).
         """
         if self.client_in_control_id and self.client_in_control_id == client:
+            logger.info("Releasing control from %s", client)
             self.client_in_control_id = None
             return ctrl.ControlResponse.REP_SUCCESS
+
+        logger.debug("%s tried to release control, but in control.", client)
         return ctrl.ControlResponse.REP_FAILURE
 
     def _handle_experiment_problem(self, add_problem: bool,
@@ -139,14 +149,18 @@ class ControlRouter:
         """
         old_problems_set = copy.deepcopy(self.problems_set)
         if add_problem:
+            logger.debug("Adding problem %s", exp_problem)
             self.problems_set.add(exp_problem)
         else:
+            logger.debug("Removing problem %s", exp_problem)
             self.problems_set.remove(exp_problem)
 
         if not old_problems_set and self.problems_set:
+            logger.info("Entering problem mode")
             self.control_mode = ctrl.ControlMode.CM_PROBLEM
             self.client_in_control_id = None
         elif old_problems_set and not self.problems_set:
+            logger.info("Exiting problem mode, switching to automated.")
             self.control_mode = ctrl.ControlMode.CM_AUTOMATED
             self.client_in_control_id = None
 
@@ -187,6 +201,7 @@ class ControlRouter:
         Returns:
             ControlResponse indicating success/failure.
         """
+        logger.info("Control mode changed to %s", control_mode)
         self.control_mode = control_mode
         self.client_in_control_id = None
         return ctrl.ControlResponse.REP_SUCCESS
@@ -198,6 +213,7 @@ class ControlRouter:
         requested. It may be used externally to shutdown/pass the request
         on, etc.
         """
+        logger.info("End of experiment requested.")
         self.shutdown_was_requested = True
         return ctrl.ControlResponse.REP_SUCCESS
 
@@ -213,7 +229,6 @@ class ControlRouter:
         Returns:
             ControlResponse to the request.
         """
-
         if req == ctrl.ControlRequest.REQ_REQUEST_CTRL:
             return self._handle_control_request(client, obj)
         if req == ctrl.ControlRequest.REQ_RELEASE_CTRL:
@@ -245,20 +260,24 @@ class ControlRouter:
         else:
             msg = self.frontend.recv_multipart()
 
-        client = msg[0]
-        if client:
+        if msg:
+            client = msg[0]
             client_id = self._parse_client_id(client)
             req, obj = cmd.parse_request(msg[2:])  # client, __, ...
+            logger.debug("Message received from client %s: %s, %s", client_id,
+                         req, obj)
+
             rep = self._on_request(client_id, req, obj)
+            logger.debug("Sending reply to %s: %s", client_id, rep)
             self.frontend.send_multipart([client, b"",
                                           cmd.serialize_response(rep)])
 
-    # TODO: Test me
     def get_control_state(self):
         """Creates and returns a ControState instance from current state."""
         state = ctrl.ControlState()
         state.control_mode = self.control_mode
-        state.client_in_control_id = self.client_in_control_id
+        if self.client_in_control_id:
+            state.client_in_control_id = self.client_in_control_id
         state.problems_set.extend(self.problems_set)
         return state
 

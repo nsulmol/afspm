@@ -58,7 +58,9 @@ class ControlServer:
             msg = self.server.recv_multipart()
 
         if msg:
-            return cmd.parse_request(msg)
+            req, obj = cmd.parse_request(msg)
+            logger.debug("Message received: %s, %s", req, obj)
+            return (req, obj)
         return (None, None)
 
     def reply(self, rep: ctrl.ControlResponse):
@@ -70,4 +72,5 @@ class ControlServer:
             rep: ctrl.ControlResponse we wish to send as response to the prior
                 req received.
         """
+        logger.debug("Sending reply: %s", rep)
         self.server.send(cmd.serialize_response(rep))

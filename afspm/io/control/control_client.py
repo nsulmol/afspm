@@ -73,7 +73,7 @@ class ControlClient:
     def _init_client(self):
         """Starts up (or restarts) the client socket."""
         if self.client and not self.client.closed:
-            logger.error("client init, but exists and is not closed. Do nothing.")
+            logger.error("Client init, but exists and is not closed. Do nothing.")
             return
         self.client = self.ctx.socket(zmq.REQ)
         # Set identity (if provided)
@@ -84,7 +84,7 @@ class ControlClient:
     def _close_client(self):
         """Closes the client socket."""
         self.client.setsockopt(zmq.LINGER, 0)
-        self.client.close
+        self.client.close()
 
     def _try_send_req(self, msg: list[list[bytes]]
                       ) -> ctrl.ControlResponse:
@@ -105,15 +105,16 @@ class ControlClient:
                 # Response is expected to be int
                 return cmd.parse_response(self.client.recv())
             retries_left -= 1
-            logger.warning("No response from server")
+            logger.debug("No response from server")
             # Socket is confused. Close and remove it.
             self._close_client()
 
             if retries_left == 0:
-                logger.error("Server seems to be offline, cannot send message")
+                logger.warning("Server seems to be offline, cannot send" +
+                               " message.")
                 return ctrl.ControlResponse.REP_NO_RESPONSE
 
-            logger.info("Reconnecting to server")
+            logger.debug("Reconnecting to server")
             self._init_client()
             self.client.send_multipart(msg)
 
@@ -123,6 +124,7 @@ class ControlClient:
         Returns:
             The received RequestResponse.
         """
+        logger.debug("Sending start_scan request.")
         msg = cmd.serialize_req_obj(ctrl.ControlRequest.REQ_START_SCAN)
         return self._try_send_req(msg)
 
@@ -132,6 +134,7 @@ class ControlClient:
         Returns:
             The received RequestResponse.
         """
+        logger.debug("Sending stop_scan request.")
         msg = cmd.serialize_req_obj(ctrl.ControlRequest.REQ_STOP_SCAN)
         return self._try_send_req(msg)
 
@@ -145,6 +148,7 @@ class ControlClient:
         Returns:
             The received RequestResponse.
         """
+        logger.debug("Sending set_scan_params with: %s", scan_params)
         msg = cmd.serialize_req_obj(ctrl.ControlRequest.REQ_SET_SCAN_PARAMS,
                                     scan_params)
         return self._try_send_req(msg)
@@ -166,6 +170,7 @@ class ControlClient:
             A RequestResponse enum indicating the success/failure of the
                 request.
         """
+        logger.debug("Sending request_ctrl with mode: %s", control_mode)
         msg = cmd.serialize_req_obj(ctrl.ControlRequest.REQ_REQUEST_CTRL,
                                     control_mode)
         return self._try_send_req(msg)
@@ -176,6 +181,7 @@ class ControlClient:
         Returns:
             Response received from server.
         """
+        logger.debug("Sending release_ctrl.")
         msg = cmd.serialize_req_obj(ctrl.ControlRequest.REQ_RELEASE_CTRL)
         return self._try_send_req(msg)
 
@@ -189,6 +195,7 @@ class ControlClient:
         Return:
             Response received from server.
         """
+        logger.debug("Sendding add_exp_prblm with problem: %s", problem)
         msg = cmd.serialize_req_obj(
             ctrl.ControlRequest.REQ_ADD_EXP_PRBLM, problem)
         return self._try_send_req(msg)
@@ -203,6 +210,7 @@ class ControlClient:
         Return:
             Response received from server.
         """
+        logger.debug("Sendding rmv_exp_prblm with problem: %s", problem)
         msg = cmd.serialize_req_obj(ctrl.ControlRequest.REQ_RMV_EXP_PRBLM,
                                     problem)
         return self._try_send_req(msg)
@@ -229,15 +237,17 @@ class AdminControlClient(ControlClient):
         Returns:
             Response received from the server.
         """
-        msg = cmd.serialize_req_obj(ctrl.ControlRequests.REQ_SET_CONTROL_MODE,
+        logger.debug("Sending set_control_mode with mode: %s", mode)
+        msg = cmd.serialize_req_obj(ctrl.ControlRequest.REQ_SET_CONTROL_MODE,
                                     mode)
         return self._try_send_req(msg)
 
     def end_experiment(self) -> ctrl.ControlResponse:
-       """Indicate the experiment should end.
+        """Indicate the experiment should end.
 
-       The AFSPM Controller should receive this request and notify all
-       connected components to close.
-       """
-       msg = cmd.serialize_req_obj(ctrl.ControlRequests.REQ_END_EXPERIMENT)
-       return self._try_send_req(msg)
+        The AFSPM Controller should receive this request and notify all
+        connected components to close.
+        """
+        logger.debug("Sending end_experiment.")
+        msg = cmd.serialize_req_obj(ctrl.ControlRequest.REQ_END_EXPERIMENT)
+        return self._try_send_req(msg)

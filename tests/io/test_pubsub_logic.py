@@ -12,6 +12,7 @@ from afspm.io.cache import pbc_logic as pbc
 from afspm.io.pubsub import publisher
 from afspm.io.pubsub import subscriber
 from afspm.io.pubsub import pubsubcache
+from afspm.io.pubsub import kill
 
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
@@ -59,6 +60,7 @@ def topics_control_state():
 def topics_both():
     return [cl.CacheLogic.create_envelope_from_proto(scan_pb2.Scan2d()),
             cl.CacheLogic.create_envelope_from_proto(control_pb2.ControlState())]
+
 
 @pytest.fixture(scope="module")
 def wait_ms():
@@ -221,19 +223,19 @@ def short_wait_ms():
 
 
 def got_kill_signal(socket: zmq.Socket,
-                    timeout_ms: int) -> (bool, list[list[bytes]]):
+                    timeout_ms: int) -> bool:
     """See if we received a signal from the socket."""
     if socket.poll(timeout_ms, zmq.POLLIN):
         msg = socket.recv_multipart(zmq.NOBLOCK)
         envelope = msg[0].decode()
-        if envelope == subscriber.Subscriber.KILL_SIGNAL:
-            return True, msg
-    return False, None
+        if envelope == kill.KILL_SIGNAL:
+            return True
+    return False
 
 
 def send_kill_signal(socket: zmq.Socket):
     """Send the kill signal out on a socket."""
-    socket.send_multipart([subscriber.Subscriber.KILL_SIGNAL.encode()])
+    socket.send_multipart([kill.KILL_SIGNAL.encode()])
 
 
 def pubsubcache_routine(psc_url, pub_url, comm_url, short_wait_ms,
@@ -254,9 +256,9 @@ def pubsubcache_routine(psc_url, pub_url, comm_url, short_wait_ms,
         psc.poll(short_wait_ms)
 
         # Check if kill signal received, and send it through pubsubcache if so
-        got_signal, msg = got_kill_signal(comm, short_wait_ms)
+        got_signal = got_kill_signal(comm, short_wait_ms)
         if got_signal:
-            psc.send_message(msg)
+            psc.send_kill_signal()
             stay_alive = False
 
 
