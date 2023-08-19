@@ -1,21 +1,30 @@
 """Holds Abstract Device Controller Class (defines controller logic)."""
 
+import logging
 import time
+import datetime
 import copy
 from abc import ABCMeta, abstractmethod
-from typing import Callable, MappingProxyType
+from typing import Callable
+from types import MappingProxyType
 import zmq
 from google.protobuf.message import Message
 
-from .io.pubsub import publisher as pub
-from .io.control import commands as cmd
-from .io.control import control_server
+from . import afspm_component as afspmc
 
-from .io.protos.generated import scan_pb2 as scan
-from .io.protos.generated import control_pb2 as ctrl
+from ..io.pubsub import publisher as pub
+from ..io.pubsub import subscriber as sub
+from ..io.control import commands as cmd
+from ..io.control import control_server as ctrl_srvr
+
+from ..io.protos.generated import scan_pb2 as scan
+from ..io.protos.generated import control_pb2 as ctrl
 
 
-class DeviceController(metaclass=ABCMeta):
+logger = logging.getLogger(__name__)
+
+
+class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
     """Handles communicating with SPM device and handling requests.
 
     The DeviceController is the principal node for communicating with an SPM
@@ -24,7 +33,7 @@ class DeviceController(metaclass=ABCMeta):
     - Sending appropriate requests to the device itself, to perform actions;
     - Monitoring the SPM device for state changes, and reporting these changes
     to any listeners via its publisher;
-    - Sending out any performed scans out to listeners via its publisher.
+    - Sending out any performed scans out to listeners via its Publisher.
 
     It communicates with any ControlClients via a zmq REP node, where it
     receives requests and handles them via its appropriate methods (e.g.
@@ -37,45 +46,76 @@ class DeviceController(metaclass=ABCMeta):
     specific. We expect a DeviceController child class for a given SPM
     controller.
 
+    Note: we allow providing a subscriber to DeviceController (it inherits
+    from AspmComponent). If subscribed to the PubSubCache, it will receive
+    kill signals and shutdown appropriately.
+
     Attributes:
         publisher: Publisher instance, for publishing data.
         control_server: ControlServer instance, for responding to control
             requests.
-        loop_sleep_ms: how long the device sleeps between loops in its main
-            loop.
+        poll_timeout_ms: how long to wait when polling the server.
+        req_handler_map: mapping from ControlRequest to method to call, for
+            ease of use within some of the methods.
         scan_state: device's current ScanState.
         scan_params; device's current ScanParameters2d.
         scan: device's most recent Scan2d.
+        subscriber: optional subscriber, to hook into (and detect) kill
+            signals.
     """
 
-    def __init__(self, ctrl_url: str, pub_url: str, loop_sleep_ms: int,
-                 get_envelope_given_proto: Callable[[Message], str],
-                 ctx: zmq.Context = None,
-                 get_envelope_kwargs: dict = None):
+    NAME = "DeviceController"
+    TIMESTAMP_ATTRIB_NAME = 'timestamp'
+
+    # Indicates commands we will allow to be sent while a scan is ongoing
+    ALLOWED_COMMANDS_DURING_SCAN = [ctrl.ControlRequest.REQ_STOP_SCAN]
+
+    # Note: REQ_HANDLER_MAP defined at end, due to dependency on methods
+    # defined below.
+
+    def __init__(self, publisher: pub.Publisher,
+                 control_server: ctrl_srvr.ControlServer,
+                 poll_timeout_ms: int, loop_sleep_s: int, hb_period_s: float,
+                 ctx: zmq.Context = None, subscriber: sub.Subscriber = None):
         """Initializes the controller.
 
         Args:
-            ctrl_url: our control server address, in zmq format.
-            pub_url: our publishing address, in zmq format.
-            loop_sleep_ms: how long we sleep in our main loop, in ms.
-            get_envelope_given_proto: method that maps from proto message to
-                our desired publisher 'envelope' string.
+            publisher: Publisher instance, for publishing data.
+            control_server: ControlServer instance, for responding to control
+                requests.
+            poll_timeout_ms: how long to wait when polling the server.
+            loop_sleep_s: how long we sleep in our main loop, in s.
+            hb_period_s: how frequently we should send a hearbeat.
             ctx: zmq Context; if not provided, we will create a new instance.
-            get_envelope_kwargs: any additional arguments to be fed to
-                get_envelope_given_proto.
+            subscriber: optional subscriber, to hook into (and detect) kill
+                signals.
         """
         if not ctx:
             ctx = zmq.Context.instance()
 
-        self.publisher = pub.Publisher(pub_url, get_envelope_given_proto,
-                                       ctx, get_envelope_kwargs)
-        self.control_server = control_server.ControlServer(ctrl_url)
-        self.loop_sleep_s = loop_sleep_ms / 1000
+        self.publisher = publisher
+        self.control_server = control_server
+        self.poll_timeout_ms = poll_timeout_ms
+        self.req_handler_map = self.create_req_handler_map()
 
         # Init our current understanding of state / params
         self.scan_state = self.poll_scan_state()
         self.scan_params = self.poll_scan_params()
         self.scan = self.get_latest_scan()
+
+        # AfspmComponent constructor: no control_client provided, as that
+        # logic is handled by the control_server.
+        super().__init__(self.NAME, loop_sleep_s, hb_period_s,
+                         self.poll_timeout_ms, subscriber=subscriber,
+                         control_client=None, ctx=ctx)
+
+    def create_req_handler_map(self) -> dict[ctrl.ControlRequest, Callable]:
+        """Create our req_handler_map, for mapping REQ to methods."""
+        return MappingProxyType({
+            ctrl.ControlRequest.REQ_START_SCAN: self.on_start_scan,
+            ctrl.ControlRequest.REQ_STOP_SCAN:  self.on_stop_scan,
+            ctrl.ControlRequest.REQ_SET_SCAN_PARAMS: self.on_set_scan_params})
+
 
     @abstractmethod
     def on_start_scan(self) -> ctrl.ControlResponse:
@@ -96,15 +136,32 @@ class DeviceController(metaclass=ABCMeta):
 
     @abstractmethod
     def poll_scan_params(self) -> scan.ScanParameters2d:
-        """Poll the controller for the current scan parameters."""
+        """Poll the controller for the current scan parameters.
+
+        Note: if returning a member variable instance, make sure to
+        copy.deepcopy, as python is pass-by-assignment (protobuf.Message
+        is a mutable object)!
+        """
 
     @abstractmethod
     def get_latest_scan(self) -> scan.Scan2d:
         """Obtain latest performed scan.
 
-        Return None if you know a scan was not performed. Otherwise,
-        we will compare the last scan to the latest to determine if
-        the scan succeeded.
+        We will compare the prior scan to the latest to determine if
+        the scan succeeded (i.e. it is different).
+
+        Note that we will first consider the timestamp attribute when
+        comparing scans. If this attribute is not passed, we will do
+        a data comparison.
+
+        To read the creation time of a file using Python, use
+            get_file_creation_datetime()
+        and you can put that in the timestamp param with:
+            scan.timestamp.FromDatetime(ts)
+
+        Note: if returning a member variable instance, make sure to
+        copy.deepcopy, as python is pass-by-assignment (protobuf.Message
+        is a mutable object)!
         """
 
     def _handle_polling_device(self):
@@ -113,8 +170,9 @@ class DeviceController(metaclass=ABCMeta):
         self.scan_state = self.poll_scan_state()
 
         if old_scan_state != self.scan_state:
-            self.publisher.send_msg(self.scan_state)
-
+            logger.debug("New scan state detected, sending out.")
+            scan_state_msg = scan.ScanStateMsg(scan_state=self.scan_state)
+            self.publisher.send_msg(scan_state_msg)
 
         if (old_scan_state == scan.ScanState.SS_SCANNING and
                 self.scan_state != scan.ScanState.SS_SCANNING):
@@ -122,48 +180,52 @@ class DeviceController(metaclass=ABCMeta):
             self.scan = self.get_latest_scan()
 
             # If scans are different, assume now and send out!
-            # TODO: Consider just comparing timestamps!?!?!
-            if old_scan != self.scan:
+            # Test timestamps if they exist. Otherwise, compare
+            # data arrays.
+            send_scan = False
+            if (scan_val.HasField(self.TIMESTAMP_ATTRIB_NAME)
+                    for scan_val in [old_scan, self.scan]):
+                if old_scan.timestamp != self.scan.timestamp:
+                    send_scan = True
+            elif old_scan.values != self.scan.values:
+                send_scan = True
+
+            if send_scan:
+                logger.debug("New scan, sending out.")
                 self.publisher.send_msg(self.scan)
 
         old_scan_params = self.scan_params
         self.scan_params = self.poll_scan_params()
         if old_scan_params != self.scan_params:
+            logger.debug("New scan_params, sending out.")
             self.publisher.send_msg(self.scan_params)
 
     def _handle_incoming_requests(self):
         """Polls control_server for requests and responds to them."""
-        req, proto = self.control_server.poll()
-
-        # Refuse most requests while in the middle of a scan
-        if (self.scan_state == scan.ScanState.SCANNING and
-                req not in self.ALLOWED_COMMANDS_DURING_SCAN):
-            self.control_server.reply(ctrl.ControlResponse.REP_PERFORMING_SCAN)
-        elif req:
-            handler = self.REQ_HANDLER_MAP[req]
-
-            if proto:
-                rep = handler(proto)
-            else:
-                rep = handler()
-
-            self.control_server.reply(rep)
+        req, proto = self.control_server.poll(self.poll_timeout_ms)
+        if req:  # Ensure we received something
+            # Refuse most requests while in the middle of a scan
+            if (self.scan_state == scan.ScanState.SS_SCANNING and
+                    req not in self.ALLOWED_COMMANDS_DURING_SCAN):
+                self.control_server.reply(
+                    ctrl.ControlResponse.REP_PERFORMING_SCAN)
+            elif req:
+                handler = self.req_handler_map[req]
+                rep = handler(proto) if proto else handler()
+                self.control_server.reply(rep)
 
 
-    def run(self):
-        """Main loop, where we monitor for requests and publish results."""
-        while True:
-            self._handle_incoming_requests()
-            self._handle_polling_device()
-            time.sleep(self.loop_sleep_s)
+    def run_per_loop(self):
+        """Where we monitor for requests and publish results."""
+        self._handle_incoming_requests()
+        self._handle_polling_device()
 
-    # STATIC VARIABLES
-    # dict[ctrl.ControlRequest, tuple(Callable, Message)]
-    REQ_HANDLER_MAP = MappingProxyType({
-        ctrl.ControlRequest.REQ_START_SCAN: on_start_scan,
-        ctrl.ControlRequest.REQ_STOP_SCAN:  on_stop_scan,
-        ctrl.ControlRequest.REQ_SET_SCAN_PARAMS: on_set_scan_params
-    })
 
-    # Indicates commands we will allow to be sent while a scan is ongoing
-    ALLOWED_COMMANDS_DURING_SCAN = [ctrl.ControlRequest.REQ_STOP_SCAN]
+def get_file_creation_datetime(filename: str) -> datetime.datetime:
+    """Read creation time of a file, return a datetime representing it.
+
+    Taken from: https://stackoverflow.com/questions/237079/how-do-i-get-file-
+    creation-and-modification-date-times.
+    """
+    return datetime.datetime.fromtimestamp(filename.stat().st_ctime,
+                                           tz=datetime.timezone.utc)
