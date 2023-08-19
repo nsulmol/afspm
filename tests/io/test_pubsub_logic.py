@@ -20,7 +20,7 @@ from afspm.io.protos.generated import control_pb2
 
 # -------------------- Fixtures -------------------- #
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def ctx():
     return zmq.Context.instance()
 
@@ -70,57 +70,41 @@ def wait_ms():
 @pytest.fixture
 def sub_scan_pub(ctx, pub_url, topics_scan2d, cache_kwargs,
              wait_ms):
-    sub = subscriber.Subscriber(
+    return subscriber.Subscriber(
         pub_url, cl.extract_proto, topics_scan2d,
         cl.update_cache, ctx,
         extract_proto_kwargs=cache_kwargs,
         update_cache_kwargs=cache_kwargs)
 
-    # We need some delay between initializing and sending out the first message
-    time.sleep(wait_ms / 1000)  # ms to s
-    return sub
-
 
 @pytest.fixture
 def sub_control_state_pub(ctx, pub_url, topics_control_state, cache_kwargs,
                       wait_ms):
-    sub = subscriber.Subscriber(
+    return subscriber.Subscriber(
         pub_url, cl.extract_proto, topics_control_state,
         cl.update_cache, ctx,
         extract_proto_kwargs=cache_kwargs,
         update_cache_kwargs=cache_kwargs)
 
-    # We need some delay between initializing and sending out the first message
-    time.sleep(wait_ms / 1000)  # ms to s
-    return sub
-
 
 @pytest.fixture
 def sub_scan_psc(ctx, psc_url, topics_scan2d, cache_kwargs,
                  wait_ms):
-    sub = subscriber.Subscriber(
+    return subscriber.Subscriber(
         psc_url, cl.extract_proto, topics_scan2d,
         cl.update_cache, ctx,
         extract_proto_kwargs=cache_kwargs,
         update_cache_kwargs=cache_kwargs)
 
-    # We need some delay between initializing and sending out the first message
-    time.sleep(wait_ms / 1000)  # ms to s
-    return sub
-
 
 @pytest.fixture
 def sub_control_state_psc(ctx, psc_url, topics_control_state, cache_kwargs,
                           wait_ms):
-    sub = subscriber.Subscriber(
+    return subscriber.Subscriber(
         psc_url, cl.extract_proto, topics_control_state,
         cl.update_cache, ctx,
         extract_proto_kwargs=cache_kwargs,
         update_cache_kwargs=cache_kwargs)
-
-    # We need some delay between initializing and sending out the first message
-    time.sleep(wait_ms / 1000)  # ms to s
-    return sub
 
 
 @pytest.fixture
@@ -210,11 +194,12 @@ def comm_url():
     return "tcp://127.0.0.1:7777"
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def comm_pub(ctx, comm_url):
     comm_publisher = ctx.socket(zmq.PUB)
     comm_publisher.bind(comm_url)
-    return comm_publisher
+    yield comm_publisher
+    comm_publisher.close()
 
 
 @pytest.fixture(scope="module")
@@ -238,6 +223,14 @@ def send_kill_signal(socket: zmq.Socket):
     socket.send_multipart([kill.KILL_SIGNAL.encode()])
 
 
+def kill_and_wait(socket: zmq.Socket, wait_ms: int,
+                  thread: threading.Thread):
+    """Tell thread to die, wait, and join."""
+    send_kill_signal(socket)
+    time.sleep(5*wait_ms / 1000)
+    thread.join()
+
+
 def pubsubcache_routine(psc_url, pub_url, comm_url, short_wait_ms,
                         ctx, cache_kwargs):
     """Routine to create and run a pubsubcache."""
@@ -254,13 +247,14 @@ def pubsubcache_routine(psc_url, pub_url, comm_url, short_wait_ms,
     stay_alive = True
     while stay_alive:
         psc.poll(short_wait_ms)
-
-        # Check if kill signal received, and send it through pubsubcache if so
-        got_signal = got_kill_signal(comm, short_wait_ms)
-        if got_signal:
+        if got_kill_signal(comm, short_wait_ms):
+            print("Kill signal received, sending through PSC")
             psc.send_kill_signal()
             stay_alive = False
 
+    print("Dying, closing sockets")
+    # Close bound sockets
+    psc.backend.close() # TODO: uncomment
 
 @pytest.fixture
 def thread_psc(psc_url, pub_url, comm_url, short_wait_ms, ctx, wait_ms,
@@ -271,9 +265,33 @@ def thread_psc(psc_url, pub_url, comm_url, short_wait_ms, ctx, wait_ms,
     thread.daemon = True
     thread.start()
 
+    # TODO: Investigate this! Not having this causes tests to crash. Having it
+    # magically fixes them. I am worried.
     # We need some delay between initializing and sending out the first message
     time.sleep(wait_ms / 1000)  # ms to s
     return thread
+
+
+@pytest.fixture
+def sub_all_topics_psc(psc_url, cache_kwargs, ctx, wait_ms):
+    all_topics = [""]
+    return subscriber.Subscriber(
+        psc_url, cl.extract_proto, all_topics,
+        cl.update_cache, ctx,
+        extract_proto_kwargs=cache_kwargs,
+        update_cache_kwargs=cache_kwargs)
+
+
+def test_pubsubcache_kill_signal(sub_all_topics_psc, wait_ms, comm_pub,
+                                 thread_psc):
+    """Validate that a kill signal is received by a subscriber."""
+    assert not sub_all_topics_psc.poll_and_store(wait_ms)
+    assert not sub_all_topics_psc.was_shutdown_requested()
+
+    kill_and_wait(comm_pub, wait_ms, thread_psc)
+
+    sub_all_topics_psc.poll_and_store(wait_ms)
+    assert sub_all_topics_psc.was_shutdown_requested()
 
 
 def test_pubsubcache(psc_url, cache_kwargs, ctx, pub, topics_both,
@@ -323,32 +341,4 @@ def test_pubsubcache(psc_url, cache_kwargs, ctx, pub, topics_both,
     assert_sub_received_proto(sub_both, sample_scan, wait_ms)
     assert_sub_received_proto(sub_scan, sample_scan, wait_ms)
 
-    send_kill_signal(comm_pub)  # Kill pubsubcache, since test is ended
-    time.sleep(wait_ms / 1000)
-
-@pytest.fixture
-def sub_all_topics_psc(psc_url, cache_kwargs, ctx, wait_ms):
-    all_topics = [""]
-    sub = subscriber.Subscriber(
-        psc_url, cl.extract_proto, all_topics,
-        cl.update_cache, ctx,
-        extract_proto_kwargs=cache_kwargs,
-        update_cache_kwargs=cache_kwargs)
-
-    # We need some delay between initializing and sending out the first message
-    time.sleep(wait_ms / 1000)  # ms to s
-    return sub
-
-
-
-def test_pubsubcache_kill_signal(sub_all_topics_psc, wait_ms, comm_pub,
-                                 thread_psc):
-    """Validate that a kill signal is received by a subscriber."""
-    assert not sub_all_topics_psc.poll_and_store(wait_ms)
-    assert not sub_all_topics_psc.was_shutdown_requested()
-
-    send_kill_signal(comm_pub)
-    time.sleep(wait_ms / 1000)  # ms to s
-
-    assert sub_all_topics_psc.poll_and_store(wait_ms)
-    assert sub_all_topics_psc.was_shutdown_requested()
+    kill_and_wait(comm_pub, wait_ms, thread_psc)

@@ -143,11 +143,6 @@ class PubSubCache:
         """
         events = dict(self.poller.poll(timeout_ms))
 
-        # Any new envelope data we cache and then forward
-        if self.frontend in events:
-            msg = self.frontend.recv_multipart()
-            self._on_message_received(msg)
-
         # Handle subscriptions
         # (when we get a subscription, we pull data from the cache)
         # I think this means we re-send cache data to *everyone* subscribed :/.
@@ -157,6 +152,12 @@ class PubSubCache:
             if event[0] == 1:
                 envelope = event[1:].decode()
                 self._on_new_subscription(envelope)
+
+        # Any new envelope data we cache and then forward
+        if self.frontend in events:
+            msg = self.frontend.recv_multipart()
+            self._on_message_received(msg)
+
 
     def _on_message_received(self, msg: list[bytes]):
         """Decode message, cache it, and pass on to subscribers.
