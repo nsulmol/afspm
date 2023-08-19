@@ -184,9 +184,9 @@ def component_name():
 @pytest.fixture
 def afspm_component(loop_sleep_s, hb_period_s, sub_scan_state, admin_client,
                     component_name, poll_timeout_ms, ctx):
-    return sc.AfspmComponent(component_name, loop_sleep_s, hb_period_s,
-                             poll_timeout_ms, sub_scan_state, admin_client,
-                             ctx)
+    return AfspmComponent(component_name, loop_sleep_s, hb_period_s,
+                          poll_timeout_ms, sub_scan_state, admin_client,
+                          ctx)
 
 
 # -------------------- Helper Methods -------------------- #

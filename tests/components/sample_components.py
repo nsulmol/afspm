@@ -2,31 +2,22 @@
 
 import time
 import copy
-import threading
-import pytest
-import zmq
-
-from google.protobuf.message import Message
-from google.protobuf.timestamp_pb2 import Timestamp
 
 from afspm.components.device_controller import DeviceController
 from afspm.components.afspm_controller import AfspmController
-from afspm.components.afspm_component import AfspmComponent
-
 
 from afspm.io.pubsub.subscriber import Subscriber
 from afspm.io.pubsub.publisher import Publisher
 from afspm.io.pubsub.pubsubcache import PubSubCache
 from afspm.io.cache import cache_logic as cl
-from afspm.io.cache import pbc_logic as pbc
 
 
 from afspm.io.control.control_server import ControlServer
 from afspm.io.control.control_router import ControlRouter
-from afspm.io.control.control_client import ControlClient, AdminControlClient
 
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
+
 
 # --- Device Controller Stuff --- #
 class SampleDeviceController(DeviceController):
@@ -58,29 +49,22 @@ class SampleDeviceController(DeviceController):
 
     def poll_scan_state(self) -> scan_pb2.ScanState:
         """Add simulated scan time and move time."""
-        #print("poll_scan_state start")
         if self.start_ts:
             duration = None
             update_scan = False
             if self.tmp_scan_state == scan_pb2.ScanState.SS_SCANNING:
-                #print("waiting for scan to end")
                 duration = self.scan_time_ms
                 update_scan = True
             elif self.tmp_scan_state == scan_pb2.ScanState.SS_MOVING:
-                #print("waiting for move to end")  # TODO: Delete prints!
                 duration = self.move_time_ms
 
             if duration:
                 curr_ts = time.time()
-                #print(f"curr_ts - self.start_ts: {curr_ts - self.start_ts}, duration: {duration}")
                 if curr_ts - self.start_ts > (duration / 1000):
                     self.start_ts = None
                     self.tmp_scan_state = scan_pb2.ScanState.SS_FREE
                     if update_scan:
-                        #ts = Timestamp()
-                        #ts.GetCurrentTime()
                         self.tmp_scan.timestamp.GetCurrentTime()
-                        #print(f"Updated scan, ts: {self.tmp_scan.timestamp}")
         return self.tmp_scan_state
 
     def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
