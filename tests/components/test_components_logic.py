@@ -231,7 +231,9 @@ def end_experiment(afspm_component: AfspmComponent,
     afspm_component.subscriber.poll_and_store(wait_ms)
     assert afspm_component.subscriber.was_shutdown_requested()
 
-    #time.sleep(wait_ms / 1000)
+    # TODO: Look into removing this. Ugly delay to get stuff to
+    # close properly in pytest.
+    time.sleep(2*wait_ms / 1000)
 
 
 
