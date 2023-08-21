@@ -1,10 +1,11 @@
-"""Test the afspm_component module logic."""
+"""Test the afspm_components_monitor module logic."""
 
 import time
 import pytest
 import zmq
 
-from afspm.components import afspm_component as afspmc
+from afspm.components.afspm_component import AfspmComponent
+from afspm.components.afspm_components_monitor import AfspmComponentsMonitor
 
 
 # ----- Fixtures ----- #
@@ -48,13 +49,13 @@ def time_to_wait_s(hb_period_s, missed_beats_before_dead):
 
 
 # ----- Classes for Testing ----- #
-class SimpleComponent(afspmc.AfspmComponent):
+class SimpleComponent(AfspmComponent):
     """A simple component that will run forever."""
     def run_per_loop(self):
         pass
 
 
-class CrashingComponent(afspmc.AfspmComponent):
+class CrashingComponent(AfspmComponent):
     """A simple component that crashes after some time."""
     def __init__(self, time_to_crash_s: float, **kwargs):
         self.time_to_crash_s = time_to_crash_s
@@ -67,7 +68,7 @@ class CrashingComponent(afspmc.AfspmComponent):
             raise SystemExit
 
 
-class ExitingComponent(afspmc.AfspmComponent):
+class ExitingComponent(AfspmComponent):
     """A simple component that exits purposefully after some time."""
     def __init__(self, time_to_exit_s: float, **kwargs):
         self.time_to_exit_s = time_to_exit_s
@@ -81,7 +82,7 @@ class ExitingComponent(afspmc.AfspmComponent):
             raise SystemExit
 
 
-def monitor_and_wait(monitor: afspmc.AfspmComponentsMonitor,
+def monitor_and_wait(monitor: AfspmComponentsMonitor,
                      start_ts: float, time_to_wait_s: float,
                      loop_sleep_s: float):
     """Helper to wait and monitor a bit."""
@@ -98,10 +99,10 @@ def test_basic_component(ctx, kwargs, loop_sleep_s, hb_period_s,
                          time_to_wait_s):
     """Ensure a standard component stays alive for the test lifetime."""
     comp_constructor_kwargs_list = [(SimpleComponent, kwargs)]
-    monitor = afspmc.AfspmComponentsMonitor(comp_constructor_kwargs_list,
-                                            loop_sleep_s,
-                                            missed_beats_before_dead,
-                                            ctx)
+    monitor = AfspmComponentsMonitor(comp_constructor_kwargs_list,
+                                     loop_sleep_s,
+                                     missed_beats_before_dead,
+                                     ctx)
     assert len(monitor.component_processes) == 1
     assert comp_name in monitor.component_processes
     original_pid = monitor.component_processes[comp_name].pid
@@ -120,10 +121,10 @@ def test_crashing_component(ctx, kwargs, loop_sleep_s, hb_period_s,
     """Ensure a crashing component is restarted in the test lifetime."""
     kwargs['time_to_crash_s'] = 2 * hb_period_s
     comp_constructor_kwargs_list = [(CrashingComponent, kwargs)]
-    monitor = afspmc.AfspmComponentsMonitor(comp_constructor_kwargs_list,
-                                            loop_sleep_s,
-                                            missed_beats_before_dead,
-                                            ctx)
+    monitor = AfspmComponentsMonitor(comp_constructor_kwargs_list,
+                                     loop_sleep_s,
+                                     missed_beats_before_dead,
+                                     ctx)
     assert len(monitor.component_processes) == 1
     assert comp_name in monitor.component_processes
     original_pid = monitor.component_processes[comp_name].pid
@@ -142,10 +143,10 @@ def test_exiting_component(ctx, kwargs, loop_sleep_s, hb_period_s,
     """Ensure a purposefully exiting component is *not* restarted."""
     kwargs['time_to_exit_s'] = 2 * hb_period_s
     comp_constructor_kwargs_list = [(ExitingComponent, kwargs)]
-    monitor = afspmc.AfspmComponentsMonitor(comp_constructor_kwargs_list,
-                                            loop_sleep_s,
-                                            missed_beats_before_dead,
-                                            ctx)
+    monitor = AfspmComponentsMonitor(comp_constructor_kwargs_list,
+                                     loop_sleep_s,
+                                     missed_beats_before_dead,
+                                     ctx)
     assert len(monitor.component_processes) == 1
     assert comp_name in monitor.component_processes
 
