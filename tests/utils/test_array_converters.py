@@ -1,3 +1,5 @@
+"""Test array conversion logic."""
+
 import afspm.utils.array_converters as conv
 import xarray as xr
 import numpy as np
