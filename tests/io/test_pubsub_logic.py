@@ -254,7 +254,7 @@ def pubsubcache_routine(psc_url, pub_url, comm_url, short_wait_ms,
 
     print("Dying, closing sockets")
     # Close bound sockets
-    psc.backend.close() # TODO: uncomment
+    psc.backend.close()
 
 @pytest.fixture
 def thread_psc(psc_url, pub_url, comm_url, short_wait_ms, ctx, wait_ms,

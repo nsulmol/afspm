@@ -233,7 +233,7 @@ def end_experiment(afspm_component: AfspmComponent,
 
     # TODO: Look into removing this. Ugly delay to get stuff to
     # close properly in pytest.
-    time.sleep(2*wait_ms / 1000)
+    time.sleep(4*wait_ms / 1000)
 
 
 
