@@ -23,7 +23,7 @@ class ControlServer:
         server: the REP socket associated with our server
     """
 
-    def __init__(self, url: str, ctx: zmq.Context = None):
+    def __init__(self, url: str, ctx: zmq.Context = None, **kwargs):
         if not ctx:
             ctx = zmq.Context.instance()
 

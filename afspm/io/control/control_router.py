@@ -50,7 +50,7 @@ class ControlRouter:
 
     def __init__(self, server_url: str, router_url: str,
                  ctx: zmq.Context = None,
-                 server_timeout_ms: int = 1000):
+                 server_timeout_ms: int = 1000, **kwargs):
         """Init the class.
 
         Args:
@@ -60,6 +60,8 @@ class ControlRouter:
             ctx: zmq context.
             server_timeout_ms: delay to wait for a reply from the
                 ControlServer.
+            kwargs: allows non-used input arguments to be passed (so we can
+                initialize from an unfiltered dict).
         """
         if not ctx:
             ctx = zmq.Context.instance()

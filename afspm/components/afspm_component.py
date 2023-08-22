@@ -58,7 +58,7 @@ class AfspmComponent:
                  hb_period_s: float, poll_timeout_ms: int = 0,
                  subscriber: sub.Subscriber = None,
                  control_client: ctrl_client.ControlClient = None,
-                 ctx: zmq.Context = None):
+                 ctx: zmq.Context = None, **kwargs):
         """Initialize our AfspmComponent.
 
         Args:
@@ -70,6 +70,8 @@ class AfspmComponent:
                 DeviceController.
             control_client: client to ControlServer, to allow sending requests.
             ctx: zmq context.
+            kwargs: allows non-used input arguments to be passed (so we can
+                initialize from an unfiltered dict).
         """
         if not ctx:
             ctx = zmq.Context.instance()

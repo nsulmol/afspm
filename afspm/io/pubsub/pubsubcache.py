@@ -78,7 +78,7 @@ class PubSubCache:
                  ctx: zmq.Context = None,
                  extract_proto_kwargs: dict = None,
                  get_envelope_kwargs: dict = None,
-                 update_cache_kwargs: dict = None):
+                 update_cache_kwargs: dict = None, **kwargs):
         """Initializes the caching logic and connects our nodes.
 
         Args:
@@ -98,7 +98,8 @@ class PubSubCache:
                 pub_get_envelope_given_proto.
             update_cache_kwargs: any additional arguments to be fed to
                 update_cache.
-
+            kwargs: allows non-used input arguments to be passed (so we can
+                initialize from an unfiltered dict).
         """
         self.sub_extract_proto = sub_extract_proto
         self.extract_proto_kwargs = (extract_proto_kwargs if

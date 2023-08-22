@@ -76,7 +76,8 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
     def __init__(self, publisher: pub.Publisher,
                  control_server: ctrl_srvr.ControlServer,
                  poll_timeout_ms: int, loop_sleep_s: int, hb_period_s: float,
-                 ctx: zmq.Context = None, subscriber: sub.Subscriber = None):
+                 ctx: zmq.Context = None, subscriber: sub.Subscriber = None,
+                 **kwargs):
         """Initializes the controller.
 
         Args:
@@ -89,6 +90,8 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
             ctx: zmq Context; if not provided, we will create a new instance.
             subscriber: optional subscriber, to hook into (and detect) kill
                 signals.
+            kwargs: allows non-used input arguments to be passed (so we can
+                initialize from an unfiltered dict).
         """
         if not ctx:
             ctx = zmq.Context.instance()

@@ -45,7 +45,7 @@ class AfspmController(afspmc.AfspmComponent):
                  pubsubcache: pbc.PubSubCache,
                  router: ctrl_rtr.ControlRouter,
                  poll_timeout_ms: int,
-                 ctx: zmq.Context = None):
+                 ctx: zmq.Context = None, **kwargs):
         """Initialize AfspmController instance.
 
         Args:
@@ -56,6 +56,8 @@ class AfspmController(afspmc.AfspmComponent):
             poll_timeout_ms: how long to wait when polling for the different
                 components.
             ctx: zmq context.
+            kwargs: allows non-used input arguments to be passed (so we can
+                initialize from an unfiltered dict).
         """
         if not ctx:
             ctx = zmq.Context.instance()

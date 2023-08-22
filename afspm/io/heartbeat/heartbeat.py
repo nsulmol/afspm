@@ -31,13 +31,15 @@ class Heartbeater:
             heartbeat.
     """
     def __init__(self, url: str, beat_period_s: int,
-                 ctx: zmq.Context = None):
+                 ctx: zmq.Context = None, **kwargs):
         """Init heartbeater.
 
         Args:
             url: address we will bind to, to send hearbeats.
             beat_period_s: how frequently we should send a hearbeat.
             ctx: zmq context.
+            kwargs: allows non-used input arguments to be passed (so we can
+                initialize from an unfiltered dict).
         """
         if not ctx:
             ctx = zmq.Context.instance()
@@ -84,7 +86,7 @@ class HeartbeatListener:
     """
     def __init__(self, url: str, beat_period_s: int,
                  missed_beats_before_dead: int,
-                 ctx: zmq.Context = None):
+                 ctx: zmq.Context = None, **kwargs):
         """Init listener.
 
         Args:
@@ -93,6 +95,8 @@ class HeartbeatListener:
             missed_beats_before_dead: how many missed beats we will allow
                 before we consider the Heartbeater dead.
             ctx: zmq.Context.
+            kwargs: allows non-used input arguments to be passed (so we can
+                initialize from an unfiltered dict).
         """
         if not ctx:
             ctx = zmq.Context.instance()

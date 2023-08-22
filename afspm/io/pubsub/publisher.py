@@ -20,7 +20,7 @@ class Publisher:
     def __init__(self, url: str,
                  get_envelope_given_proto: Callable[[Message], str],
                  ctx: zmq.Context = None,
-                 get_envelope_kwargs: dict = None):
+                 get_envelope_kwargs: dict = None, **kwargs):
         """ Initializes the publisher.
 
         Args:
@@ -30,6 +30,8 @@ class Publisher:
             ctx: zmq Context; if not provided, we will create a new instance.
             get_envelope_kwargs: any additional arguments to be fed to
                 get_envelope_given_proto.
+            kwargs: allows non-used input arguments to be passed (so we can
+                initialize from an unfiltered dict).
         """
         self.get_envelope_given_proto = get_envelope_given_proto
         self.get_envelope_kwargs = (get_envelope_kwargs if get_envelope_kwargs

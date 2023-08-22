@@ -41,7 +41,7 @@ class ControlClient:
     def __init__(self, url: str, ctx: zmq.Context = None,
                  uuid: str = None,
                  request_retries: int = 3,
-                 request_timeout_ms: int = 2500):
+                 request_timeout_ms: int = 2500, **kwargs):
         """Initialize, given server url and additional parms.
 
         Args:
@@ -54,6 +54,8 @@ class ControlClient:
             request_retries: how many times we will retry sending a message,
                 before giving up and returning a connection error.
             request_timeout_ms: how long we wait between request tries.
+            kwargs: allows non-used input arguments to be passed (so we can
+                initialize from an unfiltered dict).
         """
         if not ctx:
             ctx = zmq.Context.instance()
