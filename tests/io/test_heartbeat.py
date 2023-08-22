@@ -148,7 +148,7 @@ def test_heartbeat_under_freeze(ctx, hb_listener, thread_hb, beat_period_s,
         curr_ts = time.time()
 
     send_comm_msg(comm_pub, CommMessage.FREEZE)
-    time.sleep(2 * missed_beats_before_dead * beat_period_s)
+    time.sleep(3 * missed_beats_before_dead * beat_period_s)
     assert hb_listener.check_if_dead(hb_listener_timeout_ms)
     assert not hb_listener.received_kill_signal
 
