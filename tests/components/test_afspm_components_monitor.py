@@ -49,12 +49,6 @@ def time_to_wait_s(hb_period_s, missed_beats_before_dead):
 
 
 # ----- Classes for Testing ----- #
-class SimpleComponent(AfspmComponent):
-    """A simple component that will run forever."""
-    def run_per_loop(self):
-        pass
-
-
 class CrashingComponent(AfspmComponent):
     """A simple component that crashes after some time."""
     def __init__(self, time_to_crash_s: float, **kwargs):
@@ -98,8 +92,9 @@ def test_basic_component(ctx, kwargs, loop_sleep_s, hb_period_s,
                          comp_name, missed_beats_before_dead,
                          time_to_wait_s):
     """Ensure a standard component stays alive for the test lifetime."""
-    comp_constructor_kwargs_list = [(SimpleComponent, kwargs)]
-    monitor = AfspmComponentsMonitor(comp_constructor_kwargs_list,
+    kwargs['class'] = 'afspm.components.afspm_component.AfspmComponent'
+    components_params_dict = {comp_name: kwargs}
+    monitor = AfspmComponentsMonitor(components_params_dict,
                                      loop_sleep_s,
                                      missed_beats_before_dead,
                                      ctx)
@@ -120,8 +115,10 @@ def test_crashing_component(ctx, kwargs, loop_sleep_s, hb_period_s,
                             time_to_wait_s):
     """Ensure a crashing component is restarted in the test lifetime."""
     kwargs['time_to_crash_s'] = 2 * hb_period_s
-    comp_constructor_kwargs_list = [(CrashingComponent, kwargs)]
-    monitor = AfspmComponentsMonitor(comp_constructor_kwargs_list,
+    kwargs['class'] = ('tests.components.test_afspm_components_monitor.'
+                       + 'CrashingComponent')
+    components_params_dict = {comp_name: kwargs}
+    monitor = AfspmComponentsMonitor(components_params_dict,
                                      loop_sleep_s,
                                      missed_beats_before_dead,
                                      ctx)
@@ -142,8 +139,11 @@ def test_exiting_component(ctx, kwargs, loop_sleep_s, hb_period_s,
                            time_to_wait_s):
     """Ensure a purposefully exiting component is *not* restarted."""
     kwargs['time_to_exit_s'] = 2 * hb_period_s
-    comp_constructor_kwargs_list = [(ExitingComponent, kwargs)]
-    monitor = AfspmComponentsMonitor(comp_constructor_kwargs_list,
+
+    kwargs['class'] = ('tests.components.test_afspm_components_monitor.'
+                       + 'ExitingComponent')
+    components_params_dict = {comp_name: kwargs}
+    monitor = AfspmComponentsMonitor(components_params_dict,
                                      loop_sleep_s,
                                      missed_beats_before_dead,
                                      ctx)
