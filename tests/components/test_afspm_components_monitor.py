@@ -98,6 +98,8 @@ def test_basic_component(ctx, kwargs, loop_sleep_s, hb_period_s,
                                      loop_sleep_s,
                                      missed_beats_before_dead,
                                      ctx)
+    monitor._startup_processes_and_listeners()
+
     assert len(monitor.component_processes) == 1
     assert comp_name in monitor.component_processes
     original_pid = monitor.component_processes[comp_name].pid
@@ -122,6 +124,8 @@ def test_crashing_component(ctx, kwargs, loop_sleep_s, hb_period_s,
                                      loop_sleep_s,
                                      missed_beats_before_dead,
                                      ctx)
+    monitor._startup_processes_and_listeners()
+
     assert len(monitor.component_processes) == 1
     assert comp_name in monitor.component_processes
     original_pid = monitor.component_processes[comp_name].pid
@@ -147,6 +151,8 @@ def test_exiting_component(ctx, kwargs, loop_sleep_s, hb_period_s,
                                      loop_sleep_s,
                                      missed_beats_before_dead,
                                      ctx)
+    monitor._startup_processes_and_listeners()
+
     assert len(monitor.component_processes) == 1
     assert comp_name in monitor.component_processes
 

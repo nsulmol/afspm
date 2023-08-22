@@ -88,15 +88,9 @@ class AfspmComponentsMonitor:
         self.loop_sleep_s = loop_sleep_s
         self.missed_beats_before_dead = missed_beats_before_dead
 
-        # Build up processes and listeners
         self.component_processes = {}
         self.listeners = {}
-        for name in self.component_params_dict:
-            self.component_processes[name] = self._startup_component(
-                self.component_params_dict[name], self.ctx)
-            self.listeners[name] = self._startup_listener(
-                self.component_params_dict[name],
-                self.missed_beats_before_dead, self.ctx)
+        # Note: starting up of the processes and listeners is in run()
 
     def __del__(self):
         """Extra-careful deletion to ensure processes are deleted.
@@ -110,8 +104,8 @@ class AfspmComponentsMonitor:
         ensure our member variable of interest exists before calling on it.
         """
         if self.component_processes:
-            for key in self.component_processes:
-                self.component_processes[key].terminate()
+            for __, process in self.component_processes.items():
+                process.terminate()
         # Not calling super().__del__() because there is no super.
 
     @staticmethod
@@ -153,12 +147,26 @@ class AfspmComponentsMonitor:
         return HeartbeatListener(hb_url, hb_period_s,
                                  missed_beats_before_dead, ctx)
 
+    def _startup_processes_and_listeners(self):
+        """Startup component processes and their associated listeners."""
+        for name in self.component_params_dict:
+            self.component_processes[name] = self._startup_component(
+                self.component_params_dict[name], self.ctx)
+            self.listeners[name] = self._startup_listener(
+                self.component_params_dict[name],
+                self.missed_beats_before_dead, self.ctx)
+
     def run(self):
         """Main loop."""
-        while True:
+        self._startup_processes_and_listeners()
+        continue_running = True
+        while continue_running:
             try:
                 self.run_per_loop()
                 time.sleep(self.loop_sleep_s)
+                if not self.component_processes and not self.listeners:
+                    logger.info("All components closed, exiting.")
+                    continue_running = False
             except (KeyboardInterrupt, SystemExit):
                 logger.warning("Interrupt received. Stopping.")
                 break
