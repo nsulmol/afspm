@@ -158,7 +158,7 @@ def _evaluate_values_recursively(params_dict: dict) -> dict:
             class: 'afspm.io.pubsub.subscriber.Subscriber',
             sub_url: 'tcp://127.0.0.1:5555'
             sub_extract_proto:
-            'afspm.io.cache.cache_logic.CacheLogic.create_envelope_from_proto',
+            'afspm.io.cache.cache_logic.CacheLogic.extract_proto',
             [...]
         }
     }
