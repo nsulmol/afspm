@@ -2,6 +2,7 @@
 
 import logging
 import time
+import tempfile
 import zmq
 
 from google.protobuf.message import Message
@@ -148,4 +149,4 @@ class AfspmComponent:
 
 def get_heartbeat_url(name: str):
     """Create a hearbeat url, given a component name."""
-    return "ipc://" + name
+    return "ipc://" + tempfile.gettempdir() + '/' + name
