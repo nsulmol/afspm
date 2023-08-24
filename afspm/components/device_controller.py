@@ -102,9 +102,9 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
         self.req_handler_map = self.create_req_handler_map()
 
         # Init our current understanding of state / params
-        self.scan_state = self.poll_scan_state()
-        self.scan_params = self.poll_scan_params()
-        self.scan = self.get_latest_scan()
+        self.scan_state = copy.deepcopy(self.poll_scan_state())
+        self.scan_params = copy.deepcopy(self.poll_scan_params())
+        self.scan = copy.deepcopy(self.poll_scan())
 
         # AfspmComponent constructor: no control_client provided, as that
         # logic is handled by the control_server.
@@ -139,15 +139,10 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
 
     @abstractmethod
     def poll_scan_params(self) -> scan.ScanParameters2d:
-        """Poll the controller for the current scan parameters.
-
-        Note: if returning a member variable instance, make sure to
-        copy.deepcopy, as python is pass-by-assignment (protobuf.Message
-        is a mutable object)!
-        """
+        """Poll the controller for the current scan parameters."""
 
     @abstractmethod
-    def get_latest_scan(self) -> scan.Scan2d:
+    def poll_scan(self) -> scan.Scan2d:
         """Obtain latest performed scan.
 
         We will compare the prior scan to the latest to determine if
@@ -161,15 +156,11 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
             get_file_creation_datetime()
         and you can put that in the timestamp param with:
             scan.timestamp.FromDatetime(ts)
-
-        Note: if returning a member variable instance, make sure to
-        copy.deepcopy, as python is pass-by-assignment (protobuf.Message
-        is a mutable object)!
         """
 
     def _handle_polling_device(self):
         """Polls aspects of device, and publishes changes (including scans)."""
-        old_scan_state = self.scan_state
+        old_scan_state = copy.deepcopy(self.scan_state)
         self.scan_state = self.poll_scan_state()
 
         if old_scan_state != self.scan_state:
@@ -179,15 +170,14 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
 
         if (old_scan_state == scan.ScanState.SS_SCANNING and
                 self.scan_state != scan.ScanState.SS_SCANNING):
-            old_scan = self.scan
-            self.scan = self.get_latest_scan()
+            old_scan = copy.deepcopy(self.scan)
+            self.scan = self.poll_scan()
 
             # If scans are different, assume now and send out!
             # Test timestamps if they exist. Otherwise, compare
             # data arrays.
             send_scan = False
-            if (scan_val.HasField(self.TIMESTAMP_ATTRIB_NAME)
-                    for scan_val in [old_scan, self.scan]):
+            if self.scan.HasField(self.TIMESTAMP_ATTRIB_NAME):
                 if old_scan.timestamp != self.scan.timestamp:
                     send_scan = True
             elif old_scan.values != self.scan.values:
@@ -197,7 +187,7 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
                 logger.debug("New scan, sending out.")
                 self.publisher.send_msg(self.scan)
 
-        old_scan_params = self.scan_params
+        old_scan_params = copy.deepcopy(self.scan_params)
         self.scan_params = self.poll_scan_params()
         if old_scan_params != self.scan_params:
             logger.debug("New scan_params, sending out.")
