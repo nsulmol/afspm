@@ -7,17 +7,15 @@ from types import MappingProxyType  # Immutable dict
 import toml
 import fire
 
-from .utils.parser import expand_variables_in_dict
-from .components.afspm_components_monitor import AfspmComponentsMonitor
-
+# TODO: Figure out why this can't be relative?
+from afspm.utils.parser import expand_variables_in_dict
+from afspm.components.afspm_components_monitor import AfspmComponentsMonitor
 
 logger = logging.getLogger(__name__)
 
 
 IS_COMPONENT_KEY = 'component'
-MONITOR_KEY = 'AfspmComponentsMonitor'
-MONITOR_LOOP_SLEEP_KEY = 'loop_sleep_s'
-MONITOR_BEATS_BEFORE_DEAD_KEY = 'missed_beats_before_dead'
+MONITOR_KEY = 'afspm_components_monitor'
 
 LOG_LEVEL_STR_TO_VAL = MappingProxyType({
     'NOTSET': logging.NOTSET,
@@ -34,7 +32,7 @@ def spawn_components(config_file: str,
                      encoding: str = 'utf-8',
                      log_file: str = 'log.txt',
                      log_to_stdout: bool = True,
-                     log_level_str: str = ""):
+                     log_level: str = "INFO"):
     """Spawn afspm components from a provided config file.
 
     This method takes as input a TOML file of the following structure:
@@ -69,11 +67,12 @@ def spawn_components(config_file: str,
     instance, which restarts any crashed/frozen components.
 
     There is one 'special case' to the above, where the dict key is the
-    class name rather than the instance name: AfspmComponentsMonitor.
+    class name rather than the instance name: afspm_components_monitor
+    (note switch from CamelCase to snake_case).
 
     This is because the monitor is what spawns the other components. For this
     exception, we expect the following in the TOML:
-        [AfspmComponentsMonitor]
+        [afspm_components_monitor]
         loop_sleep_s = ...
         missed_beats_before_dead = ...
 
@@ -100,28 +99,29 @@ def spawn_components(config_file: str,
             To not log to file, set to None.
         log_to_stdout: whether or not we print to std out as well. Default is
             True.
-        log_level_str: the log level to use. Default is INFO.
+        log_level: the log level to use. Default is INFO.
     """
-    _set_up_logging(log_file, log_to_stdout, log_level_str)
+    _set_up_logging(log_file, log_to_stdout, log_level)
+
+    #from afspm.utils.parser import expand_variables_in_dict
+    #from afspm.components.afspm_components_monitor import AfspmComponentsMonitor
+
 
     monitor = None
-    with open(config_file, 'r', encoding=encoding)as file:
+    with open(config_file, 'r', encoding=encoding) as file:
         config_dict = toml.load(file)
 
-        loop_sleep_s, beats_before_dead = _get_monitor_parameters(
-            config_dict)
-        filtered_dict = _prepare_dict_for_spawning(config_dict,
-                                                   components_to_spawn)
-        monitor = AfspmComponentsMonitor(filtered_dict, loop_sleep_s,
-                                         beats_before_dead)
+        expanded_dict = expand_variables_in_dict(config_dict)
+        filtered_dict = _filter_requested_components(expanded_dict,
+                                                     components_to_spawn)
+        monitor = AfspmComponentsMonitor(filtered_dict,
+                                         **expanded_dict[MONITOR_KEY])
 
     if monitor:
         monitor.run()
 
 
-def _set_up_logging(log_file: str = 'log.txt',
-                    log_to_stdout: bool = True,
-                    log_level_str: str = ""):
+def _set_up_logging(log_file: str, log_to_stdout: bool, log_level: str):
     """Set up logging logic.
 
     Args:
@@ -129,11 +129,11 @@ def _set_up_logging(log_file: str = 'log.txt',
             To not log to file, set to None.
         log_to_std_out: whether or not we print to std out as well. Default is
             True.
-        log_level_str: the log level to use. Default is INFO.
+        log_level: the log level to use. Default is INFO.
     """
-
-    log_level = LOG_LEVEL_STR_TO_VAL[log_level_str.upper()]
-    logger.setLevel(log_level)
+    root = logging.getLogger('afspm')
+    log_level = LOG_LEVEL_STR_TO_VAL[log_level.upper()]
+    root.setLevel(log_level)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - '
                                   '%(message)s')
 
@@ -146,50 +146,7 @@ def _set_up_logging(log_file: str = 'log.txt',
     for handler in handlers:
         handler.setLevel(log_level)
         handler.setFormatter(formatter)
-        logger.addHandler(handler)
-
-
-def _get_monitor_parameters(config_dict) -> (int, int):
-    """Validate that we have AfspmMonitorComponents parameters and provide.
-
-    Args:
-        config_dict: dictionary to analyze.
-
-    Returns:
-        tuple consisting of 'loop_sleep_s' and 'missed_beats_before_end'
-        parameters for instantiating the AfspmComponentsMonitor.
-    """
-    if MONITOR_KEY not in config_dict:
-        msg = ("%s key not found in config file, cannot continue." %
-               MONITOR_KEY)
-        logger.error(msg)
-        raise KeyError(msg)
-    return (config_dict[MONITOR_KEY][MONITOR_LOOP_SLEEP_KEY],
-            config_dict[MONITOR_KEY][MONITOR_BEATS_BEFORE_DEAD_KEY])
-
-
-def _prepare_dict_for_spawning(config_dict: dict,
-                               components_to_spawn: list[str] = None) -> dict:
-    """The 'setup' portion of spawn_components().
-
-    Here, we:
-    - Expand the variables in our config_dict out.
-    - Filter out key:vals from our config_dict that are not components we want
-    to spawn.
-
-    Args:
-        config_dict: dictionary to analyze.
-        components_to_spawn: list of strings, with each string corresponding
-            to a $COMPONENT_NAME$ in the config file. If None, all components
-            in the config file will be spawned. Note: any 'component' requires
-            a key:val of 'component': True for us to parse it properly!
-
-    Returns:
-        A new dict consisting only of the key:val pairs associated with the
-        components we want to spawn.
-    """
-    expanded_dict = expand_variables_in_dict(config_dict)
-    return _filter_requested_components(expanded_dict, components_to_spawn)
+        root.addHandler(handler)
 
 
 def _filter_requested_components(config_dict: dict,
@@ -205,6 +162,10 @@ def _filter_requested_components(config_dict: dict,
     the config dict and accept all key:vals that contain a 'component': True
     key:val.
 
+    Note: we also copy the parent key (which is the name) into a 'name' key in
+    the sub-dict. This is for convenience elsewhere, where we use the 'name'
+    key to determine the component's name.
+
     Args:
         config_dict: dictionary to analyze.
         components_to_spawn: list of strings, with each string corresponding
@@ -218,8 +179,10 @@ def _filter_requested_components(config_dict: dict,
     """
     filtered_dict = {}
     for key in config_dict:
-        if components_to_spawn is None or key in components_to_spawn:
+        if (isinstance(config_dict[key], dict) and
+            (components_to_spawn is None or key in components_to_spawn)):
             if IS_COMPONENT_KEY in config_dict[key]:
+                config_dict[key]['name'] = key
                 filtered_dict[key] = config_dict[key]
             elif components_to_spawn is not None:
                 msg = ("Requested component %s, but this is not a "
@@ -230,5 +193,9 @@ def _filter_requested_components(config_dict: dict,
     return filtered_dict
 
 
-if __name__ == '__main__':
+def cli():
     fire.Fire(spawn_components)
+
+
+if __name__ == '__main__':
+    cli()
