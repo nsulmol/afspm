@@ -122,7 +122,7 @@ def test_heartbeat_works(ctx, hb_listener, thread_hb, beat_period_s,
     curr_ts = start_ts
 
     while curr_ts - start_ts < total_duration:
-        assert not hb_listener.check_if_dead(hb_listener_timeout_ms)
+        assert hb_listener.check_is_alive(hb_listener_timeout_ms)
         curr_ts = time.time()
     send_comm_msg(comm_pub, CommMessage.END)  # Tell Heartbeat to end
 
@@ -144,12 +144,12 @@ def test_heartbeat_under_freeze(ctx, hb_listener, thread_hb, beat_period_s,
     curr_ts = start_ts
 
     while curr_ts - start_ts < beat_check_time_s:
-        assert not hb_listener.check_if_dead(hb_listener_timeout_ms)
+        assert hb_listener.check_is_alive(hb_listener_timeout_ms)
         curr_ts = time.time()
 
     send_comm_msg(comm_pub, CommMessage.FREEZE)
     time.sleep(3 * missed_beats_before_dead * beat_period_s)
-    assert hb_listener.check_if_dead(hb_listener_timeout_ms)
+    assert not hb_listener.check_is_alive(hb_listener_timeout_ms)
     assert not hb_listener.received_kill_signal
 
     send_comm_msg(comm_pub, CommMessage.END)  # Tell Heartbeat to end
@@ -172,12 +172,12 @@ def test_heartbeat_under_crash(ctx, hb_listener, thread_hb, beat_period_s,
     curr_ts = start_ts
 
     while curr_ts - start_ts < beat_check_time_s:
-        assert not hb_listener.check_if_dead(hb_listener_timeout_ms)
+        assert hb_listener.check_is_alive(hb_listener_timeout_ms)
         curr_ts = time.time()
 
     send_comm_msg(comm_pub, CommMessage.CRASH)
     time.sleep(2 * missed_beats_before_dead * beat_period_s)
-    assert hb_listener.check_if_dead(hb_listener_timeout_ms)
+    assert not hb_listener.check_is_alive(hb_listener_timeout_ms)
     assert not hb_listener.received_kill_signal
 
 
@@ -198,10 +198,10 @@ def test_heartbeat_under_end(ctx, hb_listener, thread_hb, beat_period_s,
     curr_ts = start_ts
 
     while curr_ts - start_ts < beat_check_time_s:
-        assert not hb_listener.check_if_dead(hb_listener_timeout_ms)
+        assert hb_listener.check_is_alive(hb_listener_timeout_ms)
         curr_ts = time.time()
 
     send_comm_msg(comm_pub, CommMessage.END)
     time.sleep(2 * missed_beats_before_dead * beat_period_s)
-    assert hb_listener.check_if_dead(hb_listener_timeout_ms)
+    assert not hb_listener.check_is_alive(hb_listener_timeout_ms)
     assert hb_listener.received_kill_signal

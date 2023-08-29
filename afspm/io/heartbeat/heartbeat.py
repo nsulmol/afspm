@@ -108,9 +108,10 @@ class HeartbeatListener:
         self.time_before_dead_s = missed_beats_before_dead * beat_period_s
         self.last_beat_ts = time.time()
         self.received_kill_signal = False
+        self.received_first_beat = False
 
-    def check_if_dead(self, timeout_ms: int = 10) -> bool:
-        """Checks if the Hearbeater is dead.
+    def check_is_alive(self, timeout_ms: int = 10) -> bool:
+        """Checks if the Hearbeater is alive.
 
         If self.time_before_dead_ms has already been met, we do not even poll.
         If not, we poll and check for a heartbeat or KILL signal.
@@ -126,18 +127,19 @@ class HeartbeatListener:
             msg = self.subscriber.recv(zmq.NOBLOCK)
             msg_enum = HBMessage(int.from_bytes(msg, 'big'))
             if msg_enum == HBMessage.HEARTBEAT:
+                self.received_first_beat = True
                 self.last_beat_ts = curr_ts
             elif msg_enum == HBMessage.KILL:
                 self.received_kill_signal = True
             else:
                 logger.warning("Received non-HBMessage message. Ignoring.")
 
-        if curr_ts - self.last_beat_ts >= self.time_before_dead_s:
-            return True
-        return False
+        if (curr_ts - self.last_beat_ts >= self.time_before_dead_s or
+                self.received_kill_signal):
+            return False
+        return True
 
     def reset(self):
         """Reset internal logic following a restart of Heartbeater."""
         self.last_beat_ts = time.time()
-        self.curr_ts = self.last_beat_ts
         self.received_kill_signal = False
