@@ -63,8 +63,6 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
         subscriber: optional subscriber, to hook into (and detect) kill
             signals.
     """
-
-    NAME = "DeviceController"
     TIMESTAMP_ATTRIB_NAME = 'timestamp'
 
     # Indicates commands we will allow to be sent while a scan is ongoing
@@ -73,7 +71,7 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
     # Note: REQ_HANDLER_MAP defined at end, due to dependency on methods
     # defined below.
 
-    def __init__(self, publisher: pub.Publisher,
+    def __init__(self, name: str, publisher: pub.Publisher,
                  control_server: ctrl_srvr.ControlServer,
                  poll_timeout_ms: int, loop_sleep_s: int, hb_period_s: float,
                  ctx: zmq.Context = None, subscriber: sub.Subscriber = None,
@@ -81,6 +79,7 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
         """Initializes the controller.
 
         Args:
+            name: component name.
             publisher: Publisher instance, for publishing data.
             control_server: ControlServer instance, for responding to control
                 requests.
@@ -108,7 +107,7 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
 
         # AfspmComponent constructor: no control_client provided, as that
         # logic is handled by the control_server.
-        super().__init__(self.NAME, loop_sleep_s, hb_period_s,
+        super().__init__(name, loop_sleep_s, hb_period_s,
                          self.poll_timeout_ms, subscriber=subscriber,
                          control_client=None, ctx=ctx)
 

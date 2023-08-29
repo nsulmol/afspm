@@ -74,6 +74,7 @@ class AfspmComponent:
             kwargs: allows non-used input arguments to be passed (so we can
                 initialize from an unfiltered dict).
         """
+        logger.debug("Initializing component %s", name)
         if not ctx:
             ctx = zmq.Context.instance()
 
@@ -88,15 +89,15 @@ class AfspmComponent:
 
     def run(self):
         """Main loop."""
+        logger.debug("Beginning main loop for component %s", self.name)
         while self.stay_alive:
             try:
-                #print(f"Main loop for: {self.name}")
                 self.heartbeater.handle_beat()
                 self._handle_subscriber()
                 self.run_per_loop()
                 time.sleep(self.loop_sleep_s)
             except (KeyboardInterrupt, SystemExit):
-                logger.warning("%s: Interrupt received. Stopping., self.name")
+                logger.warning("%s: Interrupt received. Stopping.", self.name)
                 self.stay_alive = False
 
     def _handle_subscriber(self):

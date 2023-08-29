@@ -39,9 +39,8 @@ class AfspmController(afspmc.AfspmComponent):
             and determine if a new message is to be sent out (via the
             publisher).
     """
-    NAME = "AfspmController"
-
-    def __init__(self, loop_sleep_s: float, hb_period_s: float,
+    # TODO: update input parameters to remove afspm_component ones
+    def __init__(self, name: str, loop_sleep_s: float, hb_period_s: float,
                  pubsubcache: pbc.PubSubCache,
                  router: ctrl_rtr.ControlRouter,
                  poll_timeout_ms: int,
@@ -49,6 +48,7 @@ class AfspmController(afspmc.AfspmComponent):
         """Initialize AfspmController instance.
 
         Args:
+            name: component name.
             loop_sleep_s: how long we sleep in our main loop.
             hb_period_s: how frequently we should send a hearbeat.
             pubsubcache: PubSubCache instance, for caching data received.
@@ -68,7 +68,7 @@ class AfspmController(afspmc.AfspmComponent):
         self.control_state = ctrl.ControlState()
         # AfspmComponent constructor: no subscriber or control_client
         # are provided, as they are not applicable here.
-        super().__init__(self.NAME, loop_sleep_s, hb_period_s,
+        super().__init__(name, loop_sleep_s, hb_period_s,
                          self.poll_timeout_ms, subscriber=None,
                          control_client=None, ctx=ctx)
 
@@ -100,4 +100,5 @@ class AfspmController(afspmc.AfspmComponent):
         if self.router.was_shutdown_requested():
             logger.info("Shutdown requested, sending kill signal out.")
             self.pubsubcache.send_kill_signal()
+            self.heartbeater.handle_closing()
             self.stay_alive = False  # shutdown self

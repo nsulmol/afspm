@@ -33,6 +33,7 @@ class SampleDeviceController(DeviceController):
 
         self.scan_time_s = scan_time_s
         self.move_time_s = move_time_s
+        kwargs['name'] = 'dev_con'
         super().__init__(**kwargs)
 
     def on_start_scan(self):
@@ -120,7 +121,7 @@ def afspm_controller_routine(psc_url, pub_url, server_url, router_url,
                       update_cache_kwargs=cache_kwargs)
     router = ControlRouter(server_url, router_url, ctx, poll_timeout_ms)
 
-    controller = AfspmController(loop_sleep_s, hb_period_s,
+    controller = AfspmController('afspm_ctrl', loop_sleep_s, hb_period_s,
                                  psc, router, poll_timeout_ms,
                                  ctx)
     controller.run()

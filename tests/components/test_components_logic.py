@@ -295,8 +295,8 @@ def test_start_scan(thread_device_controller, thread_afspm_controller,
     rep = afspm_component.control_client.start_scan()
     scan_state_msg = scan_pb2.ScanStateMsg(
         scan_state=scan_pb2.ScanState.SS_SCANNING)
-
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
+
     assert_sub_received_proto(afspm_component.subscriber,
                               scan_state_msg,
                               wait_ms)
