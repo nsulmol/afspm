@@ -39,7 +39,6 @@ class AfspmController(afspmc.AfspmComponent):
             and determine if a new message is to be sent out (via the
             publisher).
     """
-    # TODO: update input parameters to remove afspm_component ones
     def __init__(self, name: str, loop_sleep_s: float, hb_period_s: float,
                  pubsubcache: pbc.PubSubCache,
                  router: ctrl_rtr.ControlRouter,
