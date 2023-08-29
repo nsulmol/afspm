@@ -7,13 +7,20 @@ The two main methods here are:
 All other methods are used within these and thus private.
 """
 
+import copy
+import logging
 from importlib import import_module
 from typing import Any
+
+
+logger = logging.getLogger(__name__)
+
 
 # Constants for string evaluation of inspection/instantiation.
 INSPECTABLE_CHAR = '.'
 URL_CHAR = ':'
-INSTANTIATE_STR = '()'
+INST_CHARS = '()'
+ARG_SEP = ','
 
 # Constant expected key indicating something is a class and should be
 # instantiated
@@ -65,20 +72,27 @@ def _expand_variables_recursively(config_dict: dict, sub_dict: dict) -> dict:
     Returns:
         the expanded out version of the sub_dict.
     """
-
     if sub_dict is None:
+        # TODO: Consider live replacement logic (skipping deepcopy)
+        config_dict = copy.deepcopy(config_dict)
         sub_dict = config_dict
 
-    new_dict = {}
-    for key in sub_dict:
-        if isinstance(sub_dict[key], dict):  # Go deeper in 'tree'
-            new_dict[key] = _expand_variables_recursively(config_dict,
-                                                          sub_dict[key])
-        elif sub_dict[key] in config_dict:  # Expand variable
-            new_dict[key] = config_dict[sub_dict[key]]
-        else:  # Copy value over (this is not a variable)
-            new_dict[key] = sub_dict[key]
-    return new_dict
+    try:
+        for key in sub_dict:
+            if isinstance(sub_dict[key], dict):  # Go deeper in 'tree'
+                sub_dict[key] = _expand_variables_recursively(config_dict,
+                                                              sub_dict[key])
+            elif (isinstance(sub_dict[key], str) and
+                  sub_dict[key] in config_dict):  # Expand variable
+                sub_dict[key] = config_dict[sub_dict[key]]
+            else:  # Copy value over (this is not a variable)
+                sub_dict[key] = sub_dict[key]
+    except Exception as exc:
+        msg = ("Exception for key:val = %s : %s, exception: %s" %
+               (key, sub_dict[key], str(exc)))
+        logger.error(msg)
+        raise exc
+    return sub_dict
 
 
 def construct_and_run_component(params_dict: dict):
@@ -239,35 +253,75 @@ def _evaluate_value_str(value: str) -> Any:
     """
     if INSPECTABLE_CHAR in value and URL_CHAR not in value:
         # This is something we need to inspect!
-        instantiate = False
-        if value[-2:] == INSTANTIATE_STR:
-            # Last 2 chars indicate instantiation
-            instantiate = True
-            value = value[:-2]  # Remove last 2 characters for inspection
+        args = None
+        if INST_CHARS[-1] in value:
+            # We have something to instantiate. We will first extract all
+            # arguments and evaluate them recursively.
+            start_idx = value.find(INST_CHARS[0])
+            end_idx = value.rfind(INST_CHARS[1])
+            if start_idx > 0 and end_idx > 0:
+                arg_strs = value[start_idx:end_idx + 1]
+                value = value.replace(arg_strs, '')
+                # Remove ends (parentheses); split by ARG_SEP
+                arg_strs = arg_strs[1:-1].split(ARG_SEP)
+                args = [_evaluate_value_str(arg_str) for arg_str in arg_strs]
+
         imported = _import_from_string(value)
-        if instantiate:
-            return imported()  # Return instantiation of what we imported
+        if args:
+            # If there were no arguments, args will be a list with one empty
+            # string
+            instantiated = imported(*args) if args != [''] else imported()
+            return instantiated  # Return instantiation of what we imported
         return imported  # Return imported class or method
     return value  # Return original string
 
 
-def _import_from_string(class_path: str) -> Any:
+def _import_from_string(obj_path: str) -> Any:
     """Import a class or method given a string like 'a.b.c'.
 
-    This method will import the exemplary class c, imported from a.b.
+    This method will import:
+    - the exemplary class c, imported from a.b.
+    - a method d, imported from a.b (a.b.d).
+    - a static method d, imported from class c in package a.b (a.b.c.d).
 
-    Note: taken from Pat's answer here:
+    To account for the 3rd case, we also try to import the 'sub-mod' path
+    'a.b' when extracting a string 'a.b.c.d'.
+
+    Note: modified from Pat's answer here:
     https://stackoverflow.com/questions/452969/does-python-have-an-equivalent
     -to-java-class-forname
 
     Args:
-        class_path: string describing the class in the form 'a.b.c', where
-            'c' is the class name, and 'a.b' is the module path.
+        obj_path: string describing the class in the form 'a.b.c', where
+            'c' is the class name, and 'a.b' is the module path (or one of the
+            other supported formats mentioned above).
 
     Returns:
         The imported object.
     """
-    module_path, _, class_name = class_path.rpartition('.')
-    mod = import_module(module_path)
-    klass = getattr(mod, class_name)
-    return klass
+
+    top_mod_path, _, top_obj = obj_path.rpartition('.')
+    sub_mod_path, _, sub_obj = top_mod_path.rpartition('.')
+
+    caught_exc = None
+    final_obj = None
+    for (module_path, obj_name) in zip([top_mod_path, sub_mod_path],
+                                       [top_obj, sub_obj]):
+        try:
+            if module_path:  # Do not continue if module path is empty
+                mod = import_module(module_path)
+                final_obj = getattr(mod, obj_name)
+                if obj_name == sub_obj:
+                    final_obj = getattr(final_obj, top_obj)
+                break
+        except ModuleNotFoundError as exc:
+            caught_exc = exc
+            continue
+
+    if final_obj:
+        return final_obj
+    else:
+        logger.warning("Could not import %s, got exception %s. " +
+                       "Treating as direct string and continuing.",
+                       obj_path, caught_exc)
+        return obj_path

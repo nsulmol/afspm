@@ -15,11 +15,7 @@ def sample_dict():
             'afspm.io.cache.cache_logic.CacheLogic.create_envelope_from_proto'
         },
         'level3': {
-            'publisher': {
-                'url': 'pub_url',
-                'get_envelope_given_proto':
-                'afspm.io.cache.cache_logic.CacheLogic.create_envelope_from_proto'
-            }
+            'my_publisher': 'publisher'
         }
     }
 
@@ -33,7 +29,7 @@ def expected_expanded_dict():
             'afspm.io.cache.cache_logic.CacheLogic.create_envelope_from_proto'
         },
         'level3': {
-            'publisher': {
+            'my_publisher': {
                 'url': 'tcp://127.0.0.1:5555',
                 'get_envelope_given_proto':
                 'afspm.io.cache.cache_logic.CacheLogic.create_envelope_from_proto'
@@ -57,7 +53,6 @@ def control_client_str():
 def sample_url():
     return 'inproc://banana'
 
-
 def test_import_from_string(control_client_str, sample_url):
     """Validate class importing ability."""
 
@@ -69,9 +64,10 @@ def test_import_from_string(control_client_str, sample_url):
     assert isinstance(instance, ControlClient)
 
     # Lastly, confirm we *cannot* import without the module path.
+    # Instead, it just returns the original string and logs a warning.
     no_path_pbc_logic = "ProtoBasedCacheLogic"
-    with pytest.raises(ValueError):
-        parser._import_from_string(no_path_pbc_logic)
+    res = parser._import_from_string(no_path_pbc_logic)
+    assert res == no_path_pbc_logic
 
 
 @pytest.fixture
@@ -79,8 +75,19 @@ def pbc_logic_str():
     return 'afspm.io.cache.pbc_logic.ProtoBasedCacheLogic'
 
 
+@pytest.fixture
+def scan2d_str():
+    return "afspm.io.protos.generated.scan_pb2.Scan2d()"
+
+
+@pytest.fixture
+def topics_scan2d_str(scan2d_str):
+    return ("afspm.io.cache.cache_logic.CacheLogic.create_envelope_from_proto("
+            + scan2d_str + ")")
+
+
 def test_evaluate_value_str(control_client_str, sample_url,
-                            pbc_logic_str):
+                            pbc_logic_str, topics_scan2d_str):
     """Ensure we handle evaluating values in key:val pairs properly."""
     # Test doing nothing (url)
     res = parser._evaluate_value_str(sample_url)
@@ -95,6 +102,11 @@ def test_evaluate_value_str(control_client_str, sample_url,
     res = parser._evaluate_value_str(pbc_logic_str + '()')
     from afspm.io.cache.pbc_logic import ProtoBasedCacheLogic
     assert isinstance(res, ProtoBasedCacheLogic)
+
+    # Validate multilevel instantiation
+    res = parser._evaluate_value_str(topics_scan2d_str)
+    from afspm.io.protos.generated.scan_pb2 import Scan2d
+    assert res == Scan2d.__name__
 
 
 @pytest.fixture
