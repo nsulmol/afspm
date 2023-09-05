@@ -12,6 +12,7 @@ from google.protobuf.message import Message
 
 from . import afspm_component as afspmc
 
+from ..io import common
 from ..io.pubsub import publisher as pub
 from ..io.pubsub import subscriber as sub
 from ..io.control import commands as cmd
@@ -65,8 +66,8 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
     """
     TIMESTAMP_ATTRIB_NAME = 'timestamp'
 
-    # Indicates commands we will allow to be sent while a scan is ongoing
-    ALLOWED_COMMANDS_DURING_SCAN = [ctrl.ControlRequest.REQ_STOP_SCAN]
+    # Indicates commands we will allow to be sent while not free
+    ALLOWED_COMMANDS_WHILE_NOT_FREE = [ctrl.ControlRequest.REQ_STOP_SCAN]
 
     # Note: REQ_HANDLER_MAP defined at end, due to dependency on methods
     # defined below.
@@ -101,9 +102,9 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
         self.req_handler_map = self.create_req_handler_map()
 
         # Init our current understanding of state / params
-        self.scan_state = copy.deepcopy(self.poll_scan_state())
-        self.scan_params = copy.deepcopy(self.poll_scan_params())
-        self.scan = copy.deepcopy(self.poll_scan())
+        self.scan_state = scan.ScanState.SS_UNDEFINED
+        self.scan_params = scan.ScanParameters2d()
+        self.scan = scan.Scan2d()
 
         # AfspmComponent constructor: no control_client provided, as that
         # logic is handled by the control_server.
@@ -158,14 +159,15 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
         """
 
     def _handle_polling_device(self):
-        """Polls aspects of device, and publishes changes (including scans)."""
+        """Polls aspects of device, and publishes changes (including scans).
+
+        Note: we expect scan state to be sent *last*, so that any client has
+        the ability to validate the expected changes have taken effect. Put
+        differently: any client should get all other changes *before* the
+        state change.
+        """
         old_scan_state = copy.deepcopy(self.scan_state)
         self.scan_state = self.poll_scan_state()
-
-        if old_scan_state != self.scan_state:
-            logger.debug("New scan state detected, sending out.")
-            scan_state_msg = scan.ScanStateMsg(scan_state=self.scan_state)
-            self.publisher.send_msg(scan_state_msg)
 
         if (old_scan_state == scan.ScanState.SS_SCANNING and
                 self.scan_state != scan.ScanState.SS_SCANNING):
@@ -183,27 +185,45 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
                 send_scan = True
 
             if send_scan:
-                logger.debug("New scan, sending out.")
+                logger.info("New scan, sending out.")
                 self.publisher.send_msg(self.scan)
 
         old_scan_params = copy.deepcopy(self.scan_params)
         self.scan_params = self.poll_scan_params()
         if old_scan_params != self.scan_params:
-            logger.debug("New scan_params, sending out.")
+            logger.info("New scan_params, sending out.")
             self.publisher.send_msg(self.scan_params)
+
+        # Scan state changes sent *last*!
+        if old_scan_state != self.scan_state:
+            logger.info("New scan state %s, sending out.",
+                        common.get_enum_str(scan.ScanState,
+                                            self.scan_state))
+            scan_state_msg = scan.ScanStateMsg(scan_state=self.scan_state)
+            self.publisher.send_msg(scan_state_msg)
 
     def _handle_incoming_requests(self):
         """Polls control_server for requests and responds to them."""
         req, proto = self.control_server.poll(self.poll_timeout_ms)
         if req:  # Ensure we received something
-            # Refuse most requests while in the middle of a scan
-            if (self.scan_state == scan.ScanState.SS_SCANNING and
-                    req not in self.ALLOWED_COMMANDS_DURING_SCAN):
+            # Refuse most requests while moving/scanning (not free)
+            if (self.scan_state != scan.ScanState.SS_FREE and
+                    req not in self.ALLOWED_COMMANDS_WHILE_NOT_FREE):
                 self.control_server.reply(
-                    ctrl.ControlResponse.REP_PERFORMING_SCAN)
-            elif req:
+                    ctrl.ControlResponse.REP_NOT_FREE)
+            else:
                 handler = self.req_handler_map[req]
                 rep = handler(proto) if proto else handler()
+
+                # Special case! If scan was cancelled and succeeded, we
+                # send out an SS_INTERRUPTED state, to allow detecting
+                # interruptions.
+                if (req == ctrl.ControlRequest.REQ_STOP_SCAN and
+                        rep == ctrl.ControlResponse.REP_SUCCESS):
+                    scan_state_msg = scan.ScanStateMsg(
+                        scan_state=scan.ScanState.SS_INTERRUPTED)
+                    self.publisher.send_msg(scan_state_msg)
+
                 self.control_server.reply(rep)
 
 

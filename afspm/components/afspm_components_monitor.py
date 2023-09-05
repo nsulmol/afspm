@@ -131,7 +131,7 @@ class AfspmComponentsMonitor:
             Process spawned.
         """
         params_dict['ctx'] = None
-        logger.debug("Creating process for component %s", params_dict['name'])
+        logger.info("Creating process for component %s", params_dict['name'])
         proc = mp.Process(target=construct_and_run_component,
                           kwargs={'params_dict': params_dict},
                           daemon=True)  # Ensures we try to kill on main exit
@@ -157,7 +157,7 @@ class AfspmComponentsMonitor:
         hb_period_s = params_dict['hb_period_s']
         hb_url = get_heartbeat_url(name)
 
-        logger.debug("Creating listener for component %s", params_dict['name'])
+        logger.info("Creating listener for component %s", params_dict['name'])
         return HeartbeatListener(hb_url, hb_period_s,
                                  missed_beats_before_dead, ctx)
 
@@ -178,8 +178,8 @@ class AfspmComponentsMonitor:
                 is_alive = self.listeners[name].check_is_alive()
 
             if not self.listeners[name].received_first_beat:
-                logger.debug("Component %s failed on start up, exiting.",
-                             name)
+                logger.info("Component %s failed on start up, exiting.",
+                            name)
                 succeeded = False
                 break
 
@@ -187,6 +187,7 @@ class AfspmComponentsMonitor:
             keys = list(self.listeners.keys())
             for key in keys:
                 self._remove_process(key)
+        return succeeded
 
     def run(self):
         """Main loop."""

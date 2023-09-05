@@ -317,6 +317,7 @@ def test_start_scan(thread_device_controller, thread_afspm_controller,
                          thread_afspm_controller)
 
 
+# TODO: update, this will fail! Need to add a check for scan changing to interrupted
 def test_stop_scan(thread_device_controller, thread_afspm_controller,
                    afspm_component, wait_ms, scan_time_ms,
                    sub_scan2d, default_control_state, component_name):
@@ -339,10 +340,14 @@ def test_stop_scan(thread_device_controller, thread_afspm_controller,
     # Cancel scan before it finishes!
     afspm_component.control_client.stop_scan()
 
-    scan_state_msg.scan_state = scan_pb2.ScanState.SS_FREE
-    assert_sub_received_proto(afspm_component.subscriber,
-                              scan_state_msg,
-                              wait_ms)
+    # First, will receive an SS_INTERRUPTED state; then, an SS_FREE state.
+    for state in [scan_pb2.ScanState.SS_INTERRUPTED,
+                  scan_pb2.ScanState.SS_FREE]:
+        scan_state_msg.scan_state = state
+        assert_sub_received_proto(afspm_component.subscriber,
+                                  scan_state_msg,
+                                  wait_ms)
+
     assert not sub_scan2d.poll_and_store(wait_ms)
     assert not afspm_component.subscriber.poll_and_store(wait_ms)
 
@@ -435,7 +440,7 @@ def test_calls_while_scanning(thread_device_controller,
     for command in unallowed_commands_for_scan:
         arg = unallowed_commands_for_scan[command]
         rep = command(arg) if arg is not None else command()
-        assert rep == control_pb2.ControlResponse.REP_PERFORMING_SCAN
+        assert rep == control_pb2.ControlResponse.REP_NOT_FREE
 
     # TODO: Remove this (waiting for the scan to finish) and get running
     # again

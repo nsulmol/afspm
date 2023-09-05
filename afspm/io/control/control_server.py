@@ -5,6 +5,7 @@ import logging
 from google.protobuf.message import Message
 
 from . import commands as cmd
+from .. import common
 from ..protos.generated import control_pb2 as ctrl
 
 logger = logging.getLogger(__name__)
@@ -59,7 +60,8 @@ class ControlServer:
 
         if msg:
             req, obj = cmd.parse_request(msg)
-            logger.debug("Message received: %s, %s", req, obj)
+            logger.debug("Message received: %s, %s",
+                         common.get_enum_str(ctrl.ControlRequest, req), obj)
             return (req, obj)
         return (None, None)
 
@@ -72,5 +74,6 @@ class ControlServer:
             rep: ctrl.ControlResponse we wish to send as response to the prior
                 req received.
         """
-        logger.debug("Sending reply: %s", rep)
+        logger.debug("Sending reply: %s",
+                     common.get_enum_str(ctrl.ControlResponse, rep))
         self.server.send(cmd.serialize_response(rep))

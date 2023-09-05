@@ -6,7 +6,7 @@ import logging
 import zmq
 from google.protobuf.message import Message
 
-from . import kill
+from .. import common
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +92,7 @@ class Subscriber:
         for topic in topics_to_sub:
             self.subscriber.setsockopt(zmq.SUBSCRIBE, topic.encode())
         # Everyone *must* subscribe to the kill signal
-        self.subscriber.setsockopt(zmq.SUBSCRIBE, kill.KILL_SIGNAL.encode())
+        self.subscriber.setsockopt(zmq.SUBSCRIBE, common.KILL_SIGNAL.encode())
 
         self.cache = {}
         self.shutdown_was_requested = False
@@ -139,13 +139,13 @@ class Subscriber:
                 we return None.
         """
         envelope = msg[0].decode()
-        if envelope == kill.KILL_SIGNAL:
+        if envelope == common.KILL_SIGNAL:
             logger.info("Shutdown was requested!")
             self.shutdown_was_requested = True
             return None
 
         proto = self.sub_extract_proto(msg, **self.extract_proto_kwargs)
-        logger.debug("Message received: %s, %s", envelope, proto)
+        logger.debug("Message received %s", envelope)
         self.cache = self.update_cache(envelope, proto, self.cache,
                                        **self.update_cache_kwargs)
         return envelope, proto

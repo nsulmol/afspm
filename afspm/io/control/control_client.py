@@ -4,6 +4,7 @@ import zmq
 import logging
 
 from . import commands as cmd
+from .. import common
 
 from ..protos.generated import control_pb2 as ctrl
 from ..protos.generated import scan_pb2 as scan
@@ -75,7 +76,8 @@ class ControlClient:
     def _init_client(self):
         """Starts up (or restarts) the client socket."""
         if self.client and not self.client.closed:
-            logger.error("Client init, but exists and is not closed. Do nothing.")
+            logger.error("Client init, but exists and is not closed. "
+                         "Do nothing.")
             return
         self.client = self.ctx.socket(zmq.REQ)
         # Set identity (if provided)
@@ -105,7 +107,10 @@ class ControlClient:
         while True:
             if (self.client.poll(self.request_timeout_ms) & zmq.POLLIN) != 0:
                 # Response is expected to be int
-                return cmd.parse_response(self.client.recv())
+                rep = cmd.parse_response(self.client.recv())
+                logger.debug("Received reply: %s",
+                             common.get_enum_str(ctrl.ControlResponse, rep))
+                return rep
             retries_left -= 1
             logger.debug("No response from server")
             # Socket is confused. Close and remove it.
@@ -172,7 +177,8 @@ class ControlClient:
             A RequestResponse enum indicating the success/failure of the
                 request.
         """
-        logger.debug("Sending request_ctrl with mode: %s", control_mode)
+        logger.debug("Sending request_ctrl with mode: %s",
+                     common.get_enum_str(ctrl.ControlMode, control_mode))
         msg = cmd.serialize_req_obj(ctrl.ControlRequest.REQ_REQUEST_CTRL,
                                     control_mode)
         return self._try_send_req(msg)
@@ -197,7 +203,8 @@ class ControlClient:
         Return:
             Response received from server.
         """
-        logger.debug("Sendding add_exp_prblm with problem: %s", problem)
+        logger.debug("Sending add_exp_prblm with problem: %s",
+                     common.get_enum_str(ctrl.ExperimentProblem, problem))
         msg = cmd.serialize_req_obj(
             ctrl.ControlRequest.REQ_ADD_EXP_PRBLM, problem)
         return self._try_send_req(msg)
@@ -212,7 +219,8 @@ class ControlClient:
         Return:
             Response received from server.
         """
-        logger.debug("Sendding rmv_exp_prblm with problem: %s", problem)
+        logger.debug("Sending rmv_exp_prblm with problem: %s",
+                     common.get_enum_str(ctrl.ExperimentProblem, problem))
         msg = cmd.serialize_req_obj(ctrl.ControlRequest.REQ_RMV_EXP_PRBLM,
                                     problem)
         return self._try_send_req(msg)
@@ -239,7 +247,8 @@ class AdminControlClient(ControlClient):
         Returns:
             Response received from the server.
         """
-        logger.debug("Sending set_control_mode with mode: %s", mode)
+        logger.debug("Sending set_control_mode with mode: %s",
+                     common.get_enum_str(ctrl.ControlMode, mode))
         msg = cmd.serialize_req_obj(ctrl.ControlRequest.REQ_SET_CONTROL_MODE,
                                     mode)
         return self._try_send_req(msg)

@@ -8,6 +8,7 @@ import PySimpleGUI as sg
 
 from google.protobuf.message import Message
 
+from ..io import common
 from ..io.pubsub import subscriber as sub
 from ..io.control import control_client as ctrl_client
 
@@ -34,31 +35,6 @@ PROBLEMS_SET_KEY = 'PRBLM'
 ERROR_LOG_KEY = 'ERROR_LOG'
 
 MODE_GROUP = 'Modes'
-
-# TODO: Could *re-implement* all of these as string enums, and avoid this crap...
-# Set up map modes
-MAP_MODE_STR = MappingProxyType({
-    control_pb2.ControlMode.CM_MANUAL: 'Manual',
-    control_pb2.ControlMode.CM_AUTOMATED: 'Automated',
-    control_pb2.ControlMode.CM_PROBLEM: 'Problem'
-})
-
-MAP_STR_MODE = {}
-for mode, txt in MAP_MODE_STR.items():
-    MAP_STR_MODE[txt] = mode
-
-SCAN_STATE_STR = MappingProxyType({
-    scan_pb2.ScanState.SS_UNDEFINED: 'Undefined',
-    scan_pb2.ScanState.SS_MOVING: 'Moving',
-    scan_pb2.ScanState.SS_SCANNING: 'Scanning',
-    scan_pb2.ScanState.SS_FREE: 'Free'
-})
-
-PROBLEMS_SET_STR = MappingProxyType({
-    control_pb2.ExperimentProblem.EP_NONE: 'None',
-    control_pb2.ExperimentProblem.EP_TIP_SHAPE_CHANGED: 'Tip Shape Changed',
-    control_pb2.ExperimentProblem.EP_DEVICE_MALFUNCTION: 'Device Malfunction'
-})
 
 TOPICS_TO_SUB_KEY = 'topics_to_sub'
 ALL_TOPICS = ""
@@ -105,9 +81,12 @@ class AfspmControlUI(AfspmComponent):
         self.layout = [[sg.Text(CTRL_MODE)]]
 
         buttons = []
-        txt_automated = MAP_MODE_STR[control_pb2.CM_AUTOMATED]
-        for mode, txt in MAP_MODE_STR.items():
+
+        cm = control_pb2.ControlMode
+        txt_automated = common.get_enum_name(cm, cm.CM_AUTOMATED)
+        for mode in [cm.CM_MANUAL, cm.CM_AUTOMATED, cm.CM_PROBLEM]:
             is_default = mode == txt_automated
+            txt = common.get_enum_name(cm, mode)
             buttons.append(sg.Radio(txt, MODE_GROUP, key=txt,
                                     default=is_default))
         self.layout.append(buttons)
@@ -131,10 +110,11 @@ class AfspmControlUI(AfspmComponent):
 
         req_methods = []
         req_args = []
-        if event in MAP_STR_MODE:
-            logger.debug("Control Mode Selected: %s", MAP_STR_MODE[event])
+        if common.is_str_in_enum(control_pb2.ControlMode, event):
+            logger.debug("Control Mode Selected: %s", event)
             req_methods.append(self.control_client.set_control_mode)
-            req_args.append(MAP_STR_MODE[event])
+            req_args.append(common.get_enum_val(control_pb2.ControlMode,
+                                                event))
         elif event == PROBLEMS_SET:
             logger.debug("Flush problems set selected.")
             problems = copy.deepcopy(self.control_state.problems_set)
@@ -161,7 +141,7 @@ class AfspmControlUI(AfspmComponent):
                     self.window[ERROR_LOG_KEY].update(value=msg)
 
     def on_message_received(self, envelope: str, proto: Message):
-        logger.debug("Message received: %s, %s", envelope, proto)
+        logger.debug("Message received, envelope: %s", envelope)
         if isinstance(proto, control_pb2.ControlState):
             last_cs = copy.deepcopy(self.control_state)
             self.control_state = proto
@@ -179,13 +159,15 @@ class AfspmControlUI(AfspmComponent):
                 self._handle_scan_state_changed()
 
     def _handle_mode_changed(self):
+        ctrl_mode = control_pb2.ControlMode
+
         mode = self.control_state.control_mode
-        button_id = MAP_MODE_STR[mode]
+        button_id = common.get_enum_str(ctrl_mode, mode)
         self.window[button_id].update(value=True)
 
         # Set disabled/enabled state of radio options
-        problem_id = MAP_MODE_STR[control_pb2.ControlMode.CM_PROBLEM]
-        auto_id = MAP_MODE_STR[control_pb2.ControlMode.CM_AUTOMATED]
+        problem_id = common.get_enum_str(ctrl_mode, ctrl_mode.CM_PROBLEM)
+        auto_id = common.get_enum_str(ctrl_mode, ctrl_mode.CM_AUTOMATED)
 
         problem_disabled = button_id != problem_id
         self.window[problem_id].update(disabled=problem_disabled)
@@ -197,13 +179,15 @@ class AfspmControlUI(AfspmComponent):
         self.window[IN_CTRL_KEY].update(client)
 
     def _handle_scan_state_changed(self):
-        self.window[SCAN_STATE_KEY].update(SCAN_STATE_STR[self.scan_state])
+        txt = common.get_enum_str(scan_pb2.ScanState, self.scan_state)
+        self.window[SCAN_STATE_KEY].update(txt)
 
     def _handle_problems_changed(self):
         problems_set = self.control_state.problems_set
         log_txt = ""
         for problem in problems_set:
-            log_txt += PROBLEMS_SET_STR[problem] + '\n'
+            log_txt += common.get_enum_str(control_pb2.ExperimentProblem,
+                                           problem) + '\n'
 
         self.window[PROBLEMS_SET_KEY].update(log_txt)
 

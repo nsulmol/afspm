@@ -30,7 +30,7 @@ enum ControlResponse {
     REP_ALREADY_UNDER_CONTROL = 4;
     REP_WRONG_CONTROL_MODE = 5;
     REP_NOT_IN_CONTROL = 6;
-    REP_PERFORMING_SCAN = 7;
+    REP_NOT_FREE = 7;
 }
 
 /* Enum holding the current control mode of afspm. */

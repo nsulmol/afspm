@@ -12,7 +12,7 @@ from afspm.io.cache import pbc_logic as pbc
 from afspm.io.pubsub import publisher
 from afspm.io.pubsub import subscriber
 from afspm.io.pubsub import pubsubcache
-from afspm.io.pubsub import kill
+from afspm.io import common
 
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
@@ -213,14 +213,14 @@ def got_kill_signal(socket: zmq.Socket,
     if socket.poll(timeout_ms, zmq.POLLIN):
         msg = socket.recv_multipart(zmq.NOBLOCK)
         envelope = msg[0].decode()
-        if envelope == kill.KILL_SIGNAL:
+        if envelope == common.KILL_SIGNAL:
             return True
     return False
 
 
 def send_kill_signal(socket: zmq.Socket):
     """Send the kill signal out on a socket."""
-    socket.send_multipart([kill.KILL_SIGNAL.encode()])
+    socket.send_multipart([common.KILL_SIGNAL.encode()])
 
 
 def kill_and_wait(socket: zmq.Socket, wait_ms: int,
@@ -274,7 +274,7 @@ def thread_psc(psc_url, pub_url, comm_url, short_wait_ms, ctx, wait_ms,
 
 @pytest.fixture
 def sub_all_topics_psc(psc_url, cache_kwargs, ctx, wait_ms):
-    all_topics = [""]
+    all_topics = [common.ALL_ENVELOPE]
     return subscriber.Subscriber(
         psc_url, cl.extract_proto, all_topics,
         cl.update_cache, ctx,

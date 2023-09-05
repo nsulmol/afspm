@@ -6,6 +6,7 @@ import logging
 from google.protobuf.message import Message
 
 from . import commands as cmd
+from .. import common
 
 from ..protos.generated import control_pb2 as ctrl
 from ..protos.generated import scan_pb2 as scan
@@ -113,7 +114,9 @@ class ControlRouter:
             return ctrl.ControlResponse.REP_SUCCESS
 
         logger.debug("%s requested control, but sent control mode %s, when" +
-                     "under %s", client, control_mode, self.control_mode)
+                     "under %s", client,
+                     common.get_enum_str(ctrl.ControlMode, control_mode),
+                     common.get_enum_str(ctrl.ControlMode, self.control_mode))
         return ctrl.ControlResponse.REP_WRONG_CONTROL_MODE
 
     def _handle_control_release(self, client: str) -> ctrl.ControlResponse:
@@ -151,10 +154,14 @@ class ControlRouter:
         """
         old_problems_set = copy.deepcopy(self.problems_set)
         if add_problem:
-            logger.debug("Adding problem %s", exp_problem)
+            logger.debug("Adding problem %s",
+                         common.get_enum_str(ctrl.ExperimentProblem,
+                                             exp_problem))
             self.problems_set.add(exp_problem)
         else:
-            logger.debug("Removing problem %s", exp_problem)
+            logger.debug("Removing problem %s",
+                         common.get_enum_str(ctrl.ExperimentProblem,
+                                             exp_problem))
             self.problems_set.remove(exp_problem)
 
         if not old_problems_set and self.problems_set:
@@ -186,6 +193,8 @@ class ControlRouter:
         Returns:
             ControlResponse received from the ControlServer.
         """
+        logger.debug("Handling send request: %s, %s",
+                     common.get_enum_str(ctrl.ControlRequest, req), proto)
         msg = cmd.serialize_req_obj(req, proto)  # No need for empty envelope
         self.backend.send_multipart(msg)
 
@@ -267,10 +276,11 @@ class ControlRouter:
             client_id = self._parse_client_id(client)
             req, obj = cmd.parse_request(msg[2:])  # client, __, ...
             logger.debug("Message received from client %s: %s, %s", client_id,
-                         req, obj)
+                         common.get_enum_str(ctrl.ControlRequest, req), obj)
 
             rep = self._on_request(client_id, req, obj)
-            logger.debug("Sending reply to %s: %s", client_id, rep)
+            logger.debug("Sending reply to %s: %s", client_id,
+                         common.get_enum_str(ctrl.ControlResponse, rep))
             self.frontend.send_multipart([client, b"",
                                           cmd.serialize_response(rep)])
 

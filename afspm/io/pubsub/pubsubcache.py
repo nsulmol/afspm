@@ -6,7 +6,7 @@ import logging
 import zmq
 from google.protobuf.message import Message
 
-from . import kill
+from .. import common
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class PubSubCache:
     To allow this, we require two more methods:
     - sub_extract_proto() knows the envelope-to-proto mapping on the subscriber
     end, so it can extract any proto as received.
-    - pub_get_envelope_for_proto() defines *this cache's* mapping from proto
+    - pub_get_envelope_given_proto() defines *this cache's* mapping from proto
     to envelope.
 
     The main accessor is poll(). If you instead want to include this class's
@@ -167,7 +167,6 @@ class PubSubCache:
             msg: list of bytes corresponding to the message received by the
                 frontend.
         """
-        logger.debug("Message received: %s", msg)
         proto = self.sub_extract_proto(msg, **self.extract_proto_kwargs)
         return self.send_message(proto)
 
@@ -180,13 +179,21 @@ class PubSubCache:
         Args:
             envelope: the subscribed envelope.
         """
-        logger.debug("New subscription to %s.", envelope)
-        if envelope in self.cache:
-            logger.info("Subscription: cache for %s being sent out.",
-                        envelope)
-            for proto in self.cache[envelope]:
-                self.backend.send_multipart([envelope.encode(),
-                                             proto.SerializeToString()])
+        envelope_log = (common.ALL_ENVELOPE_LOG
+                        if envelope == common.ALL_ENVELOPE else envelope)
+        logger.info("New subscription to %s.", envelope_log)
+
+        # If "ALL" subscribed, send all envelopes in our cache
+        envelopes_to_send = (list(self.cache.keys())
+                             if envelope == common.ALL_ENVELOPE
+                             else [envelope])
+        for env in envelopes_to_send:
+            if env in self.cache:
+                logger.info("Subscription: cache for %s being sent out.",
+                            env)
+                for proto in self.cache[env]:
+                    self.backend.send_multipart([env.encode(),
+                                                 proto.SerializeToString()])
 
     def send_message(self, proto: Message):
         """Cache message and pass on to subscribers.
@@ -194,15 +201,18 @@ class PubSubCache:
         Args:
             proto: protobuf Message.
         """
+        # TODO: pub_get_envelope not needed, since update cache does it???
+        # Or do we keep it in case?
+
         envelope = self.pub_get_envelope_given_proto(
             proto, **self.get_envelope_kwargs)
         self.cache = self.update_cache(envelope, proto, self.cache,
                                        **self.update_cache_kwargs)
-        logger.debug("Sending message: %s, %s", envelope, proto)
+        logger.debug("Sending message %s", envelope)
         self.backend.send_multipart([envelope.encode(),
                                      proto.SerializeToString()])
 
     def send_kill_signal(self):
         """Send a kill signal to subscribers."""
         logger.debug("Sending kill signal.")
-        self.backend.send_multipart([kill.KILL_SIGNAL.encode()])
+        self.backend.send_multipart([common.KILL_SIGNAL.encode()])

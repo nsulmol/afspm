@@ -14,6 +14,7 @@ enum ScanState {
   SS_MOVING = 1;  // Moving, not scanning
   SS_SCANNING = 2;
   SS_FREE = 3; // Neither scanning nor moving, free to do something else
+  SS_INTERRUPTED = 4; // Scan was interrupted mid scan!
 }
 
 /* Message to hold ScanState. Remember, any message 'published' by the
