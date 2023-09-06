@@ -226,7 +226,10 @@ def _instantiate_classes_recursively(params_dict: dict) -> Any | dict:
 
     if CLASS_KEY in final_dict:
         # This is a class level, instantiate a class and return it
-        return final_dict[CLASS_KEY](**final_dict)
+        class_obj = final_dict[CLASS_KEY]
+        del final_dict[CLASS_KEY]
+        tmp = class_obj(**final_dict)
+        return tmp
     return final_dict  # Go up a level
 
 

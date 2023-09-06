@@ -1,5 +1,6 @@
 """Proto-Based Cache Logic classes."""
 
+import logging
 import copy
 from collections.abc import Iterable
 from collections import deque
@@ -7,6 +8,10 @@ from google.protobuf.message import Message
 
 from .cache_logic import CacheLogic, DEFAULT_PROTO_WITH_HIST_SEQ
 from ..protos.generated import scan_pb2
+from ...utils import protos
+
+
+logger = logging.getLogger(__name__)
 
 
 class ProtoBasedCacheLogic(CacheLogic):
@@ -65,13 +70,14 @@ class PBCWithROILogic(ProtoBasedCacheLogic):
 
     def __init__(self, proto_with_history_list: list[(Message, int)] =
                  DEFAULT_PROTO_WITH_HIST_SEQ,
-                 default_scan_length: int = 1, **kwargs):
+                 default_scan_history: int = 1, **kwargs):
 
         """Override to force default Scan2d history and protos."""
         super().__init__(proto_with_history_list, **kwargs)
 
-        if self.scan_id not in self.envelope_to_history_map:
-            self.envelope_to_history_map[self.scan_id] = default_scan_length
+        # Even if this was set in proto_with_history_list, override with
+        # expliict input variable.
+        self.envelope_to_history_map[self.scan_id] = default_scan_history
 
         if self.scan_id not in self.envelope_to_proto_map:
             self.envelope_to_proto_map[self.scan_id] = (
@@ -109,3 +115,23 @@ class PBCWithROILogic(ProtoBasedCacheLogic):
                 cache[envelope] = deque(maxlen=self.envelope_to_history_map[
                     self.scan_id])
             cache[envelope].append(proto)
+
+
+def create_roi_proto_hist_list(sizes_with_hist_list: list[float, int]
+                               ) -> list[(Message, int)]:
+    """Helper to create a proto-with-hist list for special ROIs.
+
+    Args:
+        sizes_with_hist_list: list of different sizes for ROIs, with history
+            lengths for each.
+
+    Returns:
+        A proto-history list, for instantiation of a PBCWithROi cache logic.
+    """
+
+    proto_with_hist_list = list(DEFAULT_PROTO_WITH_HIST_SEQ)
+    for (size, hist) in sizes_with_hist_list:
+        scan_params = protos.create_scan_params_2d(size=[size, size])
+        scan_2d = protos.create_scan_2d(scan_params=scan_params)
+        proto_with_hist_list.append((scan_2d, hist))
+    return proto_with_hist_list
