@@ -56,7 +56,7 @@ class PubSubCache:
             envelope-to-proto mapping.
         extract_proto_kwargs: any additional arguments to be fed to
             sub_extract_proto.
-        pub_get_envelope_given_proto: method that maps from proto message to
+        pub_get_envelope_for_proto: method that maps from proto message to
             our desired publisher 'envelope' string.
         get_envelope_kwargs: any additional arguments to be fed to
             pub_get_envelope_given_proto.
@@ -71,7 +71,7 @@ class PubSubCache:
 
     def __init__(self, url: str, sub_url: str,
                  sub_extract_proto: Callable[[list[bytes], ...], Message],
-                 pub_get_envelope_given_proto: Callable[[Message, ...], str],
+                 pub_get_envelope_for_proto: Callable[[Message, ...], str],
                  update_cache: Callable[[str, Message,
                                          dict[str, Iterable], ...],
                                         dict[str, Iterable]],
@@ -88,14 +88,14 @@ class PubSubCache:
             sub_extract_proto: method which extracts the proto message from a
                 message received from the sub. It must therefore know the
                 envelope-to-proto mapping.
-            pub_get_envelope_given_proto: method that maps from proto message to
+            pub_get_envelope_for_proto: method that maps from proto message to
                 our desired publisher 'envelope' string.
             update_cache: method that updates our cache.
             ctx: zmq Context; if not provided, we will create a new instance.
             extract_proto_kwargs: any additional arguments to be fed to
                 sub_extract_proto.
             get_envelope_kwargs: any additional arguments to be fed to
-                pub_get_envelope_given_proto.
+                pub_get_envelope_for_proto.
             update_cache_kwargs: any additional arguments to be fed to
                 update_cache.
             kwargs: allows non-used input arguments to be passed (so we can
@@ -104,7 +104,7 @@ class PubSubCache:
         self.sub_extract_proto = sub_extract_proto
         self.extract_proto_kwargs = (extract_proto_kwargs if
                                      extract_proto_kwargs else {})
-        self.pub_get_envelope_given_proto = pub_get_envelope_given_proto
+        self.pub_get_envelope_for_proto = pub_get_envelope_for_proto
         self.get_envelope_kwargs = (get_envelope_kwargs if
                                     get_envelope_kwargs else {})
         self.update_cache = update_cache
@@ -204,7 +204,7 @@ class PubSubCache:
         # TODO: pub_get_envelope not needed, since update cache does it???
         # Or do we keep it in case?
 
-        envelope = self.pub_get_envelope_given_proto(
+        envelope = self.pub_get_envelope_for_proto(
             proto, **self.get_envelope_kwargs)
         self.update_cache(proto, self.cache,
                           **self.update_cache_kwargs)
