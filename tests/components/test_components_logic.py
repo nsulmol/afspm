@@ -93,14 +93,14 @@ def cache_kwargs():
 
 @pytest.fixture(scope="module")
 def topics_scan2d():
-    return [cl.CacheLogic.create_envelope_from_proto(scan_pb2.Scan2d())]
+    return [cl.CacheLogic.get_envelope_for_proto(scan_pb2.Scan2d())]
 
 
 @pytest.fixture(scope="module")
 def topics_states():
-    return [cl.CacheLogic.create_envelope_from_proto(
+    return [cl.CacheLogic.get_envelope_for_proto(
         scan_pb2.ScanStateMsg()),
-            cl.CacheLogic.create_envelope_from_proto(
+            cl.CacheLogic.get_envelope_for_proto(
                 control_pb2.ControlState())
             ]
 
@@ -195,8 +195,8 @@ def assert_sub_received_proto(sub: Subscriber,
                               wait_ms: int):
     """Confirm a message is received by a subscriber."""
     assert sub.poll_and_store(wait_ms)
-    assert len(sub.cache[cl.CacheLogic.create_envelope_from_proto(proto)]) == 1
-    assert (sub.cache[cl.CacheLogic.create_envelope_from_proto(proto)][0]
+    assert len(sub.cache[cl.CacheLogic.get_envelope_for_proto(proto)]) == 1
+    assert (sub.cache[cl.CacheLogic.get_envelope_for_proto(proto)][0]
             == proto)
 
 

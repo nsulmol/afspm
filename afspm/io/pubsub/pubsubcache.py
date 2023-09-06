@@ -206,8 +206,8 @@ class PubSubCache:
 
         envelope = self.pub_get_envelope_given_proto(
             proto, **self.get_envelope_kwargs)
-        self.cache = self.update_cache(envelope, proto, self.cache,
-                                       **self.update_cache_kwargs)
+        self.update_cache(proto, self.cache,
+                          **self.update_cache_kwargs)
         logger.debug("Sending message %s", envelope)
         self.backend.send_multipart([envelope.encode(),
                                      proto.SerializeToString()])

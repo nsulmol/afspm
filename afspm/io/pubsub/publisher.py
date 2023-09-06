@@ -13,27 +13,27 @@ class Publisher:
     """Encapsulates publisher node logic.
 
     More particularly, this encapsulates the proto-to-envelope mapping
-    (get_envelope_given_proto), so the method using it can simply feed the
+    (get_envelope_for_proto), so the method using it can simply feed the
     desired proto.
     """
 
     def __init__(self, url: str,
-                 get_envelope_given_proto: Callable[[Message], str],
+                 get_envelope_for_proto: Callable[[Message], str],
                  ctx: zmq.Context = None,
                  get_envelope_kwargs: dict = None, **kwargs):
         """ Initializes the publisher.
 
         Args:
             url: our publishing address, in zmq format.
-            get_envelope_given_proto: method that maps from proto message to
+            get_envelope_for_proto: method that maps from proto message to
                 our desired publisher 'envelope' string.
             ctx: zmq Context; if not provided, we will create a new instance.
             get_envelope_kwargs: any additional arguments to be fed to
-                get_envelope_given_proto.
+                get_envelope_for_proto.
             kwargs: allows non-used input arguments to be passed (so we can
                 initialize from an unfiltered dict).
         """
-        self.get_envelope_given_proto = get_envelope_given_proto
+        self.get_envelope_for_proto = get_envelope_for_proto
         self.get_envelope_kwargs = (get_envelope_kwargs if get_envelope_kwargs
                                     else {})
 
@@ -46,15 +46,15 @@ class Publisher:
     def send_msg(self, proto: Message):
         """ Send message via publisher.
 
-        It uses get_envelope_given_proto to determine the envelope of our
+        It uses get_envelope_for_proto to determine the envelope of our
         message.
 
         Args:
             proto: protobuf message to send.
         """
 
-        envelope = self.get_envelope_given_proto(proto,
-                                                 **self.get_envelope_kwargs)
+        envelope = self.get_envelope_for_proto(proto,
+                                               **self.get_envelope_kwargs)
         logger.debug("Sending message %s", envelope)
         self.publisher.send_multipart([envelope.encode(),
                                        proto.SerializeToString()])

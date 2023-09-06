@@ -87,7 +87,7 @@ def device_controller_routine(pub_url, server_url, psc_url, poll_timeout_ms,
                               loop_sleep_s,
                               hb_period_s, ctx, move_time_ms, scan_time_ms,
                               cache_kwargs):
-    pub = Publisher(pub_url, cl.CacheLogic.create_envelope_from_proto)
+    pub = Publisher(pub_url, cl.CacheLogic.get_envelope_for_proto)
     server = ControlServer(server_url, ctx)
     topics_none = []
     sub = Subscriber(
@@ -115,7 +115,7 @@ def afspm_controller_routine(psc_url, pub_url, server_url, router_url,
                              poll_timeout_ms, ctx):
     psc = PubSubCache(psc_url, pub_url,
                       cl.extract_proto,
-                      cl.CacheLogic.create_envelope_from_proto,
+                      cl.CacheLogic.get_envelope_for_proto,
                       cl.update_cache, ctx,
                       extract_proto_kwargs=cache_kwargs,
                       update_cache_kwargs=cache_kwargs)

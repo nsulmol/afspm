@@ -12,7 +12,7 @@ def sample_dict():
         'publisher': {
             'url': 'pub_url',
             'get_envelope_given_proto':
-            'afspm.io.cache.cache_logic.CacheLogic.create_envelope_from_proto'
+            'afspm.io.cache.cache_logic.CacheLogic.get_envelope_for_proto'
         },
         'level3': {
             'my_publisher': 'publisher'
@@ -26,13 +26,13 @@ def expected_expanded_dict():
         'publisher': {
             'url': 'tcp://127.0.0.1:5555',
             'get_envelope_given_proto':
-            'afspm.io.cache.cache_logic.CacheLogic.create_envelope_from_proto'
+            'afspm.io.cache.cache_logic.CacheLogic.get_envelope_for_proto'
         },
         'level3': {
             'my_publisher': {
                 'url': 'tcp://127.0.0.1:5555',
                 'get_envelope_given_proto':
-                'afspm.io.cache.cache_logic.CacheLogic.create_envelope_from_proto'
+                'afspm.io.cache.cache_logic.CacheLogic.get_envelope_for_proto'
             }
         }
     }
@@ -82,7 +82,7 @@ def scan2d_str():
 
 @pytest.fixture
 def topics_scan2d_str(scan2d_str):
-    return ("afspm.io.cache.cache_logic.CacheLogic.create_envelope_from_proto("
+    return ("afspm.io.cache.cache_logic.CacheLogic.get_envelope_for_proto("
             + scan2d_str + ")")
 
 

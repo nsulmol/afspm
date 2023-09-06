@@ -146,8 +146,8 @@ class Subscriber:
 
         proto = self.sub_extract_proto(msg, **self.extract_proto_kwargs)
         logger.debug("Message received %s", envelope)
-        self.cache = self.update_cache(envelope, proto, self.cache,
-                                       **self.update_cache_kwargs)
+        self.update_cache(proto, self.cache,
+                          **self.update_cache_kwargs)
         return envelope, proto
 
 

@@ -43,23 +43,23 @@ def cache_kwargs():
 @pytest.fixture
 def pub(pub_url):
     return publisher.Publisher(pub_url,
-                               cl.CacheLogic.create_envelope_from_proto)
+                               cl.CacheLogic.get_envelope_for_proto)
 
 
 @pytest.fixture(scope="module")
 def topics_scan2d():
-    return [cl.CacheLogic.create_envelope_from_proto(scan_pb2.Scan2d())]
+    return [cl.CacheLogic.get_envelope_for_proto(scan_pb2.Scan2d())]
 
 
 @pytest.fixture(scope="module")
 def topics_control_state():
-    return [cl.CacheLogic.create_envelope_from_proto(control_pb2.ControlState())]
+    return [cl.CacheLogic.get_envelope_for_proto(control_pb2.ControlState())]
 
 
 @pytest.fixture(scope="module")
 def topics_both():
-    return [cl.CacheLogic.create_envelope_from_proto(scan_pb2.Scan2d()),
-            cl.CacheLogic.create_envelope_from_proto(control_pb2.ControlState())]
+    return [cl.CacheLogic.get_envelope_for_proto(scan_pb2.Scan2d()),
+            cl.CacheLogic.get_envelope_for_proto(control_pb2.ControlState())]
 
 
 @pytest.fixture(scope="module")
@@ -139,8 +139,8 @@ def assert_sub_received_proto(sub: subscriber.Subscriber,
                               wait_ms: int):
     """Confirm a message is received by a subscriber."""
     assert sub.poll_and_store(wait_ms)
-    assert len(sub.cache[cl.CacheLogic.create_envelope_from_proto(proto)]) == 1
-    assert (sub.cache[cl.CacheLogic.create_envelope_from_proto(proto)][0]
+    assert len(sub.cache[cl.CacheLogic.get_envelope_for_proto(proto)]) == 1
+    assert (sub.cache[cl.CacheLogic.get_envelope_for_proto(proto)][0]
             == proto)
 
 
@@ -240,7 +240,7 @@ def pubsubcache_routine(psc_url, pub_url, comm_url, short_wait_ms,
 
     psc = pubsubcache.PubSubCache(psc_url, pub_url,
                                   cl.extract_proto,
-                                  cl.CacheLogic.create_envelope_from_proto,
+                                  cl.CacheLogic.get_envelope_for_proto,
                                   cl.update_cache, ctx,
                                   extract_proto_kwargs=cache_kwargs,
                                   update_cache_kwargs=cache_kwargs)

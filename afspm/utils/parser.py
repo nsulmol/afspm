@@ -39,13 +39,13 @@ def expand_variables_in_dict(config_dict: dict) -> dict:
         publisher:
             url: 'pub_url'
             get_envelope_given_proto: 'afspm.io.cache.cache_logic.CacheLogic.
-                create_envelope_from_proto'
+                get_envelope_for_proto'
     , it will expand out into:
         pub_url: 'tcp://127.0.0.1:5555'
         publisher:
             url: 'tcp://127.0.0.1:5555'
-            get_envelope_given_proto: 'afspm.io.cache.cache_logic.CacheLogic.
-                create_envelope_from_proto'
+            get_envelope_for_proto: 'afspm.io.cache.cache_logic.CacheLogic.
+                get_envelope_for_proto'
 
     Args:
         config_dict: dictionary to expand variables in.

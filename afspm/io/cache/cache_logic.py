@@ -1,9 +1,10 @@
 """Holds abc class and overarching helper methods for cache handling."""
 
 import string
-from typing import Mapping
+from typing import Mapping, Callable
 from abc import ABCMeta, abstractmethod
 from collections.abc import Iterable
+from collections import deque
 from google.protobuf.message import Message
 
 from ..protos.generated import scan_pb2
@@ -35,24 +36,20 @@ class CacheLogic(metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def update_cache(self, envelope: str, proto: Message,
-                     cache: Mapping[str, Iterable]) -> Mapping[str, Iterable]:
+    def update_cache(self, proto: Message, cache: Mapping[str, Iterable]
+                     ):
         """Update the provided cache with the provided envelope and proto.
 
         Args:
-            envelope: envelope used to pass this proto.
             proto: protobuf structure linked to the envelope.
             cache: mapping for storing the messages received. of the form:
                 envelope: list[proto] (for key:val). Note that the suggested
                 'list' type here is a dequeue, as it allows a size definition
                 (and will pop elements from the back if you exceed the size).
-
-        Returns:
-            updated mapping.
         """
 
     @staticmethod
-    def create_envelope_from_proto(proto: Message) -> str:
+    def get_envelope_for_proto(proto: Message) -> str:
         """Given a protobuf structure, return the appropriate envelope string.
 
         This envelope will be used for caching data.
@@ -79,10 +76,9 @@ def extract_proto(msg: list[bytes], cache_logic: CacheLogic) -> Message:
     return cache_logic.extract_proto(msg)
 
 
-def update_cache(envelope: str, proto: Message,
-                 cache: dict[str, Iterable],
-                 cache_logic: CacheLogic) -> dict[str, Iterable]:
+def update_cache(proto: Message, cache: dict[str, Iterable],
+                 cache_logic: CacheLogic):
     """Non-class method for updating the cache for a particular proto.
 
     see CacheLogic.update_cache() for more info."""
-    return cache_logic.update_cache(envelope, proto, cache)
+    cache_logic.update_cache(proto, cache)
