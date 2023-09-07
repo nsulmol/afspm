@@ -32,6 +32,8 @@ class ControlRouter:
         is under control.
 
     Attributes:
+        ctx: Context, needed to restart the backend socket.
+        backend_url: backend url, needed to restart the backend socket.
         backend: the REP socket that connects to the ControlServer.
         frontend: the ROUTER socket that connects with all ControlClients.
         problems_set: holds the set of problems which have been notified by
@@ -67,8 +69,10 @@ class ControlRouter:
         if not ctx:
             ctx = zmq.Context.instance()
 
-        self.backend = ctx.socket(zmq.REQ)
-        self.backend.connect(server_url)
+        self.ctx = ctx
+        self.backend_url = server_url
+        self.backend = None
+        self._init_backend()
 
         self.frontend = ctx.socket(zmq.ROUTER)
         # Drop old sockets with same uuid
@@ -81,6 +85,20 @@ class ControlRouter:
         self.client_in_control_id = None
         self.server_timeout_ms = server_timeout_ms
         self.shutdown_was_requested = False
+
+    def _init_backend(self):
+        """Startup (or restart) the backend socket."""
+        if self.backend and not self.backend.closed:
+            logger.error("Backend init, but exists and is not closed. "
+                         "Do nothing.")
+            return
+        self.backend = self.ctx.socket(zmq.REQ)
+        self.backend.connect(self.backend_url)
+
+    def _close_backend(self):
+        """Close the backend socket."""
+        self.backend.setsockopt(zmq.LINGER, 0)
+        self.backend.close()
 
     def _handle_control_request(self, client: str,
                                 control_mode: ctrl.ControlMode,
@@ -200,6 +218,12 @@ class ControlRouter:
 
         if (self.backend.poll(self.server_timeout_ms) & zmq.POLLIN) != 0:
             return cmd.parse_response(self.backend.recv())
+
+        logger.error("Backend did not respond in time, likely timeout issue."
+                     "Restarting socket. ")
+        self._close_backend()
+        self._init_backend()
+
         return ctrl.ControlResponse.REP_NO_RESPONSE
 
     def _handle_set_control_mode(self, control_mode: ctrl.ControlMode

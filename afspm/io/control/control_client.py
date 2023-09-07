@@ -117,8 +117,8 @@ class ControlClient:
             self._close_client()
 
             if retries_left == 0:
-                logger.warning("Server seems to be offline, cannot send" +
-                               " message.")
+                logger.error("Server seems to be offline, cannot send" +
+                             " message.")
                 return ctrl.ControlResponse.REP_NO_RESPONSE
 
             logger.debug("Reconnecting to server")
