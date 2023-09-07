@@ -8,7 +8,7 @@ from google.protobuf.message import Message
 
 from .cache_logic import CacheLogic, DEFAULT_PROTO_WITH_HIST_SEQ
 from ..protos.generated import scan_pb2
-from ...utils import protos
+from .. import common
 
 
 logger = logging.getLogger(__name__)
@@ -131,7 +131,7 @@ def create_roi_proto_hist_list(sizes_with_hist_list: list[float, int]
 
     proto_with_hist_list = list(DEFAULT_PROTO_WITH_HIST_SEQ)
     for (size, hist) in sizes_with_hist_list:
-        scan_params = protos.create_scan_params_2d(size=[size, size])
-        scan_2d = protos.create_scan_2d(scan_params=scan_params)
+        scan_params = common.create_scan_params_2d(size=[size, size])
+        scan_2d = common.create_scan_2d(scan_params=scan_params)
         proto_with_hist_list.append((scan_2d, hist))
     return proto_with_hist_list
