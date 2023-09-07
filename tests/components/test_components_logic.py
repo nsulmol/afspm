@@ -317,7 +317,6 @@ def test_start_scan(thread_device_controller, thread_afspm_controller,
                          thread_afspm_controller)
 
 
-# TODO: update, this will fail! Need to add a check for scan changing to interrupted
 def test_stop_scan(thread_device_controller, thread_afspm_controller,
                    afspm_component, wait_ms, scan_time_ms,
                    sub_scan2d, default_control_state, component_name):

@@ -201,9 +201,6 @@ class PubSubCache:
         Args:
             proto: protobuf Message.
         """
-        # TODO: pub_get_envelope not needed, since update cache does it???
-        # Or do we keep it in case?
-
         envelope = self.pub_get_envelope_for_proto(
             proto, **self.get_envelope_kwargs)
         self.update_cache(proto, self.cache,
