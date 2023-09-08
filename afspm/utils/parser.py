@@ -80,8 +80,11 @@ def _expand_variables_recursively(config_dict: dict, sub_dict: dict) -> dict:
     try:
         for key in sub_dict:
             if isinstance(sub_dict[key], dict):  # Go deeper in 'tree'
-                sub_dict[key] = _expand_variables_recursively(config_dict,
-                                                              sub_dict[key])
+                sub_dict[key] = _expand_variables_recursively(
+                    config_dict, sub_dict[key])
+            elif isinstance(sub_dict[key], list):
+                sub_dict[key] = _expand_variables_list_recursively(
+                    config_dict, sub_dict[key])
             elif (isinstance(sub_dict[key], str) and
                   sub_dict[key] in config_dict):  # Expand variable
                 sub_dict[key] = config_dict[sub_dict[key]]
@@ -93,6 +96,25 @@ def _expand_variables_recursively(config_dict: dict, sub_dict: dict) -> dict:
         logger.error(msg)
         raise exc
     return sub_dict
+
+
+def _expand_variables_list_recursively(config_dict: dict, in_list: list
+                                       ) -> list:
+    """Recursively go through a list, expanding varaibles out.
+
+    This method is a list-specific expansion of _expand_variables_recursively,
+    used within it to expand lists specifically. Read that method for the
+    explanation.
+    """
+    for idx in range(len(in_list)):
+        if isinstance(in_list[idx], list):  # Go deeper
+            in_list[idx] = _expand_variables_list_recursively(config_dict,
+                                                              in_list[idx])
+        elif (isinstance(in_list[idx], str) and
+              in_list[idx] in config_dict):  # Expand variable
+            in_list[idx] = config_dict[in_list[idx]]
+
+    return in_list
 
 
 def construct_and_run_component(params_dict: dict):

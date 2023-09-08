@@ -11,6 +11,20 @@ poll_timeout_ms = 1000 # was 1000 # was 250
 loop_sleep_s = 0.1 #0.1  # was 0
 hb_period_s = 1
 
+# --- Experiment Scan Aspects --- #
+# - Physical Stuff - #
+physical_units = 'nm'
+full_scan_origin = [0, 0]
+full_scan_size = [200, 200]
+sub_rois_per_dim = 5
+small_scan_origin = [0, 0]
+small_scan_size = [40, 40]  # 200 / 5
+
+# - Data Stuff - #
+data_units = 'nm'
+full_scan_res = [256, 256]
+small_scan_res = [512, 512]
+
 
 # --- PubSub Params --- #
 topics_experiment = [""]  # TODO: test instantiating proper topics
@@ -23,7 +37,7 @@ update_cache = 'afspm.io.cache.cache_logic.update_cache'
 
 [proto_hist_list]
 class = 'afspm.io.cache.pbc_logic.create_roi_proto_hist_list'
-sizes_with_hist_list = [[[200, 200], 1], [[40, 40], 3]]
+sizes_with_hist_list = [['full_scan_size', 1], ['small_scan_size', 3]]
 
 [pbc_with_roi_logic]
 class = 'afspm.io.cache.pbc_logic.PBCWithROILogic'
@@ -108,8 +122,8 @@ class = 'image_device_controller.ImageDeviceController'
 
 img_path = 'peppers.tiff'
 physical_dims = [0, 0, 200, 200]
-physical_units = 'nm'
-data_units = 'nm'
+physical_units = 'physical_units'
+data_units = 'data_units'
 
 scan_time_s = 5
 move_time_s = 1
@@ -126,12 +140,12 @@ subscriber = 'experiment_sub'
 component = true
 class = 'roi_experimenter.ROIExperimenter'
 
-full_scan_res = [200, 200]
-full_scan_physical_size = [200, 200]
-physical_units = 'nm'
-data_units = 'nm'
-sub_rois_per_dim = 5
-sub_scan_res = [400, 400]
+full_scan_res = 'full_scan_res'
+full_scan_physical_size = 'full_scan_size'
+physical_units = 'physical_units'
+data_units = 'data_units'
+sub_rois_per_dim = 'sub_rois_per_dim'
+sub_scan_res = 'small_scan_res'
 sub_scans_per_full_scan = 3
 get_envelope_for_proto = 'pbc_envelope_for_proto'
 rerun_wait_s = 5
