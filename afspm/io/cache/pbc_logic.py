@@ -76,7 +76,7 @@ class PBCWithROILogic(ProtoBasedCacheLogic):
         super().__init__(proto_with_history_list, **kwargs)
 
         # Even if this was set in proto_with_history_list, override with
-        # expliict input variable.
+        # explicit input variable.
         self.envelope_to_history_map[self.scan_id] = default_scan_history
 
         if self.scan_id not in self.envelope_to_proto_map:
