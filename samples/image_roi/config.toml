@@ -23,7 +23,7 @@ update_cache = 'afspm.io.cache.cache_logic.update_cache'
 
 [proto_hist_list]
 class = 'afspm.io.cache.pbc_logic.create_roi_proto_hist_list'
-sizes_with_hist_list = [[200, 1], [40, 3]]
+sizes_with_hist_list = [[[200, 200], 1], [[40, 40], 3]]
 
 [pbc_with_roi_logic]
 class = 'afspm.io.cache.pbc_logic.PBCWithROILogic'

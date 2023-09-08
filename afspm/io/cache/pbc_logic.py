@@ -117,14 +117,14 @@ class PBCWithROILogic(ProtoBasedCacheLogic):
             cache[envelope].append(proto)
 
 
-# TODO: Modify to support size as 2d array!!
-def create_roi_proto_hist_list(sizes_with_hist_list: tuple[float, int]
+def create_roi_proto_hist_list(sizes_with_hist_list:
+                               list[tuple[tuple[float, float], int]]
                                ) -> list[(Message, int)]:
     """Helper to create a proto-with-hist list for special ROIs.
 
     Args:
-        sizes_with_hist_list: list of different sizes for ROIs, with history
-            lengths for each.
+        sizes_with_hist_list: list of (size, cache_length), where size is
+            (x, y).
 
     Returns:
         A proto-history list, for instantiation of a PBCWithROi cache logic.
@@ -132,7 +132,7 @@ def create_roi_proto_hist_list(sizes_with_hist_list: tuple[float, int]
 
     proto_with_hist_list = list(DEFAULT_PROTO_WITH_HIST_SEQ)
     for (size, hist) in sizes_with_hist_list:
-        scan_params = common.create_scan_params_2d(size=[size, size])
+        scan_params = common.create_scan_params_2d(size=[size[0], size[1]])
         scan_2d = common.create_scan_2d(scan_params=scan_params)
         proto_with_hist_list.append((scan_2d, hist))
     return proto_with_hist_list

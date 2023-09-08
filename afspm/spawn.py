@@ -4,7 +4,7 @@ import logging
 import sys
 from types import MappingProxyType  # Immutable dict
 
-import toml
+import tomli
 import fire
 
 # TODO: Figure out why this can't be relative?
@@ -30,7 +30,6 @@ LOG_LEVEL_STR_TO_VAL = MappingProxyType({
 
 def spawn_components(config_file: str,
                      components_to_spawn: list[str] = None,
-                     encoding: str = 'utf-8',
                      log_file: str = 'log.txt',
                      log_to_stdout: bool = True,
                      log_level: str = "INFO"):
@@ -95,7 +94,6 @@ def spawn_components(config_file: str,
             to a $COMPONENT_NAME$ in the config file. If None, all components
             in the config file will be spawned. Note: any 'component' requires
             a key:val of 'component': True for us to parse it properly!
-        encoding: encoding to use for reading config file, as a str.
         log_file: a file path to save the process log. Default is 'log.txt'.
             To not log to file, set to None.
         log_to_stdout: whether or not we print to std out as well. Default is
@@ -105,8 +103,8 @@ def spawn_components(config_file: str,
     _set_up_logging(log_file, log_to_stdout, log_level)
 
     monitor = None
-    with open(config_file, 'r', encoding=encoding) as file:
-        config_dict = toml.load(file)
+    with open(config_file, 'rb') as file:
+        config_dict = tomli.load(file)
 
         expanded_dict = expand_variables_in_dict(config_dict)
         filtered_dict = _filter_requested_components(expanded_dict,

@@ -12,10 +12,10 @@ xarray = "^2023.7.0"
 pyzmq = "^25.1.0"
 numpy = "^1.25.1"
 protobuf = "^4.23.4"
-toml = "^0.10.2"
 fire = "^0.5.0"
 pysimplegui = "^4.60.5"
 imageio = "^2.31.2"
+tomli = "^2.0.1"
 
 [tool.poetry.group.dev.dependencies]
 debugpy = "^1.6.7"
