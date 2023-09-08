@@ -16,10 +16,10 @@ ALL_ENVELOPE_LOG = "ALL"
 
 
 # --- Creation Helpers --- #
-def create_scan_params_2d(top_left: list[float, float] = None,
-                          size: list[float, float] = None,
+def create_scan_params_2d(top_left: tuple[float, float] = None,
+                          size: tuple[float, float] = None,
                           phys_units: str = None,
-                          data_shape: list[int, int] = None,
+                          data_shape: tuple[int, int] = None,
                           data_units: str = None, channel_name: str = None
                           ) -> scan_pb2.ScanParameters2d:
     """Create ScanParameters2d object.

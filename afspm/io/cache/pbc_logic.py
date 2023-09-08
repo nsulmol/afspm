@@ -117,7 +117,8 @@ class PBCWithROILogic(ProtoBasedCacheLogic):
             cache[envelope].append(proto)
 
 
-def create_roi_proto_hist_list(sizes_with_hist_list: list[float, int]
+# TODO: Modify to support size as 2d array!!
+def create_roi_proto_hist_list(sizes_with_hist_list: tuple[float, int]
                                ) -> list[(Message, int)]:
     """Helper to create a proto-with-hist list for special ROIs.
 
