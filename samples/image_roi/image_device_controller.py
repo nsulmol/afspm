@@ -37,14 +37,16 @@ class ImageDeviceController(DeviceController):
         start_ts: a timestamp for timing the scan and move durations.
     """
     def __init__(self, img_path: str,
-                 physical_dims: tuple[float, float, float, float],
+                 physical_origin: tuple[float, float],
+                 physical_size: tuple[float, float],
                  physical_units: str, data_units: str,
                  scan_time_s: float, move_time_s: float, **kwargs):
         """Initialize controller.
 
         Args:
             img_path: path to image to load.
-            physical_dims: physical dimensions as [tl.x, tl.y, width, height].
+            physical_origin: physical origin as top-left (x,y).
+            physical_size: physical size as (width, height).
             physical_units: the units of the physical dimensions (i.e. x/y
                 dimension), str.
             data_units: the units of the scan data (i.e. z-dimension), str.
@@ -57,8 +59,8 @@ class ImageDeviceController(DeviceController):
         self.move_time_s = move_time_s
 
         self.dev_img = self.create_xarray_from_img_path(img_path,
-                                                        physical_dims[0:2],
-                                                        physical_dims[2:4],
+                                                        physical_origin,
+                                                        physical_size,
                                                         physical_units,
                                                         data_units)
         self.dev_scan_state = scan_pb2.ScanState.SS_FREE

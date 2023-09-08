@@ -121,7 +121,8 @@ component = true
 class = 'image_device_controller.ImageDeviceController'
 
 img_path = 'peppers.tiff'
-physical_dims = [0, 0, 200, 200]
+physical_origin = 'full_scan_origin'
+physical_size = 'full_scan_size'
 physical_units = 'physical_units'
 data_units = 'data_units'
 
