@@ -14,6 +14,7 @@ from afspm.components.afspm_components_monitor import AfspmComponentsMonitor
 logger = logging.getLogger(__name__)
 
 
+LOGGER_ROOT = 'afspm'
 IS_COMPONENT_KEY = 'component'
 MONITOR_KEY = 'afspm_components_monitor'
 
@@ -103,10 +104,6 @@ def spawn_components(config_file: str,
     """
     _set_up_logging(log_file, log_to_stdout, log_level)
 
-    #from afspm.utils.parser import expand_variables_in_dict
-    #from afspm.components.afspm_components_monitor import AfspmComponentsMonitor
-
-
     monitor = None
     with open(config_file, 'r', encoding=encoding) as file:
         config_dict = toml.load(file)
@@ -131,7 +128,7 @@ def _set_up_logging(log_file: str, log_to_stdout: bool, log_level: str):
             True.
         log_level: the log level to use. Default is INFO.
     """
-    root = logging.getLogger('afspm')
+    root = logging.getLogger(LOGGER_ROOT)
     log_level = LOG_LEVEL_STR_TO_VAL[log_level.upper()]
     root.setLevel(log_level)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - '
