@@ -1,0 +1,157 @@
+# ----- General variables ----- #
+# --- URLs --- #
+pub_url = "tcp://127.0.0.1:9000"
+psc_url = "tcp://127.0.0.1:9001"
+server_url = "tcp://127.0.0.1:6666"
+router_url = "tcp://127.0.0.1:6667"
+
+# --- Timing Logic --- #
+wait_ms = 3000
+poll_timeout_ms = 1000 # was 1000 # was 250
+loop_sleep_s = 0.1 #0.1  # was 0
+hb_period_s = 1
+
+
+# --- PubSub Params --- #
+topics_experiment = [""]  # TODO: test instantiating proper topics
+sub_extract_proto = 'afspm.io.cache.cache_logic.extract_proto'
+std_envelope_for_proto = 'afspm.io.cache.cache_logic.CacheLogic.get_envelope_for_proto'
+pbc_envelope_for_proto =  'afspm.io.cache.pbc_logic.PBCWithROILogic.get_envelope_for_proto'
+update_cache = 'afspm.io.cache.cache_logic.update_cache'
+
+# --- Cache Aspects --- #
+
+[proto_hist_list]
+class = 'afspm.io.cache.pbc_logic.create_roi_proto_hist_list'
+sizes_with_hist_list = [[200, 1], [40, 3]]
+
+[pbc_with_roi_logic]
+class = 'afspm.io.cache.pbc_logic.PBCWithROILogic'
+proto_with_history_list = 'proto_hist_list'
+
+[cache_kwargs]
+cache_logic = 'afspm.io.cache.pbc_logic.ProtoBasedCacheLogic()'
+
+[roi_cache_kwargs]
+cache_logic = 'pbc_with_roi_logic'
+
+# ----- PubSub ----- #
+[devcon_pub]
+class = 'afspm.io.pubsub.publisher.Publisher'
+url = 'pub_url'
+get_envelope_for_proto = 'std_envelope_for_proto'
+
+[controller_psc]
+class = 'afspm.io.pubsub.pubsubcache.PubSubCache'
+url = 'psc_url'
+sub_url = 'pub_url'
+sub_extract_proto = 'sub_extract_proto'
+pub_get_envelope_for_proto = 'pbc_envelope_for_proto'
+update_cache = 'update_cache'
+extract_proto_kwargs = 'cache_kwargs'
+update_cache_kwargs = 'roi_cache_kwargs'
+
+[experiment_sub]
+class = 'afspm.io.pubsub.subscriber.Subscriber'
+sub_url = 'psc_url'
+sub_extract_proto = 'sub_extract_proto'
+topics_to_sub = 'topics_experiment'
+update_cache = 'update_cache'
+extract_proto_kwargs = 'roi_cache_kwargs'
+update_cache_kwargs = 'roi_cache_kwargs'
+
+# ----- Control Logic ----- #
+[devcon_server]
+class = 'afspm.io.control.control_server.ControlServer'
+url = 'server_url'
+
+[controller_router]
+class = 'afspm.io.control.control_router.ControlRouter'
+server_url = 'server_url'
+router_url = 'router_url'
+server_timeout_ms = 'poll_timeout_ms'  # was wait_ms # was poll_timeout_ms
+
+[experiment_client]
+class = 'afspm.io.control.control_client.ControlClient'
+url = 'router_url'
+uuid = 'client_for_experiment'
+request_timeout_ms = 'wait_ms'
+request_retries = 1  # TODO: make default?
+
+[ui_client]
+class = 'afspm.io.control.control_client.AdminControlClient'
+url = 'router_url'
+uuid = 'client_for_ui'
+request_timeout_ms = 'wait_ms'
+
+
+# ----- Components ----- #
+[afspm_components_monitor]
+loop_sleep_s = 'loop_sleep_s'
+missed_beats_before_dead = 5
+poll_timeout_ms = 'poll_timeout_ms'
+
+[afspm_controller]
+component = true
+class = 'afspm.components.afspm_controller.AfspmController'
+
+loop_sleep_s = 'loop_sleep_s'
+hb_period_s = 'hb_period_s'
+poll_timeout_ms = 'poll_timeout_ms'
+
+pubsubcache = 'controller_psc'
+router = 'controller_router'
+
+[dev_con]
+component = true
+class = 'image_device_controller.ImageDeviceController'
+
+img_path = 'peppers.tiff'
+physical_dims = [0, 0, 200, 200]
+physical_units = 'nm'
+data_units = 'nm'
+
+scan_time_s = 5
+move_time_s = 1
+
+poll_timeout_ms = 'poll_timeout_ms'
+loop_sleep_s = 'loop_sleep_s'
+hb_period_s = 'hb_period_s'
+
+publisher = 'devcon_pub'
+control_server = 'devcon_server'
+subscriber = 'experiment_sub'
+
+[experiment]
+component = true
+class = 'roi_experimenter.ROIExperimenter'
+
+full_scan_res = [200, 200]
+full_scan_physical_size = [200, 200]
+physical_units = 'nm'
+data_units = 'nm'
+sub_rois_per_dim = 5
+sub_scan_res = [400, 400]
+sub_scans_per_full_scan = 3
+get_envelope_for_proto = 'pbc_envelope_for_proto'
+rerun_wait_s = 5
+visualization_style = 'imshow'
+visualization_colormap = 'nipy_spectral'
+
+loop_sleep_s = 'loop_sleep_s'
+hb_period_s = 'hb_period_s'
+poll_timeout_ms = 'poll_timeout_ms'
+
+subscriber = 'experiment_sub'
+control_client = 'experiment_client'
+
+[ui]
+#component = true  # TODO uncomment
+class = 'afspm.components.afspm_control_ui.AfspmControlUI'
+
+loop_sleep_s = 'loop_sleep_s'
+hb_period_s = 'hb_period_s'
+poll_timeout_ms = 'poll_timeout_ms'
+
+subscriber = 'experiment_sub'
+control_client = 'ui_client'
