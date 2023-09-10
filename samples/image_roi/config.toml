@@ -142,6 +142,7 @@ component = true
 class = 'roi_experimenter.ROIExperimenter'
 
 full_scan_res = 'full_scan_res'
+full_scan_physical_origin = 'full_scan_origin'
 full_scan_physical_size = 'full_scan_size'
 physical_units = 'physical_units'
 data_units = 'data_units'

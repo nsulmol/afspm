@@ -40,6 +40,7 @@ class ROIExperimenter(Visualizer):
         phys_units: the units of the physical dimensions (i.e. x/y dimension),
             str.
         data_units: the units of the scan data (i.e. z-dimension), str.
+        fscan_phys_origin: the physical origin of the full scan.
         fscan_phys_size: the physical size of the full scan.
         fscan_res: the scan resolution of the full scan.
         sscan_origins: the sub-scan origins (list).
@@ -66,6 +67,7 @@ class ROIExperimenter(Visualizer):
         sscan_key: the cache key for sub-scan.
     """
     def __init__(self, full_scan_res: list[int],
+                 full_scan_physical_origin: list[float],
                  full_scan_physical_size: list[float],
                  physical_units: str, data_units: str,
                  sub_rois_per_dim: int,
@@ -79,6 +81,7 @@ class ROIExperimenter(Visualizer):
 
         Args:
             full_scan_res: the scan resolution of the full scan.
+            full_scan_physical_origin: the physical origin of the full scan.
             full_scan_physical_size: the physical size of the full scan.
             physical_units: the units of the physical dimensions (i.e. x/y
                 dimension), str.
@@ -99,6 +102,8 @@ class ROIExperimenter(Visualizer):
         """
         self.phys_units = physical_units
         self.data_units = data_units
+        self.fscan_phys_origin = np.asarray(full_scan_physical_origin,
+                                            np.float32)
         self.fscan_phys_size = np.asarray(full_scan_physical_size, np.float32)
         self.fscan_res = np.asarray(full_scan_res, np.uint)
         self.sscan_res = np.asarray(sub_scan_res, np.uint)
@@ -132,10 +137,10 @@ class ROIExperimenter(Visualizer):
 
     def _set_up_sub_scans(self, sub_rois_per_dim: int):
         """Initiailizes sscan_origins and sscan_phys_size"""
-        x = np.linspace(0, self.fscan_phys_size[0], sub_rois_per_dim,
-                        endpoint=False)
-        y = np.linspace(0, self.fscan_phys_size[1], sub_rois_per_dim,
-                        endpoint=False)
+        x = np.linspace(self.fscan_phys_origin[0], self.fscan_phys_size[0],
+                        sub_rois_per_dim, endpoint=False)
+        y = np.linspace(self.fscan_phys_origin[1], self.fscan_phys_size[1],
+                        sub_rois_per_dim, endpoint=False)
         x_points, y_points = np.meshgrid(x, y)
         self.sscan_origins = np.array([x_points.flatten(),
                                        y_points.flatten()]).T
@@ -149,11 +154,8 @@ class ROIExperimenter(Visualizer):
 
         cache_meaning_map = {self.fscan_key: CacheMeaning.TEMPORAL.name,
                              self.sscan_key: CacheMeaning.REGIONS.name}
-        scan_phys_extents_map = {self.fscan_key: None,
-                                 self.sscan_key: self.fscan_phys_size}
-        scan_data_extents_map = {self.fscan_key: None,
-                                 self.sscan_key: self.sscan_res *
-                                 sub_rois_per_dim}
+        scan_phys_origin_map = {self.sscan_key: self.fscan_phys_origin}
+        scan_phys_size_map = {self.sscan_key: self.fscan_phys_size}
         visualization_style_map = {self.fscan_key: visualization_style,
                                    self.sscan_key: visualization_style}
         visualization_colormap_map = {self.fscan_key: visualization_colormap,
@@ -165,9 +167,10 @@ class ROIExperimenter(Visualizer):
                                               force_parent=True,
                                               **self.get_envelope_kwargs)
 
-        super().__init__(cache_meaning_map, scan_phys_extents_map,
-                         scan_data_extents_map, visualization_style_map,
-                         visualization_colormap_map, True, scan_id, **kwargs)
+        super().__init__(cache_meaning_map, scan_phys_origin_map,
+                         scan_phys_size_map,
+                         visualization_style_map, visualization_colormap_map,
+                         True, scan_id, **kwargs)
 
     def on_message_received(self, envelope: str, proto: Message):
         """Override: we update the ScanHandler and Visualizer (parent)."""
@@ -190,7 +193,7 @@ class ROIExperimenter(Visualizer):
             ScanParameters2d of the next scan.
         """
         if self.scans_since_last_fscan >= self.sscans_per_fscan:
-            origin = np.array([0, 0])
+            origin = self.fscan_phys_origin
             size = self.fscan_phys_size
             res = self.fscan_res
             logger.info("Performing full scan.")

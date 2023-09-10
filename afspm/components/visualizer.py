@@ -66,16 +66,12 @@ class Visualizer(AfspmComponent):
             pairs. Used to determine if a cache's data is considered to be
             'temporal' (meaning we only show the latest image); or 'regions',
             meaning we treat all as being sub-regions of a larger region.
-        scan_phys_extents_map: dictionary containing scan_envelope:phys_extents
-            pairs. For a scan_envelope, None (or no key) means we visualize the
-            data as-is; having extents means we visualize it as being within
-            the provided extents. Useful to illustrate the scan within the full
+        scan_phys_origin_map: dictionary containing scan_envelope:phys_origin
+            pairs. Useful to illustrate the scan within the full
             scan region, for example. Note that extents are *required* for
             'regions' visualizations.
-        scan_data_extents_map: dictionary containing scan_envelope:data_extents
-            pairs. For a scan_envelope, None (or no key) means we visualize the
-            data as-is; having extents means we visualize it as being within
-            the provided extents. Useful to illustrate the scan within the full
+        scan_phys_size_map: dictionary containing scan_envelope:phys_size
+            pairs. Useful to illustrate the scan within the full
             scan region, for example. Note that extents are *required* for
             'regions' visualizations.
         visualization_style_map: dictionary containing scan_envelope:viz_style
@@ -92,21 +88,16 @@ class Visualizer(AfspmComponent):
             pairs. Part of matplotlib backend, used for visualization.
     """
     def __init__(self, cache_meaning_map: dict[str, str],
-                 scan_phys_extents_map: dict[str, tuple[float, float]],
-                 scan_data_extents_map: dict[str, tuple[int, int]],
+                 scan_phys_origin_map: dict[str, tuple[float, float]],
+                 scan_phys_size_map: dict[str, tuple[float, float]],
                  visualization_style_map: dict[str, str],
                  visualization_colormap_map: dict[str, str],
                  visualize_undeclared_scans: bool,
                  scan_id: str,
                  **kwargs):
-        # Validate all maps have same keys
-        for viz_map in [scan_phys_extents_map, scan_data_extents_map,
-                        visualization_style_map, visualization_colormap_map]:
-            assert cache_meaning_map.keys() == viz_map.keys()
-
         self.cache_meaning_map = cache_meaning_map
-        self.scan_phys_extents_map = scan_phys_extents_map
-        self.scan_data_extents_map = scan_data_extents_map
+        self.scan_phys_origin_map = scan_phys_origin_map
+        self.scan_phys_size_map = scan_phys_size_map
         self.visualization_style_map = visualization_style_map
         self.visualization_colormap_map = visualization_colormap_map
 
@@ -122,10 +113,10 @@ class Visualizer(AfspmComponent):
         for key in self.cache_meaning_map:
             if (self.cache_meaning_map[key].upper() ==
                     CacheMeaning.REGIONS.name and
-                    (self.scan_phys_extents_map[key] is None or
-                     self.scan_data_extents_map[key] is None)):
+                    (key not in self.scan_phys_origin_map or
+                     key not in self.scan_phys_size_map)):
                 msg = ("Scan data with key %s is of meaning REGIONS "
-                       "with no extents. Not currently supported!",
+                       "with no extents. Not currently supported!" %
                        key)
                 logger.error(msg)
                 raise KeyError(msg)
@@ -201,22 +192,31 @@ class Visualizer(AfspmComponent):
         """Creates a 'regions' xarray, for visualization.
 
         A 'regions' image is an image where we merge all cached scans from a
-        key, treating them as ROIs in a larger image. The scan_phys_extents
-        define the overall size of the image, and the phys_data_extents the
-        image resolution.
-
-        NOTE: we probably do not need phys_data_extents, if we used xarray's
-        'merge' method...
+        key, treating them as ROIs in a larger image. The scan_phys_origin and
+        scan_phys_size define the overall size of the image; the full image
+        data resolution is calculated from this and the data_res/phys_size.
         """
-        # TODO: Try to reimplement using xarray's merge.
+        # TODO: Try to reimplement using xarray's merge. You tried previously,
+        # but could not get it working.
         cache_list = self.subscriber.cache[key]
-        scan_phys_extents = self.scan_phys_extents_map[key]
-        scan_data_extents = self.scan_data_extents_map[key]
+
+        scan_phys_origin = self.scan_phys_origin_map[key]
+        scan_phys_size = self.scan_phys_size_map[key]
         data_units = cache_list[0].params.data.units
         phys_units = cache_list[0].params.spatial.units
 
-        x = np.linspace(0, scan_phys_extents[0], scan_data_extents[0])
-        y = np.linspace(0, scan_phys_extents[1], scan_data_extents[1])
+        # Determine res of 'full image'
+        sample_scan = ac.convert_scan_pb2_to_xarray(cache_list[0])
+        sample_phys_size = np.array([np.ptp(sample_scan.x.data),
+                                     np.ptp(sample_scan.y.data)])
+        sample_data_res = np.array(sample_scan.data.shape)
+        full_res = scan_phys_size * (sample_data_res / sample_phys_size)
+        full_res = full_res.astype(int)
+
+        x = np.linspace(scan_phys_origin[0], scan_phys_size[0],
+                        full_res[0])
+        y = np.linspace(scan_phys_origin[0], scan_phys_size[0],
+                        full_res[1])
         xarr = xr.DataArray(dims=['y', 'x'],
                             coords={'y': y, 'x': x},
                             attrs={'units': data_units})
@@ -243,7 +243,4 @@ class Visualizer(AfspmComponent):
     def _add_to_visualizations(self, key: str):
         """Add a new key to our visualization maps."""
         self.cache_meaning_map[key] = CacheMeaning.TEMPORAL.name
-        self.scan_phys_extents_map[key] = None
-        self.scan_data_extents_map[key] = None
-
         self._add_to_plt_maps(key)
