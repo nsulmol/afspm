@@ -47,6 +47,10 @@ class ScanHandler:
         get_next_params: method to determine the next scan_params to scan. If
             None is provided, it will log this and retry later.
         next_params_kwargs: kwargs for get_next_params.
+        control_mode_to_run: ControlMode to run under. If the controller is not
+            in this control mode, we do nothing until they switch to it.
+
+        control_mode: current control mode the controller is in.
         scan_params: current ScanParameters2d instance.
         scan_state: current ScanState.
         desired_scan_state: desired ScanState.
@@ -57,13 +61,16 @@ class ScanHandler:
 
     def __init__(self, rerun_wait_s: int,
                  get_next_params: Callable[[Any], scan_pb2.ScanParameters2d],
-                 next_params_kwargs: dict = {}):
+                 next_params_kwargs: dict = {},
+                 control_mode: control_pb2.ControlMode =
+                 control_pb2.ControlMode.CM_AUTOMATED):
         self.rerun_wait_s = rerun_wait_s
         self.get_next_params = get_next_params
         self.next_params_kwargs = next_params_kwargs
+        self.control_mode_to_run = control_mode
 
+        self.control_mode = control_pb2.ControlMode.CM_UNDEFINED
         self.scan_params = scan_pb2.ScanParameters2d()
-
         self.scan_state = scan_pb2.ScanState.SS_UNDEFINED
         self.desired_scan_state = scan_pb2.ScanState.SS_UNDEFINED
 
@@ -84,6 +91,8 @@ class ScanHandler:
             proto: Protobuf message received by the AfspmComponent.
             control_client: AfspmComponent's control_client.
         """
+        if isinstance(proto, control_pb2.ControlState):
+            self.control_mode = proto.control_mode
         if isinstance(proto, scan_pb2.ScanStateMsg):
             self._handle_scan_state_receipt(proto)
             self._perform_scanning_logic(control_client)
@@ -101,7 +110,8 @@ class ScanHandler:
         Args:
             control_client: AfspmComponent's control_client.
         """
-        if self.rerun_scanning_logic:
+        in_desired_control_mode = self.control_mode_to_run == self.control_mode
+        if in_desired_control_mode and self.rerun_scanning_logic:
             need_to_wait = self.rerun_sleep_ts is not None
             enough_time_has_passed = (need_to_wait and
                                       (time.time() - self.rerun_sleep_ts >
@@ -161,8 +171,13 @@ class ScanHandler:
         Args:
             control_client: AfspmComponent's ControlClient.
         """
-        if (scan_pb2.ScanState.SS_UNDEFINED in (self.scan_state,
-                                                self.desired_scan_state)):
+        in_desired_control_mode = self.control_mode_to_run == self.control_mode
+        scan_state_undefined = (scan_pb2.ScanState.SS_UNDEFINED in
+                                (self.scan_state, self.desired_scan_state))
+        if scan_state_undefined or not in_desired_control_mode:
+            logger.debug("Not performing scanning logic because ScanState "
+                         "undefined or ControlMode not desired one.")
+            self.rerun_scanning_logic = True
             return  # Early return, we're not ready yet.
 
         # Handle sending requests (not guaranteed it will work!)
