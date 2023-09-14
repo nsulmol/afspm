@@ -83,11 +83,12 @@ class AfspmControlUI(AfspmComponent):
         buttons = []
 
         cm = control_pb2.ControlMode
-        txt_automated = common.get_enum_name(cm, cm.CM_AUTOMATED)
+        txt_automated = common.get_enum_str(cm, cm.CM_AUTOMATED)
         for mode in [cm.CM_MANUAL, cm.CM_AUTOMATED, cm.CM_PROBLEM]:
             is_default = mode == txt_automated
-            txt = common.get_enum_name(cm, mode)
+            txt = common.get_enum_str(cm, mode)
             buttons.append(sg.Radio(txt, MODE_GROUP, key=txt,
+                                    enable_events=True,
                                     default=is_default))
         self.layout.append(buttons)
 
@@ -110,20 +111,21 @@ class AfspmControlUI(AfspmComponent):
 
         req_methods = []
         req_args = []
-        if common.is_str_in_enum(control_pb2.ControlMode, event):
-            logger.debug("Control Mode Selected: %s", event)
+
+        if common.is_str_in_enums(control_pb2.ControlMode, event):
+            logger.info("Control Mode Selected: %s", event)
             req_methods.append(self.control_client.set_control_mode)
             req_args.append(common.get_enum_val(control_pb2.ControlMode,
                                                 event))
         elif event == PROBLEMS_SET:
-            logger.debug("Flush problems set selected.")
+            logger.info("Flush problems set selected.")
             problems = copy.deepcopy(self.control_state.problems_set)
             for problem in problems:
                 req_methods.append(self.control_client.
                                    remove_experiment_problem)
                 req_args.append(problem)
         elif event == END_EXP:
-            logger.debug("End experiment selected.")
+            logger.info("End experiment selected.")
             req_methods.append(self.control_client.end_experiment)
             req_args.append(None)
         elif event == sg.WINDOW_CLOSED:
