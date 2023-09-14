@@ -1,193 +1,241 @@
 #+title: afspm Overview
 #+startup: beamer
 #+latex_class: beamer
-#+latex_class_options: [presentation]
-#+options: h:1 toc:nil
-#+beamer_theme: boxes
-#+beamer_color_theme: rose
-#+beamer_font_theme: structurebold
+# 10pt dictates the overall font size, from 8-12.
+#+latex_class_options: [presentation, 9pt]
+
+# Set toc to nil if no outline is desired.
+# h/headlines is the headlines level considered for slides.
+#+options: h:2 toc:1
+
+# Set institute
+#+beamer_header:\institute{National Research Council Canada (NRC/CNRC)}
+
+# Remove weird navigation buttons
+#+beamer_header:\setbeamertemplate{navigation symbols}{}
+
+# --- Set our theme! --- #
+# -- Colors -- #
+# Outer Color theme: whale, seahorse, dolphin
+#+beamer_header: \usecolortheme{dolphin}
+# Inner Color theme: rose, lily, orchid
+#+beamer_header: \usecolortheme{rose}
+
+#+beamer_header:\definecolor{mellowgreen}{rgb}{0.25, 0.5, 0.25}
+#+beamer_header:\definecolor{mellowblue}{rgb}{0.25, 0.25, 0.5}
+#+beamer_header:\definecolor{lessmellowblue}{rgb}{0.0, 0.33, 0.66}
+#+beamer_header:\definecolor{urlblue}{rgb}{0.25, 0.25, 0.75}
+#+beamer_header:\definecolor{mydarkgray}{rgb}{0.4, 0.4, 0.4}
+
+# Main hook: structure. All other theme colors will be based on this.
+#+beamer_header:\setbeamercolor{structure}{fg=mellowgreen}
+
+# Change the normal text color, to be less garish
+#+beamer_header:\setbeamercolor{normal text}{fg=mydarkgray}
+
+# Set urls blue
+#+beamer_header:\hypersetup{colorlinks, allcolors=., urlcolor=urlblue}
+
+# Set 'alert' (org bold) to be a nice bolded color.
+# Define % between structure and black
+#+beamer_header:\setbeamercolor{alerted text}{fg=structure!85!white}
+#+beamer_header:\setbeamerfont{alerted text}{series=\bfseries}
+
+# -- Theme structure -- #
+# Inner theme: default, circles, rectangles, rounded
+#+beamer_inner_theme: rectangles
+#+beamer_outer_theme: [subsection=false, compress, footline=authortitle]miniframes
+
+# Provides nicer equation fonts
+#+beamer_font_theme: professionalfonts
 #+beamer_header:\documentclass[xcolor=SeaGreen]{beamer}
-#+beamer_header:\hypersetup{ colorlinks, allcolors=., urlcolor=blue }
-#+beamer_header:\definecolor{carmine}{rgb}{0.59, 0.0, 0.09}
-#+beamer_header:\setbeamercolor{alerted text}{fg=carmine}
+
 #+property: header-args :mkdirp yes :results value drawer
 
-#+name: attr_fit_width
-#+begin_src bash :var data="" :var org_percent=50 :var latex_percent=80 :results output :exports none
-  echo "#+attr_org: :width $org_percent%"
-  echo "#+attr_latex: :width $(bc <<< "scale=2; $latex_percent/100")\linewidth"
-  echo "$data"
-#+end_src
+* Justification
+** SPM Basics
+In Scanning Probe Microscopy (SPM), an *atomically-sharp tip* is *scanned* above a *surface*, while *measuring* one or more *properties* gleaned from this tip.
+#+beamer:\medskip
+
+This process allows *atomic-level imaging* of properties, spectroscopic analysis, and even manipulation of a sample (toward *atomic-scale manufacturing*).
+
+*** AFM Configuration :BMCOL:
+:PROPERTIES:
+:BEAMER_col: 0.5
+:END:
+# https://en.wikipedia.org/wiki/File:AFM_conf.jpg
+#+attr_org: :width 50%
+#+attr_latex: :width 0.75\linewidth
+#+caption: Typical AFM Configuration, Tom Toyosaki, Wikimedia Commons.
+[[./images/AFM_conf.jpg]]
+*** AFM Topography :BMCOL:
+:PROPERTIES:
+:BEAMER_col: 0.5
+:END:
+# https://en.wikipedia.org/wiki/Atomic_force_microscopy#/media/File:Schematics_of_Topographic_image_forming.jpg
+#+attr_org: :width 50%
+#+attr_latex: :width 0.75\linewidth
+#+caption: Schematics of AFM topographic image forming, Tom Toyosaki, Wikimedia Commons.
+[[./images/Schematics_of_Topographic_image_forming.jpg]]
+
+** Standard Experiment
+*** Image :BMCOL:
+:PROPERTIES:
+:BEAMER_col: 0.45
+:END:
+#+attr_org: :width 50%
+#+attr_latex: :width 0.95\linewidth
+[[./images/experiment_no_automation.png]]
+*** Description :BMCOL:
+:PROPERTIES:
+:BEAMER_col: 0.55
+:END:
+In a traditional SPM experiment, a researcher with domain knowledge will:
+1. *Prepare the system*: including defining the SPM mode (e.g. FM-AFM).
+2. *Run the experiment*: monitoring collected scans, deciding on next scans, and updating any aspects of the experiment.
+3. *Finalize the experiment*: by undoing any experiment-specific setup needed to run.
+*** Note :B_ignoreheading:
+:PROPERTIES:
+:BEAMER_env: ignoreheading
+:END:
+#+beamer:\bigskip
+#+beamer:\centering
+/Running the experiment is often *long*, and requires *constant* researcher *attention*./
+
+** System Scripting and Code Reuse
+*** Description :BMCOL:
+:PROPERTIES:
+:BEAMER_col: 0.55
+:END:
+Many SPM systems allow custom scripts to run an experiment.
+
+#+beamer:\medskip
+However:
+- Scripts written for a *specific* SPM system *cannot be re-used* for other SPM systems: different API/language constraints.
+- While *decoupling* of SPM device and experiment logic *is possible*, it is *rarely* a *priority* for researchers.
+*** Image :BMCOL:
+:PROPERTIES:
+:BEAMER_col: 0.45
+:END:
+#+attr_org: :width 50%
+#+attr_latex: :width 0.95\linewidth
+[[./images/experiment_with_script.png]]
+*** Note :B_ignoreheading:
+:PROPERTIES:
+:BEAMER_env: ignoreheading
+:END:
+#+beamer:\bigskip
+#+beamer:\centering
+/Code *reuse* is *rare*./
+* Introduction to afspm
+** Goals and Scope
+*** Goals
+- *Clear Decoupling*: of SPM device specifics from the desired experiment; to allow reuse of a given experiment on multiple devices.
+- *Multi-Language Support*: for integration with SPM devices; we should not be the limiting factor to integration.
+- *Pausable Automation*: to allow a researcher to take over.
+- *Separable on Multiple Devices*: composed of concise, separable components.
+*** Scope
+afspm will concern itself *only* with automation of high-level, low-frequency decisions a researcher would perform *during* an experiment.
+
+** High-Level Design
+*** Image: :BMCOL:
+:PROPERTIES:
+:BEAMER_col: 0.45
+:END:
+#+attr_org: :width 50%
+#+attr_latex: :width 0.95\linewidth
+[[./images/afspm_hl_diagram.png]]
+*** Notes :BMCOL:
+:PROPERTIES:
+:BEAMER_col: 0.55
+:END:
+*afspm* is designed around 'computation' components that correspond to nodes in a network. An experiment contains:
+- *Device Controller*: abstract - specifies the required methods to communicate with an SPM device. Each SPM device will have its own DeviceController implementation.
+- *Afspm Controller*: mediates control of the SPM device (only 1 component in control at a time).
+- *Afspm Components*: the one or more components the user requires to run their experiment.
+** Communication Protocol
+*** Image :B_ignoreheading:
+:PROPERTIES:
+:BEAMER_env: ignoreheading
+:END:
+#+attr_org: :width 50%
+#+attr_latex: :width 0.35\linewidth
+[[./images/network_framework.png]]
+
+*** Notes :B_ignoreheading:
+:PROPERTIES:
+:BEAMER_env: ignoreheading
+:END:
+*afspm* uses ZeroMQ as its communications/concurrency framework and protobuffers as its serialization layer. Both are cross-platform and cross-language.
+***** What is ZeroMQ?
+Library that abstracts away protocols used, allowing easy switching of how 'nodes' communicate in a system.
+***** What are protobuffers?
+Library for serializing structured data (translating a data structure into a format that can be stored/communicated).
+
+* Design Particulars
+** I/O Paths
+*** Publisher-Subscriber Path
+- The DeviceController *publishes* ScanState, ScanParameters, and Scan *changes*.
+- These are passed on by the AfspmController. Data is *stored* in a *cache* and resent to new/crashed components.
+- Each component choose what aspects to *subscribe* to, and receives data from these.
+*** Control Path
+- Each component can send *control requests* over its client.
+- The AfspmController determines which *client* is *in-control*, and *forwards* these to the DeviceController.
+- The DeviceController *receives* control requests from one client and *responds*.
+** afspm: Detailed View
+#+attr_org: :width 50%
+#+attr_latex: :width 1.0\linewidth
+[[./images/afspm_control.png]]
+** afspm Controller
+*** Cache Logic
+Data is *stored* into the *cache* according to a *user-defined configuration*.
+
+#+beamer:\medskip
+These map a *protobuf Message* to a *cache key* (envelope), and vice-versa.
+*** Experiment Problems
+Any component can *report* experiment *problems*, indicating issues that should cause the experiment to *pause* until *resolved*, and can *remove* these problems.
+
+#+beamer:\medskip
+This allows, e.g., detecting a tip crash and attempting to correct it.
+
+*** Control Modes
+The AfspmController defines the *control mode*, which can be:
+- *Automated*: default, automation runs.
+- *Manual*: pause automation.
+- *Problem*: experiment problems are logged, pause automation.
+** The Config File
+*** Description :BMCOL:
+:PROPERTIES:
+:BEAMER_col: 0.6
+:END:
+afspm uses a *single* TOML *configuration file* per experiment.
+
+#+beamer:\medskip
+Within this file, a user defines:
+- The communication protocols used between components.
+- Common variables passed between components (e.g. how big the scan size will be).
+- The components to spawn.
+
+#+beamer:\medskip
+Top-level definitions can function as *variables*: any *references* deeper in the config are *replaced* by them. This should *minimize* *repeating* oneself.
+
+*** Image :BMCOL:
+:PROPERTIES:
+:BEAMER_col: 0.4
+:END:
+#+attr_org: :width 50%
+#+attr_latex: :width 1.0\linewidth
+[[./images/config_toml.png]]
 
 
-* Introduction
-afspm is a Framework for the Automation of Scanning Probe Microscopy, developed using ZeroMQ as the communications/concurrency framework and protobuffers as the serialization layer.
 
-** What is ZeroMQ?
-A cross-platform, cross-language communication library that *abstracts away* protocols used, allowing easy switching of how 'nodes' communicate in a system.
-** What are protobuffers?
-A cross-platform, cross-language mechanism for serializing structured data. Serialization is the process of translating a data structure into a format that can be stored/communicated.
-* Introduction (ii)
+** Spawning the Experiment
+*** Distributed Computing
+Components can be *split up* among devices; on startup, the components to spawn can be specified.
 
-#+header: :post attr_fit_width(data=*this*, org_percent=50, latex_percent=75)
-#+begin_src plantuml :file images/network_framework.png
-  skinparam componentStyle rectangle
+*** Component Monitoring
+All spawned components are *monitored*:
+- Each sends *heartbeats* at a regular cadence.
+- If one *stops* beating, it is *restarted*.
 
-  component "Component A" as comp_a {
-    component REQ as node_a
-    component proto_a [
-    message info
-    {
-        int num
-        str name
-    }
-    ]
-
-    component "list[bytes]" as bytes_a
-    proto_a .u.> bytes_a: serialize
-    bytes_a .u.> node_a
-  }
-
-  component "Component B" as comp_b {
-    component REP as node_b
-    component proto_b [
-    message info
-    {
-        int num
-        str name
-    }
-    ]
-
-    component "list[bytes]" as bytes_b
-    node_b .d.> bytes_b
-    bytes_b .d.> proto_b: deserialize
-  }
-
-  node_a --r-- node_b: "//zmq communication protocol//"
-  #+end_src
-
-  #+RESULTS:
-  :results:
-  #+attr_org: :width 50%
-  #+attr_latex: :width .50\linewidth
-  [[file:images/network_framework.png]]
-  :end:
-
-* Introduction (iii)
-With afspm, the user designs 'computation' components that correspond to nodes in a network. Each component subscribes to data from the afspm device, and can optionally send requests to it to perform actions.
-
-All the nodes for an experiment can be spawned:
-- on a single device, in a single process (inproc);
-- on a single device, decoupled into different processes (ipc);
-- over multiple devices, communicating over a network connection (tcp);
-- in any combination of the above.
-* A Basic Experiment
-
-#+header: :post attr_fit_width(data=*this*, org_percent=50, latex_percent=90)
-#+begin_src plantuml :file images/basic_experiment.png
-  skinparam componentStyle rectangle
-
-  component Device as dev
-  component "Device Controller" as devcon {
-    component PUB as dc_pub
-    component REP as dc_rep
-  }
-  dev <-r-> devcon
-
-  note as note_devcon
-    Abstract class:
-    - Base class handles generic communication/polling.
-    - Each implementation handles SPM controller specifics.
-  end note
-  devcon -[hidden]r- note_devcon
-
-  component Experiment as exp {
-    component SUB as exp_sub
-    component REQ as exp_req
-  }
-
-  note as note_exp
-    Script defining what to scan in what order.
-    - A given experiment can be run with any SPM controller.
-    - Minimally requires:
-        - REQ to send scan requests/parameters.
-        - SUB to know when a scan has ended.
-  end note
-  exp .[hidden]r. note_exp
-
-  dc_pub ---> exp_sub: data, \nstatus
-  exp_req ---> dc_rep: control\nrequests
-  #+end_src
-* A Basic Experiment (ii)
-Limitations:
-- How do we tell the automation to stop/pause?
-- What happens if a node crashes mid-experiment? How do we continue?
-* afspm Control
-
-#+header: :post attr_fit_width(data=*this*, org_percent=50, latex_percent=90)
-#+begin_src plantuml :file images/afspm_control.png
-  skinparam componentStyle rectangle
-
-  component Device as dev
-  component "Device Controller" as devcon {
-    component PUB as dc_pub
-    component REP as dc_rep
-  }
-  dev <-r-> devcon
-
-  component "afspm Controller" as afspm_con {
-    component SUB as afspm_sub
-    component XPUB as afspm_pub
-    component Cache as afspm_cache
-    afspm_sub .d. afspm_cache
-    afspm_cache .d. afspm_pub
-
-    component REQ as afspm_req
-    component ROUTER as afspm_rou
-    component Control as afspm_ctrl
-    afspm_req .d. afspm_ctrl
-    afspm_ctrl .d. afspm_rou
-  }
-
-  dc_pub -d-> afspm_sub: data, \nstatus
-  dc_rep <-d- afspm_req: control\nrequests
-
-  component Experiment as experiment {
-    component SUB as exp_sub
-    component REQ as exp_req
-  }
-
-  afspm_pub --> exp_sub: scan_state
-  afspm_rou <-- exp_req: scan_params\nstart_scan\nstop_scan
-
-  note as note_cache
-    Cache stores data/state passed to subscribers.
-    When a new subsciption occurs, we send from the cache.
-    If a node crashes, on reconnection it gets this prior history.
-  end note
-  note_cache -[hidden]l- afspm_con
-
-  note as note_control
-    Control handles routing data from 1 or more REQs to the Device Controller.
-    It also allows turning OFF/pausing (for manual control).
-    It also can receive "Problems" (e.g. bad tip state).
-    Upon a problem, automated control pauses until a node states it is fixed.
-  end note
-  note_control -[hidden]u- note_cache
-
-  component "Tip State Detector" as tip_classifier {
-    component SUB as tip_sub
-    component REQ as tip_req
-  }
-  afspm_pub --> tip_sub: scans
-  afspm_rou <-r- tip_req: tip_state
-
-  'tip_classifier -[hidden]r- experiment
-  #+end_src
-
-  #+RESULTS:
-  :results:
-  #+attr_org: :width 50%
-  #+attr_latex: :width .90\linewidth
-  [[file:images/afspm_control.png]]
-  :end:
+This should minimize a crash breaking experiments.

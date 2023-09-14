@@ -1,0 +1,285 @@
+#+title: Overview Code
+
+#+property: header-args :mkdirp yes :results value drawer
+
+#+name: attr_fit_width
+#+begin_src bash :var data="" :var org_percent=50 :var latex_percent=80 :results output :exports none
+  echo "#+attr_org: :width $org_percent%"
+  echo "#+attr_latex: :width $(bc <<< "scale=2; $latex_percent/100")\linewidth"
+  echo "$data"
+#+end_src
+
+* Experiment No Automation
+
+#+begin_src plantuml :file images/experiment_no_automation.png
+  skinparam componentStyle rectangle
+  skinparam defaultTextAlignment center
+  skinparam wrapWidth 200
+  skinparam maxMessageSize 200
+  !include <material/microscope>
+  !include <material/monitor>
+  !include <material/person_box>
+  !include <material/document>
+
+
+  package "spm system" as spm_system {
+    component "spm device\n<$ma_microscope>" as spmdev
+    component "spm controller\n<$ma_monitor>" as spmcon
+    spmcon <--> spmdev: high freq. \ncontrol
+  }
+
+  component "user\n<$ma_person_box>" as user
+  spmcon <--r-- user: low freq. \ncommands
+
+  component "experiment\n<$ma_document>" as exp
+  user <.. exp: experimental \nsteps
+  #+end_src
+
+  #+RESULTS:
+  :results:
+  [[file:images/experiment_no_automation.png]]
+  :end:
+* SPM-Specific Automation
+
+#+begin_src plantuml :file images/experiment_with_script.png
+  skinparam componentStyle rectangle
+  skinparam defaultTextAlignment center
+  skinparam wrapWidth 200
+  skinparam maxMessageSize 200
+  !include <material/microscope>
+  !include <material/monitor>
+  !include <material/script>
+
+
+  package "spm system" as spm_system {
+    component "spm device\n<$ma_microscope>" as spmdev
+    component "spm controller\n<$ma_monitor>" as spmcon
+    spmcon <--> spmdev: high freq. \ncontrol
+  }
+
+  component "experiment script\n<$ma_script>" as exp_script
+  spmcon <--r-- exp_script: low freq. \ncommands
+  #+end_src
+
+  #+RESULTS:
+  :results:
+  [[file:images/experiment_with_script.png]]
+  :end:
+
+* afspm High-Level Diagram
+
+#+begin_src plantuml :file images/afspm_hl_diagram.png
+  skinparam componentStyle rectangle
+  skinparam defaultTextAlignment center
+  skinparam wrapWidth 200
+  skinparam maxMessageSize 200
+  !include <material/microscope>
+  !include <material/monitor>
+  !include <material/network>
+  !include <material/tune>
+  !include <material/chart_areaspline>
+  !include <material/script>
+
+  package "spm system" as spm_system {
+    component "spm device\n<$ma_microscope>" as spmdev
+    component "spm controller\n<$ma_monitor>" as spmcon
+    spmcon <--> spmdev: high freq. \ncontrol
+  }
+
+  package afspm {
+    component "device controller\n<$ma_network>" as devcon
+    component "afspm controller\n<$ma_tune>" as afspmcon
+
+    component "experiment\n<$ma_script>" as exp
+    component "visualizer\n<$ma_chart_areaspline>" as viz
+
+    devcon <--> afspmcon
+
+    afspmcon <--> exp
+    afspmcon <--> viz
+  }
+
+  spmcon <-> devcon: low freq. \ncommands
+  #+end_src
+
+  #+RESULTS:
+  :results:
+  [[file:images/afspm_hl_diagram.png]]
+  :end:
+
+* afspm Network framework
+
+#+begin_src plantuml :file images/network_framework.png
+  skinparam componentStyle rectangle
+
+  component "Component A" as comp_a {
+    component REQ as node_a
+    component proto_a [
+    message info
+    {
+        int num
+        str name
+    }
+    ]
+
+    component "list[bytes]" as bytes_a
+    proto_a .u.> bytes_a: serialize
+    bytes_a .u.> node_a
+  }
+
+  component "Component B" as comp_b {
+    component REP as node_b
+    component proto_b [
+    message info
+    {
+        int num
+        str name
+    }
+    ]
+
+    component "list[bytes]" as bytes_b
+    node_b .d.> bytes_b
+    bytes_b .d.> proto_b: deserialize
+  }
+
+  node_a --r-- node_b: "//zmq communication protocol//"
+  #+end_src
+
+  #+RESULTS:
+  [[file:images/network_framework.png]]
+* afspm without afspm controller
+
+#+header: :post attr_fit_width(data=*this*, org_percent=75, latex_percent=90)
+#+begin_src plantuml :file images/afspm_without_afspmcon.png
+  skinparam componentStyle rectangle
+  skinparam defaultTextAlignment center
+  skinparam wrapWidth 200
+  skinparam maxMessageSize 200
+  !include <material/microscope>
+  !include <material/monitor>
+
+  package "spm system" as spm_system {
+    component "spm device\n<$ma_microscope>" as spmdev
+    component "spm controller\n<$ma_monitor>" as spmcon
+    spmcon <---> spmdev: high freq. \ncontrol
+  }
+
+  package afspm {
+    component "device controller" as devcon {
+      component PUB as dc_pub
+      component REP as dc_rep
+    }
+
+    component experiment as exp {
+      component SUB as exp_sub
+      component REQ as exp_req
+    }
+
+    dc_pub ---> exp_sub: data, \nstatus
+    exp_req ---> dc_rep: control\nrequests
+  }
+
+  spmcon <---r---> devcon: low freq. \n commands
+
+''  note as note_devcon
+''    Abstract class:
+''    - Base class handles generic communication/polling.
+''    - Each implementation handles SPM controller specifics.
+''  end note
+''  devcon -[hidden]r- note_devcon
+
+''  note as note_exp
+''    Script defining what to scan in what order.
+''    - A given experiment can be run with any SPM controller.
+''    - Minimally requires:
+''        - REQ to send scan requests/parameters.
+''        - SUB to know when a scan has ended.
+''  end note
+''  exp .[hidden]r. note_exp
+
+  #+end_src
+
+* afspm control
+
+#+header: :post attr_fit_width(data=*this*, org_percent=80, latex_percent=90)
+#+begin_src plantuml :file images/afspm_control.png
+  left to right direction
+  skinparam componentStyle rectangle
+  skinparam defaultTextAlignment center
+  skinparam wrapWidth 200
+  skinparam maxMessageSize 200
+  !include <material/microscope>
+  !include <material/monitor>
+
+  package "spm system" as spm_system {
+    component "spm device\n<$ma_microscope>" as spmdev
+    component "spm controller\n<$ma_monitor>" as spmcon
+    spmcon <---> spmdev: high freq. \ncontrol
+  }
+
+
+  package afspm {
+    component "device controller" as devcon {
+      component PUB as dc_pub
+      component REP as dc_rep
+    }
+
+    component "afspm controller" as afspm_con {
+      component SUB as afspm_sub
+      component XPUB as afspm_pub
+      component "//cache//" as afspm_cache
+      afspm_sub .. afspm_cache
+      afspm_cache .. afspm_pub
+
+      component REQ as afspm_req
+      component ROU as afspm_rou
+      component "//control//" as afspm_ctrl
+      afspm_req .. afspm_ctrl
+      afspm_ctrl .. afspm_rou
+    }
+
+    dc_pub -d-> afspm_sub: data, \nstatus
+    dc_rep <-d- afspm_req: control\nrequests
+
+    component experiment as experiment {
+      component SUB as exp_sub
+      component REQ as exp_req
+    }
+
+    afspm_pub --> exp_sub: scan_state
+    afspm_rou <-- exp_req: scan_params\nstart_scan\nstop_scan
+
+    component visualizer as viz {
+      component SUB as viz_sub
+      component REQ as viz_req
+    }
+
+    afspm_pub --> viz_sub: scans
+    afspm_rou <-r- viz_req: tip_state
+  }
+
+  spmcon <--> devcon: low freq. \ncommands
+
+  'note as note_cache
+  ''  Cache stores data/state passed to subscribers.
+  ''  When a new subsciption occurs, we send from the cache.
+  ''  If a node crashes, on reconnection it gets this prior history.
+  'end note
+  'note_cache -[hidden]- afspm
+
+  'note as note_control
+  ''  Control handles routing data from 1 or more REQs to the Device Controller.
+  ''  It also allows turning OFF/pausing (for manual control).
+  ''  It also can receive "Problems" (e.g. bad tip state).
+  ''  Upon a problem, automated control pauses until a node states it is fixed.
+  'end note
+  'note_control -[hidden]- afspm
+
+  #+end_src
+
+  #+RESULTS:
+  :results:
+  #+attr_org: :width 80%
+  #+attr_latex: :width .90\linewidth
+  [[file:images/afspm_control.png]]
+  :end:
