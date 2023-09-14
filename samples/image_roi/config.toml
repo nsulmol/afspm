@@ -7,8 +7,8 @@ router_url = "tcp://127.0.0.1:6667"
 
 # --- Timing Logic --- #
 wait_ms = 3000
-poll_timeout_ms = 1000 # was 1000 # was 250
-loop_sleep_s = 0.1 #0.1  # was 0
+poll_timeout_ms = 1000
+loop_sleep_s = 0.1
 hb_period_s = 1
 
 # --- Experiment Scan Aspects --- #
@@ -83,14 +83,14 @@ url = 'server_url'
 class = 'afspm.io.control.control_router.ControlRouter'
 server_url = 'server_url'
 router_url = 'router_url'
-server_timeout_ms = 'poll_timeout_ms'  # was wait_ms # was poll_timeout_ms
+server_timeout_ms = 'wait_ms' # was poll_timeout_ms
 
 [experiment_client]
 class = 'afspm.io.control.control_client.ControlClient'
 url = 'router_url'
 uuid = 'client_for_experiment'
 request_timeout_ms = 'wait_ms'
-request_retries = 1  # TODO: make default?
+request_retries = 1
 
 [ui_client]
 class = 'afspm.io.control.control_client.AdminControlClient'
@@ -151,7 +151,7 @@ sub_scan_res = 'small_scan_res'
 sub_scans_per_full_scan = 3
 get_envelope_for_proto = 'pbc_envelope_for_proto'
 rerun_wait_s = 5
-visualization_style = 'imshow'
+visualization_style = 'surface'
 visualization_colormap = 'nipy_spectral'
 
 loop_sleep_s = 'loop_sleep_s'
@@ -162,8 +162,20 @@ subscriber = 'experiment_sub'
 control_client = 'experiment_client'
 
 [ui]
-#component = true  # TODO uncomment
+component = true
 class = 'afspm.components.afspm_control_ui.AfspmControlUI'
+
+loop_sleep_s = 'loop_sleep_s'
+hb_period_s = 'hb_period_s'
+poll_timeout_ms = 'poll_timeout_ms'
+
+subscriber = 'experiment_sub'
+control_client = 'ui_client'
+
+[tip_detector]
+#component = true  # uncomment to enable
+class = 'freq_trigger_tip_detector.FreqTriggerTipDetector'
+scan_period_raise_problem = 2
 
 loop_sleep_s = 'loop_sleep_s'
 hb_period_s = 'hb_period_s'
