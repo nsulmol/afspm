@@ -191,7 +191,7 @@ Library for serializing structured data (translating a data structure into a for
 Data is *stored* into the *cache* according to a *user-defined configuration*.
 
 #+beamer:\medskip
-These map a *protobuf Message* to a *cache key* (envelope), and vice-versa.
+These map a *protobuf message* to a *cache key* (envelope), and vice-versa.
 *** Experiment Problems
 Any component can *report* experiment *problems*, indicating issues that should cause the experiment to *pause* until *resolved*, and can *remove* these problems.
 
@@ -217,7 +217,7 @@ Within this file, a user defines:
 - The components to spawn.
 
 #+beamer:\medskip
-Top-level definitions can function as *variables*: any *references* deeper in the config are *replaced* by them. This should *minimize* *repeating* oneself.
+Top-level definitions can function as *variables*: any *references* deeper in the config are *replaced* by them. This should minimize repeating oneself.
 
 *** Image :BMCOL:
 :PROPERTIES:
