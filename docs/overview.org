@@ -44,11 +44,17 @@
 # -- Theme structure -- #
 # Inner theme: default, circles, rectangles, rounded
 #+beamer_inner_theme: rectangles
-#+beamer_outer_theme: [subsection=false, compress, footline=authortitle]miniframes
+#+beamer_outer_theme: [subsection=false, footline=authortitle]miniframes
+
+# Add frame numbers
+#+beamer_header:\setbeamertemplate{page number in head/foot}[framenumber]
 
 # Provides nicer equation fonts
 #+beamer_font_theme: professionalfonts
 #+beamer_header:\documentclass[xcolor=SeaGreen]{beamer}
+
+# Uncomment to skip animations
+# #+latex_class_options: [handout, 9pt]
 
 #+property: header-args :mkdirp yes :results value drawer
 
@@ -94,6 +100,7 @@ In a traditional SPM experiment, a researcher with domain knowledge will:
 1. *Prepare the system*: including defining the SPM mode (e.g. FM-AFM).
 2. *Run the experiment*: monitoring collected scans, deciding on next scans, and updating any aspects of the experiment.
 3. *Finalize the experiment*: by undoing any experiment-specific setup needed to run.
+#+beamer:\pause
 *** Note :B_ignoreheading:
 :PROPERTIES:
 :BEAMER_env: ignoreheading
@@ -120,6 +127,7 @@ However:
 #+attr_org: :width 50%
 #+attr_latex: :width 0.95\linewidth
 [[./images/experiment_with_script.png]]
+#+beamer:\pause
 *** Note :B_ignoreheading:
 :PROPERTIES:
 :BEAMER_env: ignoreheading
@@ -129,11 +137,13 @@ However:
 /Code *reuse* is *rare*./
 * Introduction to afspm
 ** Goals and Scope
+#+beamer:\pause
 *** Goals
 - *Clear Decoupling*: of SPM device specifics from the desired experiment; to allow reuse of a given experiment on multiple devices.
 - *Multi-Language Support*: for integration with SPM devices; we should not be the limiting factor to integration.
 - *Pausable Automation*: to allow a researcher to take over.
 - *Separable on Multiple Devices*: composed of concise, separable components.
+#+beamer:\pause
 *** Scope
 afspm will concern itself *only* with automation of high-level, low-frequency decisions a researcher would perform *during* an experiment.
 
@@ -167,17 +177,21 @@ afspm will concern itself *only* with automation of high-level, low-frequency de
 :BEAMER_env: ignoreheading
 :END:
 *afspm* uses ZeroMQ as its communications/concurrency framework and protobuffers as its serialization layer. Both are cross-platform and cross-language.
+#+beamer:\pause
 ***** What is ZeroMQ?
 Library that abstracts away protocols used, allowing easy switching of how 'nodes' communicate in a system.
+#+beamer:\pause
 ***** What are protobuffers?
 Library for serializing structured data (translating a data structure into a format that can be stored/communicated).
 
 * Design Particulars
 ** I/O Paths
+#+beamer:\pause
 *** Publisher-Subscriber Path
 - The DeviceController *publishes* ScanState, ScanParameters, and Scan *changes*.
 - These are passed on by the AfspmController. Data is *stored* in a *cache* and resent to new/crashed components.
 - Each component choose what aspects to *subscribe* to, and receives data from these.
+#+beamer:\pause
 *** Control Path
 - Each component can send *control requests* over its client.
 - The AfspmController determines which *client* is *in-control*, and *forwards* these to the DeviceController.
@@ -187,17 +201,20 @@ Library for serializing structured data (translating a data structure into a for
 #+attr_latex: :width 1.0\linewidth
 [[./images/afspm_control.png]]
 ** afspm Controller
+#+beamer:\pause
 *** Cache Logic
 Data is *stored* into the *cache* according to a *user-defined configuration*.
 
 #+beamer:\medskip
 These map a *protobuf message* to a *cache key* (envelope), and vice-versa.
+#+beamer:\pause
 *** Experiment Problems
 Any component can *report* experiment *problems*, indicating issues that should cause the experiment to *pause* until *resolved*, and can *remove* these problems.
 
 #+beamer:\medskip
 This allows, e.g., detecting a tip crash and attempting to correct it.
 
+#+beamer:\pause
 *** Control Modes
 The AfspmController defines the *control mode*, which can be:
 - *Automated*: default, automation runs.
@@ -228,14 +245,24 @@ Top-level definitions can function as *variables*: any *references* deeper in th
 [[./images/config_toml.png]]
 
 
-
 ** Spawning the Experiment
+#+beamer:\pause
 *** Distributed Computing
 Components can be *split up* among devices; on startup, the components to spawn can be specified.
 
+#+beamer:\pause
 *** Component Monitoring
 All spawned components are *monitored*:
 - Each sends *heartbeats* at a regular cadence.
 - If one *stops* beating, it is *restarted*.
 
 This should minimize a crash breaking experiments.
+** The End :BMCOL:
+:PROPERTIES:
+:BEAMER_col: 1.0
+:END:
+#+beamer:\centering
+Let us know what you think and help us make it better.
+
+#+beamer:\medskip
+[[https://www.github.com/nsulmol/afspm][afspm on github]]
