@@ -182,6 +182,7 @@ class AfspmComponentsMonitor:
                             name)
                 succeeded = False
                 break
+            logger.debug("Received first heartbeat for component %s, continuing.")
 
         if not succeeded:
             keys = list(self.listeners.keys())
