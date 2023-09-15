@@ -25,6 +25,9 @@ data_units = 'nm'
 full_scan_res = [256, 256]
 small_scan_res = [512, 512]
 
+sscans_per_fscan = 3
+scans_per_reset = 4  # 3 + 1
+
 visualization_style = 'imshow'
 visualization_colormap = 'nipy_spectral'
 
@@ -46,7 +49,7 @@ size = 'small_scan_size'
 
 [proto_hist_list]
 class = 'afspm.io.cache.pbc_logic.create_roi_proto_hist_list'
-sizes_with_hist_list = [['full_scan_size', 1], ['small_scan_size', 3]]
+sizes_with_hist_list = [['full_scan_size', 1], ['small_scan_size', 'sscans_per_fscan']]
 
 [pbc_with_roi_logic]
 class = 'afspm.io.cache.pbc_logic.PBCWithROILogic'
@@ -109,43 +112,6 @@ request_timeout_ms = 'wait_ms'
 
 
 # ----- Components ----- #
-[afspm_components_monitor]
-loop_sleep_s = 'loop_sleep_s'
-missed_beats_before_dead = 5
-poll_timeout_ms = 'poll_timeout_ms'
-
-[afspm_controller]
-component = true
-class = 'afspm.components.afspm_controller.AfspmController'
-
-loop_sleep_s = 'loop_sleep_s'
-hb_period_s = 'hb_period_s'
-poll_timeout_ms = 'poll_timeout_ms'
-
-pubsubcache = 'controller_psc'
-router = 'controller_router'
-
-[dev_con]
-component = true
-class = 'image_device_controller.ImageDeviceController'
-
-img_path = 'peppers.tiff'
-physical_origin = 'full_scan_origin'
-physical_size = 'full_scan_size'
-physical_units = 'physical_units'
-data_units = 'data_units'
-
-scan_time_s = 5
-move_time_s = 1
-
-poll_timeout_ms = 'poll_timeout_ms'
-loop_sleep_s = 'loop_sleep_s'
-hb_period_s = 'hb_period_s'
-
-publisher = 'devcon_pub'
-control_server = 'devcon_server'
-subscriber = 'experiment_sub'
-
 [experiment]
 component = true
 class = 'roi_experimenter.ROIExperimenter'
@@ -157,7 +123,7 @@ physical_units = 'physical_units'
 data_units = 'data_units'
 sub_rois_per_dim = 'sub_rois_per_dim'
 sub_scan_res = 'small_scan_res'
-sub_scans_per_full_scan = 3
+sub_scans_per_full_scan = 'sscans_per_fscan'
 get_envelope_for_proto = 'pbc_envelope_for_proto'
 rerun_wait_s = 5
 
@@ -195,7 +161,7 @@ control_client = 'ui_client'
 component = true
 class = 'reset_scans_visualizer.ResetScansVisualizer'
 
-num_scans_before_reset = 4
+num_scans_before_reset = 'scans_per_reset'
 list_keys = ['full_scan_id', 'small_scan_id']
 cache_meaning_list = ['temporal', 'regions']
 scan_phys_origin_list = ['full_scan_origin', 'full_scan_origin']
@@ -212,3 +178,40 @@ poll_timeout_ms = 'poll_timeout_ms'
 
 subscriber = 'experiment_sub'
 control_client = 'ui_client'
+
+[afspm_components_monitor]
+loop_sleep_s = 'loop_sleep_s'
+missed_beats_before_dead = 5
+poll_timeout_ms = 'poll_timeout_ms'
+
+[afspm_controller]
+component = true
+class = 'afspm.components.afspm_controller.AfspmController'
+
+loop_sleep_s = 'loop_sleep_s'
+hb_period_s = 'hb_period_s'
+poll_timeout_ms = 'poll_timeout_ms'
+
+pubsubcache = 'controller_psc'
+router = 'controller_router'
+
+[dev_con]
+component = true
+class = 'image_device_controller.ImageDeviceController'
+
+img_path = 'peppers.tiff'
+physical_origin = 'full_scan_origin'
+physical_size = 'full_scan_size'
+physical_units = 'physical_units'
+data_units = 'data_units'
+
+scan_time_s = 5
+move_time_s = 1
+
+poll_timeout_ms = 'poll_timeout_ms'
+loop_sleep_s = 'loop_sleep_s'
+hb_period_s = 'hb_period_s'
+
+publisher = 'devcon_pub'
+control_server = 'devcon_server'
+subscriber = 'experiment_sub'
