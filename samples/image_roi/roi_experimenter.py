@@ -1,4 +1,4 @@
-""""""
+"""Experimenter that alternates between large and small scans."""
 
 import logging
 from typing import Callable
@@ -7,7 +7,7 @@ import numpy as np
 from google.protobuf.message import Message
 
 from afspm.spawn import LOGGER_ROOT
-from afspm.components.visualizer import Visualizer, CacheMeaning
+from afspm.components.afspm_component import AfspmComponent
 from afspm.components.helpers.scan_handler import ScanHandler
 from afspm.io import common
 from afspm.io.protos.generated import scan_pb2
@@ -16,7 +16,7 @@ from afspm.io.protos.generated import scan_pb2
 logger = logging.getLogger(LOGGER_ROOT + '.samples.image_roi.' + __name__)
 
 
-class ROIExperimenter(Visualizer):
+class ROIExperimenter(AfspmComponent):
     """An experimenter that alternates between large and small scans.
 
     More specifically, it will perform one 'large' scan (full scan range,
@@ -74,9 +74,7 @@ class ROIExperimenter(Visualizer):
                  sub_scan_res: list[int],
                  sub_scans_per_full_scan: int, rerun_wait_s: int,
                  get_envelope_for_proto: Callable[[Message], str],
-                 get_envelope_kwargs: dict = None,
-                 visualization_style: str = 'colormesh',
-                 visualization_colormap: str = None, **kwargs):
+                 get_envelope_kwargs: dict = None, **kwargs):
         """ Initialize ROIExperimenter.
 
         Args:
@@ -95,10 +93,6 @@ class ROIExperimenter(Visualizer):
                 our desired publisher 'envelope' string.
             get_envelope_kwargs: any additional arguments to be fed to
                 get_envelope_for_proto.
-            visualization_style: the plotting style to use for visualizing all
-                scans.
-            visualization_colormap: the colormap to use for visualizing all
-                scans.
         """
         self.phys_units = physical_units
         self.data_units = data_units
@@ -126,8 +120,8 @@ class ROIExperimenter(Visualizer):
 
         self.fscan_key = None
         self.sscan_key = None
-        self._init_visualizer(sub_rois_per_dim, visualization_style,
-                              visualization_colormap, **kwargs)
+
+        super().__init__(**kwargs)
 
     def _get_key_for_size(self, size: np.ndarray) -> str:
         """Determines cache key for a particular Scan2d size."""
@@ -146,40 +140,12 @@ class ROIExperimenter(Visualizer):
                                        y_points.flatten()]).T
         self.sscan_phys_size = np.array([x[1] - x[0], y[1] - y[0]])
 
-    def _init_visualizer(self, sub_rois_per_dim: int, visualization_style: str,
-                         visualization_colormap: str, **kwargs):
-        """Initialize the visualizer."""
-        self.fscan_key = self._get_key_for_size(self.fscan_phys_size)
-        self.sscan_key = self._get_key_for_size(self.sscan_phys_size)
-
-        cache_meaning_map = {self.fscan_key: CacheMeaning.TEMPORAL.name,
-                             self.sscan_key: CacheMeaning.REGIONS.name}
-        scan_phys_origin_map = {self.sscan_key: self.fscan_phys_origin}
-        scan_phys_size_map = {self.sscan_key: self.fscan_phys_size}
-        visualization_style_map = {self.fscan_key: visualization_style,
-                                   self.sscan_key: visualization_style}
-        visualization_colormap_map = {self.fscan_key: visualization_colormap,
-                                      self.sscan_key: visualization_colormap}
-
-        # TODO: This is a hack (using force_parent). It will fail if not
-        # using PBCWithROILogic.
-        scan_id = self.get_envelope_for_proto(scan_pb2.Scan2d(),
-                                              force_parent=True,
-                                              **self.get_envelope_kwargs)
-
-        super().__init__(cache_meaning_map, scan_phys_origin_map,
-                         scan_phys_size_map,
-                         visualization_style_map, visualization_colormap_map,
-                         True, scan_id, **kwargs)
-
     def on_message_received(self, envelope: str, proto: Message):
-        """Override: we update the ScanHandler and Visualizer (parent)."""
+        """Override: we update the ScanHandler."""
         self.scan_handler.on_message_received(proto, self.control_client)
-        super().on_message_received(envelope, proto)
 
     def run_per_loop(self):
-        """Override: we update the ScanHandler and Visualizer (parent)."""
-        super().run_per_loop()
+        """Override: we update the ScanHandler."""
         self.scan_handler.handle_resends(self.control_client)
 
     def get_scan_params_for_next_scan(self) -> scan_pb2.ScanParameters2d:
@@ -219,8 +185,3 @@ class ROIExperimenter(Visualizer):
 
         # Update rng to restart knowledge of what we scanned previously
         self.rng = np.random.default_rng()
-
-        # Reset the cache, so the next time we visualize we only use the sub-
-        # scans linked to the latest full scan.
-        if self.sscan_key in self.subscriber.cache:
-            del self.subscriber.cache[self.sscan_key]
