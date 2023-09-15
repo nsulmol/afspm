@@ -87,25 +87,65 @@ class Visualizer(AfspmComponent):
         plt_figures_map: dictionary containing scan_envelope:pyplot_figure
             pairs. Part of matplotlib backend, used for visualization.
     """
-    def __init__(self, cache_meaning_map: dict[str, str],
-                 scan_phys_origin_map: dict[str, tuple[float, float]],
-                 scan_phys_size_map: dict[str, tuple[float, float]],
-                 visualization_style_map: dict[str, str],
-                 visualization_colormap_map: dict[str, str],
-                 visualize_undeclared_scans: bool,
-                 scan_id: str,
-                 **kwargs):
-        self.cache_meaning_map = cache_meaning_map
-        self.scan_phys_origin_map = scan_phys_origin_map
-        self.scan_phys_size_map = scan_phys_size_map
-        self.visualization_style_map = visualization_style_map
-        self.visualization_colormap_map = visualization_colormap_map
+    def __init__(self, list_keys: list[str], cache_meaning_list: list[str],
+                 scan_phys_origin_list: tuple[float, float],
+                 scan_phys_size_list: tuple[float, float],
+                 visualization_style_list: list[str],
+                 visualization_colormap_list: list[str],
+                 visualize_undeclared_scans: bool, scan_id: str, **kwargs):
+        """ Initializes visualizer.
+
+        Primarily, it creats maps for the lists fed in. Note that we use lists
+        because this makes it easier to expand variables in our config file
+        (i.e. this is an implementation detail that has spread its grubby
+        fingers, and really you should not know about this).
+
+        Args:
+            list_keys: the keys associated to the following lists, which will
+                be used to create our maps.
+            scan_phys_origin_list: list of values, with keys in list_keys.
+                creates scan_phys_origin_map.
+            scan_phys_size_list: list of values, with keys in list_keys.
+                creates scan_phys_size_map.
+            visualization_style_list: list of values, with keys in list_keys.
+                creates visualization_style_map. If False, uses default
+                (colormesh).
+            visualization_colormap_list: list of values, with keys in list_keys.
+                creates visualization_colormap_map. If False, uses default
+                mapping (it's blue).
+            visualize_undeclared_scans: see class attribute.
+            scan_id: see class attribute.
+        """
+
+        # Validate lists match in size and populate map
+        for vals_list in [cache_meaning_list, scan_phys_origin_list,
+                          scan_phys_size_list, visualization_style_list,
+                          visualization_colormap_list]:
+            assert len(list_keys) == len(vals_list)
+
+        self.cache_meaning_map = {}
+        self.scan_phys_origin_map = {}
+        self.scan_phys_size_map = {}
+        self.visualization_style_map = {}
+        self.visualization_colormap_map = {}
+        for idx, key in enumerate(list_keys):
+            self.cache_meaning_map[key] = cache_meaning_list[idx]
+            self.scan_phys_origin_map[key] = scan_phys_origin_list[idx]
+            self.scan_phys_size_map[key] = scan_phys_size_list[idx]
+
+
+            # Special cases since viz stuff can be None (using matplotlib
+            # defaults).
+            style = visualization_style_list[idx]
+            self.visualization_style_map[key] = style if style else None
+            colormap = visualization_colormap_list[idx]
+            self.visualization_colormap_map[key] = (colormap if colormap
+                                                    else None)
 
         self.visualize_undeclared_scans = visualize_undeclared_scans
         self.scan_id = scan_id
 
         self.plt_figures_map = {}
-        self._set_up_visualization()
         super().__init__(**kwargs)
 
     def _set_up_visualization(self):
@@ -126,6 +166,8 @@ class Visualizer(AfspmComponent):
 
     def run_per_loop(self):
         """Override to update figures every loop."""
+        self._set_up_visualization()
+
         for __, fig in self.plt_figures_map.items():
             fig.canvas.draw_idle()
             fig.canvas.flush_events()
@@ -171,7 +213,9 @@ class Visualizer(AfspmComponent):
                 axes = self.plt_figures_map[key].add_subplot()
 
             viz_method = None
-            if viz_style == VisualizationStyle.COLORMESH.name:
+            # Default is colormesh
+            if (not viz_style or
+                    viz_style == VisualizationStyle.COLORMESH.name):
                 viz_method = scan_xarr.plot.pcolormesh
             elif viz_style == VisualizationStyle.IMSHOW.name:
                 viz_method = scan_xarr.plot.imshow
@@ -210,7 +254,7 @@ class Visualizer(AfspmComponent):
         sample_phys_size = np.array([np.ptp(sample_scan.x.data),
                                      np.ptp(sample_scan.y.data)])
         sample_data_res = np.array(sample_scan.data.shape)
-        full_res = scan_phys_size * (sample_data_res / sample_phys_size)
+        full_res = sample_data_res * (scan_phys_size / sample_phys_size)
         full_res = full_res.astype(int)
 
         x = np.linspace(scan_phys_origin[0], scan_phys_size[0],
