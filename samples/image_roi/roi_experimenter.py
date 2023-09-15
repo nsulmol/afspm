@@ -130,7 +130,7 @@ class ROIExperimenter(AfspmComponent):
         return self.get_envelope_for_proto(scan_2d, **self.get_envelope_kwargs)
 
     def _set_up_sub_scans(self, sub_rois_per_dim: int):
-        """Initiailizes sscan_origins and sscan_phys_size"""
+        """Initiailizes sscan_origins and sscan_phys_size."""
         x = np.linspace(self.fscan_phys_origin[0], self.fscan_phys_size[0],
                         sub_rois_per_dim, endpoint=False)
         y = np.linspace(self.fscan_phys_origin[1], self.fscan_phys_size[1],
