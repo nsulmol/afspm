@@ -136,3 +136,10 @@ def create_roi_proto_hist_list(sizes_with_hist_list:
         scan_2d = common.create_scan_2d(scan_params=scan_params)
         proto_with_hist_list.append((scan_2d, hist))
     return proto_with_hist_list
+
+
+def create_roi_scan_envelope(size: tuple[float, float]) -> str:
+    """Helper to create envelope for Scan2d of specific size."""
+    scan_params = common.create_scan_params_2d(size=[size[0], size[1]])
+    scan_2d = common.create_scan_2d(scan_params=scan_params)
+    return PBCWithROILogic.get_envelope_for_proto(scan_2d)
