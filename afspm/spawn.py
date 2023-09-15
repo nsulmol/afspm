@@ -175,7 +175,7 @@ def _filter_requested_components(config_dict: dict,
     filtered_dict = {}
     for key in config_dict:
         if (isinstance(config_dict[key], dict) and
-            (components_to_spawn is None or key in components_to_spawn)):
+                (components_to_spawn is None or key in components_to_spawn)):
             if IS_COMPONENT_KEY in config_dict[key]:
                 config_dict[key]['name'] = key
                 filtered_dict[key] = config_dict[key]
