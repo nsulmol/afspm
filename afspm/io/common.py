@@ -108,7 +108,7 @@ def is_str_in_enums(enum_obj: EnumTypeWrapper, name: str) -> bool:
         true if the name corresponds to an enum value, false otherwise.
     """
     try:
-        val = get_enum_val(name)
-        return True
+        val = get_enum_val(enum_obj, name)
+        return val is not None
     except ValueError:
         return False
