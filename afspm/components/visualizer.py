@@ -164,10 +164,13 @@ class Visualizer(AfspmComponent):
             self.plt_figures_map[key] = plt.figure()
         plt.show(block=False)
 
+    def run(self):
+        """Overriding to set up visualization."""
+        self._set_up_visualization()
+        super().run()
+
     def run_per_loop(self):
         """Override to update figures every loop."""
-        self._set_up_visualization()
-
         for __, fig in self.plt_figures_map.items():
             fig.canvas.draw_idle()
             fig.canvas.flush_events()
