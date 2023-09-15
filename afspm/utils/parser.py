@@ -80,20 +80,20 @@ def _expand_variables_recursively(config_dict: dict, sub_dict: dict) -> dict:
     try:
         for key in sub_dict:
             if isinstance(sub_dict[key], dict):  # Go deeper in 'tree'
-                logger.debug("Going deeper in dict, into key %s", key)
+                logger.trace("Going into dict for expansion, with key %s", key)
                 sub_dict[key] = _expand_variables_recursively(
                     config_dict, sub_dict[key])
             elif isinstance(sub_dict[key], list):
-                logger.debug("Expanding out list with key %s", key)
+                logger.trace("Going into list for expansion, with key %s", key)
                 sub_dict[key] = _expand_variables_list_recursively(
                     config_dict, sub_dict[key])
             elif (isinstance(sub_dict[key], str) and
                   sub_dict[key] in config_dict):  # Expand variable
                 logger.debug("Expanding %s into %s.", sub_dict[key],
-                             config_dict[sub_dict[key]])
+                            config_dict[sub_dict[key]])
                 sub_dict[key] = config_dict[sub_dict[key]]
             else:  # Copy value over (this is not a variable)
-                logger.debug("Keeping %s for key %s", sub_dict[key], key)
+                logger.trace("Keeping %s for key %s", sub_dict[key], key)
                 sub_dict[key] = sub_dict[key]
     except Exception as exc:
         msg = ("Exception for key:val = %s : %s, exception: %s" %
@@ -112,13 +112,18 @@ def _expand_variables_list_recursively(config_dict: dict, in_list: list
     explanation.
     """
     for idx in range(len(in_list)):
-        if isinstance(in_list[idx], list):  # Go deeper
+        if isinstance(in_list[idx], dict):  # Go deeper
+            logger.trace("Going into dict for expansion with index %s", idx)
+            in_list[idx] = _expand_variables_recursively(config_dict,
+                                                         in_list[idx])
+        elif isinstance(in_list[idx], list):  # Go deeper
+            logger.trace("Going into list for expansion with index %s", idx)
             in_list[idx] = _expand_variables_list_recursively(config_dict,
                                                               in_list[idx])
         elif (isinstance(in_list[idx], str) and
               in_list[idx] in config_dict):  # Expand variable
             logger.debug("Expanding %s into %s.", in_list[idx],
-                         config_dict[in_list[idx]])
+                        config_dict[in_list[idx]])
             in_list[idx] = config_dict[in_list[idx]]
 
     return in_list
@@ -220,14 +225,17 @@ def _evaluate_values_recursively(params_dict: dict) -> dict:
     kwargs_dict = {}
     for key in params_dict:
         if isinstance(params_dict[key], dict):  # Go deeper in 'tree'
+            logger.trace("Going into dict for evaluation, with key %s", key)
             kwargs_dict[key] = _evaluate_values_recursively(params_dict[key])
         elif isinstance(params_dict[key], list):
+            logger.trace("Going into list for evaluation, with key %s", key)
             kwargs_dict[key] = _evaluate_values_list_recursively(
                 params_dict[key])
         elif isinstance(params_dict[key], str):
-            # Evaluate the value of this key:val pair if str
+            logger.debug("Evaluating value %s", params_dict[key])
             kwargs_dict[key] = _evaluate_value_str(params_dict[key])
         else:
+            logger.trace("Keeping key %s without evaluating", key)
             kwargs_dict[key] = params_dict[key]
     return kwargs_dict
 
@@ -240,9 +248,14 @@ def _evaluate_values_list_recursively(values_list: list) -> list:
     """
     for idx, val in enumerate(values_list):
         if isinstance(val, list):  # Go deeper
+            logger.trace("Going into list for evaluation, with index %s", idx)
             values_list[idx] = _evaluate_values_list_recursively(val)
         elif isinstance(val, dict):  # Evaluate dict
+            logger.trace("Going into dict for evaluation, with index %s", idx)
             values_list[idx] = _evaluate_values_recursively(val)
+        elif isinstance(val, str):
+            logger.debug("Evaluating value %s", val)
+            values_list[idx] = _evaluate_value_str(val)
     return values_list
 
 
@@ -266,12 +279,15 @@ def _instantiate_classes_recursively(params_dict: dict) -> Any | dict:
     final_dict = {}
     for key in params_dict:
         if isinstance(params_dict[key], dict):  # Go deeper in 'tree'
+            logger.trace("Going into dict for instantation, with key %s", key)
             final_dict[key] = _instantiate_classes_recursively(
                 params_dict[key])
         elif isinstance(params_dict[key], list):
+            logger.trace("Going into list for instantation, with key %s", key)
             final_dict[key] = _instantiate_classes_in_list_recursively(
                 params_dict[key])
-        else:  # Evaluate the value of this key:val pair
+        else:  # Copy over value
+            logger.trace("Copying over key %s without changing.", key)
             final_dict[key] = params_dict[key]
 
     if CLASS_KEY in final_dict:
@@ -292,8 +308,10 @@ def _instantiate_classes_in_list_recursively(values_list: list) -> list:
     """
     for idx, val in enumerate(values_list):
         if isinstance(val, list):  # Go deeper
+            logger.trace("Going into list for instantation, with idx %s", idx)
             values_list[idx] = _instantiate_classes_in_list_recursively(val)
         elif isinstance(val, dict):  # Instantiate dict
+            logger.trace("Going into dict for instantation, with idx %s", idx)
             values_list[idx] = _instantiate_classes_recursively(val)
     return values_list
 
@@ -341,6 +359,7 @@ def _evaluate_value_str(value: str) -> Any:
             logger.debug("Instantiating %s with args: %s", value, args)
             instantiated = imported(*args) if args != [''] else imported()
             return instantiated  # Return instantiation of what we imported
+        logger.debug("Imported class/method %s", imported)
         return imported  # Return imported class or method
     return value  # Return original string
 
