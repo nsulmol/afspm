@@ -80,15 +80,20 @@ def _expand_variables_recursively(config_dict: dict, sub_dict: dict) -> dict:
     try:
         for key in sub_dict:
             if isinstance(sub_dict[key], dict):  # Go deeper in 'tree'
+                logger.debug("Going deeper in dict, into key %s", key)
                 sub_dict[key] = _expand_variables_recursively(
                     config_dict, sub_dict[key])
             elif isinstance(sub_dict[key], list):
+                logger.debug("Expanding out list with key %s", key)
                 sub_dict[key] = _expand_variables_list_recursively(
                     config_dict, sub_dict[key])
             elif (isinstance(sub_dict[key], str) and
                   sub_dict[key] in config_dict):  # Expand variable
+                logger.debug("Expanding %s into %s.", sub_dict[key],
+                             config_dict[sub_dict[key]])
                 sub_dict[key] = config_dict[sub_dict[key]]
             else:  # Copy value over (this is not a variable)
+                logger.debug("Keeping %s for key %s", sub_dict[key], key)
                 sub_dict[key] = sub_dict[key]
     except Exception as exc:
         msg = ("Exception for key:val = %s : %s, exception: %s" %
@@ -100,7 +105,7 @@ def _expand_variables_recursively(config_dict: dict, sub_dict: dict) -> dict:
 
 def _expand_variables_list_recursively(config_dict: dict, in_list: list
                                        ) -> list:
-    """Recursively go through a list, expanding varaibles out.
+    """Recursively go through a list, expanding variables out.
 
     This method is a list-specific expansion of _expand_variables_recursively,
     used within it to expand lists specifically. Read that method for the
@@ -112,6 +117,8 @@ def _expand_variables_list_recursively(config_dict: dict, in_list: list
                                                               in_list[idx])
         elif (isinstance(in_list[idx], str) and
               in_list[idx] in config_dict):  # Expand variable
+            logger.debug("Expanding %s into %s.", in_list[idx],
+                         config_dict[in_list[idx]])
             in_list[idx] = config_dict[in_list[idx]]
 
     return in_list
@@ -214,12 +221,29 @@ def _evaluate_values_recursively(params_dict: dict) -> dict:
     for key in params_dict:
         if isinstance(params_dict[key], dict):  # Go deeper in 'tree'
             kwargs_dict[key] = _evaluate_values_recursively(params_dict[key])
+        elif isinstance(params_dict[key], list):
+            kwargs_dict[key] = _evaluate_values_list_recursively(
+                params_dict[key])
         elif isinstance(params_dict[key], str):
             # Evaluate the value of this key:val pair if str
             kwargs_dict[key] = _evaluate_value_str(params_dict[key])
         else:
             kwargs_dict[key] = params_dict[key]
     return kwargs_dict
+
+
+def _evaluate_values_list_recursively(values_list: list) -> list:
+    """Recursively go through values in list, evaluating dicts.
+
+    This is an expansion of _evaluate_values_recursively(), specific to lists.
+    Read the description of that method for more info.
+    """
+    for idx, val in enumerate(values_list):
+        if isinstance(val, list):  # Go deeper
+            values_list[idx] = _evaluate_values_list_recursively(val)
+        elif isinstance(val, dict):  # Evaluate dict
+            values_list[idx] = _evaluate_values_recursively(val)
+    return values_list
 
 
 def _instantiate_classes_recursively(params_dict: dict) -> Any | dict:
@@ -242,7 +266,11 @@ def _instantiate_classes_recursively(params_dict: dict) -> Any | dict:
     final_dict = {}
     for key in params_dict:
         if isinstance(params_dict[key], dict):  # Go deeper in 'tree'
-            final_dict[key] = _instantiate_classes_recursively(params_dict[key])
+            final_dict[key] = _instantiate_classes_recursively(
+                params_dict[key])
+        elif isinstance(params_dict[key], list):
+            final_dict[key] = _instantiate_classes_in_list_recursively(
+                params_dict[key])
         else:  # Evaluate the value of this key:val pair
             final_dict[key] = params_dict[key]
 
@@ -250,9 +278,24 @@ def _instantiate_classes_recursively(params_dict: dict) -> Any | dict:
         # This is a class level, instantiate a class and return it
         class_obj = final_dict[CLASS_KEY]
         del final_dict[CLASS_KEY]
+        logger.debug("Instantiating %s with kwargs: %s", class_obj, final_dict)
         tmp = class_obj(**final_dict)
         return tmp
     return final_dict  # Go up a level
+
+
+def _instantiate_classes_in_list_recursively(values_list: list) -> list:
+    """Recursively go through values in list, instantiating dicts.
+
+    Expansion of _instantiate_classes_recursively(), specific to lists. Read
+    that method's description for more info.
+    """
+    for idx, val in enumerate(values_list):
+        if isinstance(val, list):  # Go deeper
+            values_list[idx] = _instantiate_classes_in_list_recursively(val)
+        elif isinstance(val, dict):  # Instantiate dict
+            values_list[idx] = _instantiate_classes_recursively(val)
+    return values_list
 
 
 def _evaluate_value_str(value: str) -> Any:
@@ -295,6 +338,7 @@ def _evaluate_value_str(value: str) -> Any:
         if args:
             # If there were no arguments, args will be a list with one empty
             # string
+            logger.debug("Instantiating %s with args: %s", value, args)
             instantiated = imported(*args) if args != [''] else imported()
             return instantiated  # Return instantiation of what we imported
         return imported  # Return imported class or method

@@ -16,8 +16,10 @@ def sample_dict():
         },
         'level3': {
             'my_publisher': 'publisher'
-        }
+        },
+        'list_with_pub_url': ['pub_url', ['pub_url', 1]]
     }
+
 
 @pytest.fixture
 def expected_expanded_dict():
@@ -34,7 +36,8 @@ def expected_expanded_dict():
                 'get_envelope_given_proto':
                 'afspm.io.cache.cache_logic.CacheLogic.get_envelope_for_proto'
             }
-        }
+        },
+        'list_with_pub_url': ['tcp://127.0.0.1:5555', ['tcp://127.0.0.1:5555', 1]]
     }
 
 
@@ -57,7 +60,6 @@ def test_import_from_string(control_client_str, sample_url):
     """Validate class importing ability."""
 
     # First, confirm we can import when the module path is provided properly.
-    #control_client_str = 'afspm.io.control.control_client.ControlClient'
     control_client_class = parser._import_from_string(control_client_str)
     instance = control_client_class(url=sample_url)
     from afspm.io.control.control_client import ControlClient
@@ -131,8 +133,38 @@ def afspm_component_params_dict():
         }
     }
 
+@pytest.fixture
+def scan_size():
+    return [200, 200]
 
-def test_construct_component(afspm_component_params_dict):
+@pytest.fixture
+def visualizer_params_dict(scan_size):
+    full_scan_origin = [0, 0]
+    full_scan_id = {
+        'class': 'afspm.io.cache.pbc_logic.create_roi_scan_envelope',
+        'size': scan_size
+    }
+
+    return {
+        'class': 'afspm.components.visualizer.Visualizer',
+        'name': 'TheMasterOfTheUniverse',
+        'list_keys': [full_scan_id],
+        'cache_meaning_list':  ['temporal'],
+        'scan_phys_origin_list': [full_scan_origin],
+        'scan_phys_size_list': [scan_size],
+        'visualization_style_list': [False],  # Default
+        'visualization_colormap_list': [False],  # Default
+        'visualize_undeclared_scans': True,
+        'scan_id': 'Scan2d',
+        'loop_sleep_s': 0,
+        'hb_period_s': 5,
+        'poll_timeout_ms': 1000,
+    }
+
+
+def test_construct_component(afspm_component_params_dict,
+                             visualizer_params_dict,
+                             scan_size):
     """Confirm we can construct a component from a dict.
 
     This tests _construct_component() *without* testing the run()
@@ -142,3 +174,14 @@ def test_construct_component(afspm_component_params_dict):
     res = parser._construct_component(afspm_component_params_dict)
     from afspm.components.afspm_component import AfspmComponent
     assert isinstance(res, AfspmComponent)
+
+    visualizer_params_dict['ctx'] = zmq.Context.instance()
+    res = parser._construct_component(visualizer_params_dict)
+    from afspm.components.visualizer import Visualizer
+    assert isinstance(res, Visualizer)
+
+    from afspm.io.cache.pbc_logic import create_roi_scan_envelope
+    scan_envelope = create_roi_scan_envelope(scan_size)
+    assert scan_envelope in res.cache_meaning_map
+    assert res.visualization_style_map[scan_envelope] is None
+    assert res.visualization_colormap_map[scan_envelope] is None
