@@ -74,7 +74,7 @@ class AfspmComponent:
             kwargs: allows non-used input arguments to be passed (so we can
                 initialize from an unfiltered dict).
         """
-        logger.info("Initializing component %s", name)
+        logger.debug("Initializing component %s", name)
         if not ctx:
             ctx = zmq.Context.instance()
 
@@ -89,7 +89,7 @@ class AfspmComponent:
 
     def run(self):
         """Main loop."""
-        logger.info("Beginning main loop for component %s", self.name)
+        logger.info("Starting main loop for component %s", self.name)
 
         try:
             while self.stay_alive:
