@@ -38,7 +38,7 @@ class ResetScansVisualizer(Visualizer):
         if isinstance(proto, scan_pb2.Scan2d):
             self.scans_since_reset += 1
 
-            if self.scans_since_reset >= self.num_scans_before_reset:
+            if self.scans_since_reset > self.num_scans_before_reset:
                 self.scans_since_reset = 0
                 # Reset all cache keys that are scan related.
                 for key in list(self.subscriber.cache.keys()):
