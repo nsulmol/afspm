@@ -1,5 +1,7 @@
-"""Allows adding new log types to logger package."""
-"""Taken directly from: https://stackoverflow.com/a/35804945"""
+"""Allows adding new log types to logger package.
+
+Taken directly from: https://stackoerflow.com/a/35804945.
+"""
 
 import logging
 

@@ -9,8 +9,8 @@ import fire
 
 # TODO: Figure out why this can't be relative?
 from afspm.utils.parser import expand_variables_in_dict
-from afspm.utils.logging import addLoggingLevel
 from afspm.components.afspm_components_monitor import AfspmComponentsMonitor
+
 
 logger = logging.getLogger(__name__)
 
@@ -192,8 +192,6 @@ def _filter_requested_components(config_dict: dict,
 
 
 def cli():
-    # Add 'TRACE' logging level.
-    addLoggingLevel("TRACE", TRACE_LOG_LEVEL)
     fire.Fire(spawn_components)
 
 
