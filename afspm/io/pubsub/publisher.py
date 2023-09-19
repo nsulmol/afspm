@@ -41,6 +41,7 @@ class Publisher:
             ctx = zmq.Context.instance()
 
         self.publisher = ctx.socket(zmq.PUB)
+        self.publisher.setsockopt(zmq.LINGER, 0)  # Never linger on closure
         self.publisher.bind(url)
 
     def send_msg(self, proto: Message):

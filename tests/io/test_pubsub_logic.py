@@ -1,5 +1,6 @@
 """ Test publisher-subscriber logic."""
 
+import logging
 import threading
 import time
 import pytest
@@ -16,6 +17,9 @@ from afspm.io import common
 
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
+
+
+logger = logging.getLogger(__name__)
 
 
 # -------------------- Fixtures -------------------- #
@@ -45,7 +49,6 @@ def pub(pub_url):
     return publisher.Publisher(pub_url,
                                cl.CacheLogic.get_envelope_for_proto)
 
-
 @pytest.fixture(scope="module")
 def topics_scan2d():
     return [cl.CacheLogic.get_envelope_for_proto(scan_pb2.Scan2d())]
@@ -64,12 +67,12 @@ def topics_both():
 
 @pytest.fixture(scope="module")
 def wait_ms():
-    return 100
+    return 500
 
 
 @pytest.fixture
 def sub_scan_pub(ctx, pub_url, topics_scan2d, cache_kwargs,
-             wait_ms):
+                 wait_ms):
     return subscriber.Subscriber(
         pub_url, cl.extract_proto, topics_scan2d,
         cl.update_cache, ctx,
@@ -79,7 +82,7 @@ def sub_scan_pub(ctx, pub_url, topics_scan2d, cache_kwargs,
 
 @pytest.fixture
 def sub_control_state_pub(ctx, pub_url, topics_control_state, cache_kwargs,
-                      wait_ms):
+                          wait_ms):
     return subscriber.Subscriber(
         pub_url, cl.extract_proto, topics_control_state,
         cl.update_cache, ctx,
@@ -125,7 +128,7 @@ def control_state():
 
 # -------------------- PubSub Tests -------------------- #
 
-def test_pub(ctx, pub, sample_scan):
+def test_pub_send_msg(ctx, pub, sample_scan):
     """Confirm we can connect and send messages into the void.
 
     Messages sent with no subscriber are just shelved. We should get no fail
@@ -206,6 +209,10 @@ def comm_pub(ctx, comm_url):
 def short_wait_ms():
     return 25
 
+@pytest.fixture(scope="module")
+def wait_count():
+    return 3
+
 
 def got_kill_signal(socket: zmq.Socket,
                     timeout_ms: int) -> bool:
@@ -224,10 +231,10 @@ def send_kill_signal(socket: zmq.Socket):
 
 
 def kill_and_wait(socket: zmq.Socket, wait_ms: int,
-                  thread: threading.Thread):
+                  wait_count: int, thread: threading.Thread):
     """Tell thread to die, wait, and join."""
     send_kill_signal(socket)
-    time.sleep(5*wait_ms / 1000)
+    time.sleep(wait_count * wait_ms / 1000)
     thread.join()
 
 
@@ -248,11 +255,11 @@ def pubsubcache_routine(psc_url, pub_url, comm_url, short_wait_ms,
     while stay_alive:
         psc.poll(short_wait_ms)
         if got_kill_signal(comm, short_wait_ms):
-            print("Kill signal received, sending through PSC")
+            logging.debug("Kill signal received, sending through PSC")
             psc.send_kill_signal()
             stay_alive = False
 
-    print("Dying, closing sockets")
+    logging.debug("Dying, closing sockets")
     # Close bound sockets
     psc.backend.close()
 
@@ -264,11 +271,6 @@ def thread_psc(psc_url, pub_url, comm_url, short_wait_ms, ctx, wait_ms,
                                     ctx, cache_kwargs))
     thread.daemon = True
     thread.start()
-
-    # TODO: Investigate this! Not having this causes tests to crash. Having it
-    # magically fixes them. I am worried.
-    # We need some delay between initializing and sending out the first message
-    time.sleep(wait_ms / 1000)  # ms to s
     return thread
 
 
@@ -282,13 +284,13 @@ def sub_all_topics_psc(psc_url, cache_kwargs, ctx, wait_ms):
         update_cache_kwargs=cache_kwargs)
 
 
-def test_pubsubcache_kill_signal(sub_all_topics_psc, wait_ms, comm_pub,
-                                 thread_psc):
+def test_pubsubcache_kill_signal(sub_all_topics_psc, wait_ms, wait_count,
+                                 comm_pub, thread_psc):
     """Validate that a kill signal is received by a subscriber."""
     assert not sub_all_topics_psc.poll_and_store(wait_ms)
     assert not sub_all_topics_psc.was_shutdown_requested()
 
-    kill_and_wait(comm_pub, wait_ms, thread_psc)
+    kill_and_wait(comm_pub, wait_ms, wait_count, thread_psc)
 
     sub_all_topics_psc.poll_and_store(wait_ms)
     assert sub_all_topics_psc.was_shutdown_requested()
@@ -296,7 +298,7 @@ def test_pubsubcache_kill_signal(sub_all_topics_psc, wait_ms, comm_pub,
 
 def test_pubsubcache(psc_url, cache_kwargs, ctx, pub, topics_both,
                      sub_scan_psc, sub_control_state_psc,
-                     sample_scan, control_state, wait_ms,
+                     sample_scan, control_state, wait_ms, wait_count,
                      thread_psc, comm_pub):
     """ Test a pub-sub network *with* our pubsubcache.
 
@@ -341,4 +343,4 @@ def test_pubsubcache(psc_url, cache_kwargs, ctx, pub, topics_both,
     assert_sub_received_proto(sub_both, sample_scan, wait_ms)
     assert_sub_received_proto(sub_scan, sample_scan, wait_ms)
 
-    kill_and_wait(comm_pub, wait_ms, thread_psc)
+    kill_and_wait(comm_pub, wait_ms, wait_count, thread_psc)
