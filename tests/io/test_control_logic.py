@@ -23,17 +23,17 @@ def ctx():
 
 @pytest.fixture(scope="module")
 def server_url():
-    return "tcp://127.0.0.1:6666"
+    return "tcp://127.0.0.1:7000"
 
 
 @pytest.fixture(scope="module")
 def router_url():
-    return "tcp://127.0.0.1:6667"
+    return "tcp://127.0.0.1:7001"
 
 
 @pytest.fixture(scope="module")
 def comm_url():
-    return "tcp://127.0.0.1:6668"
+    return "tcp://127.0.0.1:7002"
 
 
 @pytest.fixture(scope="module")
@@ -43,7 +43,7 @@ def timeout_ms():
 
 @pytest.fixture(scope="module")
 def kill_url():
-    return "tcp://127.0.0.1:7000"
+    return "tcp://127.0.0.1:7003"
 
 
 @pytest.fixture(scope="module")
