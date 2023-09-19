@@ -67,13 +67,23 @@ def default_control_state():
 
 # --- Timing Stuff --- #
 @pytest.fixture(scope="module")
-def wait_ms():
-    return 100
+def devcon_timeout_ms():
+    return 50
+
+@pytest.fixture(scope="module")
+def afspmcon_timeout_ms():
+    return 250
 
 
 @pytest.fixture(scope="module")
-def poll_timeout_ms():
-    return 25
+def wait_ms(afspmcon_timeout_ms):
+    return 2 * afspmcon_timeout_ms
+
+
+@pytest.fixture(scope="module")
+def wait_count():
+    return 3
+
 
 @pytest.fixture(scope="module")
 def loop_sleep_s():
@@ -107,8 +117,7 @@ def topics_states():
 
 # --- I/O Classes (Subscribers, Clients) --- #
 @pytest.fixture
-def sub_scan_state(ctx, psc_url, topics_states, cache_kwargs,
-        wait_ms):
+def sub_scan_state(ctx, psc_url, topics_states, cache_kwargs):
     return Subscriber(
         psc_url, cl.extract_proto, topics_states,
         cl.update_cache, ctx,
@@ -117,8 +126,7 @@ def sub_scan_state(ctx, psc_url, topics_states, cache_kwargs,
 
 
 @pytest.fixture
-def sub_scan2d(ctx, psc_url, topics_scan2d, cache_kwargs,
-               wait_ms):
+def sub_scan2d(ctx, psc_url, topics_scan2d, cache_kwargs):
     return Subscriber(
         psc_url, cl.extract_proto, topics_scan2d,
         cl.update_cache, ctx,
@@ -126,9 +134,6 @@ def sub_scan2d(ctx, psc_url, topics_scan2d, cache_kwargs,
         update_cache_kwargs=cache_kwargs)
 
 
-# Testing with wait_ms instead of poll_tiomeout_ms for client!!!
-# Effectively, the client *NEEDS* to wait a reasonable amount
-# longer than the server or router. Otherwise, they will miss messages!
 @pytest.fixture
 def admin_client(router_url, ctx, component_name, wait_ms):
     return AdminControlClient(router_url, ctx, component_name,
@@ -137,23 +142,23 @@ def admin_client(router_url, ctx, component_name, wait_ms):
 
 # --- Main Test Classes --- #
 # -- Device Controller Stuff -- #
-@pytest.fixture#(scope="module")
-def scan_time_ms():
-    return 1500
+@pytest.fixture(scope="module")
+def scan_time_ms(wait_ms):
+    return 5 * wait_ms  # TODO: Make shorter?
 
 
-@pytest.fixture#(scope="module")
-def move_time_ms():
-    return 250
+@pytest.fixture(scope="module")
+def move_time_ms(wait_ms):
+    return 2 * wait_ms  # TODO: Make shorter?
 
 
 @pytest.fixture
-def thread_device_controller(pub_url, server_url, psc_url, poll_timeout_ms,
+def thread_device_controller(pub_url, server_url, psc_url, devcon_timeout_ms,
                              loop_sleep_s, hb_period_s, ctx, move_time_ms,
                              scan_time_ms, cache_kwargs):
     thread = threading.Thread(target=sc.device_controller_routine,
                               args=(pub_url, server_url, psc_url,
-                                    poll_timeout_ms, loop_sleep_s,
+                                    devcon_timeout_ms, loop_sleep_s,
                                     hb_period_s, ctx, move_time_ms,
                                     scan_time_ms, cache_kwargs))
     thread.daemon = True
@@ -165,11 +170,11 @@ def thread_device_controller(pub_url, server_url, psc_url, poll_timeout_ms,
 @pytest.fixture
 def thread_afspm_controller(psc_url, pub_url, server_url, router_url,
                             cache_kwargs, loop_sleep_s, hb_period_s,
-                            poll_timeout_ms, ctx):
+                            afspmcon_timeout_ms, ctx):
     thread = threading.Thread(target=sc.afspm_controller_routine,
                               args=(psc_url, pub_url, server_url, router_url,
                                     cache_kwargs, loop_sleep_s, hb_period_s,
-                                    poll_timeout_ms, ctx))
+                                    afspmcon_timeout_ms, ctx))
     thread.daemon = True
     thread.start()
     return thread
@@ -183,10 +188,10 @@ def component_name():
 
 @pytest.fixture
 def afspm_component(loop_sleep_s, hb_period_s, sub_scan_state, admin_client,
-                    component_name, poll_timeout_ms, ctx):
+                    component_name, wait_ms, ctx):
     return AfspmComponent(component_name, loop_sleep_s, hb_period_s,
-                          poll_timeout_ms, sub_scan_state, admin_client,
-                          ctx)
+                          wait_ms, sub_scan_state,
+                          admin_client, ctx)
 
 
 # -------------------- Helper Methods -------------------- #
@@ -201,11 +206,12 @@ def assert_sub_received_proto(sub: Subscriber,
 
 
 def startup_flush_messages(afspm_component: AfspmController,
-                           wait_ms: int):
+                           wait_ms: int, wait_count: int):
     """On startup, we will receive a couple of messages. Flush them."""
-    received = True
-    while received:
-        received = afspm_component.subscriber.poll_and_store(wait_ms)
+    counter = 0
+    while counter < wait_count:
+        afspm_component.subscriber.poll_and_store(wait_ms)
+        counter += 1
 
 
 def request_control(afspm_component: AfspmController, wait_ms: int,
@@ -231,11 +237,6 @@ def end_experiment(afspm_component: AfspmComponent,
     afspm_component.subscriber.poll_and_store(wait_ms)
     assert afspm_component.subscriber.was_shutdown_requested()
 
-    # TODO: Look into removing this. Ugly delay to get stuff to
-    # close properly in pytest.
-    time.sleep(4*wait_ms / 1000)
-
-
 
 def wait_on_threads(thread_device_controller: threading.Thread,
                     thread_afspm_controller: threading.Thread):
@@ -244,10 +245,10 @@ def wait_on_threads(thread_device_controller: threading.Thread,
 
 
 def startup_and_req_ctrl(afspm_component: AfspmController, wait_ms: int,
-                 default_control_state: control_pb2.ControlState,
-                 component_name: str):
+                         default_control_state: control_pb2.ControlState,
+                         component_name: str, wait_count: int):
     """Calls the above 2 one after the other."""
-    startup_flush_messages(afspm_component, wait_ms)
+    startup_flush_messages(afspm_component, wait_ms, wait_count)
     request_control(afspm_component, wait_ms, default_control_state,
                     component_name)
 
@@ -262,19 +263,19 @@ def end_and_wait_threads(afspm_component: AfspmComponent,
 
 # -------------------- Tests -------------------- #
 def test_end_experiment(thread_device_controller, thread_afspm_controller,
-                        afspm_component, wait_ms, ctx):
+                        afspm_component, wait_ms, wait_count, ctx):
     """Ensure we can end the experiment."""
-    startup_flush_messages(afspm_component, wait_ms)
+    startup_flush_messages(afspm_component, wait_ms, wait_count)
     end_and_wait_threads(afspm_component, wait_ms, thread_device_controller,
                          thread_afspm_controller)
 
 
 def test_get_release_control(thread_device_controller, thread_afspm_controller,
-                             afspm_component, wait_ms, move_time_ms,
+                             afspm_component, wait_ms, wait_count, move_time_ms,
                              component_name, default_control_state, ctx):
     """Ensure we can obtain and release control."""
     startup_and_req_ctrl(afspm_component, wait_ms, default_control_state,
-                         component_name)
+                         component_name, wait_count)
 
     rep = afspm_component.control_client.release_control()
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
@@ -286,11 +287,11 @@ def test_get_release_control(thread_device_controller, thread_afspm_controller,
 
 
 def test_start_scan(thread_device_controller, thread_afspm_controller,
-                    afspm_component, wait_ms, scan_time_ms,
+                    afspm_component, wait_ms, wait_count, scan_time_ms,
                     sub_scan2d, component_name, default_control_state):
     """Ensure that we receive indication of a scan starting when we request it."""
     startup_and_req_ctrl(afspm_component, wait_ms, default_control_state,
-                         component_name)
+                         component_name, wait_count)
 
     rep = afspm_component.control_client.start_scan()
     scan_state_msg = scan_pb2.ScanStateMsg(
@@ -318,11 +319,11 @@ def test_start_scan(thread_device_controller, thread_afspm_controller,
 
 
 def test_stop_scan(thread_device_controller, thread_afspm_controller,
-                   afspm_component, wait_ms, scan_time_ms,
+                   afspm_component, wait_ms, wait_count, scan_time_ms,
                    sub_scan2d, default_control_state, component_name):
     """Ensure that we can cancel a scan and receive updates."""
     startup_and_req_ctrl(afspm_component, wait_ms, default_control_state,
-                         component_name)
+                         component_name, wait_count)
 
     rep = afspm_component.control_client.start_scan()
     scan_state_msg = scan_pb2.ScanStateMsg(
@@ -355,7 +356,7 @@ def test_stop_scan(thread_device_controller, thread_afspm_controller,
 
 
 def test_set_scan_params(thread_device_controller, thread_afspm_controller,
-                         afspm_component, wait_ms, move_time_ms,
+                         afspm_component, wait_ms, wait_count, move_time_ms,
                          sub_scan2d, default_control_state, component_name):
     """Ensure that we receive motion messages when we change scan params.
 
@@ -363,7 +364,7 @@ def test_set_scan_params(thread_device_controller, thread_afspm_controller,
     real SPM, it would depend on whether the spatial roi has changed.
     """
     startup_and_req_ctrl(afspm_component, wait_ms, default_control_state,
-                         component_name)
+                         component_name, wait_count)
 
     rep = afspm_component.control_client.set_scan_params(
         scan_pb2.ScanParameters2d())
@@ -391,10 +392,10 @@ def test_set_scan_params(thread_device_controller, thread_afspm_controller,
 
 
 def test_experiment_problems(thread_device_controller, thread_afspm_controller,
-                             afspm_component, wait_ms, move_time_ms,
+                             afspm_component, wait_ms, wait_count, move_time_ms,
                              default_control_state):
     """Ensure we can set/unset experiment problems and receive in sub."""
-    startup_flush_messages(afspm_component, wait_ms)
+    startup_flush_messages(afspm_component, wait_ms, wait_count)
 
     problem = control_pb2.ExperimentProblem.EP_TIP_SHAPE_CHANGED
     rep = afspm_component.control_client.add_experiment_problem(problem)
@@ -416,12 +417,12 @@ def test_experiment_problems(thread_device_controller, thread_afspm_controller,
 
 
 def test_calls_while_scanning(thread_device_controller,
-                              thread_afspm_controller,
+                              thread_afspm_controller, wait_count,
                               afspm_component, wait_ms, default_control_state,
                               component_name, scan_time_ms):
     """Confirm that very few calls can be run while scanning."""
     startup_and_req_ctrl(afspm_component, wait_ms, default_control_state,
-                         component_name)
+                         component_name, wait_count)
 
     rep = afspm_component.control_client.start_scan()
     scan_state_msg = scan_pb2.ScanStateMsg(
@@ -441,8 +442,6 @@ def test_calls_while_scanning(thread_device_controller,
         rep = command(arg) if arg is not None else command()
         assert rep == control_pb2.ControlResponse.REP_NOT_FREE
 
-    # TODO: Remove this (waiting for the scan to finish) and get running
-    # again
     # Wait for scan to finish
     time.sleep(2 * scan_time_ms / 1000)
     assert afspm_component.subscriber.poll_and_store(wait_ms)
@@ -452,9 +451,10 @@ def test_calls_while_scanning(thread_device_controller,
 
 
 def test_set_control_mode(thread_device_controller, thread_afspm_controller,
-                          afspm_component, wait_ms, default_control_state):
+                          afspm_component, wait_ms, wait_count,
+                          default_control_state):
     """Confirm we can set the control mode."""
-    startup_flush_messages(afspm_component, wait_ms)
+    startup_flush_messages(afspm_component, wait_ms, wait_count)
 
     mode = control_pb2.ControlMode.CM_MANUAL
     rep = afspm_component.control_client.set_control_mode(mode)
