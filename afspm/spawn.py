@@ -132,8 +132,8 @@ def _set_up_logging(log_file: str, log_to_stdout: bool, log_level: str):
     root = logging.getLogger(LOGGER_ROOT)
     log_level = LOG_LEVEL_STR_TO_VAL[log_level.upper()]
     root.setLevel(log_level)
-    formatter = logging.Formatter('%(asctime)s:%(msecs)03d- %(name)s - '
-                                  '%(levelname)s - %(message)s')
+    formatter = logging.Formatter('%(asctime)s.%(msecs)03d- %(name)s - '
+                                  '%(levelname)s:%(lineno)s - %(message)s')
 
     handlers = []
     if log_file:
