@@ -222,6 +222,9 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
                         rep == ctrl.ControlResponse.REP_SUCCESS):
                     scan_state_msg = scan.ScanStateMsg(
                         scan_state=scan.ScanState.SS_INTERRUPTED)
+                    logger.info("Scan interrupted, sending out %s.",
+                                common.get_enum_str(scan.ScanState,
+                                                    scan_state_msg.scan_state))
                     self.publisher.send_msg(scan_state_msg)
 
                 self.control_server.reply(rep)
