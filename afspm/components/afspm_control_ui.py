@@ -60,11 +60,13 @@ class AfspmControlUI(AfspmComponent):
         self.mode_buttons: a list of strings corresponding to the control mode
             buttons.
         self.map_mode_button_to_mode
-
+        ui_timeout_ms: the ui read timeout used to poll ui elements, in
+            milliseconds.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, ui_timeout_ms: int = common.POLL_TIMEOUT_MS, **kwargs):
         self._create_ui()
+        self.ui_timeout_ms = ui_timeout_ms
         self.control_state = control_pb2.ControlState()
         self.scan_state = scan_pb2.ScanState.SS_UNDEFINED
         super().__init__(**kwargs)
@@ -107,7 +109,7 @@ class AfspmControlUI(AfspmComponent):
 
     def _handle_ui_event_loop(self):
         #self.layout[ERROR_LOG_KEY].update(value="")  # Clear error log
-        event, values = self.window.read(timeout=self.poll_timeout_ms)
+        event, values = self.window.read(timeout=self.ui_timeout_ms)
 
         req_methods = []
         req_args = []

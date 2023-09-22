@@ -3,7 +3,9 @@
 from typing import Callable
 from collections.abc import Iterable
 import logging
+
 import zmq
+
 from google.protobuf.message import Message
 
 from .. import common
@@ -63,6 +65,9 @@ class PubSubCache:
         update_cache: method that updates our cache.
         update_cache_kwargs: any additional arguments to be fed to
             update_cache.
+        poll_timeout_ms: the poll timeout, in milliseconds. If None,
+            we do not poll and do a blocking receive instead.
+
         frontend: SUB socket connected to the publisher.
         backend: XPUB socket, the publisher end
         cache: the cache, where we store data according to update_cache.
@@ -78,7 +83,9 @@ class PubSubCache:
                  ctx: zmq.Context = None,
                  extract_proto_kwargs: dict = None,
                  get_envelope_kwargs: dict = None,
-                 update_cache_kwargs: dict = None, **kwargs):
+                 update_cache_kwargs: dict = None,
+                 poll_timeout_ms: int = common.POLL_TIMEOUT_MS,
+                 **kwargs):
         """Initializes the caching logic and connects our nodes.
 
         Args:
@@ -98,6 +105,8 @@ class PubSubCache:
                 pub_get_envelope_for_proto.
             update_cache_kwargs: any additional arguments to be fed to
                 update_cache.
+            poll_timeout_ms: the poll timeout, in milliseconds. If None,
+                we do not poll and do a blocking receive instead.
             kwargs: allows non-used input arguments to be passed (so we can
                 initialize from an unfiltered dict).
         """
@@ -110,6 +119,7 @@ class PubSubCache:
         self.update_cache = update_cache
         self.update_cache_kwargs = (update_cache_kwargs if
                                     update_cache_kwargs else {})
+        self.poll_timeout_ms = poll_timeout_ms
 
         if not ctx:
             ctx = zmq.Context.instance()
@@ -132,17 +142,17 @@ class PubSubCache:
         self.poller.register(self.frontend, zmq.POLLIN)
         self.poller.register(self.backend, zmq.POLLIN)
 
-    def poll(self, timeout_ms: int = 1000):
+        common.sleep_on_socket_startup()
+
+
+    def poll(self):
         """Poll and handle communication between pub and subs.
 
 
         Note: poll() *does not* handle KeyboardInterruption exceptions,
         please make sure your calling code does.
-
-        Args:
-            timeout_ms: the poll timeout, in milliseconds
         """
-        events = dict(self.poller.poll(timeout_ms))
+        events = dict(self.poller.poll(self.poll_timeout_ms))
 
         # Handle subscriptions
         # (when we get a subscription, we pull data from the cache)

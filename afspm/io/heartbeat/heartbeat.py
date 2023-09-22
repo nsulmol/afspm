@@ -3,7 +3,10 @@
 import time
 import logging
 from enum import Enum
+
 import zmq
+
+from .. import common
 
 
 logger = logging.getLogger(__name__)
@@ -30,7 +33,7 @@ class Heartbeater:
         last_beat_ts: a timestamp of the last time we sent a
             heartbeat.
     """
-    def __init__(self, url: str, beat_period_s: int,
+    def __init__(self, url: str, beat_period_s: int = common.HEARTBEAT_PERIOD_S,
                  ctx: zmq.Context = None, **kwargs):
         """Init heartbeater.
 
@@ -49,6 +52,11 @@ class Heartbeater:
         self.beat_period_s = beat_period_s
 
         self.last_beat_ts = time.time()
+
+        common.sleep_on_socket_startup()
+
+        # Send a startup beat, to indicate we have initialized.
+        self.publisher.send(HBMessage.HEARTBEAT.value.to_bytes(1, 'big'))
 
     def handle_beat(self):
         """Send a beat if sufficient time has elapsed."""
@@ -83,9 +91,11 @@ class HeartbeatListener:
         last_beat_ts: the timestamp of the last beat.
         received_kill_signal: whether we received a KILL signal from the
             Heartbeater (implying they died on purpose).
+        poll_timeout_ms: the poll timeout, in milliseconds.
     """
-    def __init__(self, url: str, beat_period_s: int,
-                 missed_beats_before_dead: int,
+    def __init__(self, url: str, beat_period_s: int = common.HEARTBEAT_PERIOD_S,
+                 missed_beats_before_dead: int = common.BEATS_BEFORE_DEAD,
+                 poll_timeout_ms: int = common.POLL_TIMEOUT_MS,
                  ctx: zmq.Context = None, **kwargs):
         """Init listener.
 
@@ -97,6 +107,7 @@ class HeartbeatListener:
             ctx: zmq.Context.
             kwargs: allows non-used input arguments to be passed (so we can
                 initialize from an unfiltered dict).
+            poll_timeout_ms: the poll timeout, in milliseconds.
         """
         if not ctx:
             ctx = zmq.Context.instance()
@@ -106,24 +117,24 @@ class HeartbeatListener:
         self.subscriber.setsockopt(zmq.SUBSCRIBE, b"")  # Subscribe to all
 
         self.time_before_dead_s = missed_beats_before_dead * beat_period_s
+        self.poll_timeout_ms = poll_timeout_ms
         self.last_beat_ts = time.time()
         self.received_kill_signal = False
         self.received_first_beat = False
 
-    def check_is_alive(self, timeout_ms: int = 10) -> bool:
+        common.sleep_on_socket_startup()
+
+    def check_is_alive(self) -> bool:
         """Checks if the Hearbeater is alive.
 
         If self.time_before_dead_ms has already been met, we do not even poll.
         If not, we poll and check for a heartbeat or KILL signal.
 
-        Args:
-            timeout_ms: the poll timeout, in milliseconds.
-
         Returns:
             whether or not the Hearbeater is dead.
         """
         curr_ts = time.time()
-        if self.subscriber.poll(timeout_ms, zmq.POLLIN):
+        if self.subscriber.poll(self.poll_timeout_ms, zmq.POLLIN):
             msg = self.subscriber.recv(zmq.NOBLOCK)
             msg_enum = HBMessage(int.from_bytes(msg, 'big'))
             if msg_enum == HBMessage.HEARTBEAT:

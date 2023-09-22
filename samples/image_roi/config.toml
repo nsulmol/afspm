@@ -6,10 +6,6 @@ server_url = "tcp://127.0.0.1:6666"
 router_url = "tcp://127.0.0.1:6667"
 
 # --- Timing Logic --- #
-wait_ms = 3000
-poll_timeout_ms = 1000
-loop_sleep_s = 0.1
-hb_period_s = 1
 
 # --- Experiment Scan Aspects --- #
 # - Physical Stuff - #
@@ -95,20 +91,17 @@ url = 'server_url'
 class = 'afspm.io.control.control_router.ControlRouter'
 server_url = 'server_url'
 router_url = 'router_url'
-server_timeout_ms = 'wait_ms' # was poll_timeout_ms
 
 [experiment_client]
 class = 'afspm.io.control.control_client.ControlClient'
 url = 'router_url'
 uuid = 'client_for_experiment'
-request_timeout_ms = 'wait_ms'
 request_retries = 1
 
 [ui_client]
 class = 'afspm.io.control.control_client.AdminControlClient'
 url = 'router_url'
 uuid = 'client_for_ui'
-request_timeout_ms = 'wait_ms'
 
 
 # ----- Components ----- #
@@ -127,10 +120,6 @@ sub_scans_per_full_scan = 'sscans_per_fscan'
 get_envelope_for_proto = 'pbc_envelope_for_proto'
 rerun_wait_s = 5
 
-loop_sleep_s = 'loop_sleep_s'
-hb_period_s = 'hb_period_s'
-poll_timeout_ms = 'poll_timeout_ms'
-
 subscriber = 'experiment_sub'
 control_client = 'experiment_client'
 
@@ -138,22 +127,14 @@ control_client = 'experiment_client'
 component = true
 class = 'afspm.components.afspm_control_ui.AfspmControlUI'
 
-loop_sleep_s = 'loop_sleep_s'
-hb_period_s = 'hb_period_s'
-poll_timeout_ms = 'poll_timeout_ms'
-
 subscriber = 'experiment_sub'
 control_client = 'ui_client'
 
 [tip_detector]
 #component = true  # uncomment to enable
 class = 'freq_trigger_tip_detector.FreqTriggerTipDetector'
+
 scan_period_raise_problem = 2
-
-loop_sleep_s = 'loop_sleep_s'
-hb_period_s = 'hb_period_s'
-poll_timeout_ms = 'poll_timeout_ms'
-
 subscriber = 'experiment_sub'
 control_client = 'ui_client'
 
@@ -172,25 +153,14 @@ visualization_colormap_list = ['visualization_colormap', 'visualization_colormap
 visualize_undeclared_scans = true
 scan_id = 'Scan2d'
 
-loop_sleep_s = 'loop_sleep_s'
-hb_period_s = 'hb_period_s'
-poll_timeout_ms = 'poll_timeout_ms'
-
 subscriber = 'experiment_sub'
 control_client = 'ui_client'
 
 [afspm_components_monitor]
-loop_sleep_s = 'loop_sleep_s'
-missed_beats_before_dead = 5
-poll_timeout_ms = 'poll_timeout_ms'
 
 [afspm_controller]
 component = true
 class = 'afspm.components.afspm_controller.AfspmController'
-
-loop_sleep_s = 'loop_sleep_s'
-hb_period_s = 'hb_period_s'
-poll_timeout_ms = 'poll_timeout_ms'
 
 pubsubcache = 'controller_psc'
 router = 'controller_router'
@@ -207,10 +177,6 @@ data_units = 'data_units'
 
 scan_time_s = 5
 move_time_s = 1
-
-poll_timeout_ms = 'poll_timeout_ms'
-loop_sleep_s = 'loop_sleep_s'
-hb_period_s = 'hb_period_s'
 
 publisher = 'devcon_pub'
 control_server = 'devcon_server'

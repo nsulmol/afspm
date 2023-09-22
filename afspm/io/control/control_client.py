@@ -1,7 +1,8 @@
 """Handles control requests to the AFSPM."""
 
-import zmq
 import logging
+
+import zmq
 
 from . import commands as cmd
 from .. import common
@@ -11,6 +12,9 @@ from ..protos.generated import scan_pb2 as scan
 
 
 logger = logging.getLogger(__name__)
+
+
+_DEFAULT_CLIENT_RETRIES = 1
 
 
 class ControlClient:
@@ -41,8 +45,9 @@ class ControlClient:
 
     def __init__(self, url: str, ctx: zmq.Context = None,
                  uuid: str = None,
-                 request_retries: int = 3,
-                 request_timeout_ms: int = 2500, **kwargs):
+                 request_retries: int = _DEFAULT_CLIENT_RETRIES,
+                 request_timeout_ms: int = 2 * common.REQUEST_TIMEOUT_MS,
+                 **kwargs):
         """Initialize, given server url and additional parms.
 
         Args:
@@ -72,6 +77,7 @@ class ControlClient:
         self.client = None
         self._init_client()
 
+        common.sleep_on_socket_startup()
 
     def _init_client(self):
         """Starts up (or restarts) the client socket."""

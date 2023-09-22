@@ -3,8 +3,12 @@
 from typing import Callable
 from collections.abc import Iterable
 import logging
+
 import zmq
+
 from google.protobuf.message import Message
+
+from .. import common
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +47,9 @@ class Publisher:
         self.publisher = ctx.socket(zmq.PUB)
         self.publisher.setsockopt(zmq.LINGER, 0)  # Never linger on closure
         self.publisher.bind(url)
+
+        common.sleep_on_socket_startup()
+
 
     def send_msg(self, proto: Message):
         """ Send message via publisher.

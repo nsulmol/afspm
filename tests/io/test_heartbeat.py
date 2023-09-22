@@ -53,7 +53,7 @@ def missed_beats_before_dead():
 
 @pytest.fixture
 def hb_count_flushing():
-    return 2
+    return 3
 
 @pytest.fixture
 def hb_count_non_flushing():
@@ -61,9 +61,11 @@ def hb_count_non_flushing():
 
 
 @pytest.fixture
-def hb_listener(ctx, hb_url, beat_period_s, missed_beats_before_dead):
+def hb_listener(ctx, hb_url, beat_period_s, missed_beats_before_dead,
+                hb_listener_timeout_ms):
     return HeartbeatListener(hb_url, beat_period_s,
-                             missed_beats_before_dead, ctx)
+                             missed_beats_before_dead,
+                             hb_listener_timeout_ms, ctx)
 
 
 @pytest.fixture
@@ -122,31 +124,28 @@ def heartbeat_routine(ctx, hb_url, beat_period_s, comm_url,
                 break
 
 def check_hb_n_times(hb_listener: HeartbeatListener, hb_count: int,
-                     hb_listener_timeout_ms: int,
                      assert_check: bool):
     counter = 0
     while counter < hb_count:
         if assert_check:
-            assert hb_listener.check_is_alive(hb_listener_timeout_ms)
+            assert hb_listener.check_is_alive()
         else:
-            hb_listener.check_is_alive(hb_listener_timeout_ms)
+            hb_listener.check_is_alive()
         counter += 1
 
 
 # ----- Tests ----- #
 def test_heartbeat_works(ctx, hb_listener, thread_hb, beat_period_s,
-                         hb_listener_timeout_ms, comm_pub,
-                         hb_count_non_flushing):
+                         comm_pub, hb_count_non_flushing):
     """Make sure we get heartbeats for 5 heartbeats-worth of time."""
-    check_hb_n_times(hb_listener, hb_count_non_flushing,
-                     hb_listener_timeout_ms, True)
+    check_hb_n_times(hb_listener, hb_count_non_flushing, True)
     send_comm_msg(comm_pub, CommMessage.END)  # Tell Heartbeat to end
     thread_hb.join()
 
 
 def test_heartbeat_under_freeze(ctx, hb_listener, thread_hb, beat_period_s,
-                                hb_listener_timeout_ms, comm_pub,
-                                missed_beats_before_dead, hb_count_flushing):
+                                comm_pub, missed_beats_before_dead,
+                                hb_count_flushing):
     """Make sure we can detect the heartbeater freezing.
 
     We:
@@ -159,10 +158,9 @@ def test_heartbeat_under_freeze(ctx, hb_listener, thread_hb, beat_period_s,
 
     # We cannot guarantee how many heartbeats have been sent since
     # our command. We will throw out a number of checks before validating.
-    check_hb_n_times(hb_listener, hb_count_flushing,
-                     hb_listener_timeout_ms, False)
+    check_hb_n_times(hb_listener, hb_count_flushing, False)
 
-    assert not hb_listener.check_is_alive(hb_listener_timeout_ms)
+    assert not hb_listener.check_is_alive()
     assert not hb_listener.received_kill_signal
 
     send_comm_msg(comm_pub, CommMessage.END)  # Tell Heartbeat to end
@@ -170,8 +168,8 @@ def test_heartbeat_under_freeze(ctx, hb_listener, thread_hb, beat_period_s,
 
 
 def test_heartbeat_under_crash(ctx, hb_listener, thread_hb, beat_period_s,
-                               hb_listener_timeout_ms, comm_pub,
-                               missed_beats_before_dead, hb_count_flushing):
+                               comm_pub, missed_beats_before_dead,
+                               hb_count_flushing):
     """Make sure we can detect a crash.
 
     We:
@@ -185,17 +183,16 @@ def test_heartbeat_under_crash(ctx, hb_listener, thread_hb, beat_period_s,
 
     # We cannot guarantee how many heartbeats have been sent since
     # our command. We will throw out a number of checks before validating.
-    check_hb_n_times(hb_listener, hb_count_flushing,
-                     hb_listener_timeout_ms, False)
+    check_hb_n_times(hb_listener, hb_count_flushing, False)
 
-    assert not hb_listener.check_is_alive(hb_listener_timeout_ms)
+    assert not hb_listener.check_is_alive()
     assert not hb_listener.received_kill_signal
     thread_hb.join()
 
 
 def test_heartbeat_under_end(ctx, hb_listener, thread_hb, beat_period_s,
-                             hb_listener_timeout_ms, comm_pub,
-                             missed_beats_before_dead, hb_count_flushing):
+                             comm_pub, missed_beats_before_dead,
+                             hb_count_flushing):
     """Make sure we can detect a purposeful end.
 
     We:
@@ -209,9 +206,8 @@ def test_heartbeat_under_end(ctx, hb_listener, thread_hb, beat_period_s,
 
     # We cannot guarantee how many heartbeats have been sent since
     # our command. We will throw out a number of checks before validating.
-    check_hb_n_times(hb_listener, hb_count_flushing,
-                     hb_listener_timeout_ms, False)
+    check_hb_n_times(hb_listener, hb_count_flushing, False)
 
-    assert not hb_listener.check_is_alive(hb_listener_timeout_ms)
+    assert not hb_listener.check_is_alive()
     assert hb_listener.received_kill_signal
     thread_hb.join()

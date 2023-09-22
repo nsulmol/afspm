@@ -83,9 +83,8 @@ class SampleDeviceController(DeviceController):
         super().run_per_loop()
 
 
-def device_controller_routine(pub_url, server_url, psc_url, poll_timeout_ms,
-                              loop_sleep_s,
-                              hb_period_s, ctx, move_time_ms, scan_time_ms,
+def device_controller_routine(pub_url, server_url, psc_url,
+                              ctx, move_time_ms, scan_time_ms,
                               cache_kwargs):
     pub = Publisher(pub_url, cl.CacheLogic.get_envelope_for_proto)
     server = ControlServer(server_url, ctx)
@@ -98,10 +97,7 @@ def device_controller_routine(pub_url, server_url, psc_url, poll_timeout_ms,
 
     devcon = SampleDeviceController(scan_time_ms / 1000, move_time_ms / 1000,
                                     publisher=pub, control_server=server,
-                                    poll_timeout_ms=poll_timeout_ms,
-                                    loop_sleep_s=loop_sleep_s,
-                                    hb_period_s=hb_period_s, ctx=ctx,
-                                    subscriber=sub)
+                                    ctx=ctx, subscriber=sub)
     devcon.run()
 
     # Forcing closure of bound sockets (for pytests)
@@ -109,21 +105,22 @@ def device_controller_routine(pub_url, server_url, psc_url, poll_timeout_ms,
     server.server.close()
 
 
+
+from afspm.io import common
+
+
 # --- AfspmController Stuff --- #
 def afspm_controller_routine(psc_url, pub_url, server_url, router_url,
-                             cache_kwargs, loop_sleep_s, hb_period_s,
-                             poll_timeout_ms, ctx):
+                             cache_kwargs, ctx):
     psc = PubSubCache(psc_url, pub_url,
                       cl.extract_proto,
                       cl.CacheLogic.get_envelope_for_proto,
                       cl.update_cache, ctx,
                       extract_proto_kwargs=cache_kwargs,
                       update_cache_kwargs=cache_kwargs)
-    router = ControlRouter(server_url, router_url, ctx, poll_timeout_ms)
+    router = ControlRouter(server_url, router_url, ctx)
 
-    controller = AfspmController('afspm_ctrl', loop_sleep_s, hb_period_s,
-                                 psc, router, poll_timeout_ms,
-                                 ctx)
+    controller = AfspmController('afspm_ctrl', psc, router, ctx=ctx)
     controller.run()
 
     # Forcing closure of bound sockets (for pytests)

@@ -2,6 +2,7 @@
 
 import zmq
 import logging
+
 from google.protobuf.message import Message
 
 from . import commands as cmd
@@ -22,28 +23,30 @@ class ControlServer:
 
     Attributes:
         server: the REP socket associated with our server
+        poll_timeout_ms: how long to wait when polling for messages.
+            If None, we do not poll and do a blocking receive instead.
     """
 
-    def __init__(self, url: str, ctx: zmq.Context = None, **kwargs):
+    def __init__(self, url: str, ctx: zmq.Context = None,
+                 poll_timeout_ms: int = common.POLL_TIMEOUT_MS,
+                 **kwargs):
+        self.poll_timeout_ms = poll_timeout_ms
         if not ctx:
             ctx = zmq.Context.instance()
 
         self.server = ctx.socket(zmq.REP)
         self.server.bind(url)
 
-    def poll(self, timeout_ms: int = 1000
-             ) -> (ctrl.ControlRequest, Message):
+        common.sleep_on_socket_startup()
+
+    def poll(self) -> (ctrl.ControlRequest, Message):
         """Poll for message and return if received.
 
-        We use a poll() first, to ensure there is a message to receive. To do
-        a blocking receive, simply set timeout_ms to None.
+        We use a poll() first, to ensure there is a message to receive.
+        If self.poll_timeout_ms is None, we do a blocking receive.
 
         Note: recv() *does not* handle KeyboardInterruption exceptions,
         please make sure your calling code does.
-
-        Args:
-            timeout_ms: the poll timeout, in milliseconds. If None,
-                we do not pull and do a blocking receive instead.
 
         Returns:
             A tuple consisting of:
@@ -52,8 +55,8 @@ class ControlServer:
             If no request was received, both will be None.
         """
         msg = None
-        if timeout_ms:
-            if self.server.poll(timeout_ms, zmq.POLLIN):
+        if self.poll_timeout_ms:
+            if self.server.poll(self.poll_timeout_ms, zmq.POLLIN):
                 msg = self.server.recv_multipart(zmq.NOBLOCK)
         else:
             msg = self.server.recv_multipart()

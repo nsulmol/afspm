@@ -7,6 +7,7 @@ import zmq
 
 from google.protobuf.message import Message
 
+from ..io import common
 from ..io.heartbeat.heartbeat import Heartbeater
 from ..io.pubsub import subscriber as sub
 from ..io.control import control_client as ctrl_client
@@ -50,23 +51,22 @@ class AfspmComponent:
             DeviceController. Note: unless you really know what you are doing,
             use a subscriber - i.e. do not consider it optional.
         control_client: client to ControlServer, to allow sending requests.
-        poll_timeout_ms: how long to wait when polling the subscriber.
         stay_alive: boolean indicating whether we should continue looping in
             run(). In other words, if False, run() ends.
     """
 
-    def __init__(self, name: str, loop_sleep_s: float,
-                 hb_period_s: float, poll_timeout_ms: int = 0,
+    def __init__(self, name: str,
                  subscriber: sub.Subscriber = None,
                  control_client: ctrl_client.ControlClient = None,
+                 loop_sleep_s: float = common.LOOP_SLEEP_S,
+                 beat_period_s: float = common.HEARTBEAT_PERIOD_S,
                  ctx: zmq.Context = None, **kwargs):
         """Initialize our AfspmComponent.
 
         Args:
             name: str, chosen to function as the component's uuid.
             loop_sleep_s: how long we sleep in our main loop.
-            hb_period_s: how frequently we should send a hearbeat.
-            poll_timeout_ms: how long to wait when polling the subscriber.
+            beat_period_s: how frequently we should send a hearbeat.
             subscriber: subscriber instance, to receive data from the
                 DeviceController.
             control_client: client to ControlServer, to allow sending requests.
@@ -80,11 +80,10 @@ class AfspmComponent:
 
         self.name = name
         hb_url = get_heartbeat_url(self.name)
-        self.heartbeater = Heartbeater(hb_url, hb_period_s, ctx)
+        self.heartbeater = Heartbeater(hb_url, beat_period_s, ctx)
         self.loop_sleep_s = loop_sleep_s
         self.subscriber = subscriber
         self.control_client = control_client
-        self.poll_timeout_ms = poll_timeout_ms
         self.stay_alive = True
 
     def run(self):
@@ -99,8 +98,6 @@ class AfspmComponent:
                 time.sleep(self.loop_sleep_s)
         except (KeyboardInterrupt, SystemExit):
             logger.warning("%s: Interrupt received. Stopping.", self.name)
-        except Exception as exc:  # TODO: Add acceptable general error?
-            logger.error("Unhandled exception, exiting: %s.", exc)
 
     def _handle_subscriber(self):
         """Poll subscriber and check for a shutdown request.
@@ -109,7 +106,7 @@ class AfspmComponent:
         instance). If so, it will also check the
         """
         if self.subscriber:
-            msg = self.subscriber.poll_and_store(self.poll_timeout_ms)
+            msg = self.subscriber.poll_and_store()
 
             # If the last value indicates shutdown was requested, stop
             # looping

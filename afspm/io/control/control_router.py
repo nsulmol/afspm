@@ -3,6 +3,7 @@
 import copy
 import zmq
 import logging
+
 from google.protobuf.message import Message
 
 from . import commands as cmd
@@ -46,14 +47,19 @@ class ControlRouter:
             the current control_mode (and no other client is currently
             under control).
         client_in_control_id: a uuid for the client currently under control.
-        server_timeout_ms: delay to wait for a reply from the ControlServer.
+        poll_timeout_ms: delay to wait when polling for a request from the
+           frontend.
+        req_timeout_ms: delay to wait for a reply from a request we send to the
+            backend.
         shutdown_was_requested: boolean indicating whether a request to end the
             experiment has been sent.
     """
 
     def __init__(self, server_url: str, router_url: str,
                  ctx: zmq.Context = None,
-                 server_timeout_ms: int = 1000, **kwargs):
+                 poll_timeout_ms: int = common.POLL_TIMEOUT_MS,
+                 request_timeout_ms: int = common.REQUEST_TIMEOUT_MS,
+                 **kwargs):
         """Init the class.
 
         Args:
@@ -61,8 +67,10 @@ class ControlRouter:
             router_url: the url of the Router, for ControlClients to connect
                 to.
             ctx: zmq context.
-            server_timeout_ms: delay to wait for a reply from the
-                ControlServer.
+            poll_timeout_ms: delay to wait when polling for a request from the
+                frontend.
+            request_timeout_ms: delay to wait for a reply from a request we send
+                to the backend.
             kwargs: allows non-used input arguments to be passed (so we can
                 initialize from an unfiltered dict).
         """
@@ -83,8 +91,12 @@ class ControlRouter:
 
         self.control_mode = ctrl.ControlMode.CM_AUTOMATED
         self.client_in_control_id = None
-        self.server_timeout_ms = server_timeout_ms
+
+        self.poll_timeout_ms = poll_timeout_ms
+        self.request_timeout_ms = request_timeout_ms
         self.shutdown_was_requested = False
+
+        common.sleep_on_socket_startup()
 
     def _init_backend(self):
         """Startup (or restart) the backend socket."""
@@ -216,7 +228,7 @@ class ControlRouter:
         msg = cmd.serialize_req_obj(req, proto)  # No need for empty envelope
         self.backend.send_multipart(msg)
 
-        if (self.backend.poll(self.server_timeout_ms) & zmq.POLLIN) != 0:
+        if (self.backend.poll(self.request_timeout_ms) & zmq.POLLIN) != 0:
             return cmd.parse_response(self.backend.recv())
 
         logger.error("Backend did not respond in time, likely timeout issue."
@@ -281,16 +293,12 @@ class ControlRouter:
             return self._handle_send_req(req, obj)
         return ctrl.ControlResponse.REP_NOT_IN_CONTROL
 
-    def poll_and_handle(self, timeout_ms: int = 1000):
+    def poll_and_handle(self):
         """Poll for ControlClient requests and handle.
-
-        Args:
-            timeout_ms: the poll timeout, in milliseconds. If None,
-                we do not poll and do a blocking receive instead.
         """
         msg = None
-        if timeout_ms:
-            if self.frontend.poll(timeout_ms, zmq.POLLIN):
+        if self.poll_timeout_ms:
+            if self.frontend.poll(self.poll_timeout_ms, zmq.POLLIN):
                 msg = self.frontend.recv_multipart(zmq.NOBLOCK)
         else:
             msg = self.frontend.recv_multipart()

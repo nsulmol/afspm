@@ -6,6 +6,7 @@ from typing import Callable
 import multiprocessing as mp
 import zmq
 
+from ..io import common
 from ..io.heartbeat.heartbeat import HeartbeatListener
 from .afspm_component import AfspmComponent, get_heartbeat_url
 from ..utils.parser import construct_and_run_component
@@ -65,8 +66,9 @@ class AfspmComponentsMonitor:
     """
     def __init__(self,
                  component_params_dict: dict[str, dict],
-                 poll_timeout_ms: int, loop_sleep_s: float,
-                 missed_beats_before_dead: int = 5,
+                 poll_timeout_ms: int = common.POLL_TIMEOUT_MS,
+                 loop_sleep_s: float = common.LOOP_SLEEP_S,
+                 missed_beats_before_dead: int = common.BEATS_BEFORE_DEAD,
                  ctx: zmq.Context = None, **kwargs):
         """Initialize the components monitor.
 
@@ -82,6 +84,7 @@ class AfspmComponentsMonitor:
             kwargs: allows non-used input arguments to be passed (so we can
                 initialize from an unfiltered dict).
         """
+        logger.debug("Initializing components monitor.")
         if not ctx:
             ctx = zmq.Context.instance()
         self.ctx = ctx
@@ -140,7 +143,8 @@ class AfspmComponentsMonitor:
 
     @staticmethod
     def _startup_listener(params_dict: dict, missed_beats_before_dead: int,
-                          ctx: zmq.Context) -> HeartbeatListener:
+                          poll_timeout_ms: int, ctx: zmq.Context
+                          ) -> HeartbeatListener:
         """Start up a HeartbeatListener to monitor an AfspmComponent.
 
         Args:
@@ -148,29 +152,32 @@ class AfspmComponentsMonitor:
                 AfspmComponent's constructor.
             missed_beats_before_dead: how many missed beats we will allow
                 before we consider the Heartbeater dead.
+            poll_timeout_ms: the polling timeout for the listener.
             ctx: zmq.Context instance.
 
         Returns:
             The created HeartbeatListener instance.
         """
-        name = params_dict['name']
-        hb_period_s = params_dict['hb_period_s']
-        hb_url = get_heartbeat_url(name)
+        params_dict['url'] = get_heartbeat_url(params_dict['name'])
+        params_dict['poll_timeout_ms'] = poll_timeout_ms
 
         logger.info("Creating listener for component %s", params_dict['name'])
-        return HeartbeatListener(hb_url, hb_period_s,
-                                 missed_beats_before_dead, ctx)
+        return HeartbeatListener(**params_dict)
 
     def _startup_processes_and_listeners(self) -> bool:
         """Startup component processes and their associated listeners."""
         succeeded = True
         for name in self.component_params_dict:
-            self.listeners[name] = self._startup_listener(
-                self.component_params_dict[name],
-                self.missed_beats_before_dead, self.ctx)
-
             self.component_processes[name] = self._startup_component(
                 self.component_params_dict[name])
+            # Starting listener second because it will wait for startup
+            # time (_startup_component() will not, due to it spawning a
+            # process).
+            self.listeners[name] = self._startup_listener(
+                self.component_params_dict[name],
+                self.missed_beats_before_dead,
+                self.poll_timeout_ms, self.ctx)
+
 
             # wait until we get our first heartbeat
             is_alive = True
@@ -193,6 +200,7 @@ class AfspmComponentsMonitor:
 
     def run(self):
         """Main loop."""
+        logger.info("Starting main loop for components monitor.")
         continue_running = self._startup_processes_and_listeners()
         try:
             while continue_running:
@@ -203,8 +211,6 @@ class AfspmComponentsMonitor:
                     continue_running = False
         except (KeyboardInterrupt, SystemExit):
             logger.warning("Interrupt received. Stopping.")
-        except Exception as exc:  # TODO: Add acceptable general error?
-            logger.error("Unhandled exception, exiting: %s.", exc)
 
     def run_per_loop(self):
         """The method that is run on every iteration of the main loop.
@@ -216,7 +222,7 @@ class AfspmComponentsMonitor:
         """
         procs_to_be_removed = []
         for key in self.listeners:
-            if not self.listeners[key].check_is_alive(self.poll_timeout_ms):
+            if not self.listeners[key].check_is_alive():
                 if self.listeners[key].received_kill_signal:
                     logger.info("Component %s has finished. Closing.", key)
 

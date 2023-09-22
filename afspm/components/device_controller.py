@@ -55,7 +55,6 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
         publisher: Publisher instance, for publishing data.
         control_server: ControlServer instance, for responding to control
             requests.
-        poll_timeout_ms: how long to wait when polling the server.
         req_handler_map: mapping from ControlRequest to method to call, for
             ease of use within some of the methods.
         scan_state: device's current ScanState.
@@ -74,7 +73,8 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
 
     def __init__(self, name: str, publisher: pub.Publisher,
                  control_server: ctrl_srvr.ControlServer,
-                 poll_timeout_ms: int, loop_sleep_s: int, hb_period_s: float,
+                 loop_sleep_s: int = common.LOOP_SLEEP_S,
+                 hb_period_s: float = common.HEARTBEAT_PERIOD_S,
                  ctx: zmq.Context = None, subscriber: sub.Subscriber = None,
                  **kwargs):
         """Initializes the controller.
@@ -84,7 +84,6 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
             publisher: Publisher instance, for publishing data.
             control_server: ControlServer instance, for responding to control
                 requests.
-            poll_timeout_ms: how long to wait when polling the server.
             loop_sleep_s: how long we sleep in our main loop, in s.
             hb_period_s: how frequently we should send a hearbeat.
             ctx: zmq Context; if not provided, we will create a new instance.
@@ -98,7 +97,6 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
 
         self.publisher = publisher
         self.control_server = control_server
-        self.poll_timeout_ms = poll_timeout_ms
         self.req_handler_map = self.create_req_handler_map()
 
         # Init our current understanding of state / params
@@ -108,9 +106,9 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
 
         # AfspmComponent constructor: no control_client provided, as that
         # logic is handled by the control_server.
-        super().__init__(name, loop_sleep_s, hb_period_s,
-                         self.poll_timeout_ms, subscriber=subscriber,
-                         control_client=None, ctx=ctx)
+        super().__init__(name, subscriber=subscriber, control_client=None,
+                         ctx=ctx, loop_sleep_s=loop_sleep_s,
+                         hb_period_s=hb_period_s)
 
     def create_req_handler_map(self) -> dict[ctrl.ControlRequest, Callable]:
         """Create our req_handler_map, for mapping REQ to methods."""
@@ -204,7 +202,7 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
 
     def _handle_incoming_requests(self):
         """Polls control_server for requests and responds to them."""
-        req, proto = self.control_server.poll(self.poll_timeout_ms)
+        req, proto = self.control_server.poll()
         if req:  # Ensure we received something
             # Refuse most requests while moving/scanning (not free)
             if (self.scan_state != scan.ScanState.SS_FREE and

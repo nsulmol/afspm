@@ -2,6 +2,7 @@
 
 from google.protobuf.internal.enum_type_wrapper import EnumTypeWrapper
 
+import time
 import numpy as np
 
 from ..io.protos.generated import scan_pb2
@@ -13,6 +14,27 @@ from ..io.protos.generated import geometry_pb2
 KILL_SIGNAL = "KILL"
 ALL_ENVELOPE = ""
 ALL_ENVELOPE_LOG = "ALL"
+
+
+# --- Good defaults --- #
+REQUEST_TIMEOUT_MS = 250  # Linked to TCP delay
+POLL_TIMEOUT_MS = 25
+LOOP_SLEEP_S = 0.1  # 100 ms
+HEARTBEAT_PERIOD_S = 5
+BEATS_BEFORE_DEAD = 5
+
+
+# We appear to need a small startup delay, to allow zmq sockets to properly
+# get setup.
+_STARTUP_SLEEP_S = 0.25  # 250 ms
+
+
+def sleep_on_socket_startup():
+    """Sleep a set amount of time on spawning of a zmq socket.
+
+    Not doing this can cause weird race conditions.
+    """
+    time.sleep(_STARTUP_SLEEP_S)
 
 
 # --- Creation Helpers --- #

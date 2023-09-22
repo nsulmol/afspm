@@ -3,7 +3,9 @@
 from typing import Callable
 from collections.abc import Iterable
 import logging
+
 import zmq
+
 from google.protobuf.message import Message
 
 from .. import common
@@ -45,6 +47,8 @@ class Subscriber:
         cache: the cache, where we store results according to update_cache.
         shutdown_was_requested: bool, indicating whether or not a kill signal
             has been received.
+        poll_timeout_ms: the poll timeout, in milliseconds. If None,
+            we do not poll and do a blocking receive instead.
     """
 
     def __init__(self, sub_url: str,
@@ -55,12 +59,15 @@ class Subscriber:
                                         dict[str, Iterable]],
                  ctx: zmq.Context = None,
                  extract_proto_kwargs: dict = None,
-                 update_cache_kwargs: dict = None, **kwargs):
+                 update_cache_kwargs: dict = None,
+                 poll_timeout_ms: int = common.POLL_TIMEOUT_MS,
+                 **kwargs):
         """Initializes the caching logic and subscribes.
 
         Args:
             sub_url: the address of the publisher we will subscribe to, in
                 zmq format.
+
             sub_extract_proto: method which extracts the proto message from a
                 message received from the sub. It must therefore know the
                 topic-to-proto mapping.
@@ -72,6 +79,8 @@ class Subscriber:
                 sub_extract_proto.
             update_cache_kwargs: any additional arguments to be fed to
                 update_cache.
+            poll_timeout_ms: the poll timeout, in milliseconds. If None,
+                we do not poll and do a blocking receive instead.
             kwargs: allows non-used input arguments to be passed (so we can
                 initialize from an unfiltered dict).
         """
@@ -81,6 +90,7 @@ class Subscriber:
         self.update_cache = update_cache
         self.update_cache_kwargs = (update_cache_kwargs if
                                     update_cache_kwargs else {})
+        self.poll_timeout_ms = poll_timeout_ms
 
         if not ctx:
             ctx = zmq.Context.instance()
@@ -97,18 +107,17 @@ class Subscriber:
         self.cache = {}
         self.shutdown_was_requested = False
 
-    def poll_and_store(self, timeout_ms: int = 1000) -> (str, Message):
+        common.sleep_on_socket_startup()
+
+
+    def poll_and_store(self) -> (str, Message):
         """Receive message and store in cache.
 
         We use a poll() first, to ensure there is a message to receive.
-        To do a blocking receive, simply set timeout_ms to None.
+        If self.poll_timeout_ms is None, we do a blocking receive.
 
         Note: recv() *does not* handle KeyboardInterruption exceptions,
         please make sure your calling code does.
-
-        Args:
-            timeout_ms: the poll timeout, in milliseconds. If None,
-                we do not poll and do a blocking receive instead.
 
         Returns:
             - a tuple containing the envelope/cache key of the message and
@@ -116,8 +125,8 @@ class Subscriber:
             - None, if no message received.
         """
         msg = None
-        if timeout_ms:
-            if self.subscriber.poll(timeout_ms, zmq.POLLIN):
+        if self.poll_timeout_ms:
+            if self.subscriber.poll(self.poll_timeout_ms, zmq.POLLIN):
                 msg = self.subscriber.recv_multipart(zmq.NOBLOCK)
         else:
             msg = self.subscriber.recv_multipart()
