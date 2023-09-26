@@ -9,8 +9,11 @@ import zmq
 from google.protobuf.message import Message
 
 from .. import common
+from . import defaults
+
 
 logger = logging.getLogger(__name__)
+
 
 class Subscriber:
     """Encapsulates subscriber node logic.
@@ -52,14 +55,18 @@ class Subscriber:
     """
 
     def __init__(self, sub_url: str,
-                 sub_extract_proto: Callable[[list[bytes]], Message],
-                 topics_to_sub: list[str],
+                 sub_extract_proto: Callable[[list[bytes]], Message] =
+                 defaults.EXTRACT_PROTO,
+                 topics_to_sub: list[str] = [''],
                  update_cache: Callable[[str, Message,
                                          dict[str, Iterable]],
-                                        dict[str, Iterable]],
+                                        dict[str, Iterable]] =
+                 defaults.UPDATE_CACHE,
                  ctx: zmq.Context = None,
-                 extract_proto_kwargs: dict = None,
-                 update_cache_kwargs: dict = None,
+                 extract_proto_kwargs: dict =
+                 defaults.SUBSCRIBER_EXTRACT_PROTO_KWARGS,
+                 update_cache_kwargs: dict =
+                 defaults.SUBSCRIBER_UPDATE_CACHE_KWARGS,
                  poll_timeout_ms: int = common.POLL_TIMEOUT_MS,
                  **kwargs):
         """Initializes the caching logic and subscribes.

@@ -9,6 +9,7 @@ import zmq
 from google.protobuf.message import Message
 
 from .. import common
+from. import defaults
 
 logger = logging.getLogger(__name__)
 
@@ -75,15 +76,21 @@ class PubSubCache:
     """
 
     def __init__(self, url: str, sub_url: str,
-                 sub_extract_proto: Callable[[list[bytes], ...], Message],
-                 pub_get_envelope_for_proto: Callable[[Message, ...], str],
+                 sub_extract_proto: Callable[[list[bytes], ...], Message] =
+                 defaults.EXTRACT_PROTO,
+                 pub_get_envelope_for_proto: Callable[[Message, ...], str] =
+                 defaults.PUBSUBCACHE_GET_ENVELOPE_FOR_PROTO,
                  update_cache: Callable[[str, Message,
                                          dict[str, Iterable], ...],
-                                        dict[str, Iterable]],
+                                        dict[str, Iterable]] =
+                 defaults.UPDATE_CACHE,
                  ctx: zmq.Context = None,
-                 extract_proto_kwargs: dict = None,
-                 get_envelope_kwargs: dict = None,
-                 update_cache_kwargs: dict = None,
+                 extract_proto_kwargs: dict =
+                 defaults.PUBSUBCACHE_EXTRACT_PROTO_KWARGS,
+                 get_envelope_kwargs: dict =
+                 defaults.PUBSUBCACHE_GET_ENVELOPE_KWARGS,
+                 update_cache_kwargs: dict =
+                 defaults.PUBSUBCACHE_UPDATE_CACHE_KWARGS,
                  poll_timeout_ms: int = common.POLL_TIMEOUT_MS,
                  **kwargs):
         """Initializes the caching logic and connects our nodes.

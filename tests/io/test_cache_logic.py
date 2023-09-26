@@ -57,7 +57,7 @@ def pbc_with_roi_logic(proto_5nm, proto_10nm, proto_5nm_hist, proto_10nm_hist):
     def_hist_list = list(cl.DEFAULT_PROTO_WITH_HIST_SEQ)
     def_hist_list.append((proto_5nm, proto_5nm_hist))
     def_hist_list.append((proto_10nm, proto_10nm_hist))
-    return pbc.PBCWithROILogic(def_hist_list)
+    return pbc.PBCScanLogic(def_hist_list)
 
 
 def test_extract_proto(proto_5nm, pbc_logic, pbc_long_history_logic):

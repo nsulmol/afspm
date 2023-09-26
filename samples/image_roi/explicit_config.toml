@@ -27,6 +27,12 @@ scans_per_reset = 4  # 3 + 1
 visualization_style = 'imshow'
 visualization_colormap = 'nipy_spectral'
 
+# --- PubSub Params --- #
+sub_extract_proto = 'afspm.io.cache.cache_logic.extract_proto'
+std_envelope_for_proto = 'afspm.io.cache.cache_logic.CacheLogic.get_envelope_for_proto'
+pbc_envelope_for_proto =  'afspm.io.cache.pbc_logic.PBCScanLogic.get_envelope_for_proto'
+update_cache = 'afspm.io.cache.cache_logic.update_cache'
+
 # --- Cache Aspects --- #
 [full_scan_id]
 class = 'afspm.io.cache.pbc_logic.create_roi_scan_envelope'
@@ -44,6 +50,9 @@ sizes_with_hist_list = [['full_scan_size', 1], ['small_scan_size', 'sscans_per_f
 class = 'afspm.io.cache.pbc_logic.PBCScanLogic'
 proto_with_history_list = 'proto_hist_list'
 
+[cache_kwargs]
+cache_logic = 'afspm.io.cache.pbc_logic.ProtoBasedCacheLogic()'
+
 [roi_cache_kwargs]
 cache_logic = 'pbc_scan_logic'
 
@@ -51,16 +60,24 @@ cache_logic = 'pbc_scan_logic'
 [devcon_pub]
 class = 'afspm.io.pubsub.publisher.Publisher'
 url = 'pub_url'
+get_envelope_for_proto = 'std_envelope_for_proto'
 
 [controller_psc]
 class = 'afspm.io.pubsub.pubsubcache.PubSubCache'
 url = 'psc_url'
 sub_url = 'pub_url'
+sub_extract_proto = 'sub_extract_proto'
+pub_get_envelope_for_proto = 'pbc_envelope_for_proto'
+update_cache = 'update_cache'
+extract_proto_kwargs = 'cache_kwargs'
 update_cache_kwargs = 'roi_cache_kwargs'
 
 [experiment_sub]
 class = 'afspm.io.pubsub.subscriber.Subscriber'
 sub_url = 'psc_url'
+sub_extract_proto = 'sub_extract_proto'
+topics_to_sub = 'topics_experiment'
+update_cache = 'update_cache'
 extract_proto_kwargs = 'roi_cache_kwargs'
 update_cache_kwargs = 'roi_cache_kwargs'
 
@@ -99,7 +116,7 @@ data_units = 'data_units'
 sub_rois_per_dim = 'sub_rois_per_dim'
 sub_scan_res = 'small_scan_res'
 sub_scans_per_full_scan = 'sscans_per_fscan'
-get_envelope_for_proto = 'afspm.io.cache.pbc_logic.PBCScanLogic.get_envelope_for_proto'
+get_envelope_for_proto = 'pbc_envelope_for_proto'
 rerun_wait_s = 5
 
 subscriber = 'experiment_sub'

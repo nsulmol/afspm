@@ -24,9 +24,6 @@ small_scan_res = [512, 512]
 sscans_per_fscan = 3
 scans_per_reset = 4  # 3 + 1
 
-visualization_style = 'imshow'
-visualization_colormap = 'nipy_spectral'
-
 # --- Cache Aspects --- #
 [full_scan_id]
 class = 'afspm.io.cache.pbc_logic.create_roi_scan_envelope'
@@ -100,6 +97,7 @@ sub_rois_per_dim = 'sub_rois_per_dim'
 sub_scan_res = 'small_scan_res'
 sub_scans_per_full_scan = 'sscans_per_fscan'
 get_envelope_for_proto = 'afspm.io.cache.pbc_logic.PBCScanLogic.get_envelope_for_proto'
+
 rerun_wait_s = 5
 
 subscriber = 'experiment_sub'
@@ -123,18 +121,7 @@ control_client = 'ui_client'
 [visualizer]
 component = true
 class = 'reset_scans_visualizer.ResetScansVisualizer'
-
 num_scans_before_reset = 'scans_per_reset'
-list_keys = ['full_scan_id', 'small_scan_id']
-cache_meaning_list = ['temporal', 'regions']
-scan_phys_origin_list = ['full_scan_origin', 'full_scan_origin']
-scan_phys_size_list = ['full_scan_size', 'full_scan_size']
-visualization_style_list = ['visualization_style', 'visualization_style']
-visualization_colormap_list = ['visualization_colormap', 'visualization_colormap']
-
-visualize_undeclared_scans = true
-scan_id = 'Scan2d'
-
 subscriber = 'experiment_sub'
 control_client = 'ui_client'
 
@@ -143,7 +130,6 @@ control_client = 'ui_client'
 [afspm_controller]
 component = true
 class = 'afspm.components.afspm_controller.AfspmController'
-
 pubsubcache = 'controller_psc'
 router = 'controller_router'
 

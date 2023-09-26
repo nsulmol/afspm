@@ -9,6 +9,8 @@ import zmq
 from google.protobuf.message import Message
 
 from .. import common
+from . import defaults
+
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +24,11 @@ class Publisher:
     """
 
     def __init__(self, url: str,
-                 get_envelope_for_proto: Callable[[Message], str],
+                 get_envelope_for_proto: Callable[[Message], str] =
+                 defaults.PUBLISHER_ENVELOPE_FOR_PROTO,
                  ctx: zmq.Context = None,
-                 get_envelope_kwargs: dict = None, **kwargs):
+                 get_envelope_kwargs: dict =
+                 defaults.PUBLISHER_ENVELOPE_KWARGS, **kwargs):
         """ Initializes the publisher.
 
         Args:

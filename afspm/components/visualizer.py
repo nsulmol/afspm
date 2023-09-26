@@ -11,6 +11,7 @@ from google.protobuf.message import Message
 
 from .afspm_component import AfspmComponent
 from ..io.protos.generated import scan_pb2
+from ..io.pubsub.defaults import SCAN_ID
 from ..utils import array_converters as ac
 
 logger = logging.getLogger(__name__)
@@ -87,12 +88,14 @@ class Visualizer(AfspmComponent):
         plt_figures_map: dictionary containing scan_envelope:pyplot_figure
             pairs. Part of matplotlib backend, used for visualization.
     """
-    def __init__(self, list_keys: list[str], cache_meaning_list: list[str],
-                 scan_phys_origin_list: tuple[float, float],
-                 scan_phys_size_list: tuple[float, float],
-                 visualization_style_list: list[str],
-                 visualization_colormap_list: list[str],
-                 visualize_undeclared_scans: bool, scan_id: str, **kwargs):
+    def __init__(self, list_keys: list[str] = [],
+                 cache_meaning_list: list[str] = [],
+                 scan_phys_origin_list: tuple[float, float] = [],
+                 scan_phys_size_list: tuple[float, float] = [],
+                 visualization_style_list: list[str] = [],
+                 visualization_colormap_list: list[str] = [],
+                 visualize_undeclared_scans: bool = True,
+                 scan_id: str = SCAN_ID, **kwargs):
         """ Initializes visualizer.
 
         Primarily, it creats maps for the lists fed in. Note that we use lists
@@ -183,7 +186,8 @@ class Visualizer(AfspmComponent):
     def update_visualization_data(self):
         """For every cache key, updates visualization data."""
         if self.visualize_undeclared_scans:
-            keys = [key for key in self.subscriber.cache if self.scan_id in key]
+            keys = [key for key in self.subscriber.cache if self.scan_id in
+                    key]
         else:
             keys = list(self.cache_meaning_map)
 
@@ -208,7 +212,9 @@ class Visualizer(AfspmComponent):
 
             # Plot
             cmap = self.visualization_colormap_map[key]
-            viz_style = self.visualization_style_map[key].upper()
+            viz_style = self.visualization_style_map[key]
+            if viz_style:
+                viz_style = viz_style.upper()
 
             if viz_style == VisualizationStyle.SURFACE.name:
                 axes = self.plt_figures_map[key].add_subplot(projection='3d')
@@ -286,8 +292,11 @@ class Visualizer(AfspmComponent):
 
     def _add_to_plt_maps(self, key: str):
         self.plt_figures_map[key] = plt.figure()
+        plt.show(block=False)
 
     def _add_to_visualizations(self, key: str):
         """Add a new key to our visualization maps."""
         self.cache_meaning_map[key] = CacheMeaning.TEMPORAL.name
+        self.visualization_colormap_map[key] = None
+        self.visualization_style_map[key] = None
         self._add_to_plt_maps(key)

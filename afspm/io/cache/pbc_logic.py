@@ -55,12 +55,13 @@ class ProtoBasedCacheLogic(CacheLogic):
         cache[envelope].append(proto)
 
 
-class PBCWithROILogic(ProtoBasedCacheLogic):
+class PBCScanLogic(ProtoBasedCacheLogic):
     """Proto-based-cache with special handling for Scan2d.
 
     This expands upon ProtoBasedCacheLogic, to add individual caches (and
     envelopes) for different physical sizes of Scan2d (i.e. a different
-    envelope for each different size).
+    envelope for each different size) and different scan channels (i.e.
+    channels of a scan).
 
     Attributes:
         scan_id: holds string uuid for Scan2d, for help parsing.
@@ -94,9 +95,9 @@ class PBCWithROILogic(ProtoBasedCacheLogic):
                 This allows us to store non-specific Scan2d information
                 easily (such as the cache size).
         """
-        if (type(proto).__name__ == PBCWithROILogic.scan_id and
+        if (type(proto).__name__ == PBCScanLogic.scan_id and
                 not force_parent):
-            return (PBCWithROILogic.scan_id + '_'
+            return (PBCScanLogic.scan_id + '_'
                     + str(proto.params.spatial.roi.size.x))
         return ProtoBasedCacheLogic.get_envelope_for_proto(proto)
 
@@ -142,4 +143,4 @@ def create_roi_scan_envelope(size: tuple[float, float]) -> str:
     """Helper to create envelope for Scan2d of specific size."""
     scan_params = common.create_scan_params_2d(size=[size[0], size[1]])
     scan_2d = common.create_scan_2d(scan_params=scan_params)
-    return PBCWithROILogic.get_envelope_for_proto(scan_2d)
+    return PBCScanLogic.get_envelope_for_proto(scan_2d)
