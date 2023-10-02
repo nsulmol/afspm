@@ -42,7 +42,7 @@ def create_scan_params_2d(top_left: tuple[float, float] = None,
                           size: tuple[float, float] = None,
                           phys_units: str = None,
                           data_shape: tuple[int, int] = None,
-                          data_units: str = None, channel_name: str = None
+                          data_units: str = None,
                           ) -> scan_pb2.ScanParameters2d:
     """Create ScanParameters2d object.
 
@@ -70,12 +70,11 @@ def create_scan_params_2d(top_left: tuple[float, float] = None,
                                               units=phys_units)
     data_aspects = scan_pb2.DataAspects(shape=da_shape, units=data_units)
     return scan_pb2.ScanParameters2d(spatial=spatial_aspects,
-                                     data=data_aspects,
-                                     name=channel_name)
+                                     data=data_aspects)
 
 
 def create_scan_2d(scan_params: scan_pb2.ScanParameters2d = None,
-                   values: list[float] = None):
+                   channel: str = None, values: list[float] = None):
     """Create Scan2d object.
 
     This is a helper, to avoid annoyances with the protobuf data
@@ -83,6 +82,7 @@ def create_scan_2d(scan_params: scan_pb2.ScanParameters2d = None,
 
     Args:
         scan_params: ScanParameters2d instance.
+        channel: name of the channel this data comes from.
         values: list of data points corresponding to the scan. If None, will
             initialize an array with the dimensiosn of the ROI in scan_params.
 
@@ -90,6 +90,7 @@ def create_scan_2d(scan_params: scan_pb2.ScanParameters2d = None,
         Initialized Scan2d instance.
     """
     return scan_pb2.Scan2d(params=scan_params,
+                           channel=channel,
                            values=values)
 
 

@@ -3,6 +3,12 @@
   scans between afspm nodes.
 */
 
+
+// NOTE: Units are used to tell the DeviceController, not to *demand* the
+// format they should be returned in! The AfspmComponent should read the
+// units and convert to their desired format.
+// Pint can be used on either end.
+
 syntax = "proto3";
 
 import "google/protobuf/timestamp.proto";
@@ -28,7 +34,8 @@ message ScanStateMsg {
 
 /* Holds data shape and units. */
 message DataAspects {
-  optional Size2u shape = 1;
+  optional Size2u shape = 1;  // If/when we support spectroscopy, change to 3d
+  // Note: unimportant when *setting*, useful for *interpreting*.
   optional string units = 2;
 }
 
@@ -43,7 +50,6 @@ message SpatialAspects {
 message ScanParameters2d {
   optional SpatialAspects spatial = 1;
   optional DataAspects data = 2;
-  optional string name = 3; // Channel to save
 }
 
 /* Scan contains the parameters, data array from an individual scan, and
@@ -51,6 +57,7 @@ message ScanParameters2d {
 message Scan2d {
   optional ScanParameters2d params = 1;
   optional google.protobuf.Timestamp timestamp = 2;
+  optional string channel = 3; // Channel to save
 
-  repeated double values = 3; // Expect [y][x]
+  repeated double values = 4; // Expect [y][x]
 }

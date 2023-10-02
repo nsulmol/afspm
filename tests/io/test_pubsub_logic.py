@@ -121,7 +121,7 @@ def sub_control_state_psc(ctx, psc_url, topics_control_state, cache_kwargs,
 @pytest.fixture
 def sample_scan():
     scan = scan_pb2.Scan2d()
-    scan.params.name = 'john doe'
+    scan.channel = 'john doe'
     return scan
 
 

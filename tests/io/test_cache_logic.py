@@ -17,14 +17,14 @@ def cache():
 @pytest.fixture
 def proto_5nm():
     proto = scan_pb2.Scan2d()
-    proto.params.name = 'banana'
+    proto.channel = 'banana'
     proto.params.spatial.roi.size.x = 5
     return proto
 
 @pytest.fixture
 def proto_10nm():
     proto = scan_pb2.Scan2d()
-    proto.params.name = 'hammock'
+    proto.channel = 'hammock'
     proto.params.spatial.roi.size.x = 10
     return proto
 
@@ -88,31 +88,31 @@ def test_update_cache_longer_history(cache, proto_5nm, pbc_long_history_logic):
     assert proto_5nm in cache[envelope]
 
     # Test up to/before popping
-    names = ['a', 'b', 'c', 'd']
-    expected_cache_names = deque([proto_5nm.params.name],
+    channels = ['a', 'b', 'c', 'd']
+    expected_cache_channels = deque([proto_5nm.channel],
                                  maxlen=max_len)
-    for name in names:
+    for channel in channels:
         proto = copy.deepcopy(proto_5nm)
-        proto.params.name = name
-        expected_cache_names.append(name)
+        proto.channel = channel
+        expected_cache_channels.append(channel)
         logic.update_cache(proto, cache)
 
-        cache_names = [x.params.name for x in cache[envelope]]
-        for cn in expected_cache_names:
-            assert cn in cache_names
+        cache_channels = [x.channel for x in cache[envelope]]
+        for cn in expected_cache_channels:
+            assert cn in cache_channels
 
     # Test that popping works!
-    names = ['1', '2', '3', '4', '5']
-    expected_cache_names = []
-    for name in names:
+    channels = ['1', '2', '3', '4', '5']
+    expected_cache_channels = []
+    for channel in channels:
         proto = copy.deepcopy(proto_5nm)
-        proto.params.name = name
-        expected_cache_names.append(name)
+        proto.channel = channel
+        expected_cache_channels.append(channel)
         logic.update_cache(proto, cache)
 
-        cache_names = [x.params.name for x in cache[envelope]]
-        for cn in expected_cache_names:
-            assert cn in cache_names
+        cache_channels = [x.channel for x in cache[envelope]]
+        for cn in expected_cache_channels:
+            assert cn in cache_channels
 
 
 def test_pbc_with_roi_logic(cache, proto_5nm, proto_10nm,
@@ -138,7 +138,7 @@ def test_pbc_with_roi_logic(cache, proto_5nm, proto_10nm,
         expected_hist = []
         for cnt in range(0, hist):
             tmp = copy.deepcopy(proto)
-            tmp.params.name += str(cnt)
+            tmp.channel += str(cnt)
 
             logic.update_cache(tmp, cache)
             expected_hist.append(tmp)
@@ -148,7 +148,7 @@ def test_pbc_with_roi_logic(cache, proto_5nm, proto_10nm,
             assert cache_val == expected_hist[idx]
 
         tmp = copy.deepcopy(proto)
-        tmp.params.name = 'last_guy'
+        tmp.channel = 'last_guy'
         logic.update_cache(tmp, cache)
         # Append to end and remove first item (simulating deque)
         expected_hist = expected_hist[1:]

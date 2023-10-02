@@ -42,6 +42,7 @@ def convert_scan_pb2_to_xarray(scan: scan_pb2.Scan2d) -> xr.DataArray:
                       attrs={'units': scan.params.data.units})
     da.x.attrs['units'] = scan.params.spatial.units
     da.y.attrs['units'] = scan.params.spatial.units
+    da.name = scan.channel
     return da
 
 
@@ -74,9 +75,9 @@ def convert_xarray_to_scan_pb2(da: xr.DataArray) -> scan_pb2.Scan2d:
                                               units=da[da.dims[0]].units)
     data_aspects = scan_pb2.DataAspects(shape=da_shape, units=da.units)
     scan_params = scan_pb2.ScanParameters2d(spatial=spatial_aspects,
-                                            data=data_aspects,
-                                            name=da.name)
+                                            data=data_aspects)
     scan = scan_pb2.Scan2d(params=scan_params,
+                           channel=da.name,
                            values=da.values.ravel().tolist())
     return scan
 
@@ -117,6 +118,7 @@ def convert_scan_pb2_to_sidpy(scan: scan_pb2.Scan2d) -> Dataset:
         dim.quantity = 'distance'
         dim.units = scan.params.spatial.units
 
+    dset._name = scan.channel
     return dset
 
 
@@ -149,9 +151,9 @@ def convert_sidpy_to_scan_pb2(ds: Dataset) -> scan_pb2.Scan2d:
                                               units=ds.x.units)
     data_aspects = scan_pb2.DataAspects(shape=da_shape, units=ds.units)
     scan_params = scan_pb2.ScanParameters2d(spatial=spatial_aspects,
-                                            data=data_aspects,
-                                            name=ds.name)
+                                            data=data_aspects)
 
     scan = scan_pb2.Scan2d(params=scan_params,
+                           channel=ds.name,
                            values=ds.compute().ravel().tolist())
     return scan
