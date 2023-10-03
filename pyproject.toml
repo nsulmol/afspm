@@ -16,6 +16,7 @@ fire = "^0.5.0"
 pysimplegui = "^4.60.5"
 imageio = "^2.31.2"
 tomli = "^2.0.1"
+pint = "^0.22"
 
 [tool.poetry.group.dev.dependencies]
 debugpy = "^1.6.7"
