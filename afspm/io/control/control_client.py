@@ -7,8 +7,8 @@ import zmq
 from . import commands as cmd
 from .. import common
 
-from ..protos.generated import control_pb2 as ctrl
-from ..protos.generated import scan_pb2 as scan
+from ..protos.generated import control_pb2
+from ..protos.generated import scan_pb2
 
 
 logger = logging.getLogger(__name__)
@@ -97,7 +97,7 @@ class ControlClient:
         self.client.close()
 
     def _try_send_req(self, msg: list[list[bytes]]
-                      ) -> ctrl.ControlResponse:
+                      ) -> control_pb2.ControlResponse:
         """Send provided message to server over client socket.
 
         Args:
@@ -115,7 +115,7 @@ class ControlClient:
                 # Response is expected to be int
                 rep = cmd.parse_response(self.client.recv())
                 logger.debug("Received reply: %s",
-                             common.get_enum_str(ctrl.ControlResponse, rep))
+                             common.get_enum_str(control_pb2.ControlResponse, rep))
                 return rep
             retries_left -= 1
             logger.debug("No response from server")
@@ -125,34 +125,34 @@ class ControlClient:
             if retries_left == 0:
                 logger.error("Server seems to be offline, cannot send" +
                              " message.")
-                return ctrl.ControlResponse.REP_NO_RESPONSE
+                return control_pb2.ControlResponse.REP_NO_RESPONSE
 
             logger.debug("Reconnecting to server")
             self._init_client()
             self.client.send_multipart(msg)
 
-    def start_scan(self) -> ctrl.ControlResponse:
+    def start_scan(self) -> control_pb2.ControlResponse:
         """Request start a scan.
 
         Returns:
             The received RequestResponse.
         """
         logger.debug("Sending start_scan request.")
-        msg = cmd.serialize_req_obj(ctrl.ControlRequest.REQ_START_SCAN)
+        msg = cmd.serialize_req_obj(control_pb2.ControlRequest.REQ_START_SCAN)
         return self._try_send_req(msg)
 
-    def stop_scan(self) -> ctrl.ControlResponse:
+    def stop_scan(self) -> control_pb2.ControlResponse:
         """Request stop a scan.
 
         Returns:
             The received RequestResponse.
         """
         logger.debug("Sending stop_scan request.")
-        msg = cmd.serialize_req_obj(ctrl.ControlRequest.REQ_STOP_SCAN)
+        msg = cmd.serialize_req_obj(control_pb2.ControlRequest.REQ_STOP_SCAN)
         return self._try_send_req(msg)
 
-    def set_scan_params(self, scan_params: scan.ScanParameters2d
-                        ) -> ctrl.ControlResponse:
+    def set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
+                        ) -> control_pb2.ControlResponse:
         """Try to set scan parameters for the SPM device.
 
         Args:
@@ -162,12 +162,12 @@ class ControlClient:
             The received RequestResponse.
         """
         logger.debug("Sending set_scan_params with: %s", scan_params)
-        msg = cmd.serialize_req_obj(ctrl.ControlRequest.REQ_SET_SCAN_PARAMS,
+        msg = cmd.serialize_req_obj(control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS,
                                     scan_params)
         return self._try_send_req(msg)
 
-    def request_control(self, control_mode: ctrl.ControlMode
-                        ) -> ctrl.ControlResponse:
+    def request_control(self, control_mode: control_pb2.ControlMode
+                        ) -> control_pb2.ControlResponse:
         """Try to request control of the SPM device.
 
         To do so, we must indicate what ControlMode this client 'functions'
@@ -184,23 +184,23 @@ class ControlClient:
                 request.
         """
         logger.debug("Sending request_ctrl with mode: %s",
-                     common.get_enum_str(ctrl.ControlMode, control_mode))
-        msg = cmd.serialize_req_obj(ctrl.ControlRequest.REQ_REQUEST_CTRL,
+                     common.get_enum_str(control_pb2.ControlMode, control_mode))
+        msg = cmd.serialize_req_obj(control_pb2.ControlRequest.REQ_REQUEST_CTRL,
                                     control_mode)
         return self._try_send_req(msg)
 
-    def release_control(self) -> ctrl.ControlResponse:
+    def release_control(self) -> control_pb2.ControlResponse:
         """Request to release control from client.
 
         Returns:
             Response received from server.
         """
         logger.debug("Sending release_ctrl.")
-        msg = cmd.serialize_req_obj(ctrl.ControlRequest.REQ_RELEASE_CTRL)
+        msg = cmd.serialize_req_obj(control_pb2.ControlRequest.REQ_RELEASE_CTRL)
         return self._try_send_req(msg)
 
-    def add_experiment_problem(self, problem: ctrl.ExperimentProblem,
-                               ) -> ctrl.ControlResponse:
+    def add_experiment_problem(self, problem: control_pb2.ExperimentProblem,
+                               ) -> control_pb2.ControlResponse:
         """Try to add an experiment problem to the SPM device.
 
         Args:
@@ -210,13 +210,13 @@ class ControlClient:
             Response received from server.
         """
         logger.debug("Sending add_exp_prblm with problem: %s",
-                     common.get_enum_str(ctrl.ExperimentProblem, problem))
+                     common.get_enum_str(control_pb2.ExperimentProblem, problem))
         msg = cmd.serialize_req_obj(
-            ctrl.ControlRequest.REQ_ADD_EXP_PRBLM, problem)
+            control_pb2.ControlRequest.REQ_ADD_EXP_PRBLM, problem)
         return self._try_send_req(msg)
 
-    def remove_experiment_problem(self, problem: ctrl.ExperimentProblem,
-                                  ) -> ctrl.ControlResponse:
+    def remove_experiment_problem(self, problem: control_pb2.ExperimentProblem,
+                                  ) -> control_pb2.ControlResponse:
         """Try to remove an experiment problem to the SPM device.
 
         Args:
@@ -226,8 +226,8 @@ class ControlClient:
             Response received from server.
         """
         logger.debug("Sending rmv_exp_prblm with problem: %s",
-                     common.get_enum_str(ctrl.ExperimentProblem, problem))
-        msg = cmd.serialize_req_obj(ctrl.ControlRequest.REQ_RMV_EXP_PRBLM,
+                     common.get_enum_str(control_pb2.ExperimentProblem, problem))
+        msg = cmd.serialize_req_obj(control_pb2.ControlRequest.REQ_RMV_EXP_PRBLM,
                                     problem)
         return self._try_send_req(msg)
 
@@ -244,7 +244,7 @@ class AdminControlClient(ControlClient):
     same control protocol for ease/development convenience. Put another way:
     we are allowing the user of this tool to break this tool; be caferul!
     """
-    def set_control_mode(self, mode: ctrl.ControlMode) -> ctrl.ControlResponse:
+    def set_control_mode(self, mode: control_pb2.ControlMode) -> control_pb2.ControlResponse:
         """Try to change the current control mode of the afspm system.
 
         Args:
@@ -254,17 +254,17 @@ class AdminControlClient(ControlClient):
             Response received from the server.
         """
         logger.debug("Sending set_control_mode with mode: %s",
-                     common.get_enum_str(ctrl.ControlMode, mode))
-        msg = cmd.serialize_req_obj(ctrl.ControlRequest.REQ_SET_CONTROL_MODE,
+                     common.get_enum_str(control_pb2.ControlMode, mode))
+        msg = cmd.serialize_req_obj(control_pb2.ControlRequest.REQ_SET_CONTROL_MODE,
                                     mode)
         return self._try_send_req(msg)
 
-    def end_experiment(self) -> ctrl.ControlResponse:
+    def end_experiment(self) -> control_pb2.ControlResponse:
         """Indicate the experiment should end.
 
         The AFSPM Controller should receive this request and notify all
         connected components to close.
         """
         logger.debug("Sending end_experiment.")
-        msg = cmd.serialize_req_obj(ctrl.ControlRequest.REQ_END_EXPERIMENT)
+        msg = cmd.serialize_req_obj(control_pb2.ControlRequest.REQ_END_EXPERIMENT)
         return self._try_send_req(msg)

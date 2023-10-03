@@ -138,7 +138,7 @@ def test_pbc_with_roi_logic(cache, proto_5nm, proto_10nm,
         expected_hist = []
         for cnt in range(0, hist):
             tmp = copy.deepcopy(proto)
-            tmp.channel += str(cnt)
+            tmp.values.append(cnt)
 
             logic.update_cache(tmp, cache)
             expected_hist.append(tmp)
@@ -148,7 +148,8 @@ def test_pbc_with_roi_logic(cache, proto_5nm, proto_10nm,
             assert cache_val == expected_hist[idx]
 
         tmp = copy.deepcopy(proto)
-        tmp.channel = 'last_guy'
+        tmp.values.append(200) # Just differentiate from the end
+
         logic.update_cache(tmp, cache)
         # Append to end and remove first item (simulating deque)
         expected_hist = expected_hist[1:]

@@ -7,7 +7,7 @@ from google.protobuf.message import Message
 
 from . import commands as cmd
 from .. import common
-from ..protos.generated import control_pb2 as ctrl
+from ..protos.generated import control_pb2
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class ControlServer:
 
         common.sleep_on_socket_startup()
 
-    def poll(self) -> (ctrl.ControlRequest, Message):
+    def poll(self) -> (control_pb2.ControlRequest, Message):
         """Poll for message and return if received.
 
         We use a poll() first, to ensure there is a message to receive.
@@ -64,19 +64,19 @@ class ControlServer:
         if msg:
             req, obj = cmd.parse_request(msg)
             logger.debug("Message received: %s, %s",
-                         common.get_enum_str(ctrl.ControlRequest, req), obj)
+                         common.get_enum_str(control_pb2.ControlRequest, req), obj)
             return (req, obj)
         return (None, None)
 
-    def reply(self, rep: ctrl.ControlResponse):
+    def reply(self, rep: control_pb2.ControlResponse):
         """Send the reply to a request received.
 
         This method is expected to be called right after receiving a req.
 
         Args:
-            rep: ctrl.ControlResponse we wish to send as response to the prior
+            rep: control_pb2.ControlResponse we wish to send as response to the prior
                 req received.
         """
         logger.debug("Sending reply: %s",
-                     common.get_enum_str(ctrl.ControlResponse, rep))
+                     common.get_enum_str(control_pb2.ControlResponse, rep))
         self.server.send(cmd.serialize_response(rep))

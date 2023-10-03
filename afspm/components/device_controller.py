@@ -18,8 +18,8 @@ from ..io.pubsub import subscriber as sub
 from ..io.control import commands as cmd
 from ..io.control import control_server as ctrl_srvr
 
-from ..io.protos.generated import scan_pb2 as scan
-from ..io.protos.generated import control_pb2 as ctrl
+from ..io.protos.generated import scan_pb2
+from ..io.protos.generated import control_pb2
 
 
 logger = logging.getLogger(__name__)
@@ -66,7 +66,7 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
     TIMESTAMP_ATTRIB_NAME = 'timestamp'
 
     # Indicates commands we will allow to be sent while not free
-    ALLOWED_COMMANDS_WHILE_NOT_FREE = [ctrl.ControlRequest.REQ_STOP_SCAN]
+    ALLOWED_COMMANDS_WHILE_NOT_FREE = [control_pb2.ControlRequest.REQ_STOP_SCAN]
 
     # Note: REQ_HANDLER_MAP defined at end, due to dependency on methods
     # defined below.
@@ -100,9 +100,9 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
         self.req_handler_map = self.create_req_handler_map()
 
         # Init our current understanding of state / params
-        self.scan_state = scan.ScanState.SS_UNDEFINED
-        self.scan_params = scan.ScanParameters2d()
-        self.scan = scan.Scan2d()
+        self.scan_state = scan_pb2.ScanState.SS_UNDEFINED
+        self.scan_params = scan_pb2.ScanParameters2d()
+        self.scans = []
 
         # AfspmComponent constructor: no control_client provided, as that
         # logic is handled by the control_server.
@@ -110,41 +110,41 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
                          ctx=ctx, loop_sleep_s=loop_sleep_s,
                          hb_period_s=hb_period_s)
 
-    def create_req_handler_map(self) -> dict[ctrl.ControlRequest, Callable]:
+    def create_req_handler_map(self) -> dict[control_pb2.ControlRequest, Callable]:
         """Create our req_handler_map, for mapping REQ to methods."""
         return MappingProxyType({
-            ctrl.ControlRequest.REQ_START_SCAN: self.on_start_scan,
-            ctrl.ControlRequest.REQ_STOP_SCAN:  self.on_stop_scan,
-            ctrl.ControlRequest.REQ_SET_SCAN_PARAMS: self.on_set_scan_params})
+            control_pb2.ControlRequest.REQ_START_SCAN: self.on_start_scan,
+            control_pb2.ControlRequest.REQ_STOP_SCAN:  self.on_stop_scan,
+            control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS: self.on_set_scan_params})
 
 
     @abstractmethod
-    def on_start_scan(self) -> ctrl.ControlResponse:
+    def on_start_scan(self) -> control_pb2.ControlResponse:
         """Handle a request to start a scan."""
 
     @abstractmethod
-    def on_stop_scan(self) -> ctrl.ControlResponse:
+    def on_stop_scan(self) -> control_pb2.ControlResponse:
         """Handle a request to stop a scan."""
 
     @abstractmethod
-    def on_set_scan_params(self, scan_params: scan.ScanParameters2d
-                           ) -> ctrl.ControlResponse:
+    def on_set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
+                           ) -> control_pb2.ControlResponse:
         """Handle a request to change the scan parameters."""
 
     @abstractmethod
-    def poll_scan_state(self) -> scan.ScanState:
+    def poll_scan_state(self) -> scan_pb2.ScanState:
         """Poll the controller for the current scan state."""
 
     @abstractmethod
-    def poll_scan_params(self) -> scan.ScanParameters2d:
+    def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
         """Poll the controller for the current scan parameters."""
 
     @abstractmethod
-    def poll_scan(self) -> scan.Scan2d:
-        """Obtain latest performed scan.
+    def poll_scans(self) -> list[scan_pb2.Scan2d]:
+        """Obtain latest performed scans.
 
-        We will compare the prior scan to the latest to determine if
-        the scan succeeded (i.e. it is different).
+        We will compare the prior scans (or first of each) to the latest to
+        determine if the scan succeeded (i.e. they are different).
 
         Note that we will first consider the timestamp attribute when
         comparing scans. If this attribute is not passed, we will do
@@ -167,24 +167,34 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
         old_scan_state = copy.deepcopy(self.scan_state)
         self.scan_state = self.poll_scan_state()
 
-        if (old_scan_state == scan.ScanState.SS_SCANNING and
-                self.scan_state != scan.ScanState.SS_SCANNING):
-            old_scan = copy.deepcopy(self.scan)
-            self.scan = self.poll_scan()
+        if (old_scan_state == scan_pb2.ScanState.SS_SCANNING and
+                self.scan_state != scan_pb2.ScanState.SS_SCANNING):
+            old_scans = copy.deepcopy(self.scans)
+            self.scans = self.poll_scans()
 
             # If scans are different, assume now and send out!
             # Test timestamps if they exist. Otherwise, compare
             # data arrays.
             send_scan = False
-            if self.scan.HasField(self.TIMESTAMP_ATTRIB_NAME):
-                if old_scan.timestamp != self.scan.timestamp:
-                    send_scan = True
-            elif old_scan.values != self.scan.values:
+
+            both_have_scans = len(self.scans) > 0 and len(old_scans) > 0
+            only_new_has_scans = len(self.scans) > 0 and len(old_scans) == 0
+            timestamps_different = (
+                both_have_scans and
+                self.scans[0].HasField(self.TIMESTAMP_ATTRIB_NAME) and
+                old_scans[0].HasField(self.TIMESTAMP_ATTRIB_NAME) and
+                self.scans[0].timestamp != old_scans[0].timestamp)
+            values_different = (both_have_scans and
+                                self.scans[0].values != old_scans[0].values)
+
+            if (only_new_has_scans or (timestamps_different or
+                                       values_different)):
                 send_scan = True
 
             if send_scan:
-                logger.info("New scan, sending out.")
-                self.publisher.send_msg(self.scan)
+                logger.info("New scans, sending out.")
+                for scan in self.scans:
+                    self.publisher.send_msg(scan)
 
         old_scan_params = copy.deepcopy(self.scan_params)
         self.scan_params = self.poll_scan_params()
@@ -195,9 +205,9 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
         # Scan state changes sent *last*!
         if old_scan_state != self.scan_state:
             logger.info("New scan state %s, sending out.",
-                        common.get_enum_str(scan.ScanState,
+                        common.get_enum_str(scan_pb2.ScanState,
                                             self.scan_state))
-            scan_state_msg = scan.ScanStateMsg(scan_state=self.scan_state)
+            scan_state_msg = scan_pb2.ScanStateMsg(scan_state=self.scan_state)
             self.publisher.send_msg(scan_state_msg)
 
     def _handle_incoming_requests(self):
@@ -205,10 +215,10 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
         req, proto = self.control_server.poll()
         if req:  # Ensure we received something
             # Refuse most requests while moving/scanning (not free)
-            if (self.scan_state != scan.ScanState.SS_FREE and
+            if (self.scan_state != scan_pb2.ScanState.SS_FREE and
                     req not in self.ALLOWED_COMMANDS_WHILE_NOT_FREE):
                 self.control_server.reply(
-                    ctrl.ControlResponse.REP_NOT_FREE)
+                    control_pb2.ControlResponse.REP_NOT_FREE)
             else:
                 handler = self.req_handler_map[req]
                 rep = handler(proto) if proto else handler()
@@ -216,12 +226,12 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
                 # Special case! If scan was cancelled and succeeded, we
                 # send out an SS_INTERRUPTED state, to allow detecting
                 # interruptions.
-                if (req == ctrl.ControlRequest.REQ_STOP_SCAN and
-                        rep == ctrl.ControlResponse.REP_SUCCESS):
-                    scan_state_msg = scan.ScanStateMsg(
-                        scan_state=scan.ScanState.SS_INTERRUPTED)
+                if (req == control_pb2.ControlRequest.REQ_STOP_SCAN and
+                        rep == control_pb2.ControlResponse.REP_SUCCESS):
+                    scan_state_msg = scan_pb2.ScanStateMsg(
+                        scan_state=scan_pb2.ScanState.SS_INTERRUPTED)
                     logger.info("Scan interrupted, sending out %s.",
-                                common.get_enum_str(scan.ScanState,
+                                common.get_enum_str(scan_pb2.ScanState,
                                                     scan_state_msg.scan_state))
                     self.publisher.send_msg(scan_state_msg)
 

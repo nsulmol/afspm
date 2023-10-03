@@ -29,7 +29,7 @@ class SampleDeviceController(DeviceController):
         self.start_ts = None
         self.dev_scan_state = scan_pb2.ScanState.SS_FREE
         self.dev_scan_params = scan_pb2.ScanParameters2d()
-        self.dev_scan = scan_pb2.Scan2d()
+        self.dev_scan = None
 
         self.scan_time_s = scan_time_s
         self.move_time_s = move_time_s
@@ -59,8 +59,8 @@ class SampleDeviceController(DeviceController):
     def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
         return self.dev_scan_params
 
-    def poll_scan(self) -> scan_pb2.Scan2d:
-        return self.dev_scan
+    def poll_scans(self) -> list[scan_pb2.Scan2d]:
+        return [self.dev_scan] if self.dev_scan else []
 
     def run_per_loop(self):
         if self.start_ts:
@@ -75,10 +75,14 @@ class SampleDeviceController(DeviceController):
             if duration:
                 curr_ts = time.time()
                 if curr_ts - self.start_ts > duration:
+                    logger.debug("Enough time has passed, changing state "
+                                 "from %s to free.",
+                                 common.get_enum_str(scan_pb2.ScanState,
+                                                     self.dev_scan_state))
                     self.start_ts = None
                     self.dev_scan_state = scan_pb2.ScanState.SS_FREE
                     if update_scan:
-
+                        self.dev_scan = scan_pb2.Scan2d()
                         self.dev_scan.timestamp.GetCurrentTime()
         super().run_per_loop()
 

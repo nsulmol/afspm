@@ -9,8 +9,8 @@ from google.protobuf.message import Message
 from . import commands as cmd
 from .. import common
 
-from ..protos.generated import control_pb2 as ctrl
-from ..protos.generated import scan_pb2 as scan
+from ..protos.generated import control_pb2
+from ..protos.generated import scan_pb2
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +89,7 @@ class ControlRouter:
 
         self.problems_set = set()
 
-        self.control_mode = ctrl.ControlMode.CM_AUTOMATED
+        self.control_mode = control_pb2.ControlMode.CM_AUTOMATED
         self.client_in_control_id = None
 
         self.poll_timeout_ms = poll_timeout_ms
@@ -113,8 +113,8 @@ class ControlRouter:
         self.backend.close()
 
     def _handle_control_request(self, client: str,
-                                control_mode: ctrl.ControlMode,
-                                ) -> ctrl.ControlResponse:
+                                control_mode: control_pb2.ControlMode,
+                                ) -> control_pb2.ControlResponse:
         """Set client in control if possible.
 
         The client will only be placed under control if:
@@ -136,20 +136,20 @@ class ControlRouter:
         if self.client_in_control_id:
             logger.debug("%s requested control, but already under control",
                          client)
-            return ctrl.ControlResponse.REP_ALREADY_UNDER_CONTROL
+            return control_pb2.ControlResponse.REP_ALREADY_UNDER_CONTROL
 
         if self.control_mode == control_mode:
             logger.info("%s gaining control", client)
             self.client_in_control_id = client
-            return ctrl.ControlResponse.REP_SUCCESS
+            return control_pb2.ControlResponse.REP_SUCCESS
 
         logger.debug("%s requested control, but sent control mode %s, when" +
                      "under %s", client,
-                     common.get_enum_str(ctrl.ControlMode, control_mode),
-                     common.get_enum_str(ctrl.ControlMode, self.control_mode))
-        return ctrl.ControlResponse.REP_WRONG_CONTROL_MODE
+                     common.get_enum_str(control_pb2.ControlMode, control_mode),
+                     common.get_enum_str(control_pb2.ControlMode, self.control_mode))
+        return control_pb2.ControlResponse.REP_WRONG_CONTROL_MODE
 
-    def _handle_control_release(self, client: str) -> ctrl.ControlResponse:
+    def _handle_control_release(self, client: str) -> control_pb2.ControlResponse:
         """Release client control if applicable.
 
         Control can only be released by the client who currently has control.
@@ -165,14 +165,14 @@ class ControlRouter:
         if self.client_in_control_id and self.client_in_control_id == client:
             logger.info("Releasing control from %s", client)
             self.client_in_control_id = None
-            return ctrl.ControlResponse.REP_SUCCESS
+            return control_pb2.ControlResponse.REP_SUCCESS
 
         logger.debug("%s tried to release control, but in control.", client)
-        return ctrl.ControlResponse.REP_FAILURE
+        return control_pb2.ControlResponse.REP_FAILURE
 
     def _handle_experiment_problem(self, add_problem: bool,
-                                   exp_problem: ctrl.ExperimentProblem
-                                   ) -> ctrl.ControlResponse:
+                                   exp_problem: control_pb2.ExperimentProblem
+                                   ) -> control_pb2.ControlResponse:
         """Add or remove ExperimentProblems.
 
         Args:
@@ -185,29 +185,29 @@ class ControlRouter:
         old_problems_set = copy.deepcopy(self.problems_set)
         if add_problem:
             logger.debug("Adding problem %s",
-                         common.get_enum_str(ctrl.ExperimentProblem,
+                         common.get_enum_str(control_pb2.ExperimentProblem,
                                              exp_problem))
             self.problems_set.add(exp_problem)
         else:
             logger.debug("Removing problem %s",
-                         common.get_enum_str(ctrl.ExperimentProblem,
+                         common.get_enum_str(control_pb2.ExperimentProblem,
                                              exp_problem))
             self.problems_set.remove(exp_problem)
 
         if not old_problems_set and self.problems_set:
             logger.info("Entering problem mode")
-            self.control_mode = ctrl.ControlMode.CM_PROBLEM
+            self.control_mode = control_pb2.ControlMode.CM_PROBLEM
             self.client_in_control_id = None
         elif old_problems_set and not self.problems_set:
             logger.info("Exiting problem mode, switching to automated.")
-            self.control_mode = ctrl.ControlMode.CM_AUTOMATED
+            self.control_mode = control_pb2.ControlMode.CM_AUTOMATED
             self.client_in_control_id = None
 
         # Return success always for now...
-        return ctrl.ControlResponse.REP_SUCCESS
+        return control_pb2.ControlResponse.REP_SUCCESS
 
-    def _handle_send_req(self, req: ctrl.ControlRequest,
-                         proto: Message) -> ctrl.ControlResponse:
+    def _handle_send_req(self, req: control_pb2.ControlRequest,
+                         proto: Message) -> control_pb2.ControlResponse:
         """Try to send a request to the ControlServer.
 
         For a request received from the client under control, try to forward
@@ -224,7 +224,7 @@ class ControlRouter:
             ControlResponse received from the ControlServer.
         """
         logger.debug("Handling send request: %s, %s",
-                     common.get_enum_str(ctrl.ControlRequest, req), proto)
+                     common.get_enum_str(control_pb2.ControlRequest, req), proto)
         msg = cmd.serialize_req_obj(req, proto)  # No need for empty envelope
         self.backend.send_multipart(msg)
 
@@ -236,10 +236,10 @@ class ControlRouter:
         self._close_backend()
         self._init_backend()
 
-        return ctrl.ControlResponse.REP_NO_RESPONSE
+        return control_pb2.ControlResponse.REP_NO_RESPONSE
 
-    def _handle_set_control_mode(self, control_mode: ctrl.ControlMode
-                                 ) -> ctrl.ControlResponse:
+    def _handle_set_control_mode(self, control_mode: control_pb2.ControlMode
+                                 ) -> control_pb2.ControlResponse:
         """Change the control mode.
 
         Args:
@@ -251,9 +251,9 @@ class ControlRouter:
         logger.info("Control mode changed to %s", control_mode)
         self.control_mode = control_mode
         self.client_in_control_id = None
-        return ctrl.ControlResponse.REP_SUCCESS
+        return control_pb2.ControlResponse.REP_SUCCESS
 
-    def _handle_end_experiment(self) -> ctrl.ControlResponse:
+    def _handle_end_experiment(self) -> control_pb2.ControlResponse:
         """Ends the experiment.
 
         This call will update internal logic indicating a shutdown was
@@ -262,10 +262,10 @@ class ControlRouter:
         """
         logger.info("End of experiment requested.")
         self.shutdown_was_requested = True
-        return ctrl.ControlResponse.REP_SUCCESS
+        return control_pb2.ControlResponse.REP_SUCCESS
 
-    def _on_request(self, client: str, req: ctrl.ControlRequest,
-                    obj: Message | int) -> ctrl.ControlResponse:
+    def _on_request(self, client: str, req: control_pb2.ControlRequest,
+                    obj: Message | int) -> control_pb2.ControlResponse:
         """Handle a request received by a ControlClient.
 
         Args:
@@ -276,22 +276,22 @@ class ControlRouter:
         Returns:
             ControlResponse to the request.
         """
-        if req == ctrl.ControlRequest.REQ_REQUEST_CTRL:
+        if req == control_pb2.ControlRequest.REQ_REQUEST_CTRL:
             return self._handle_control_request(client, obj)
-        if req == ctrl.ControlRequest.REQ_RELEASE_CTRL:
+        if req == control_pb2.ControlRequest.REQ_RELEASE_CTRL:
             return self._handle_control_release(client)
-        if req in [ctrl.ControlRequest.REQ_ADD_EXP_PRBLM,
-                   ctrl.ControlRequest.REQ_RMV_EXP_PRBLM]:
+        if req in [control_pb2.ControlRequest.REQ_ADD_EXP_PRBLM,
+                   control_pb2.ControlRequest.REQ_RMV_EXP_PRBLM]:
             return self._handle_experiment_problem(
-                req == ctrl.ControlRequest.REQ_ADD_EXP_PRBLM, obj)
-        if req == ctrl.ControlRequest.REQ_SET_CONTROL_MODE:
+                req == control_pb2.ControlRequest.REQ_ADD_EXP_PRBLM, obj)
+        if req == control_pb2.ControlRequest.REQ_SET_CONTROL_MODE:
             return self._handle_set_control_mode(obj)
-        if req == ctrl.ControlRequest.REQ_END_EXPERIMENT:
+        if req == control_pb2.ControlRequest.REQ_END_EXPERIMENT:
             return self._handle_end_experiment()
         if (self.client_in_control_id
                 and client == self.client_in_control_id):
             return self._handle_send_req(req, obj)
-        return ctrl.ControlResponse.REP_NOT_IN_CONTROL
+        return control_pb2.ControlResponse.REP_NOT_IN_CONTROL
 
     def poll_and_handle(self):
         """Poll for ControlClient requests and handle.
@@ -308,17 +308,17 @@ class ControlRouter:
             client_id = self._parse_client_id(client)
             req, obj = cmd.parse_request(msg[2:])  # client, __, ...
             logger.debug("Message received from client %s: %s, %s", client_id,
-                         common.get_enum_str(ctrl.ControlRequest, req), obj)
+                         common.get_enum_str(control_pb2.ControlRequest, req), obj)
 
             rep = self._on_request(client_id, req, obj)
             logger.debug("Sending reply to %s: %s", client_id,
-                         common.get_enum_str(ctrl.ControlResponse, rep))
+                         common.get_enum_str(control_pb2.ControlResponse, rep))
             self.frontend.send_multipart([client, b"",
                                           cmd.serialize_response(rep)])
 
     def get_control_state(self):
         """Creates and returns a ControState instance from current state."""
-        state = ctrl.ControlState()
+        state = control_pb2.ControlState()
         state.control_mode = self.control_mode
         if self.client_in_control_id:
             state.client_in_control_id = self.client_in_control_id

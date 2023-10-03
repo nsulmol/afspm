@@ -68,6 +68,7 @@ class PBCScanLogic(ProtoBasedCacheLogic):
     """
     scan_id = ProtoBasedCacheLogic.get_envelope_for_proto(
         scan_pb2.Scan2d())
+    divider = '_'
 
     def __init__(self, proto_with_history_list: list[(Message, int)] =
                  DEFAULT_PROTO_WITH_HIST_SEQ,
@@ -97,8 +98,9 @@ class PBCScanLogic(ProtoBasedCacheLogic):
         """
         if (type(proto).__name__ == PBCScanLogic.scan_id and
                 not force_parent):
-            return (PBCScanLogic.scan_id + '_'
-                    + str(proto.params.spatial.roi.size.x))
+            return (PBCScanLogic.scan_id + PBCScanLogic.divider +
+                    proto.channel + PBCScanLogic.divider +
+                    str(proto.params.spatial.roi.size.x))
         return ProtoBasedCacheLogic.get_envelope_for_proto(proto)
 
     def update_cache(self, proto: Message, cache: dict[str, Iterable]

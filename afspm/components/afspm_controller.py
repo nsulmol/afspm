@@ -10,8 +10,8 @@ from ..io import common
 from ..io.pubsub import pubsubcache as pbc
 from ..io.control import control_router as ctrl_rtr
 
-from ..io.protos.generated import scan_pb2 as scan
-from ..io.protos.generated import control_pb2 as ctrl
+from ..io.protos.generated import scan_pb2
+from ..io.protos.generated import control_pb2
 
 
 logger = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ class AfspmController(afspmc.AfspmComponent):
 
         self.pubsubcache = pubsubcache
         self.router = router
-        self.control_state = ctrl.ControlState()
+        self.control_state = control_pb2.ControlState()
         # AfspmComponent constructor: no subscriber or control_client
         # are provided, as they are not applicable here.
         super().__init__(name, subscriber=None, control_client=None, ctx=ctx,

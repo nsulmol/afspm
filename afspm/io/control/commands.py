@@ -4,25 +4,25 @@ from types import MappingProxyType  # Immutable dict
 
 from google.protobuf.message import Message
 
-from ..protos.generated import scan_pb2 as scan
-from ..protos.generated import control_pb2 as ctrl
+from ..protos.generated import scan_pb2
+from ..protos.generated import control_pb2
 
 
 # Mapping from request to proto/enum passed with it (if applicable).
 REQ_TO_OBJ_MAP = MappingProxyType({
-    ctrl.ControlRequest.REQ_START_SCAN: None,
-    ctrl.ControlRequest.REQ_STOP_SCAN: None,
-    ctrl.ControlRequest.REQ_SET_SCAN_PARAMS: scan.ScanParameters2d(),
-    ctrl.ControlRequest.REQ_REQUEST_CTRL: ctrl.ControlMode.CM_UNDEFINED,
-    ctrl.ControlRequest.REQ_RELEASE_CTRL: None,
-    ctrl.ControlRequest.REQ_ADD_EXP_PRBLM: ctrl.ExperimentProblem.EP_NONE,
-    ctrl.ControlRequest.REQ_RMV_EXP_PRBLM: ctrl.ExperimentProblem.EP_NONE,
-    ctrl.ControlRequest.REQ_SET_CONTROL_MODE: ctrl.ControlMode.CM_UNDEFINED,
-    ctrl.ControlRequest.REQ_END_EXPERIMENT: None
+    control_pb2.ControlRequest.REQ_START_SCAN: None,
+    control_pb2.ControlRequest.REQ_STOP_SCAN: None,
+    control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS: scan_pb2.ScanParameters2d(),
+    control_pb2.ControlRequest.REQ_REQUEST_CTRL: control_pb2.ControlMode.CM_UNDEFINED,
+    control_pb2.ControlRequest.REQ_RELEASE_CTRL: None,
+    control_pb2.ControlRequest.REQ_ADD_EXP_PRBLM: control_pb2.ExperimentProblem.EP_NONE,
+    control_pb2.ControlRequest.REQ_RMV_EXP_PRBLM: control_pb2.ExperimentProblem.EP_NONE,
+    control_pb2.ControlRequest.REQ_SET_CONTROL_MODE: control_pb2.ControlMode.CM_UNDEFINED,
+    control_pb2.ControlRequest.REQ_END_EXPERIMENT: None
 })
 
 
-def parse_request(msg: list[list[bytes]]) -> (ctrl.ControlRequest,
+def parse_request(msg: list[list[bytes]]) -> (control_pb2.ControlRequest,
                                               Message | int):
     """Helper to extract the request (and optional proto/enum) from a message.
 
@@ -43,7 +43,7 @@ def parse_request(msg: list[list[bytes]]) -> (ctrl.ControlRequest,
     return (req, obj)
 
 
-def serialize_req_obj(req: ctrl.ControlRequest,
+def serialize_req_obj(req: control_pb2.ControlRequest,
                       obj: Message | int = None) -> list[list[bytes]]:
     """Helper to convert a request and its additional object to bytes.
 
@@ -64,7 +64,7 @@ def serialize_req_obj(req: ctrl.ControlRequest,
     return msg
 
 
-def parse_response(msg: list[bytes]) -> ctrl.ControlResponse:
+def parse_response(msg: list[bytes]) -> control_pb2.ControlResponse:
     """Helper to convert a response from bytes to our enum.
 
     Args:
@@ -76,7 +76,7 @@ def parse_response(msg: list[bytes]) -> ctrl.ControlResponse:
     return int.from_bytes(msg, 'big')
 
 
-def serialize_response(rep: ctrl.ControlResponse) -> list[bytes]:
+def serialize_response(rep: control_pb2.ControlResponse) -> list[bytes]:
     """Helper to convert a response to bytes.
 
     Args:

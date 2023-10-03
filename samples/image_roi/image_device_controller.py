@@ -65,7 +65,7 @@ class ImageDeviceController(DeviceController):
                                                         data_units)
         self.dev_scan_state = scan_pb2.ScanState.SS_FREE
         self.dev_scan_params = scan_pb2.ScanParameters2d()
-        self.dev_scan = scan_pb2.Scan2d()
+        self.dev_scan = None
         super().__init__(**kwargs)
 
     # TODO: Move to array converters?
@@ -105,13 +105,13 @@ class ImageDeviceController(DeviceController):
         return control_pb2.ControlResponse.REP_SUCCESS
 
     def poll_scan_state(self) -> scan_pb2.ScanState:
-        return self.dev_scan_state
+        return [self.dev_scan] if self.dev_scan else []
 
     def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
         return self.dev_scan_params
 
-    def poll_scan(self) -> scan_pb2.Scan2d:
-        return self.dev_scan
+    def poll_scans(self) -> [scan_pb2.Scan2d]:
+        return [self.dev_scan]
 
     def run_per_loop(self):
         """Main loop, where we indicate when scans and moves are done."""
