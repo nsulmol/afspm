@@ -105,13 +105,13 @@ class ImageDeviceController(DeviceController):
         return control_pb2.ControlResponse.REP_SUCCESS
 
     def poll_scan_state(self) -> scan_pb2.ScanState:
-        return [self.dev_scan] if self.dev_scan else []
+        return self.dev_scan_state
 
     def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
         return self.dev_scan_params
 
     def poll_scans(self) -> [scan_pb2.Scan2d]:
-        return [self.dev_scan]
+        return [self.dev_scan] if self.dev_scan else []
 
     def run_per_loop(self):
         """Main loop, where we indicate when scans and moves are done."""
