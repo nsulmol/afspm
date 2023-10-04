@@ -13,7 +13,7 @@ from ...io.protos.generated import geometry_pb2
 from ...io.protos.generated import scan_pb2
 from ...io.protos.generated import control_pb2
 
-from ...io.control.control_client import ControlClient
+from ...io.control.client import ControlClient
 
 
 logger = logging.getLogger(__name__)

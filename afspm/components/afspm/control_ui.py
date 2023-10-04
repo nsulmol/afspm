@@ -8,13 +8,13 @@ import PySimpleGUI as sg
 
 from google.protobuf.message import Message
 
-from ..io import common
-from ..io.pubsub import subscriber as sub
-from ..io.control import control_client as ctrl_client
+from ...io import common
+from ...io.pubsub import subscriber as sub
+from ...io.control import client as ctrl_client
 
-from .afspm_component import AfspmComponent
-from ..io.protos.generated import control_pb2
-from ..io.protos.generated import scan_pb2
+from .component import AfspmComponent
+from ...io.protos.generated import control_pb2
+from ...io.protos.generated import scan_pb2
 
 
 logger = logging.getLogger(__name__)

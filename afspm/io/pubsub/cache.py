@@ -9,7 +9,7 @@ import zmq
 from google.protobuf.message import Message
 
 from .. import common
-from. import defaults
+from . import defaults
 
 logger = logging.getLogger(__name__)
 

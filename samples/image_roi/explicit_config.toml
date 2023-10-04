@@ -28,30 +28,30 @@ visualization_style = 'imshow'
 visualization_colormap = 'nipy_spectral'
 
 # --- PubSub Params --- #
-sub_extract_proto = 'afspm.io.cache.cache_logic.extract_proto'
-std_envelope_for_proto = 'afspm.io.cache.cache_logic.CacheLogic.get_envelope_for_proto'
-pbc_envelope_for_proto =  'afspm.io.cache.pbc_logic.PBCScanLogic.get_envelope_for_proto'
-update_cache = 'afspm.io.cache.cache_logic.update_cache'
+sub_extract_proto = 'afspm.io.pubsub.logic.cache_logic.extract_proto'
+std_envelope_for_proto = 'afspm.io.pubsub.logic.cache_logic.CacheLogic.get_envelope_for_proto'
+pbc_envelope_for_proto =  'afspm.io.pubsub.logic.pbc_logic.PBCScanLogic.get_envelope_for_proto'
+update_cache = 'afspm.io.pubsub.logic.cache_logic.update_cache'
 
 # --- Cache Aspects --- #
 [full_scan_id]
-class = 'afspm.io.cache.pbc_logic.create_roi_scan_envelope'
+class = 'afspm.io.pubsub.logic.pbc_logic.create_roi_scan_envelope'
 size = 'full_scan_size'
 
 [small_scan_id]
-class = 'afspm.io.cache.pbc_logic.create_roi_scan_envelope'
+class = 'afspm.io.pubsub.logic.pbc_logic.create_roi_scan_envelope'
 size = 'small_scan_size'
 
 [proto_hist_list]
-class = 'afspm.io.cache.pbc_logic.create_roi_proto_hist_list'
+class = 'afspm.io.pubsub.logic.pbc_logic.create_roi_proto_hist_list'
 sizes_with_hist_list = [['full_scan_size', 1], ['small_scan_size', 'sscans_per_fscan']]
 
 [pbc_scan_logic]
-class = 'afspm.io.cache.pbc_logic.PBCScanLogic'
+class = 'afspm.io.pubsub.logic.pbc_logic.PBCScanLogic'
 proto_with_history_list = 'proto_hist_list'
 
 [cache_kwargs]
-cache_logic = 'afspm.io.cache.pbc_logic.ProtoBasedCacheLogic()'
+cache_logic = 'afspm.io.pubsub.logic.pbc_logic.ProtoBasedCacheLogic()'
 
 [roi_cache_kwargs]
 cache_logic = 'pbc_scan_logic'
@@ -63,7 +63,7 @@ url = 'pub_url'
 get_envelope_for_proto = 'std_envelope_for_proto'
 
 [controller_psc]
-class = 'afspm.io.pubsub.pubsubcache.PubSubCache'
+class = 'afspm.io.pubsub.cache.PubSubCache'
 url = 'psc_url'
 sub_url = 'pub_url'
 sub_extract_proto = 'sub_extract_proto'
@@ -83,22 +83,22 @@ update_cache_kwargs = 'roi_cache_kwargs'
 
 # ----- Control Logic ----- #
 [devcon_server]
-class = 'afspm.io.control.control_server.ControlServer'
+class = 'afspm.io.control.server.ControlServer'
 url = 'server_url'
 
 [controller_router]
-class = 'afspm.io.control.control_router.ControlRouter'
+class = 'afspm.io.control.router.ControlRouter'
 server_url = 'server_url'
 router_url = 'router_url'
 
 [experiment_client]
-class = 'afspm.io.control.control_client.ControlClient'
+class = 'afspm.io.control.client.ControlClient'
 url = 'router_url'
 uuid = 'client_for_experiment'
 request_retries = 1
 
 [ui_client]
-class = 'afspm.io.control.control_client.AdminControlClient'
+class = 'afspm.io.control.client.AdminControlClient'
 url = 'router_url'
 uuid = 'client_for_ui'
 
@@ -159,8 +159,7 @@ control_client = 'ui_client'
 
 [afspm_controller]
 component = true
-class = 'afspm.components.afspm_controller.AfspmController'
-
+class = 'afspm.components.afspm.controller.AfspmController'
 pubsubcache = 'controller_psc'
 router = 'controller_router'
 

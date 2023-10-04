@@ -7,8 +7,8 @@ from collections.abc import Iterable
 from collections import deque
 from google.protobuf.message import Message
 
-from ..protos.generated import scan_pb2
-from ..protos.generated import control_pb2
+from ...protos.generated import scan_pb2
+from ...protos.generated import control_pb2
 
 # A default proto-history list for a Last-Value Cache (LVC)
 # Please update with new default messages created.

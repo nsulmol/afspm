@@ -7,7 +7,7 @@ import logging
 from google.protobuf.message import Message
 
 from afspm.spawn import LOGGER_ROOT
-from afspm.components.device_controller import DeviceController
+from afspm.components.device.controller import DeviceController
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
 from afspm.utils import array_converters as ac

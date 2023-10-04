@@ -9,7 +9,7 @@ import fire
 
 # TODO: Figure out why this can't be relative?
 from afspm.utils.parser import expand_variables_in_dict
-from afspm.components.afspm_components_monitor import AfspmComponentsMonitor
+from afspm.components.afspm.monitor import AfspmComponentsMonitor
 
 
 logger = logging.getLogger(__name__)
@@ -85,7 +85,7 @@ def spawn_components(config_file: str,
     Notes:
     - $COMPONENT_CLASS$ must be: the module_path + class name:
     'path.to.module.class' (e.g.
-    'afspm.components.device_controller.DeviceController').
+    'afspm.components.device.controller.DeviceController').
     - We  expect you to have a *single* experiment config file that contains
     all the components you want to run in your experiment. You may instantiate
     these components on multiple different devices (using different

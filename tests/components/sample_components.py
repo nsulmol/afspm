@@ -3,17 +3,17 @@
 import time
 import logging
 
-from afspm.components.device_controller import DeviceController
-from afspm.components.afspm_controller import AfspmController
+from afspm.components.device.controller import DeviceController
+from afspm.components.afspm.controller import AfspmController
 
 from afspm.io.pubsub.subscriber import Subscriber
 from afspm.io.pubsub.publisher import Publisher
-from afspm.io.pubsub.pubsubcache import PubSubCache
-from afspm.io.cache import cache_logic as cl
+from afspm.io.pubsub.cache import PubSubCache
+from afspm.io.pubsub.logic import cache_logic as cl
 
 
-from afspm.io.control.control_server import ControlServer
-from afspm.io.control.control_router import ControlRouter
+from afspm.io.control.server import ControlServer
+from afspm.io.control.router import ControlRouter
 
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2

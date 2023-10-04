@@ -4,14 +4,14 @@ import logging
 import zmq
 from google.protobuf.message import Message
 
-from . import afspm_component as afspmc
+from . import component as afspmc
 
-from ..io import common
-from ..io.pubsub import pubsubcache as pbc
-from ..io.control import control_router as ctrl_rtr
+from ...io import common
+from ...io.pubsub import cache as pbc
+from ...io.control import router as ctrl_rtr
 
-from ..io.protos.generated import scan_pb2
-from ..io.protos.generated import control_pb2
+from ...io.protos.generated import scan_pb2
+from ...io.protos.generated import control_pb2
 
 
 logger = logging.getLogger(__name__)

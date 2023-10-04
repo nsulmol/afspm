@@ -38,14 +38,14 @@ def expand_variables_in_dict(config_dict: dict) -> dict:
         pub_url: 'tcp://127.0.0.1:5555'
         publisher:
             url: 'pub_url'
-            get_envelope_given_proto: 'afspm.io.cache.cache_logic.CacheLogic.
-                get_envelope_for_proto'
+            get_envelope_given_proto: 'afspm.io.pubsub.logic.cache_logic.
+                CacheLogic.get_envelope_for_proto'
     , it will expand out into:
         pub_url: 'tcp://127.0.0.1:5555'
         publisher:
             url: 'tcp://127.0.0.1:5555'
-            get_envelope_for_proto: 'afspm.io.cache.cache_logic.CacheLogic.
-                get_envelope_for_proto'
+            get_envelope_for_proto: 'afspm.io.pubsub.logic.cache_logic.
+                CacheLogic.get_envelope_for_proto'
 
     Args:
         config_dict: dictionary to expand variables in.
@@ -147,14 +147,14 @@ def construct_and_run_component(params_dict: dict):
 
     Thus, our params_dict may look like, for example:
     {
-        class: 'afspm.components.afspm_component.AfspmComponent',
+        class: 'afspm.components.afspm.component.AfspmComponent',
         loop_sleep_s: 0,
         hb_period_s: 5,
         subscriber: {
             class: 'afspm.io.pubsub.subscriber.Subscriber',
             sub_url: 'tcp://127.0.0.1:5555'
             sub_extract_proto:
-            'afspm.io.cache.cache_logic.extract_proto',
+            'afspm.io.pubsub.logic.cache_logic.extract_proto',
             [...]
         }
     }
@@ -199,14 +199,14 @@ def _evaluate_values_recursively(params_dict: dict) -> dict:
 
     With, for example:
     {
-        class: 'afspm.components.afspm_component.AfspmComponent',
+        class: 'afspm.components.afspm.component.AfspmComponent',
         loop_sleep_s: 0,
         hb_period_s: 5,
         subscriber: {
             class: 'afspm.io.pubsub.subscriber.Subscriber',
             sub_url: 'tcp://127.0.0.1:5555'
             sub_extract_proto:
-            'afspm.io.cache.cache_logic.CacheLogic.extract_proto',
+            'afspm.io.pubsub.logic.cache_logic.CacheLogic.extract_proto',
             [...]
         }
     }

@@ -12,7 +12,7 @@ def sample_dict():
         'publisher': {
             'url': 'pub_url',
             'get_envelope_given_proto':
-            'afspm.io.cache.cache_logic.CacheLogic.get_envelope_for_proto'
+            'afspm.io.pubsub.logic.cache_logic.CacheLogic.get_envelope_for_proto'
         },
         'level3': {
             'my_publisher': 'publisher'
@@ -28,13 +28,13 @@ def expected_expanded_dict():
         'publisher': {
             'url': 'tcp://127.0.0.1:5555',
             'get_envelope_given_proto':
-            'afspm.io.cache.cache_logic.CacheLogic.get_envelope_for_proto'
+            'afspm.io.pubsub.logic.cache_logic.CacheLogic.get_envelope_for_proto'
         },
         'level3': {
             'my_publisher': {
                 'url': 'tcp://127.0.0.1:5555',
                 'get_envelope_given_proto':
-                'afspm.io.cache.cache_logic.CacheLogic.get_envelope_for_proto'
+                'afspm.io.pubsub.logic.cache_logic.CacheLogic.get_envelope_for_proto'
             }
         },
         'list_with_pub_url': ['tcp://127.0.0.1:5555', ['tcp://127.0.0.1:5555', 1]]
@@ -49,7 +49,7 @@ def test_expand_variables(sample_dict, expected_expanded_dict):
 
 @pytest.fixture
 def control_client_str():
-    return 'afspm.io.control.control_client.ControlClient'
+    return 'afspm.io.control.client.ControlClient'
 
 
 @pytest.fixture
@@ -62,7 +62,7 @@ def test_import_from_string(control_client_str, sample_url):
     # First, confirm we can import when the module path is provided properly.
     control_client_class = parser._import_from_string(control_client_str)
     instance = control_client_class(url=sample_url)
-    from afspm.io.control.control_client import ControlClient
+    from afspm.io.control.client import ControlClient
     assert isinstance(instance, ControlClient)
 
     # Lastly, confirm we *cannot* import without the module path.
@@ -74,7 +74,7 @@ def test_import_from_string(control_client_str, sample_url):
 
 @pytest.fixture
 def pbc_logic_str():
-    return 'afspm.io.cache.pbc_logic.ProtoBasedCacheLogic'
+    return 'afspm.io.pubsub.logic.pbc_logic.ProtoBasedCacheLogic'
 
 
 @pytest.fixture
@@ -84,7 +84,7 @@ def scan2d_str():
 
 @pytest.fixture
 def topics_scan2d_str(scan2d_str):
-    return ("afspm.io.cache.cache_logic.CacheLogic.get_envelope_for_proto("
+    return ("afspm.io.pubsub.logic.cache_logic.CacheLogic.get_envelope_for_proto("
             + scan2d_str + ")")
 
 
@@ -102,7 +102,7 @@ def test_evaluate_value_str(control_client_str, sample_url,
 
     # Test instantiated method
     res = parser._evaluate_value_str(pbc_logic_str + '()')
-    from afspm.io.cache.pbc_logic import ProtoBasedCacheLogic
+    from afspm.io.pubsub.logic.pbc_logic import ProtoBasedCacheLogic
     assert isinstance(res, ProtoBasedCacheLogic)
 
     # Validate multilevel instantiation
@@ -114,9 +114,9 @@ def test_evaluate_value_str(control_client_str, sample_url,
 @pytest.fixture
 def afspm_component_params_dict():
     cache_kwargs = {"cache_logic":
-                    'afspm.io.cache.pbc_logic.ProtoBasedCacheLogic()'}
+                    'afspm.io.pubsub.logic.pbc_logic.ProtoBasedCacheLogic()'}
     return {
-        'class': 'afspm.components.afspm_component.AfspmComponent',
+        'class': 'afspm.components.afspm.component.AfspmComponent',
         'name': 'BananaHammock',
         'loop_sleep_s': 0,
         'hb_period_s': 5,
@@ -124,10 +124,10 @@ def afspm_component_params_dict():
             'class': 'afspm.io.pubsub.subscriber.Subscriber',
             'sub_url': 'tcp://127.0.0.1:5555',
             'sub_extract_proto':
-            'afspm.io.cache.cache_logic.extract_proto',
+            'afspm.io.pubsub.logic.cache_logic.extract_proto',
             'topics_to_sub': [],
             'update_cache':
-            'afspm.io.cache.cache_logic.update_cache',
+            'afspm.io.pubsub.logic.cache_logic.update_cache',
             'extract_proto_kwargs': cache_kwargs,
             'update_cache_kwargs': cache_kwargs
         }
@@ -141,7 +141,7 @@ def scan_size():
 def visualizer_params_dict(scan_size):
     full_scan_origin = [0, 0]
     full_scan_id = {
-        'class': 'afspm.io.cache.pbc_logic.create_roi_scan_envelope',
+        'class': 'afspm.io.pubsub.logic.pbc_logic.create_roi_scan_envelope',
         'size': scan_size
     }
 
@@ -172,7 +172,7 @@ def test_construct_component(afspm_component_params_dict,
     """
     afspm_component_params_dict['ctx'] = zmq.Context.instance()
     res = parser._construct_component(afspm_component_params_dict)
-    from afspm.components.afspm_component import AfspmComponent
+    from afspm.components.afspm.component import AfspmComponent
     assert isinstance(res, AfspmComponent)
 
     visualizer_params_dict['ctx'] = zmq.Context.instance()
@@ -180,7 +180,7 @@ def test_construct_component(afspm_component_params_dict,
     from afspm.components.visualizer import Visualizer
     assert isinstance(res, Visualizer)
 
-    from afspm.io.cache.pbc_logic import create_roi_scan_envelope
+    from afspm.io.pubsub.logic.pbc_logic import create_roi_scan_envelope
     scan_envelope = create_roi_scan_envelope(scan_size)
     assert scan_envelope in res.cache_meaning_map
     assert res.visualization_style_map[scan_envelope] is None

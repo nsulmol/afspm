@@ -7,10 +7,10 @@ import zmq
 
 from google.protobuf.message import Message
 
-from ..io import common
-from ..io.heartbeat.heartbeat import Heartbeater
-from ..io.pubsub import subscriber as sub
-from ..io.control import control_client as ctrl_client
+from ...io import common
+from ...io.heartbeat.heartbeat import Heartbeater
+from ...io.pubsub import subscriber as sub
+from ...io.control import client as ctrl_client
 
 
 logger = logging.getLogger(__name__)

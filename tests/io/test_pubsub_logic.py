@@ -8,11 +8,11 @@ import zmq
 
 from google.protobuf.message import Message
 
-from afspm.io.cache import cache_logic as cl
-from afspm.io.cache import pbc_logic as pbc
+from afspm.io.pubsub.logic import cache_logic as cl
+from afspm.io.pubsub.logic import pbc_logic as pbc
 from afspm.io.pubsub import publisher
 from afspm.io.pubsub import subscriber
-from afspm.io.pubsub import pubsubcache
+from afspm.io.pubsub import cache as pubsubcache
 from afspm.io import common
 
 from afspm.io.protos.generated import scan_pb2

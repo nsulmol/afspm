@@ -7,8 +7,8 @@ from collections import deque
 from google.protobuf.message import Message
 
 from .cache_logic import CacheLogic, DEFAULT_PROTO_WITH_HIST_SEQ
-from ..protos.generated import scan_pb2
-from .. import common
+from ...protos.generated import scan_pb2
+from ... import common
 
 
 logger = logging.getLogger(__name__)

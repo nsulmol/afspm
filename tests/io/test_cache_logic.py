@@ -4,8 +4,8 @@ import copy
 import pytest
 from collections import deque
 
-from afspm.io.cache import cache_logic as cl
-from afspm.io.cache import pbc_logic as pbc
+from afspm.io.pubsub.logic import cache_logic as cl
+from afspm.io.pubsub.logic import pbc_logic as pbc
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
 

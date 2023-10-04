@@ -7,9 +7,9 @@ import pytest
 import zmq
 
 from afspm.io.control import commands as cmd
-from afspm.io.control import control_client as ctrl_client
-from afspm.io.control import control_server as ctrl_srvr
-from afspm.io.control import control_router as ctrl_rtr
+from afspm.io.control import client as ctrl_client
+from afspm.io.control import server as ctrl_srvr
+from afspm.io.control import router as ctrl_rtr
 
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2

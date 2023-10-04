@@ -10,16 +10,16 @@ from types import MappingProxyType
 import zmq
 from google.protobuf.message import Message
 
-from . import afspm_component as afspmc
+from ..afspm import component as afspmc
 
-from ..io import common
-from ..io.pubsub import publisher as pub
-from ..io.pubsub import subscriber as sub
-from ..io.control import commands as cmd
-from ..io.control import control_server as ctrl_srvr
+from ...io import common
+from ...io.pubsub import publisher as pub
+from ...io.pubsub import subscriber as sub
+from ...io.control import commands as cmd
+from ...io.control import server as ctrl_srvr
 
-from ..io.protos.generated import scan_pb2
-from ..io.protos.generated import control_pb2
+from ...io.protos.generated import scan_pb2
+from ...io.protos.generated import control_pb2
 
 
 logger = logging.getLogger(__name__)

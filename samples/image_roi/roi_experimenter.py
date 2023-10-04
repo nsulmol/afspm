@@ -7,7 +7,7 @@ import numpy as np
 from google.protobuf.message import Message
 
 from afspm.spawn import LOGGER_ROOT
-from afspm.components.afspm_component import AfspmComponent
+from afspm.components.afspm.component import AfspmComponent
 from afspm.components.helpers.scan_handler import ScanHandler
 from afspm.io import common
 from afspm.io.protos.generated import scan_pb2

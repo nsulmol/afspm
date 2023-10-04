@@ -10,8 +10,8 @@ you can subscribe to all of them by simply using the default envelope in
 cache_logic.CacheLogic.get_envelope_for_proto.
 """
 
-from ..cache import cache_logic
-from ..cache import pbc_logic
+from .logic import cache_logic
+from .logic import pbc_logic
 
 SCAN_ID = 'Scan2d'  # Scan2d for default envelope
 UPDATE_CACHE = cache_logic.update_cache

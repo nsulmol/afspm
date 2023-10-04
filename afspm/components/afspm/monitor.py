@@ -6,10 +6,10 @@ from typing import Callable
 import multiprocessing as mp
 import zmq
 
-from ..io import common
-from ..io.heartbeat.heartbeat import HeartbeatListener
-from .afspm_component import AfspmComponent, get_heartbeat_url
-from ..utils.parser import construct_and_run_component
+from ...io import common
+from ...io.heartbeat.heartbeat import HeartbeatListener
+from .component import AfspmComponent, get_heartbeat_url
+from ...utils.parser import construct_and_run_component
 
 
 logger = logging.getLogger(__name__)
@@ -24,14 +24,14 @@ class AfspmComponentsMonitor:
 
     For example:
     'SampleAfspmComponent': {
-        class: 'afspm.components.afspm_component.AfspmComponent',
+        class: 'afspm.components.afspm.component.AfspmComponent',
         loop_sleep_s: 0,
         hb_period_s: 5,
         subscriber: {
             class: 'afspm.io.pubsub.subscriber.Subscriber',
             sub_url: 'tcp://127.0.0.1:5555'
             sub_extract_proto:
-            'afspm.io.cache.cache_logic.CacheLogic.get_envelope_for_proto',
+            'afspm.io.pubsub.logic.cache_logic.CacheLogic.get_envelope_for_proto',
             [...]
         }
     }

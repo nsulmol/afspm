@@ -9,7 +9,7 @@ import xarray as xr
 
 from google.protobuf.message import Message
 
-from .afspm_component import AfspmComponent
+from .afspm.component import AfspmComponent
 from ..io.protos.generated import scan_pb2
 from ..io.pubsub.defaults import SCAN_ID
 from ..utils import array_converters as ac

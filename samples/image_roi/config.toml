@@ -29,19 +29,19 @@ visualization_colormap = 'nipy_spectral'
 
 # --- Cache Aspects --- #
 [full_scan_id]
-class = 'afspm.io.cache.pbc_logic.create_roi_scan_envelope'
+class = 'afspm.io.pubsub.logic.pbc_logic.create_roi_scan_envelope'
 size = 'full_scan_size'
 
 [small_scan_id]
-class = 'afspm.io.cache.pbc_logic.create_roi_scan_envelope'
+class = 'afspm.io.pubsub.logic.pbc_logic.create_roi_scan_envelope'
 size = 'small_scan_size'
 
 [proto_hist_list]
-class = 'afspm.io.cache.pbc_logic.create_roi_proto_hist_list'
+class = 'afspm.io.pubsub.logic.pbc_logic.create_roi_proto_hist_list'
 sizes_with_hist_list = [['full_scan_size', 1], ['small_scan_size', 'sscans_per_fscan']]
 
 [pbc_scan_logic]
-class = 'afspm.io.cache.pbc_logic.PBCScanLogic'
+class = 'afspm.io.pubsub.logic.pbc_logic.PBCScanLogic'
 proto_with_history_list = 'proto_hist_list'
 
 [roi_cache_kwargs]
@@ -53,7 +53,7 @@ class = 'afspm.io.pubsub.publisher.Publisher'
 url = 'pub_url'
 
 [controller_psc]
-class = 'afspm.io.pubsub.pubsubcache.PubSubCache'
+class = 'afspm.io.pubsub.cache.PubSubCache'
 url = 'psc_url'
 sub_url = 'pub_url'
 update_cache_kwargs = 'roi_cache_kwargs'
@@ -66,22 +66,22 @@ update_cache_kwargs = 'roi_cache_kwargs'
 
 # ----- Control Logic ----- #
 [devcon_server]
-class = 'afspm.io.control.control_server.ControlServer'
+class = 'afspm.io.control.server.ControlServer'
 url = 'server_url'
 
 [controller_router]
-class = 'afspm.io.control.control_router.ControlRouter'
+class = 'afspm.io.control.router.ControlRouter'
 server_url = 'server_url'
 router_url = 'router_url'
 
 [experiment_client]
-class = 'afspm.io.control.control_client.ControlClient'
+class = 'afspm.io.control.client.ControlClient'
 url = 'router_url'
 uuid = 'client_for_experiment'
 request_retries = 1
 
 [ui_client]
-class = 'afspm.io.control.control_client.AdminControlClient'
+class = 'afspm.io.control.client.AdminControlClient'
 url = 'router_url'
 uuid = 'client_for_ui'
 
@@ -99,7 +99,7 @@ data_units = 'data_units'
 sub_rois_per_dim = 'sub_rois_per_dim'
 sub_scan_res = 'small_scan_res'
 sub_scans_per_full_scan = 'sscans_per_fscan'
-get_envelope_for_proto = 'afspm.io.cache.pbc_logic.PBCScanLogic.get_envelope_for_proto'
+get_envelope_for_proto = 'afspm.io.pubsub.logic.pbc_logic.PBCScanLogic.get_envelope_for_proto'
 rerun_wait_s = 5
 
 subscriber = 'experiment_sub'
@@ -107,7 +107,7 @@ control_client = 'experiment_client'
 
 [ui]
 component = true
-class = 'afspm.components.afspm_control_ui.AfspmControlUI'
+class = 'afspm.components.afspm.control_ui.AfspmControlUI'
 
 subscriber = 'experiment_sub'
 control_client = 'ui_client'
@@ -142,7 +142,7 @@ control_client = 'ui_client'
 
 [afspm_controller]
 component = true
-class = 'afspm.components.afspm_controller.AfspmController'
+class = 'afspm.components.afspm.controller.AfspmController'
 
 pubsubcache = 'controller_psc'
 router = 'controller_router'
