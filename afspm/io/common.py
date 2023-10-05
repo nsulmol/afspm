@@ -73,27 +73,6 @@ def create_scan_params_2d(top_left: tuple[float, float] = None,
                                      data=data_aspects)
 
 
-def create_scan_2d(scan_params: scan_pb2.ScanParameters2d = None,
-                   channel: str = None, values: list[float] = None):
-    """Create Scan2d object.
-
-    This is a helper, to avoid annoyances with the protobuf data
-    initialization.
-
-    Args:
-        scan_params: ScanParameters2d instance.
-        channel: name of the channel this data comes from.
-        values: list of data points corresponding to the scan. If None, will
-            initialize an array with the dimensiosn of the ROI in scan_params.
-
-    Returns:
-        Initialized Scan2d instance.
-    """
-    return scan_pb2.Scan2d(params=scan_params,
-                           channel=channel,
-                           values=values)
-
-
 # --- Enum Helpers --- #
 def get_enum_val(enum_obj: EnumTypeWrapper, name: str) -> int:
     """Gets the int enum value of a zmq enum, given its name.
