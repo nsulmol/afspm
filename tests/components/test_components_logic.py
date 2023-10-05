@@ -11,6 +11,7 @@ from google.protobuf.message import Message
 from google.protobuf.timestamp_pb2 import Timestamp
 
 from afspm.components.device.controller import DeviceController
+from afspm.components.device.params import DeviceParameter
 from afspm.components.afspm.controller import AfspmController
 from afspm.components.afspm.component import AfspmComponent
 
@@ -434,3 +435,40 @@ def test_set_control_mode(thread_device_controller, thread_afspm_controller,
 
     end_and_wait_threads(afspm_component, thread_device_controller,
                          thread_afspm_controller)
+
+
+def test_set_get_params(thread_device_controller, thread_afspm_controller,
+                        afspm_component, wait_count, default_control_state,
+                        component_name,):
+    """Confirm we can get/set supported params, and fail on unsupported."""
+    startup_and_req_ctrl(afspm_component, default_control_state,
+                         component_name, wait_count)
+
+    # Unsupported param returns unsupported message.
+    param_msg = control_pb2.ParameterMsg(
+        parameter=DeviceParameter.TIP_BIAS_VOLTAGE)
+    rep, obj = afspm_component.control_client.request_parameter(param_msg)
+    assert rep == control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED
+
+    # Supported param succeeds.
+    param_msg = control_pb2.ParameterMsg(
+        parameter=DeviceParameter.OPERATING_MODE)
+    rep, obj = afspm_component.control_client.request_parameter(param_msg)
+    assert rep == control_pb2.ControlResponse.REP_SUCCESS
+    assert obj.value == "AM-AFM"
+
+    param_msg.value = "FM-AFM"
+    rep, obj = afspm_component.control_client.request_parameter(param_msg)
+    assert rep == control_pb2.ControlResponse.REP_SUCCESS
+    assert obj.value == "FM-AFM"
+
+    # Setting failure is passed onto client. This one gets properly, but
+    # fails on a set.
+    param_msg = control_pb2.ParameterMsg(
+        parameter=DeviceParameter.TIP_VIBRATING_AMPL)
+    rep, obj = afspm_component.control_client.request_parameter(param_msg)
+    assert rep == control_pb2.ControlResponse.REP_SUCCESS
+
+    param_msg.value = "33"
+    rep, obj = afspm_component.control_client.request_parameter(param_msg)
+    assert rep == control_pb2.ControlResponse.REP_PARAM_ERROR

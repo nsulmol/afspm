@@ -25,6 +25,8 @@ from ...io.protos.generated import control_pb2
 logger = logging.getLogger(__name__)
 
 
+
+
 class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
     """Handles communicating with SPM device and handling requests.
 
@@ -51,6 +53,43 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
     from AspmComponent). If subscribed to the PubSubCache, it will receive
     kill signals and shutdown appropriately.
 
+    ---
+    The DeviceController is based around the process of setting scan
+    parameters, starting and stopping scans. For many experiments, this
+    may be all that is needed! This assumes the researcher has already
+    approached their surface and set the necessary operating mode /
+    parameters for a scan to run.
+
+    However, it may also be necessary to:
+    1. Switch operating modes between scans (e.g. dynamic AM-AFM mode, static
+    mode with constant height).
+    2. Set different parameters between scans (e.g. scan speed, feedback
+    PI/PID system parameters).
+    3. Explicitly approach/retract the tip, and use a coarse motor to move
+    the scan region further around the surface.
+    4. Perform tip conditioning, by moving the tip and performing one of a set
+    of operations with the surface.
+    5. Perform a 3D form of scanning (e.g. spectroscopy).
+
+    For (1) and (2), we have introduced the REQ_PARAM request. The idea is to
+    map settings to a common 'dictionary', with IDs defined in params.py. To
+    set/get a particular parameter, the controller calls self.param_method_map
+    (see ParamMethod below for more info). If a parameter ID is not in these
+    maps, it is not supported.
+
+    Setting/getting an operating mode is the same as setting any other
+    parameter! We make no special checks; it is assumed that an operating mode
+    corresponds to (a) a feedback/z-controller configuration, and (b) a
+    specific set of scan channels being recorded per scan (e.g. topography,
+    phase). Thus, we expect setting a given operating mode ID on two different
+    device controllers to result in the same output channels per scan. Again,
+    NO SPECIAL CHECKS ARE DONE: caveat emptor.
+
+    For (3)-(5): these *ARE NOT YET SUPPORTED*. We plan to introduce some
+    mechanism to run actions (REQ_RUN_ACTION), to support some or all
+    of these.
+    ---
+
     Attributes:
         publisher: Publisher instance, for publishing data.
         control_server: ControlServer instance, for responding to control
@@ -62,14 +101,25 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
         scan: device's most recent Scan2d.
         subscriber: optional subscriber, to hook into (and detect) kill
             signals.
+
+        param_method_map: a mapping from param id to a method which handles
+            set/get of that parameter. The method should accept an optional
+            str input, corresponding to the 'set' value. If none is provided,
+            only a 'get' is requested. We expect a (REP, str) as return val.
     """
-    TIMESTAMP_ATTRIB_NAME = 'timestamp'
+    TIMESTAMP_ATTRIB = 'timestamp'
+    PARAM_VALUE_ATTRIB = 'value'
 
     # Indicates commands we will allow to be sent while not free
     ALLOWED_COMMANDS_WHILE_NOT_FREE = [control_pb2.ControlRequest.REQ_STOP_SCAN]
 
-    # Note: REQ_HANDLER_MAP defined at end, due to dependency on methods
-    # defined below.
+    """Description of method for DeviceController.param_method_map).
+
+    This method takes in an optional set_value (if setting), and returns a
+    (ControlResponse, get_value) of the operation.
+    """
+    ParamMethod = Callable[[str | None],
+                           tuple[control_pb2.ControlResponse, str]]
 
     def __init__(self, name: str, publisher: pub.Publisher,
                  control_server: ctrl_srvr.ControlServer,
@@ -104,18 +154,24 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
         self.scan_params = scan_pb2.ScanParameters2d()
         self.scans = []
 
+        self.param_method_map = {}
+
         # AfspmComponent constructor: no control_client provided, as that
         # logic is handled by the control_server.
         super().__init__(name, subscriber=subscriber, control_client=None,
                          ctx=ctx, loop_sleep_s=loop_sleep_s,
                          hb_period_s=hb_period_s)
 
-    def create_req_handler_map(self) -> dict[control_pb2.ControlRequest, Callable]:
+    def create_req_handler_map(self) -> dict[control_pb2.ControlRequest,
+                                             Callable]:
         """Create our req_handler_map, for mapping REQ to methods."""
         return MappingProxyType({
             control_pb2.ControlRequest.REQ_START_SCAN: self.on_start_scan,
             control_pb2.ControlRequest.REQ_STOP_SCAN:  self.on_stop_scan,
-            control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS: self.on_set_scan_params})
+            control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS:
+                self.on_set_scan_params,
+            control_pb2.ControlRequest.REQ_PARAM: self._handle_param_request,
+        })
 
 
     @abstractmethod
@@ -181,8 +237,8 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
             only_new_has_scans = len(self.scans) > 0 and len(old_scans) == 0
             timestamps_different = (
                 both_have_scans and
-                self.scans[0].HasField(self.TIMESTAMP_ATTRIB_NAME) and
-                old_scans[0].HasField(self.TIMESTAMP_ATTRIB_NAME) and
+                self.scans[0].HasField(self.TIMESTAMP_ATTRIB) and
+                old_scans[0].HasField(self.TIMESTAMP_ATTRIB) and
                 self.scans[0].timestamp != old_scans[0].timestamp)
             values_different = (both_have_scans and
                                 self.scans[0].values != old_scans[0].values)
@@ -235,8 +291,39 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
                                                     scan_state_msg.scan_state))
                     self.publisher.send_msg(scan_state_msg)
 
-                self.control_server.reply(rep)
+                if isinstance(rep, tuple):  # Special case of rep with obj
+                    self.control_server.reply(rep[0], rep[1])
+                else:
+                    self.control_server.reply(rep)
 
+    def _handle_param_request(self, param: control_pb2.ParameterMsg
+                              ) -> (control_pb2.ControlResponse,
+                                    Message | int | None):
+        """Set or get a device parameter.
+
+        Respond to a ParameterMsg request. This method depends entirely on the
+        param_method_map, which maps set/get methods to given parameters.
+
+        Args:
+            param: ParameterMsg request; if value is not provided, treated as
+                a 'get' request. Otherwise, treated as a 'set' request.
+
+        Returns:
+            - Response to the request.
+            - A ParameterMsg response, indicating the state after the set (or
+                just the state, if it was a get call).
+        """
+        if (param.parameter not in self.param_method_map):
+            return (control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED,
+                    param)
+
+        set_value = (param.value if param.HasField(self.PARAM_VALUE_ATTRIB)
+                     else None)
+        rep, new_val = self.param_method_map[param.parameter](set_value)
+        if new_val:
+            param.value = new_val
+
+        return (rep, param)
 
     def run_per_loop(self):
         """Where we monitor for requests and publish results."""
