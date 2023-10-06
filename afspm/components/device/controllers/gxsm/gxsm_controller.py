@@ -138,7 +138,8 @@ class GxsmController(DeviceController):
             for fname in fnames:
                 ts = get_file_creation_datetime(fname)
                 ds = read.opendataset(fname, self.channels_config_path)
-                scan = conv.convert_xarray_to_scan_pb2(ds.data_vars[0])
+                scan = conv.convert_xarray_to_scan_pb2(
+                    ds[list(ds.data_vars)[0]])
                 scan.timestamp.FromDatetime(ts)
                 scans.append(scan)
             self.old_scans = scans
