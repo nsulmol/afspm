@@ -192,3 +192,19 @@ class GxsmController(DeviceController):
         if moving:
             return scan_pb2.ScanState.SS_MOVING
         return scan_pb2.ScanState.SS_FREE
+
+
+# Spawn settings
+CONFIG_FILE = './config.toml'
+COMPONENT_TO_SPAWN = 'devcon'
+LOG_FILE = 'log.txt'
+LOG_TO_STDOUT = 'True'
+LOG_LEVEL = 'INFO'
+
+if __name__ == '__main__':
+    from ..... import spawn
+    spawn.spawn_monitorless_component(CONFIG_FILE,
+                                      COMPONENT_TO_SPAWN,
+                                      LOG_FILE,
+                                      LOG_TO_STDOUT,
+                                      LOG_LEVEL)

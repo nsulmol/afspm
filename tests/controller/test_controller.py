@@ -8,9 +8,11 @@ import zmq
 from google.protobuf.message import Message
 
 from afspm.io.pubsub.subscriber import Subscriber
+from afspm.io.pubsub.logic import cache_logic as cl
+from afspm.io.control.client import ControlClient, AdminControlClient
+
 from afspm.components.afspm.component import AfspmComponent
 from afspm.components.afspm.controller import AfspmController
-from afspm.io.pubsub.logic import cache_logic as cl
 
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
@@ -21,21 +23,23 @@ logger = logging.getLogger(__name__)
 # -------------------- Validate Test Should Run -------------------- #
 
 # Base subscriber, to validate controller exists
-DEVCON_URL = "tcp://127.0.0.1:7777"
+SERVER_URL = "tcp://127.0.0.1:7777"
+PUBLISHER_URL = "tcp://127.0.0.1:7778"
 TEST_TIMEOUT_MS = 500
 
 
 def confirm_devcon_initialized():
     """Quick check if a device controller is setup and running."""
-    sub = Subscriber(sub_url=DEVCON_URL, poll_timeout_ms=TEST_TIMEOUT_MS)
+    sub = Subscriber(sub_url=PUBLISHER_URL, poll_timeout_ms=TEST_TIMEOUT_MS)
     return sub.poll_and_store()
 
 
 pytestmark = pytest.mark.skipif(not confirm_devcon_initialized(),
                                 reason="No device controller seems to be "
-                                "running on url: " + DEVCON_URL)
+                                "publishing on url: " + PUBLISHER_URL)
 
 # -------------------- Fixtures -------------------- #
+# --- General / Urls --- #
 @pytest.fixture
 def ctx():
     return zmq.Context.instance()
@@ -59,7 +63,7 @@ def default_control_state():
 
 
 @pytest.fixture(scope="module")
-def topics_scan2d():
+def topics_scan():
     return [cl.CacheLogic.get_envelope_for_proto(scan_pb2.Scan2d())]
 
 
@@ -73,35 +77,41 @@ def topics_scan_state():
     return [cl.CacheLogic.get_envelope_for_proto(scan_pb2.ScanStateMsg())]
 
 
+# --- I/O Classes (Subscribers, Clients) --- #
 @pytest.fixture
-def sub_scan2d(ctx, topics_scan2d, timeout_ms):
-    return Subscriber(DEVCON_URL,
-                      topics_to_sub=topics_scan2d,
+def sub_scan(ctx, topics_scan2d, timeout_ms):
+    return Subscriber(PUBLISHER_URL,
+                      topics_to_sub=topics_scan,
                       poll_timeout_ms=timeout_ms)
 
 
 @pytest.fixture
 def sub_scan_state(ctx, topics_scan_state, timeout_ms):
-    return Subscriber(DEVCON_URL,
+    return Subscriber(PUBLISHER_URL,
                       topics_to_sub=topics_scan_state,
                       poll_timeout_ms=timeout_ms)
 
 
 @pytest.fixture
 def sub_scan_params(ctx, topics_scan2d, timeout_ms):
-    return Subscriber(DEVCON_URL,
+    return Subscriber(PUBLISHER_URL,
                       topics_to_sub=topics_scan2d,
                       poll_timeout_ms=timeout_ms)
 
 
 @pytest.fixture
-def afspm_component_scan(sub_scan2d, client, component_name, ctx):
+def client(ctx, component_name):
+    return ControlClient(SERVER_URL, ctx, component_name)
+
+
+# --- Components --- #
+@pytest.fixture
+def afspm_component_scan(sub_scan, client, component_name, ctx):
     return AfspmComponent(component_name, sub_scan, client, ctx)
 
 @pytest.fixture
 def afspm_component_scan_params(sub_scan_params, client, component_name, ctx):
     return AfspmComponent(component_name, sub_scan_params, client, ctx)
-
 
 
 # -------------------- Helper Methods -------------------- #

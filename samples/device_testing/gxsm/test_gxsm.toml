@@ -1,0 +1,30 @@
+# ----- General variables ----- #
+# --- URLs --- #
+server_url = "tcp://127.0.0.1:7777"
+pub_url = "tcp://127.0.0.1:7778"
+timeout_ms = 500
+wait_ms = 60000
+
+
+# ----- PubSub ----- #
+[devcon_pub]
+class = 'afspm.io.pubsub.publisher.Publisher'
+url = 'pub_url'
+
+
+# ----- Control Logic ----- #
+[devcon_server]
+class = 'afspm.io.control.server.ControlServer'
+url = 'server_url'
+
+
+
+# ----- Components ----- #
+[dev_con]
+component = true
+class = 'afspm.components.device.controllers.gxsm.GxsmController'
+
+publisher = 'devcon_pub'
+control_server = 'devcon_server'
+
+# No subscriber, because we have to run this within gxsm.

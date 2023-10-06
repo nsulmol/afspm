@@ -10,6 +10,7 @@ import fire
 # TODO: Figure out why this can't be relative?
 from afspm.utils.parser import expand_variables_in_dict
 from afspm.components.afspm.monitor import AfspmComponentsMonitor
+from afspm.utils.parser import construct_and_run_component
 
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,7 @@ LOG_LEVEL_STR_TO_VAL = MappingProxyType({
 
 def spawn_components(config_file: str,
                      components_to_spawn: list[str] = None,
+                     components_not_to_spawn: list[str] = None,
                      log_file: str = 'log.txt',
                      log_to_stdout: bool = True,
                      log_level: str = "INFO"):
@@ -97,6 +99,9 @@ def spawn_components(config_file: str,
             to a $COMPONENT_NAME$ in the config file. If None, all components
             in the config file will be spawned. Note: any 'component' requires
             a key:val of 'component': True for us to parse it properly!
+        components_not_to_spawn: opposite of components_to_spawn. Any component
+            in this list will not be spawned. Note: only one of the two can be
+            used per call.
         log_file: a file path to save the process log. Default is 'log.txt'.
             To not log to file, set to None.
         log_to_stdout: whether or not we print to std out as well. Default is
@@ -111,12 +116,61 @@ def spawn_components(config_file: str,
 
         expanded_dict = expand_variables_in_dict(config_dict)
         filtered_dict = _filter_requested_components(expanded_dict,
-                                                     components_to_spawn)
+                                                     components_to_spawn,
+                                                     components_not_to_spawn)
         monitor = AfspmComponentsMonitor(filtered_dict,
                                          **expanded_dict[MONITOR_KEY])
 
     if monitor:
         monitor.run()
+
+
+def spawn_monitorless_component(config_file: str,
+                                component_to_spawn: str,
+                                log_file: str = 'log.txt',
+                                log_to_stdout: bool = True,
+                                log_level: str = "INFO"):
+    """Spawn an individual component from config file.
+
+    This method spawns a single component from a config file. It follows
+    the same logic as spawn_components(), except the single component
+    is spawned on its own, *without* using AfspmComponentsMonitor.
+
+    This is useful for potentially easier debugging, as the component will
+    not be spawned into a separate process. The main con is that a crashed/
+    frozen component will not be revived.
+
+    Args:
+        config_file: path to TOML config file.
+        component_to_spawn: string corresponding to a $COMPONENT_NAME$ in the
+            config file. Note: any 'component' requires a key:val of
+            'component': True for us to parse it properly!
+        log_file: a file path to save the process log. Default is 'log.txt'.
+            To not log to file, set to None.
+        log_to_stdout: whether or not we print to std out as well. Default is
+            True.
+        log_level: the log level to use. Default is INFO.
+    """
+    _set_up_logging(log_file, log_to_stdout, log_level)
+
+    with open(config_file, 'rb') as file:
+        config_dict = tomli.load(file)
+
+        expanded_dict = expand_variables_in_dict(config_dict)
+        filtered_dict = _filter_requested_components(expanded_dict,
+                                                     [component_to_spawn])
+
+        keys = filtered_dict.keys()
+        if len(keys) == 0:
+            logger.error("Component %s not found, exiting.", component_to_spawn)
+            return
+        elif len(keys) > 1:
+            logger.error("More than 1 component with name %s found, exiting.",
+                         component_to_spawn)
+            return
+
+        logger.info("Creating process for component %s", component_to_spawn)
+        construct_and_run_component(filtered_dict[keys[0]])
 
 
 def _set_up_logging(log_file: str, log_to_stdout: bool, log_level: str):
@@ -149,6 +203,7 @@ def _set_up_logging(log_file: str, log_to_stdout: bool, log_level: str):
 
 def _filter_requested_components(config_dict: dict,
                                  components_to_spawn: list[str] = None,
+                                 components_not_to_spawn: list[str] = None,
                                  ) -> dict:
     """Iterate through config_dict, filtering out requested components only.
 
@@ -170,15 +225,29 @@ def _filter_requested_components(config_dict: dict,
             to a $COMPONENT_NAME$ in the config file. If None, all components
             in the config file will be spawned. Note: any 'component' requires
             a key:val of 'component': True for us to parse it properly!
-
+        components_not_to_spawn: opposite of components_to_spawn. Any component
+            in this list will not be spawned. Note: only one of the two can be
+            used per call.
     Returns:
         A new dict consisting only of the key:val pairs associated with the
             components we want to spawn.
     """
+    if components_to_spawn and components_not_to_spawn:
+        msg = ("Only one of components_to_spawn or components_not_to_spawn "
+               "can be used at once. Exiting.")
+        logger.error(msg)
+        raise ValueError(msg)
+
+    no_filtering = (components_to_spawn is None and components_not_to_spawn
+                    is None)
+
     filtered_dict = {}
     for key in config_dict:
-        if (isinstance(config_dict[key], dict) and
-                (components_to_spawn is None or key in components_to_spawn)):
+        should_spawn = components_to_spawn and key in components_to_spawn
+        should_not_spawn = (components_not_to_spawn and
+                            key not in components_not_to_spawn)
+        spawn_component = no_filtering or should_spawn or not should_not_spawn
+        if isinstance(config_dict[key], dict) and spawn_component:
             if IS_COMPONENT_KEY in config_dict[key]:
                 config_dict[key]['name'] = key
                 filtered_dict[key] = config_dict[key]
