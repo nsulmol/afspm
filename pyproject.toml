@@ -26,6 +26,10 @@ pytest = "^7.4.0"
 [tool.poetry.group.extras.dependencies]
 sidpy = "^0.12.1"
 
+
+[tool.poetry.group.gxsm.dependencies]
+gxsmread = {path = "../gxsmread/dist/gxsmread-0.1.0-py3-none-any.whl"}
+
 [tool.poetry.scripts]
 spawn = "afspm.spawn:cli"
 
