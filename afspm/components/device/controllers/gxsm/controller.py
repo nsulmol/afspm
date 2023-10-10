@@ -188,7 +188,7 @@ LOG_TO_STDOUT = 'True'
 LOG_LEVEL = 'INFO'
 
 if __name__ == '__main__':
-    from ..... import spawn
+    from afspm import spawn
     spawn.spawn_monitorless_component(CONFIG_FILE,
                                       COMPONENT_TO_SPAWN,
                                       LOG_FILE,
