@@ -14,8 +14,7 @@ from afspm.utils import array_converters as conv
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
 
-# Note: gxsm is *not* imported here, because it is dynamically loaded within
-# the gxsm remote window.
+import gxsm  # Dynamic DLL, so not in pyproject.
 from gxsmread import read
 
 
@@ -134,7 +133,7 @@ class GxsmController(DeviceController):
 
     # TODO: Should this just be poll_scan_params???
     def _get_current_scan_params(self):
-        scan_params = scan_pb2.ScanParameters2d
+        scan_params = scan_pb2.ScanParameters2d()
         # TODO: how to handle units??  For now, just send out how they are received?
         scan_params.spatial.roi.top_left.x = gxsm.get(self.TL_X)
         scan_params.spatial.roi.top_left.y = gxsm.get(self.TL_Y)
