@@ -160,11 +160,11 @@ def spawn_monitorless_component(config_file: str,
         filtered_dict = _filter_requested_components(expanded_dict,
                                                      [component_to_spawn])
 
-        keys = filtered_dict.keys()
+        keys = len(filtered_dict.keys())
         if len(keys) == 0:
             logger.error("Component %s not found, exiting.", component_to_spawn)
             return
-        elif len(keys) > 1:
+        if len(keys) > 1:
             logger.error("More than 1 component with name %s found, exiting.",
                          component_to_spawn)
             return
@@ -244,9 +244,9 @@ def _filter_requested_components(config_dict: dict,
     filtered_dict = {}
     for key in config_dict:
         should_spawn = components_to_spawn and key in components_to_spawn
-        should_not_spawn = (components_not_to_spawn and
-                            key not in components_not_to_spawn)
-        spawn_component = no_filtering or should_spawn or not should_not_spawn
+        should_spawn = should_spawn or (components_not_to_spawn and
+                                        key not in components_not_to_spawn)
+        spawn_component = no_filtering or should_spawn
         if isinstance(config_dict[key], dict) and spawn_component:
             if IS_COMPONENT_KEY in config_dict[key]:
                 config_dict[key].pop(IS_COMPONENT_KEY, None)
