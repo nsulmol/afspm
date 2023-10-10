@@ -144,8 +144,9 @@ class GxsmController(DeviceController):
         #scan_params.spatial.scan_speed_units_s = gxsm.get(
         #    self.SCAN_SPEED_UNITS_S)
 
-        scan_params.data.shape.x = gxsm.get(self.RES_X)
-        scan_params.data.shape.y = gxsm.get(self.RES_Y)
+        # Note: all gxsm attributes returned as float, must convert to int
+        scan_params.data.shape.x = int(gxsm.get(self.RES_X))
+        scan_params.data.shape.y = int(gxsm.get(self.RES_Y))
         #scan_params.data.units = ???  # TODO: how to read units?
 
         return scan_params
