@@ -4,13 +4,14 @@ import logging
 import zmq
 from google.protobuf.message import Message
 
-from ...controller import DeviceController, get_file_creation_datetime
+from afspm.components.device.controller import (DeviceController,
+                                                get_file_creation_datetime)
 
 #from . import gxsmconstants as const
-from ...utils import units
-from ...utils import array_converters as conv
-from ...io.protos.generated import scan_pb2
-from ...io.protos.generated import control_pb2
+from afspm.utils import units
+from afspm.utils import array_converters as conv
+from afspm.io.protos.generated import scan_pb2
+from afspm.io.protos.generated import control_pb2
 
 # Note: gxsm is *not* imported here, because it is dynamically loaded within
 # the gxsm remote window.
