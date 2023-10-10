@@ -18,12 +18,10 @@ class = 'afspm.io.control.server.ControlServer'
 url = 'server_url'
 
 
-
 # ----- Components ----- #
-[dev_con]
+[devcon]
 component = true
-class = 'afspm.components.device.controllers.gxsm.GxsmController'
-
+class = 'afspm.components.device.controllers.gxsm.controller.GxsmController'
 publisher = 'devcon_pub'
 control_server = 'devcon_server'
 

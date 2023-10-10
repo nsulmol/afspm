@@ -1,6 +1,7 @@
 """Handles device communication with the gxsm3 controller."""
 
 import logging
+from typing import Any
 import zmq
 from google.protobuf.message import Message
 
@@ -43,18 +44,18 @@ class GxsmController(DeviceController):
     # NOTE: I'm thinking each side is responsible for converting the data to the
     # units they want
     def __init__(self,
-                 channels_config_path: str = "./channels_config.toml"):  #, default_physical_units: str = 'nanometer'):
+                 channels_config_path: str = "./channels_config.toml",
+                 **kwargs):
+        #, default_physical_units: str = 'nanometer'):
         self.channels_config_path = channels_config_path
         #self.sent_physical_units = default_physical_units
-        self.afspm_scan_state = scan_pb2.ScanState.SS_FREE
-
         self.last_scan_fname = ''
-        self.last_scans = []
-        self.last_state = scan_pb2.ScanState.SS_UNDEFINED
+        self.last_scan_state = scan_pb2.ScanState.SS_UNDEFINED
+
+        super().__init__(**kwargs)
 
     def on_start_scan(self):
         gxsm.startscan()
-        self.afspm_scan_state = scan_pb2.ScanState.SS_SCANNING
         return  control_pb2.ControlResponse.REP_SUCCESS
 
     def on_stop_scan(self):
@@ -85,35 +86,16 @@ class GxsmController(DeviceController):
             logger.error("Failure on setting scan params: %s", exc)
             return control_pb2.ControlResponse.REP_FAILURE
 
-        self.afspm_scan_state = scan_pb2.ScanState.SS_MOVING
         return control_pb2.ControlResponse.REP_SUCCESS
 
     def poll_scan_state(self) -> scan_pb2.ScanState:
-        """Returns current scan state in accordance with system model.
-
-        Gxsm functions differently from how our scanning model was set up:
-        once startscan() is called, moving and/or scanning states can be
-        shown. A scan is finished when it is neither scanning nor moving.
-        """
-        state = self._get_current_state()
-        if (self.last_state == scan_pb2.ScanState.SS_SCANNING and
+        """Returns current scan state in accordance with system model."""
+        state = self._get_current_scan_state()
+        if (self.last_scan_state == scan_pb2.ScanState.SS_SCANNING and
                 state  == scan_pb2.ScanState.SS_FREE):
             gxsm.autosave()  # Save the images we have recorded
+            self.last_scan_state = state
         return state
-
-        # TODO: What about SS_INTERRUPTED? Is this handled by device_controller?
-
-
-        # state_to_send = self.afspm_scan_state
-
-        # if (self.afspm_scan_state == scan_pb2.ScanState.SS_SCANNING and
-        #     not (scanning or moving)):
-        #     self.afspm_scan_state = scan_pb2.ScanState.SS_FREE
-        # else:
-        #     self.afspm_scan_state = (scan_pb2.ScanState.SS_MOVING if moving
-        #                              else scan_pb2.ScanState.SS_FREE)
-        # return state_to_send
-
 
     def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
         return self._get_current_scan_params()
@@ -126,12 +108,14 @@ class GxsmController(DeviceController):
             fname = gxsm.chfname(channel_idx)
 
             if fname != self.last_scan_fname:
+                self.last_scan_fname = fname
                 while channel_idx < self.MAX_NUM_CHANNELS:
                     fnames.append(fname)
                     channel_idx += 1
                     fname = gxsm.chfname(channel_idx)
         except Exception as exc:
-            logger.trace("Exception with requesting channel %s", channel_idx)
+            logger.trace("Exception with requesting channel %s: %s",
+                         channel_idx, str(exc))
 
         # Avoid reloading scans if they are not new.
         if len(fnames) > 0:
