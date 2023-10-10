@@ -167,9 +167,12 @@ class GxsmController(DeviceController):
         """
         svec = gxsm.rtquery('s')
         s = int(svec[0])
-        scanning = s & (2+4) > 0 or s & 8 > 0  # 8 == Vector Probe
+        scanning = (s & (2+4) > self.STATE_RUNNING_THRESH or
+                    s & 8 > self.STATE_RUNNING_THRESH)  # 8 == Vector Probe
         moving = s & 16 > self.STATE_RUNNING_THRESH
-        motor_running = gxsm.get("dsp-fbs-motor") > self.MOTOR_RUNNING_THRESH
+
+        # TODO: investigate motor logic further...
+        motor_running = gxsm.get("dsp-fbs-motor") < self.MOTOR_RUNNING_THRESH
 
         if motor_running:
             return scan_pb2.ScanState.SS_MOTOR_RUNNING
