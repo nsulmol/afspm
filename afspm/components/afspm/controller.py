@@ -42,19 +42,17 @@ class AfspmController(afspmc.AfspmComponent):
                  pubsubcache: pbc.PubSubCache,
                  router: ctrl_rtr.ControlRouter,
                  loop_sleep_s: float = common.LOOP_SLEEP_S,
-                 hb_period_s: float = common.HEARTBEAT_PERIOD_S,
-                 ctx: zmq.Context = None, **kwargs):
+                 beat_period_s: float = common.HEARTBEAT_PERIOD_S,
+                 ctx: zmq.Context = None):
         """Initialize AfspmController instance.
 
         Args:
             name: component name.
             loop_sleep_s: how long we sleep in our main loop.
-            hb_period_s: how frequently we should send a hearbeat.
+            beat_period_s: how frequently we should send a hearbeat.
             pubsubcache: PubSubCache instance, for caching data received.
             router: ControlRouter instance, for choosing between clients.
             ctx: zmq context.
-            kwargs: allows non-used input arguments to be passed (so we can
-                initialize from an unfiltered dict).
         """
         if not ctx:
             ctx = zmq.Context.instance()
@@ -65,7 +63,7 @@ class AfspmController(afspmc.AfspmComponent):
         # AfspmComponent constructor: no subscriber or control_client
         # are provided, as they are not applicable here.
         super().__init__(name, subscriber=None, control_client=None, ctx=ctx,
-                         loop_sleep_s=loop_sleep_s, hb_period_s=hb_period_s)
+                         loop_sleep_s=loop_sleep_s, beat_period_s=beat_period_s)
 
     def run_per_loop(self):  # TODO: Change this to be private everywhere!?
         """Internal checks to be done per loop in run().

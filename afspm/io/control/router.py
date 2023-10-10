@@ -58,8 +58,7 @@ class ControlRouter:
     def __init__(self, server_url: str, router_url: str,
                  ctx: zmq.Context = None,
                  poll_timeout_ms: int = common.POLL_TIMEOUT_MS,
-                 request_timeout_ms: int = common.REQUEST_TIMEOUT_MS,
-                 **kwargs):
+                 request_timeout_ms: int = common.REQUEST_TIMEOUT_MS):
         """Init the class.
 
         Args:
@@ -71,8 +70,6 @@ class ControlRouter:
                 frontend.
             request_timeout_ms: delay to wait for a reply from a request we send
                 to the backend.
-            kwargs: allows non-used input arguments to be passed (so we can
-                initialize from an unfiltered dict).
         """
         if not ctx:
             ctx = zmq.Context.instance()

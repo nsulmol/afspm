@@ -180,6 +180,7 @@ def _filter_requested_components(config_dict: dict,
         if (isinstance(config_dict[key], dict) and
                 (components_to_spawn is None or key in components_to_spawn)):
             if IS_COMPONENT_KEY in config_dict[key]:
+                config_dict[key].pop(IS_COMPONENT_KEY, None)
                 config_dict[key]['name'] = key
                 filtered_dict[key] = config_dict[key]
             elif components_to_spawn is not None:

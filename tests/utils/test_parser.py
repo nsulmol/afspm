@@ -119,7 +119,7 @@ def afspm_component_params_dict():
         'class': 'afspm.components.afspm.component.AfspmComponent',
         'name': 'BananaHammock',
         'loop_sleep_s': 0,
-        'hb_period_s': 5,
+        'beat_period_s': 5,
         'subscriber': {
             'class': 'afspm.io.pubsub.subscriber.Subscriber',
             'sub_url': 'tcp://127.0.0.1:5555',
@@ -157,8 +157,7 @@ def visualizer_params_dict(scan_size):
         'visualize_undeclared_scans': True,
         'scan_id': 'Scan2d',
         'loop_sleep_s': 0,
-        'hb_period_s': 5,
-        'poll_timeout_ms': 1000,
+        'beat_period_s': 5,
     }
 
 

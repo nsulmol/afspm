@@ -28,7 +28,7 @@ class Publisher:
                  defaults.PUBLISHER_ENVELOPE_FOR_PROTO,
                  ctx: zmq.Context = None,
                  get_envelope_kwargs: dict =
-                 defaults.PUBLISHER_ENVELOPE_KWARGS, **kwargs):
+                 defaults.PUBLISHER_ENVELOPE_KWARGS):
         """ Initializes the publisher.
 
         Args:
@@ -38,8 +38,6 @@ class Publisher:
             ctx: zmq Context; if not provided, we will create a new instance.
             get_envelope_kwargs: any additional arguments to be fed to
                 get_envelope_for_proto.
-            kwargs: allows non-used input arguments to be passed (so we can
-                initialize from an unfiltered dict).
         """
         self.get_envelope_for_proto = get_envelope_for_proto
         self.get_envelope_kwargs = (get_envelope_kwargs if get_envelope_kwargs

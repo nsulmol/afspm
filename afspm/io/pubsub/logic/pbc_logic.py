@@ -24,7 +24,7 @@ class ProtoBasedCacheLogic(CacheLogic):
     """
 
     def __init__(self, proto_with_history_list: list[(Message, int)] =
-                 DEFAULT_PROTO_WITH_HIST_SEQ, **kwargs):
+                 DEFAULT_PROTO_WITH_HIST_SEQ):
 
         self.envelope_to_history_map = {}
         self.envelope_to_proto_map = {}

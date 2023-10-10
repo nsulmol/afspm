@@ -60,7 +60,7 @@ class AfspmComponent:
                  control_client: ctrl_client.ControlClient = None,
                  loop_sleep_s: float = common.LOOP_SLEEP_S,
                  beat_period_s: float = common.HEARTBEAT_PERIOD_S,
-                 ctx: zmq.Context = None, **kwargs):
+                 ctx: zmq.Context = None):
         """Initialize our AfspmComponent.
 
         Args:
@@ -71,8 +71,6 @@ class AfspmComponent:
                 DeviceController.
             control_client: client to ControlServer, to allow sending requests.
             ctx: zmq context.
-            kwargs: allows non-used input arguments to be passed (so we can
-                initialize from an unfiltered dict).
         """
         logger.debug("Initializing component %s", name)
         if not ctx:

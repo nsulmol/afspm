@@ -149,7 +149,7 @@ def construct_and_run_component(params_dict: dict):
     {
         class: 'afspm.components.afspm.component.AfspmComponent',
         loop_sleep_s: 0,
-        hb_period_s: 5,
+        beat_period_s: 5,
         subscriber: {
             class: 'afspm.io.pubsub.subscriber.Subscriber',
             sub_url: 'tcp://127.0.0.1:5555'
@@ -201,7 +201,7 @@ def _evaluate_values_recursively(params_dict: dict) -> dict:
     {
         class: 'afspm.components.afspm.component.AfspmComponent',
         loop_sleep_s: 0,
-        hb_period_s: 5,
+        beat_period_s: 5,
         subscriber: {
             class: 'afspm.io.pubsub.subscriber.Subscriber',
             sub_url: 'tcp://127.0.0.1:5555'

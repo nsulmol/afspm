@@ -28,8 +28,7 @@ class ControlServer:
     """
 
     def __init__(self, url: str, ctx: zmq.Context = None,
-                 poll_timeout_ms: int = common.POLL_TIMEOUT_MS,
-                 **kwargs):
+                 poll_timeout_ms: int = common.POLL_TIMEOUT_MS):
         self.poll_timeout_ms = poll_timeout_ms
         if not ctx:
             ctx = zmq.Context.instance()

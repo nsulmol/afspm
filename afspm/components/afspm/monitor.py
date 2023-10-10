@@ -26,7 +26,7 @@ class AfspmComponentsMonitor:
     'SampleAfspmComponent': {
         class: 'afspm.components.afspm.component.AfspmComponent',
         loop_sleep_s: 0,
-        hb_period_s: 5,
+        beat_period_s: 5,
         subscriber: {
             class: 'afspm.io.pubsub.subscriber.Subscriber',
             sub_url: 'tcp://127.0.0.1:5555'
@@ -69,7 +69,7 @@ class AfspmComponentsMonitor:
                  poll_timeout_ms: int = common.POLL_TIMEOUT_MS,
                  loop_sleep_s: float = common.LOOP_SLEEP_S,
                  missed_beats_before_dead: int = common.BEATS_BEFORE_DEAD,
-                 ctx: zmq.Context = None, **kwargs):
+                 ctx: zmq.Context = None):
         """Initialize the components monitor.
 
         Args:
@@ -81,8 +81,6 @@ class AfspmComponentsMonitor:
             missed_beats_before_dead: how many missed beats we will allow
                 before we consider the Heartbeater dead.
             ctx: the zmq.Context instance.
-            kwargs: allows non-used input arguments to be passed (so we can
-                initialize from an unfiltered dict).
         """
         logger.debug("Initializing components monitor.")
         if not ctx:
