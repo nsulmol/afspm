@@ -160,7 +160,7 @@ def spawn_monitorless_component(config_file: str,
         filtered_dict = _filter_requested_components(expanded_dict,
                                                      [component_to_spawn])
 
-        keys = len(filtered_dict.keys())
+        keys = list(filtered_dict.keys())
         if len(keys) == 0:
             logger.error("Component %s not found, exiting.", component_to_spawn)
             return
