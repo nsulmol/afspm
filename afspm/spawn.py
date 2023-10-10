@@ -249,6 +249,7 @@ def _filter_requested_components(config_dict: dict,
         spawn_component = no_filtering or should_spawn or not should_not_spawn
         if isinstance(config_dict[key], dict) and spawn_component:
             if IS_COMPONENT_KEY in config_dict[key]:
+                config_dict[key].pop(IS_COMPONENT_KEY, None)
                 config_dict[key]['name'] = key
                 filtered_dict[key] = config_dict[key]
             elif components_to_spawn is not None:

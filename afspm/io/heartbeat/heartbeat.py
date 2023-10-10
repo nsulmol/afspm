@@ -33,7 +33,8 @@ class Heartbeater:
         last_beat_ts: a timestamp of the last time we sent a
             heartbeat.
     """
-    def __init__(self, url: str, beat_period_s: int = common.HEARTBEAT_PERIOD_S,
+    def __init__(self, url: str,
+                 beat_period_s: int = common.HEARTBEAT_PERIOD_S,
                  ctx: zmq.Context = None, **kwargs):
         """Init heartbeater.
 

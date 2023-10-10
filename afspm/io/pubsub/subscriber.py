@@ -67,8 +67,7 @@ class Subscriber:
                  defaults.SUBSCRIBER_EXTRACT_PROTO_KWARGS,
                  update_cache_kwargs: dict =
                  defaults.SUBSCRIBER_UPDATE_CACHE_KWARGS,
-                 poll_timeout_ms: int = common.POLL_TIMEOUT_MS,
-                 **kwargs):
+                 poll_timeout_ms: int = common.POLL_TIMEOUT_MS):
         """Initializes the caching logic and subscribes.
 
         Args:
@@ -88,8 +87,6 @@ class Subscriber:
                 update_cache.
             poll_timeout_ms: the poll timeout, in milliseconds. If None,
                 we do not poll and do a blocking receive instead.
-            kwargs: allows non-used input arguments to be passed (so we can
-                initialize from an unfiltered dict).
         """
         self.sub_extract_proto = sub_extract_proto
         self.extract_proto_kwargs = (extract_proto_kwargs if
