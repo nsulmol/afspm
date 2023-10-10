@@ -139,7 +139,7 @@ class GxsmController(DeviceController):
         scan_params.spatial.roi.top_left.y = gxsm.get(self.TL_Y)
         scan_params.spatial.roi.size.x = gxsm.get(self.SZ_X)
         scan_params.spatial.roi.size.y = gxsm.get(self.SZ_Y)
-        scan_params.spatial.units = const.GXSM_PHYS_UNITS
+        scan_params.spatial.units = self.GXSM_PHYS_UNITS
 
         #scan_params.spatial.scan_speed_units_s = gxsm.get(
         #    self.SCAN_SPEED_UNITS_S)
