@@ -1,5 +1,6 @@
 """Holds the components monitoring helper class."""
 
+import copy
 import logging
 import time
 from typing import Callable
@@ -131,6 +132,7 @@ class AfspmComponentsMonitor:
         Returns:
             Process spawned.
         """
+        params_dict = copy.deepcopy(params_dict)
         params_dict['ctx'] = None
         logger.info("Creating process for component %s", params_dict['name'])
         proc = mp.Process(target=construct_and_run_component,
@@ -156,6 +158,7 @@ class AfspmComponentsMonitor:
         Returns:
             The created HeartbeatListener instance.
         """
+        params_dict = copy.deepcopy(params_dict)
         params_dict['url'] = get_heartbeat_url(params_dict['name'])
         params_dict['poll_timeout_ms'] = poll_timeout_ms
 
