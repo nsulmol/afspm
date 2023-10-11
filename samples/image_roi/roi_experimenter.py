@@ -174,8 +174,9 @@ class ROIExperimenter(AfspmComponent):
                         origin)
             self.scans_since_last_fscan += 1
 
-        return common.create_scan_params_2d(origin.tolist(), size.tolist(), "",
-                                            res.tolist(), "")
+        return common.create_scan_params_2d(origin.tolist(), size.tolist(),
+                                            self.phys_units, res.tolist(),
+                                            self.data_units)
 
     def _reset_sub_scan_aspects(self):
         """After a full scan, reset our subscan aspects."""
