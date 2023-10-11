@@ -23,20 +23,20 @@ logger = logging.getLogger(__name__)
 # -------------------- Validate Test Should Run -------------------- #
 
 # Base subscriber, to validate controller exists
-SERVER_URL = "tcp://127.0.0.1:7777"
-PUBLISHER_URL = "tcp://127.0.0.1:7778"
+ROUTER_URL = "tcp://127.0.0.1:7777"
+PSC_URL = "tcp://127.0.0.1:7778"
 TEST_TIMEOUT_MS = 500
 
 
 def confirm_devcon_initialized():
     """Quick check if a device controller is setup and running."""
-    sub = Subscriber(sub_url=PUBLISHER_URL, poll_timeout_ms=TEST_TIMEOUT_MS)
+    sub = Subscriber(sub_url=PSC_URL, poll_timeout_ms=TEST_TIMEOUT_MS)
     return sub.poll_and_store()
 
 
 pytestmark = pytest.mark.skipif(not confirm_devcon_initialized(),
                                 reason="No device controller seems to be "
-                                "publishing on url: " + PUBLISHER_URL)
+                                "publishing on url: " + PSC_URL)
 
 # -------------------- Fixtures -------------------- #
 # --- General / Urls --- #
@@ -80,28 +80,28 @@ def topics_scan_state():
 # --- I/O Classes (Subscribers, Clients) --- #
 @pytest.fixture
 def sub_scan(ctx, topics_scan2d, timeout_ms):
-    return Subscriber(PUBLISHER_URL,
+    return Subscriber(PSC_URL,
                       topics_to_sub=topics_scan,
                       poll_timeout_ms=timeout_ms)
 
 
 @pytest.fixture
 def sub_scan_state(ctx, topics_scan_state, timeout_ms):
-    return Subscriber(PUBLISHER_URL,
+    return Subscriber(PSC_URL,
                       topics_to_sub=topics_scan_state,
                       poll_timeout_ms=timeout_ms)
 
 
 @pytest.fixture
 def sub_scan_params(ctx, topics_scan2d, timeout_ms):
-    return Subscriber(PUBLISHER_URL,
+    return Subscriber(PSC_URL,
                       topics_to_sub=topics_scan2d,
                       poll_timeout_ms=timeout_ms)
 
 
 @pytest.fixture
 def client(ctx, component_name):
-    return ControlClient(SERVER_URL, ctx, component_name)
+    return ControlClient(ROUTER_URL, ctx, component_name)
 
 
 # --- Components --- #

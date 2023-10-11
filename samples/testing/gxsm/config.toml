@@ -1,28 +1,47 @@
 # ----- General variables ----- #
 # --- URLs --- #
-server_url = "tcp://127.0.0.1:7777"
-pub_url = "tcp://127.0.0.1:7778"
+server_url = "tcp://127.0.0.1:7775"
+pub_url = "tcp://127.0.0.1:7776"
+router_url = "tcp://127.0.0.1:7777"
+psc_url = "tcp://127.0.0.1:7778"
 timeout_ms = 500
 wait_ms = 60000
 
 
 # ----- PubSub ----- #
-[devcon_pub]
+[pub]
 class = 'afspm.io.pubsub.publisher.Publisher'
 url = 'pub_url'
 
+[psc]
+class = 'afspm.io.pubsub.cache.PubSubCache'
+url = 'psc_url'
+sub_url = 'pub_url'
+
 
 # ----- Control Logic ----- #
-[devcon_server]
+[server]
 class = 'afspm.io.control.server.ControlServer'
 url = 'server_url'
 
+[router]
+class = 'afspm.io.control.router.ControlRouter'
+server_url = 'server_url'
+router_url = 'router_url'
+
 
 # ----- Components ----- #
+[afcon]
+component = true
+class = 'afspm.components.afspm.controller.AfspmController'
+pubsubcache = 'psc'
+router = 'router'
+
+
 [devcon]
 component = true
 class = 'afspm.components.device.controllers.gxsm.controller.GxsmController'
-publisher = 'devcon_pub'
-control_server = 'devcon_server'
+publisher = 'pub'
+control_server = 'server'
 
 # No subscriber, because we have to run this within gxsm.

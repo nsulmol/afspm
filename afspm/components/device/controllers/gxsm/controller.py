@@ -185,15 +185,13 @@ class GxsmController(DeviceController):
 
 # Spawn settings
 CONFIG_FILE = './config.toml'
-COMPONENT_TO_SPAWN = 'devcon'
 LOG_FILE = 'log.txt'
 LOG_TO_STDOUT = 'True'
 LOG_LEVEL = 'INFO'
 
 if __name__ == '__main__':
     from afspm import spawn
-    spawn.spawn_monitorless_component(CONFIG_FILE,
-                                      COMPONENT_TO_SPAWN,
-                                      LOG_FILE,
-                                      LOG_TO_STDOUT,
-                                      LOG_LEVEL)
+    spawn.spawn_components(CONFIG_FILE,
+                           log_file=LOG_FILE,
+                           log_to_stdout=LOG_TO_STDOUT,
+                           log_level=LOG_LEVEL)
