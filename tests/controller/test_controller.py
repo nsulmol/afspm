@@ -79,7 +79,7 @@ def topics_scan_state():
 
 # --- I/O Classes (Subscribers, Clients) --- #
 @pytest.fixture
-def sub_scan(ctx, topics_scan2d, timeout_ms):
+def sub_scan(ctx, topics_scan, timeout_ms):
     return Subscriber(PSC_URL,
                       topics_to_sub=topics_scan,
                       poll_timeout_ms=timeout_ms)
@@ -93,9 +93,9 @@ def sub_scan_state(ctx, topics_scan_state, timeout_ms):
 
 
 @pytest.fixture
-def sub_scan_params(ctx, topics_scan2d, timeout_ms):
+def sub_scan_params(ctx, topics_scan, timeout_ms):
     return Subscriber(PSC_URL,
-                      topics_to_sub=topics_scan2d,
+                      topics_to_sub=topics_scan,
                       poll_timeout_ms=timeout_ms)
 
 
