@@ -112,8 +112,11 @@ def spawn_components(config_file: str,
         expanded_dict = expand_variables_in_dict(config_dict)
         filtered_dict = _filter_requested_components(expanded_dict,
                                                      components_to_spawn)
-        monitor = AfspmComponentsMonitor(filtered_dict,
-                                         **expanded_dict[MONITOR_KEY])
+        if MONITOR_KEY in expanded_dict:
+            monitor = AfspmComponentsMonitor(filtered_dict,
+                                             **expanded_dict[MONITOR_KEY])
+        else:
+            monitor = AfspmComponentsMonitor(filtered_dict)
 
     if monitor:
         monitor.run()

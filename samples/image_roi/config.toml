@@ -138,8 +138,6 @@ scan_id = 'Scan2d'
 subscriber = 'experiment_sub'
 control_client = 'ui_client'
 
-[afspm_components_monitor]
-
 [afspm_controller]
 component = true
 class = 'afspm.components.afspm.controller.AfspmController'
