@@ -35,11 +35,16 @@ def component_name():
 
 @pytest.fixture
 def timeout_ms():
+    return 5000
+
+
+@pytest.fixture
+def scan_wait_ms():
     return 180000
 
 
 @pytest.fixture
-def pub_url():
+def psc_url():
     return "tcp://127.0.0.1:7778"
 
 
@@ -72,22 +77,22 @@ def topics_scan_state():
 
 # --- I/O Classes (Subscribers, Clients) --- #
 @pytest.fixture
-def sub_scan(ctx, topics_scan, timeout_ms, pub_url):
-    return Subscriber(pub_url,
+def sub_scan(ctx, topics_scan, scan_wait_ms, psc_url):
+    return Subscriber(psc_url,
                       topics_to_sub=topics_scan,
-                      poll_timeout_ms=timeout_ms)
+                      poll_timeout_ms=scan_ms)
 
 
 @pytest.fixture
-def sub_scan_state(ctx, topics_scan_state, timeout_ms, pub_url):
-    return Subscriber(pub_url,
+def sub_scan_state(ctx, topics_scan_state, timeout_ms, psc_url):
+    return Subscriber(psc_url,
                       topics_to_sub=topics_scan_state,
                       poll_timeout_ms=timeout_ms)
 
 
 @pytest.fixture
-def sub_scan_params(ctx, topics_scan, timeout_ms, pub_url):
-    return Subscriber(pub_url,
+def sub_scan_params(ctx, topics_scan, timeout_ms, psc_url):
+    return Subscriber(psc_url,
                       topics_to_sub=topics_scan,
                       poll_timeout_ms=timeout_ms)
 
@@ -95,16 +100,6 @@ def sub_scan_params(ctx, topics_scan, timeout_ms, pub_url):
 @pytest.fixture
 def client(ctx, component_name, server_url):
     return ControlClient(server_url, ctx, component_name)
-
-
-# --- Components --- #
-@pytest.fixture
-def afspm_component_scan(sub_scan, client, component_name, ctx):
-    return AfspmComponent(component_name, sub_scan, client, ctx)
-
-@pytest.fixture
-def afspm_component_scan_params(sub_scan_params, client, component_name, ctx):
-    return AfspmComponent(component_name, sub_scan_params, client, ctx)
 
 
 # -------------------- Helper Methods -------------------- #
@@ -117,46 +112,53 @@ def assert_sub_received_proto(sub: Subscriber, proto: Message):
 
 
 # -------------------- Tests -------------------- #
-def test_cancel_scan(afspm_component_scan, default_control_state,
-                     component_name, sub_scan_state):
-    afspm_component = afspm_component_scan
+def test_cancel_scan(client, default_control_state, component_name,
+                     sub_scan_state, timeout_ms):
     logger.info("Validate we can start and cancel a scan.")
+    logger.info("First, validate we *do not* have an initial scan (in the "
+                "cache).")
+    # Hack around, make poll short for this.
+    tmp_timeout_ms = sub_scan.poll_timeout_ms
+    sub_scan.poll_timeout_ms = timeout_ms
+    assert not sub_scan.poll_and_store()
+    sub_scan.poll_timeout_ms = tmp_timeout_ms  # Return to prior
 
-    rep = afspm_component.control_client.start_scan()
+    logger.info("Next, validate that we can start a scan and are notified "
+                "scanning has begun.")
+    rep = client.start_scan()
 
-    # Ensure we get a scanning message
     scan_state_msg = scan_pb2.ScanStateMsg(
         scan_state=scan_pb2.ScanState.SS_SCANNING)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
-    assert_sub_received_proto(afspm_component.subscriber,
+    assert_sub_received_proto(sub_scan_state,
                               scan_state_msg)
 
-    rep = afspm_component.control_client.stop_scan()
-
-    # Ensure we get an interrupted message, a free message, and
-    # no scan.
+    logger.info("Next, cancel the scan before it has finished, and ensure "
+                "we are notified it has been cancelled (via an interruption).")
+    rep = client.stop_scan()
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
     scan_state_msg = scan_pb2.ScanStateMsg(
         scan_state=scan_pb2.ScanState.SS_INTERRUPTED)
-    assert_sub_received_proto(afspm_component.subscriber,
+    assert_sub_received_proto(sub_scan_state,
                               scan_state_msg)
 
+    logger.info("Lastly, ensure we are notified the controller is free and no "
+                "scans were received.")
     scan_state_msg = scan_pb2.ScanStateMsg(
         scan_state=scan_pb2.ScanState.SS_FREE)
-    assert_sub_received_proto(afspm_component.subscriber,
+    assert_sub_received_proto(sub_scan_state,
                               scan_state_msg)
 
-    assert not afspm_component.subscriber.poll_and_store()
+    assert not sub_scan_state.poll_and_store()
 
 
-def test_scan_params(afspm_component_scan_params, default_control_state,
-                     component_name):
-    afspm_component = afspm_component_scan_params
+def test_scan_params(client, default_control_state, component_name,
+                     sub_scan_params):
     logger.info("Validate we can set scan parameters.")
-
-    # We should get an initial scan parameters
-    initial_params = afspm_component.subscriber.poll_and_store()
+    logger.info("First, validate we have initial scan params (from the "
+                "cache).")
+    initial_params = sub_scan_params.poll_and_store()
     assert initial_params
 
     initial_params.spatial.roi.top_left.x *= 1.1
@@ -167,31 +169,37 @@ def test_scan_params(afspm_component_scan_params, default_control_state,
     initial_params.data.shape.x -= 1
     initial_params.data.shape.y -= 1
 
-    rep = afspm_component.control_client.set_scan_params(
-        scan_pb2.ScanParameters2d())
+    logger.info("Next, set new scan params. We expect a success.")
+    rep = client.set_scan_params(scan_pb2.ScanParameters2d())
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
-    # Expect to receive a reply within our timeout!
-    last_params = afspm_component.subscriber.poll_and_store()
+    logger.info("Lastly, validate that our subscriber receives these new "
+                "params.")
+    last_params = sub_scan_params.poll_and_store()
     assert last_params == initial_params
 
 
-def test_scan(afspm_component_scan, default_control_state, component_name,
-              sub_scan_state):
-    afspm_component = afspm_component_scan
+def test_scan(client, default_control_state, component_name,
+              sub_scan_state, sub_scan, timeout_ms):
     logger.info("Validate we can start a scan, and receive one on finish.")
+    logger.info("First, validate we *do not* have an initial scan (in the "
+                "cache).")
+    # Hack around, make poll short for this.
+    tmp_timeout_ms = sub_scan.poll_timeout_ms
+    sub_scan.poll_timeout_ms = timeout_ms
+    assert not sub_scan.poll_and_store()
+    sub_scan.poll_timeout_ms = tmp_timeout_ms  # Return to prior
 
-    rep = afspm_component.control_client.start_scan()
-
-    # Ensure we get a scanning message
+    logger.info("Next, validate that we can start a scan and are notified "
+                "scanning has begun.")
+    rep = client.start_scan()
     scan_state_msg = scan_pb2.ScanStateMsg(
         scan_state=scan_pb2.ScanState.SS_SCANNING)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
-    assert_sub_received_proto(afspm_component.subscriber,
-                              scan_state_msg)
+    assert_sub_received_proto(sub_scan_state, scan_state_msg)
 
-    # Ensure we received indication the scan ended, and an image
+    logger.info("Lastly, wait for a predetermined 'long-enough' period, "
+                "and validate the scan finishes.")
     scan_state_msg.scan_state = scan_pb2.ScanState.SS_FREE
-    assert_sub_received_proto(afspm_component.subscriber,
-                              scan_state_msg)
-    assert afspm_component.subscriber.poll_and_store()
+    assert_sub_received_proto(sub_scan_state, scan_state_msg)
+    assert sub_scan.poll_and_store()
