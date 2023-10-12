@@ -16,7 +16,6 @@ ureg = pint.UnitRegistry()
 Q_ = ureg.Quantity
 
 
-# TODO: Add test for me!!
 def convert(val: Any, unit: str, desired_unit: str) -> Any:
     """Uses pint to convert a value from one unit to another.
 
