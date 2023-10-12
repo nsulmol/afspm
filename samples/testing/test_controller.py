@@ -117,27 +117,6 @@ def assert_sub_received_proto(sub: Subscriber, proto: Message):
 
 
 # -------------------- Tests -------------------- #
-def test_scan(afspm_component_scan, default_control_state, component_name,
-              sub_scan_state):
-    afspm_component = afspm_component_scan
-    logger.info("Validate we can start a scan, and receive one on finish.")
-
-    rep = afspm_component.control_client.start_scan()
-
-    # Ensure we get a scanning message
-    scan_state_msg = scan_pb2.ScanStateMsg(
-        scan_state=scan_pb2.ScanState.SS_SCANNING)
-    assert rep == control_pb2.ControlResponse.REP_SUCCESS
-    assert_sub_received_proto(afspm_component.subscriber,
-                              scan_state_msg)
-
-    # Ensure we received indication the scan ended, and an image
-    scan_state_msg.scan_state = scan_pb2.ScanState.SS_FREE
-    assert_sub_received_proto(afspm_component.subscriber,
-                              scan_state_msg)
-    assert afspm_component.subscriber.poll_and_store()
-
-
 def test_cancel_scan(afspm_component_scan, default_control_state,
                      component_name, sub_scan_state):
     afspm_component = afspm_component_scan
@@ -195,3 +174,24 @@ def test_scan_params(afspm_component_scan_params, default_control_state,
     # Expect to receive a reply within our timeout!
     last_params = afspm_component.subscriber.poll_and_store()
     assert last_params == initial_params
+
+
+def test_scan(afspm_component_scan, default_control_state, component_name,
+              sub_scan_state):
+    afspm_component = afspm_component_scan
+    logger.info("Validate we can start a scan, and receive one on finish.")
+
+    rep = afspm_component.control_client.start_scan()
+
+    # Ensure we get a scanning message
+    scan_state_msg = scan_pb2.ScanStateMsg(
+        scan_state=scan_pb2.ScanState.SS_SCANNING)
+    assert rep == control_pb2.ControlResponse.REP_SUCCESS
+    assert_sub_received_proto(afspm_component.subscriber,
+                              scan_state_msg)
+
+    # Ensure we received indication the scan ended, and an image
+    scan_state_msg.scan_state = scan_pb2.ScanState.SS_FREE
+    assert_sub_received_proto(afspm_component.subscriber,
+                              scan_state_msg)
+    assert afspm_component.subscriber.poll_and_store()
