@@ -265,9 +265,19 @@ def _filter_requested_components(config_dict: dict,
     return filtered_dict
 
 
-def cli():
+def cli_spawn():
     fire.Fire(spawn_components)
 
 
+def cli_spawn_monitorless():
+    fire.Fire(spawn_monitorless_component)
+
+
 if __name__ == '__main__':
-    cli()
+    # Note: this means you have to explicit the method if calling spawn.py
+    # directly (e.g. 'spawn.py spawn_components [ARGS]). On installation,
+    # we have aliases defined via the pyproject.toml.
+    fire.Fire({
+        'spawn_components': spawn_components,
+        'spawn_monitorless': spawn_monitorless_component
+    })

@@ -31,7 +31,8 @@ sidpy = "^0.12.1"
 gxsmread = {path = "../gxsmread/dist/gxsmread-0.1.0-py3-none-any.whl"}
 
 [tool.poetry.scripts]
-spawn = "afspm.spawn:cli"
+spawn = "afspm.spawn:cli_spawn"
+spawn_monitorless = "afspm.spawn:cli_spawn_monitorless"
 
 [build-system]
 requires = ["poetry-core"]
