@@ -1,17 +1,22 @@
 """Array converter helers."""
 
+import logging
 import xarray as xr
 import numpy as np
 from ..io.protos.generated import scan_pb2
 from ..io.protos.generated import geometry_pb2
 
+
+logger = logging.getLogger(__name__)
+
+
 try:
     import sidpy
     from sidpy.sid import Dataset
 except ModuleNotFoundError:
-    print("You don't have sidpy installed. "
-          "If you wish to use this method, you will need to install it "
-          "(pip install sidpy) before attempting.")
+    logger.warning("You don't have sidpy installed. "
+                   "If you wish to use this method, you will need to install "
+                   "it (pip install sidpy) before attempting.")
     sidpy = None
     Dataset = None
 

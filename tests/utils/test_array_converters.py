@@ -5,11 +5,6 @@ import xarray as xr
 import numpy as np
 import pytest
 
-try:
-    import sidpy
-except ModuleNotFoundError:
-    sidpy = None
-
 
 class TestConverters:
     data = np.random.normal(loc=3, scale=2.5, size=(128, 128))
@@ -31,8 +26,9 @@ class TestConverters:
 
         assert (da == da2).all()
 
-    #@pytest.mark.skipif(not sidpy, reason="sidpy not installed")
     def test_convert_sidpy(self):
+        sidpy = pytest.importorskip('sidpy')
+
         dset = sidpy.Dataset.from_array(self.data)
         dset.data_type = 'image'
         dset.units = self.data_units
