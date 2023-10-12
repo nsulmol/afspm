@@ -181,17 +181,3 @@ class GxsmController(DeviceController):
         if moving:
             return scan_pb2.ScanState.SS_MOVING
         return scan_pb2.ScanState.SS_FREE
-
-
-# Spawn settings
-CONFIG_FILE = './config.toml'
-LOG_FILE = 'log.txt'
-LOG_TO_STDOUT = 'True'
-LOG_LEVEL = 'INFO'
-
-if __name__ == '__main__':
-    from afspm import spawn
-    spawn.spawn_components(CONFIG_FILE,
-                           log_file=LOG_FILE,
-                           log_to_stdout=LOG_TO_STDOUT,
-                           log_level=LOG_LEVEL)
