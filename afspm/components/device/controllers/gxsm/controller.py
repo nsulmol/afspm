@@ -158,20 +158,20 @@ class GxsmController(DeviceController):
                        curr_units: list[str | None]) -> bool:
         """Convert a list of values to gxsm units and set them."""
         converted_vals = []
-        for val, curr_units in zip([vals, curr_units]):
-            if curr_units:
+        for val, curr_unit in zip(vals, curr_units):
+            if curr_unit:
                 try:
                     converted_vals.append(
-                        units.convert(val, curr_units,
+                        units.convert(val, curr_unit,
                                       GxsmController.GXSM_PHYS_UNITS))
                 except UndefinedUnitError:
                     logger.error("Unable to convert %s from %s to %s.",
-                                 val, curr_units,
+                                 val, curr_unit,
                                  GxsmController.GXSM_PHYS_UNITS)
                     return False
             else:
                 converted_vals.append(val)
-        for val, attr in zip([converted_vals, attrs]):
+        for val, attr in zip(converted_vals, attrs):
             gxsm.set(attr, str(val))
         return True
 
