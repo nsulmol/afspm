@@ -1,7 +1,7 @@
 """Holds Abstract Device Controller Class (defines controller logic)."""
 
+import os
 import logging
-import time
 import datetime
 import copy
 from abc import ABCMeta, abstractmethod
@@ -15,7 +15,6 @@ from ..afspm import component as afspmc
 from ...io import common
 from ...io.pubsub import publisher as pub
 from ...io.pubsub import subscriber as sub
-from ...io.control import commands as cmd
 from ...io.control import server as ctrl_srvr
 
 from ...io.protos.generated import scan_pb2
@@ -148,7 +147,7 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
         a data comparison.
 
         To read the creation time of a file using Python, use
-            get_file_creation_datetime()
+            get_file_modification_datetime()
         and you can put that in the timestamp param with:
             scan.timestamp.FromDatetime(ts)
         """
@@ -241,11 +240,11 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
         self._handle_polling_device()
 
 
-def get_file_creation_datetime(filename: str) -> datetime.datetime:
-    """Read creation time of a file, return a datetime representing it.
+def get_file_modification_datetime(filename: str) -> datetime.datetime:
+    """Read modification time of a file, return a datetime representing it.
 
     Taken from: https://stackoverflow.com/questions/237079/how-do-i-get-file-
     creation-and-modification-date-times.
     """
-    return datetime.datetime.fromtimestamp(filename.stat().st_ctime,
+    return datetime.datetime.fromtimestamp(os.path.getmtime(filename),
                                            tz=datetime.timezone.utc)
