@@ -20,23 +20,6 @@ from afspm.io.protos.generated import control_pb2
 
 logger = logging.getLogger(__name__)
 
-# -------------------- Validate Test Should Run -------------------- #
-
-# Base subscriber, to validate controller exists
-ROUTER_URL = "tcp://127.0.0.1:7777"
-PSC_URL = "tcp://127.0.0.1:7778"
-TEST_TIMEOUT_MS = 500
-
-
-def confirm_devcon_initialized():
-    """Quick check if a device controller is setup and running."""
-    sub = Subscriber(sub_url=PSC_URL, poll_timeout_ms=TEST_TIMEOUT_MS)
-    return sub.poll_and_store()
-
-
-pytestmark = pytest.mark.skipif(not confirm_devcon_initialized(),
-                                reason="No device controller seems to be "
-                                "publishing on url: " + PSC_URL)
 
 # -------------------- Fixtures -------------------- #
 # --- General / Urls --- #
@@ -53,6 +36,16 @@ def component_name():
 @pytest.fixture
 def timeout_ms():
     return 60000
+
+
+@pytest.fixture
+def pub_url():
+    return "tcp://127.0.0.1:7778"
+
+
+@pytest.fixture
+def server_url():
+    return "tcp://127.0.0.1:7777"
 
 
 @pytest.fixture(scope="module")
@@ -79,29 +72,29 @@ def topics_scan_state():
 
 # --- I/O Classes (Subscribers, Clients) --- #
 @pytest.fixture
-def sub_scan(ctx, topics_scan, timeout_ms):
-    return Subscriber(PSC_URL,
+def sub_scan(ctx, topics_scan, timeout_ms, pub_url):
+    return Subscriber(pub_url,
                       topics_to_sub=topics_scan,
                       poll_timeout_ms=timeout_ms)
 
 
 @pytest.fixture
-def sub_scan_state(ctx, topics_scan_state, timeout_ms):
-    return Subscriber(PSC_URL,
+def sub_scan_state(ctx, topics_scan_state, timeout_ms, pub_url):
+    return Subscriber(pub_url,
                       topics_to_sub=topics_scan_state,
                       poll_timeout_ms=timeout_ms)
 
 
 @pytest.fixture
-def sub_scan_params(ctx, topics_scan, timeout_ms):
-    return Subscriber(PSC_URL,
+def sub_scan_params(ctx, topics_scan, timeout_ms, pub_url):
+    return Subscriber(pub_url,
                       topics_to_sub=topics_scan,
                       poll_timeout_ms=timeout_ms)
 
 
 @pytest.fixture
-def client(ctx, component_name):
-    return ControlClient(ROUTER_URL, ctx, component_name)
+def client(ctx, component_name, server_url):
+    return ControlClient(server_url, ctx, component_name)
 
 
 # --- Components --- #
@@ -123,27 +116,11 @@ def assert_sub_received_proto(sub: Subscriber, proto: Message):
             == proto)
 
 
-def request_control(afspm_component: AfspmController,
-                    default_control_state: control_pb2.ControlState,
-                    component_name: str):
-    """Request control with a component (and flush/validate messages)"""
-    rep = afspm_component.control_client.request_control(
-        control_pb2.ControlMode.CM_AUTOMATED)
-    assert rep == control_pb2.ControlResponse.REP_SUCCESS
-
-    cs = copy.deepcopy(default_control_state)
-    cs.client_in_control_id = component_name
-
-    assert_sub_received_proto(afspm_component.subscriber, cs)
-
-
 # -------------------- Tests -------------------- #
 def test_scan(afspm_component_scan, default_control_state, component_name,
               sub_scan_state):
     afspm_component = afspm_component_scan
     logger.info("Validate we can start a scan, and receive one on finish.")
-    request_control(afspm_component, default_control_state,
-                    component_name)
 
     rep = afspm_component.control_client.start_scan()
 
@@ -165,8 +142,6 @@ def test_cancel_scan(afspm_component_scan, default_control_state,
                      component_name, sub_scan_state):
     afspm_component = afspm_component_scan
     logger.info("Validate we can start and cancel a scan.")
-    request_control(afspm_component, default_control_state,
-                    component_name)
 
     rep = afspm_component.control_client.start_scan()
 
@@ -200,8 +175,6 @@ def test_scan_params(afspm_component_scan_params, default_control_state,
                      component_name):
     afspm_component = afspm_component_scan_params
     logger.info("Validate we can set scan parameters.")
-    request_control(afspm_component, default_control_state,
-                    component_name)
 
     # We should get an initial scan parameters
     initial_params = afspm_component.subscriber.poll_and_store()
