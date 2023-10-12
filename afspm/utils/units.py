@@ -32,5 +32,8 @@ def convert(val: Any, unit: str, desired_unit: str) -> Any:
         one it does not know how to do).
         UndefinedUnitError if either unit or desired_unit are undefined.
     """
+    logger.trace("Converting %s from %s to %s", val, unit, desired_unit)
     quantity = val * ureg(unit)
-    return quantity.to(desired_unit).magnitude
+    magnitude = quantity.to(desired_unit).magnitude
+    logger.trace("After conversion, magnitude is %s", magnitude)
+    return magnitude
