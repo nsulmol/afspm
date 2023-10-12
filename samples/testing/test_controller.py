@@ -80,7 +80,7 @@ def topics_scan_state():
 def sub_scan(ctx, topics_scan, scan_wait_ms, psc_url):
     return Subscriber(psc_url,
                       topics_to_sub=topics_scan,
-                      poll_timeout_ms=scan_ms)
+                      poll_timeout_ms=scan_wait_ms)
 
 
 @pytest.fixture
@@ -91,9 +91,9 @@ def sub_scan_state(ctx, topics_scan_state, timeout_ms, psc_url):
 
 
 @pytest.fixture
-def sub_scan_params(ctx, topics_scan, timeout_ms, psc_url):
+def sub_scan_params(ctx, topics_scan_params, timeout_ms, psc_url):
     return Subscriber(psc_url,
-                      topics_to_sub=topics_scan,
+                      topics_to_sub=topics_scan_params,
                       poll_timeout_ms=timeout_ms)
 
 
@@ -158,7 +158,7 @@ def test_scan_params(client, default_control_state, component_name,
     logger.info("Validate we can set scan parameters.")
     logger.info("First, validate we have initial scan params (from the "
                 "cache).")
-    initial_params = sub_scan_params.poll_and_store()
+    envelope, initial_params = sub_scan_params.poll_and_store()
     assert initial_params
 
     initial_params.spatial.roi.top_left.x *= 1.1
@@ -175,7 +175,7 @@ def test_scan_params(client, default_control_state, component_name,
 
     logger.info("Lastly, validate that our subscriber receives these new "
                 "params.")
-    last_params = sub_scan_params.poll_and_store()
+    envelope, last_params = sub_scan_params.poll_and_store()
     assert last_params == initial_params
 
 
