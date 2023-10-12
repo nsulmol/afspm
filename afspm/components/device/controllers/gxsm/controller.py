@@ -3,6 +3,7 @@
 import logging
 from typing import Any
 import zmq
+from pint import UndefinedUnitError
 from google.protobuf.message import Message
 
 from afspm.components.device.controller import (DeviceController,
@@ -63,29 +64,23 @@ class GxsmController(DeviceController):
 
     def on_set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
                            ) -> control_pb2.ControlResponse:
-        try:
-            self._gxsm_set(self.TL_X, scan_params.spatial.roi.top_left.x,
-                           scan_params.spatial.units)
-            self._gxsm_set(self.TL_Y, scan_params.spatial.roi.top_left.y,
-                           scan_params.spatial.units)
+        attrs = [self.TL_X, self.TL_Y, self.SZ_X, self.SZ_Y, self.RES_X,
+                 self.RES_Y]
+        vals = [scan_params.spatial.roi.top_left.x,
+                scan_params.spatial.roi.top_left.y,
+                scan_params.spatial.roi.size.x,
+                scan_params.spatial.roi.size.y,
+                scan_params.data.shape.x,
+                scan_params.data.shape.y]
+        attr_units = [scan_params.spatial.units,
+                      scan_params.spatial.units,
+                      scan_params.spatial.units,
+                      scan_params.spatial.units,
+                      None, None]
 
-            self._gxsm_set(self.SZ_X, scan_params.spatial.roi.size.x,
-                           scan_params.spatial.units)
-            self._gxsm_set(self.SZ_Y, scan_params.spatial.roi.size.y,
-                           scan_params.spatial.units)
-
-            # if scan_params.spatial.HasField(scan_speed_u)
-            #self._gxsm_set(self.SCAN_SPEED_UNITS_S,
-            #               scan_params.spatial.scan_speed_units_s,
-            #               scan_params.spatial.units)
-
-            self._gxsm_set(self.RES_X, scan_params.data.shape.x)
-            self._gxsm_set(self.RES_Y, scan_params.data.shape.y)
-        except Exception as exc:
-            logger.error("Failure on setting scan params: %s", exc)
-            return control_pb2.ControlResponse.REP_FAILURE
-
-        return control_pb2.ControlResponse.REP_SUCCESS
+        if self._gxsm_set_list(attrs, vals, attr_units):
+            return control_pb2.ControlResponse.REP_SUCCESS
+        return control_pb2.ControlResponse.REP_ATTRIB_ERROR
 
     def poll_scan_state(self) -> scan_pb2.ScanState:
         """Returns current scan state in accordance with system model."""
@@ -142,9 +137,6 @@ class GxsmController(DeviceController):
         scan_params.spatial.roi.size.y = gxsm.get(GxsmController.SZ_Y)
         scan_params.spatial.units = GxsmController.GXSM_PHYS_UNITS
 
-        #scan_params.spatial.scan_speed_units_s = gxsm.get(
-        #    GxsmController.SCAN_SPEED_UNITS_S)
-
         # Note: all gxsm attributes returned as float, must convert to int
         scan_params.data.shape.x = int(gxsm.get(GxsmController.RES_X))
         scan_params.data.shape.y = int(gxsm.get(GxsmController.RES_Y))
@@ -154,11 +146,35 @@ class GxsmController(DeviceController):
 
     @staticmethod
     def _gxsm_set(attr: str, val: Any, curr_units: str = None):
+        """Convert a value to gxsm units and set it."""
         # If curr_units is None, we don't convert
         if curr_units:
             val = units.convert(val, curr_units,
                                 GxsmController.GXSM_PHYS_UNITS)
         gxsm.set(attr, str(val))
+
+    @staticmethod
+    def _gxsm_set_list(attrs: list[str], vals: list[Any],
+                       curr_units: list[str | None]) -> bool:
+        """Convert a list of values to gxsm units and set them."""
+        converted_vals = []
+        for val, curr_units in zip([vals, curr_units]):
+            if curr_units:
+                try:
+                    converted_vals.append(
+                        units.convert(val, curr_units,
+                                      GxsmController.GXSM_PHYS_UNITS))
+                except UndefinedUnitError:
+                    logger.error("Unable to convert %s from %s to %s.",
+                                 val, curr_units,
+                                 GxsmController.GXSM_PHYS_UNITS)
+                    return False
+            else:
+                converted_vals.append(val)
+        for val, attr in zip([converted_vals, attrs]):
+            gxsm.set(attr, str(val))
+        return True
+
 
     @staticmethod
     def _get_current_scan_state() -> scan_pb2.ScanState:
