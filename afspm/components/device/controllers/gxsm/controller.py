@@ -132,32 +132,36 @@ class GxsmController(DeviceController):
 
 
     # TODO: Should this just be poll_scan_params???
-    def _get_current_scan_params(self):
+    @staticmethod
+    def _get_current_scan_params():
         scan_params = scan_pb2.ScanParameters2d()
         # TODO: how to handle units??  For now, just send out how they are received?
-        scan_params.spatial.roi.top_left.x = gxsm.get(self.TL_X)
-        scan_params.spatial.roi.top_left.y = gxsm.get(self.TL_Y)
-        scan_params.spatial.roi.size.x = gxsm.get(self.SZ_X)
-        scan_params.spatial.roi.size.y = gxsm.get(self.SZ_Y)
-        scan_params.spatial.units = self.GXSM_PHYS_UNITS
+        scan_params.spatial.roi.top_left.x = gxsm.get(GxsmController.TL_X)
+        scan_params.spatial.roi.top_left.y = gxsm.get(GxsmController.TL_Y)
+        scan_params.spatial.roi.size.x = gxsm.get(GxsmController.SZ_X)
+        scan_params.spatial.roi.size.y = gxsm.get(GxsmController.SZ_Y)
+        scan_params.spatial.units = GxsmController.GXSM_PHYS_UNITS
 
         #scan_params.spatial.scan_speed_units_s = gxsm.get(
-        #    self.SCAN_SPEED_UNITS_S)
+        #    GxsmController.SCAN_SPEED_UNITS_S)
 
         # Note: all gxsm attributes returned as float, must convert to int
-        scan_params.data.shape.x = int(gxsm.get(self.RES_X))
-        scan_params.data.shape.y = int(gxsm.get(self.RES_Y))
+        scan_params.data.shape.x = int(gxsm.get(GxsmController.RES_X))
+        scan_params.data.shape.y = int(gxsm.get(GxsmController.RES_Y))
         #scan_params.data.units = ???  # TODO: how to read units?
 
         return scan_params
 
-    def _gxsm_set(self, attr: str, val: Any, curr_units: str = None):
+    @staticmethod
+    def _gxsm_set(attr: str, val: Any, curr_units: str = None):
         # If curr_units is None, we don't convert
         if curr_units:
-            val = units.convert(val, curr_units, self.GXSM_PHYS_UNITS)
+            val = units.convert(val, curr_units,
+                                GxsmController.GXSM_PHYS_UNITS)
         gxsm.set(attr, str(val))
 
-    def _get_current_scan_state(self) -> scan_pb2.ScanState:
+    @staticmethod
+    def _get_current_scan_state() -> scan_pb2.ScanState:
         """Returns the current scan state.
 
         This queries gxsm for its current scan state.
@@ -167,12 +171,14 @@ class GxsmController(DeviceController):
         """
         svec = gxsm.rtquery('s')
         s = int(svec[0])
-        scanning = (s & (2+4) > self.STATE_RUNNING_THRESH or
-                    s & 8 > self.STATE_RUNNING_THRESH)  # 8 == Vector Probe
-        moving = s & 16 > self.STATE_RUNNING_THRESH
+        # (2+4) == Scanning; 8 == Vector Probe
+        scanning = (s & (2+4) > GxsmController.STATE_RUNNING_THRESH or
+                    s & 8 > GxsmController.STATE_RUNNING_THRESH)
+        moving = s & 16 > GxsmController.STATE_RUNNING_THRESH
 
         # TODO: investigate motor logic further...
-        motor_running = gxsm.get("dsp-fbs-motor") < self.MOTOR_RUNNING_THRESH
+        motor_running = (gxsm.get("dsp-fbs-motor") <
+                         GxsmController.MOTOR_RUNNING_THRESH)
 
         if motor_running:
             return scan_pb2.ScanState.SS_MOTOR_RUNNING
