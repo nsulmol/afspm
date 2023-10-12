@@ -2,8 +2,6 @@
 # --- URLs --- #
 server_url = "tcp://127.0.0.1:7777"
 pub_url = "tcp://127.0.0.1:7778"
-timeout_ms = 500
-wait_ms = 60000
 
 
 # ----- PubSub ----- #

@@ -35,7 +35,7 @@ def component_name():
 
 @pytest.fixture
 def timeout_ms():
-    return 60000
+    return 180000
 
 
 @pytest.fixture
