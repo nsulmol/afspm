@@ -34,4 +34,4 @@ def convert(val: Any, unit: str, desired_unit: str) -> Any:
         UndefinedUnitError if either unit or desired_unit are undefined.
     """
     quantity = val * ureg(unit)
-    return quantity.to(desired_unit)
+    return quantity.to(desired_unit).magnitude
