@@ -158,24 +158,31 @@ def test_scan_params(client, default_control_state, component_name,
     logger.info("Validate we can set scan parameters.")
     logger.info("First, validate we have initial scan params (from the "
                 "cache).")
-    envelope, initial_params = sub_scan_params.poll_and_store()
+    __, initial_params = sub_scan_params.poll_and_store()
     assert initial_params
 
-    initial_params.spatial.roi.top_left.x *= 1.1
-    initial_params.spatial.roi.top_left.y *= 1.1
-    initial_params.spatial.roi.size.x *= 0.9
-    initial_params.spatial.roi.size.y *= 0.9
+    modified_params = copy.deepcopy(initial_params)
+    modified_params.spatial.roi.top_left.x *= 1.1
+    modified_params.spatial.roi.top_left.y *= 1.1
+    modified_params.spatial.roi.size.x *= 0.9
+    modified_params.spatial.roi.size.y *= 0.9
 
-    initial_params.data.shape.x -= 1
-    initial_params.data.shape.y -= 1
+    modified_params.data.shape.x -= 1
+    modified_params.data.shape.y -= 1
 
     logger.info("Next, set new scan params. We expect a success.")
-    rep = client.set_scan_params(scan_pb2.ScanParameters2d())
+    rep = client.set_scan_params(modified_params)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
-    logger.info("Lastly, validate that our subscriber receives these new "
+    logger.info("Next, validate that our subscriber receives these new "
                 "params.")
-    envelope, last_params = sub_scan_params.poll_and_store()
+    __, last_params = sub_scan_params.poll_and_store()
+    assert last_params == modified_params
+
+    logger.info("Now, return to our initial parameters.")
+    rep = client.set_scan_params(initial_params)
+    assert rep == control_pb2.ControlResponse.REP_SUCCESS
+    __, last_params = sub_scan_params.poll_and_store()
     assert last_params == initial_params
 
 
