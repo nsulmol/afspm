@@ -113,14 +113,19 @@ def assert_sub_received_proto(sub: Subscriber, proto: Message):
 
 # -------------------- Tests -------------------- #
 def test_cancel_scan(client, default_control_state, component_name,
-                     sub_scan_state, timeout_ms):
+                     sub_scan, sub_scan_state, timeout_ms):
     logger.info("Validate we can start and cancel a scan.")
     logger.info("First, validate we *do not* have an initial scan (in the "
-                "cache).")
+                "cache), and *do* have an initial scan state (SS_FREE).")
+    scan_state_msg = scan_pb2.ScanStateMsg(
+        scan_state=scan_pb2.ScanState.SS_FREE)
+
     # Hack around, make poll short for this.
     tmp_timeout_ms = sub_scan.poll_timeout_ms
     sub_scan.poll_timeout_ms = timeout_ms
     assert not sub_scan.poll_and_store()
+    assert_sub_received_proto(sub_scan_state,
+                              scan_state_msg)
     sub_scan.poll_timeout_ms = tmp_timeout_ms  # Return to prior
 
     logger.info("Next, validate that we can start a scan and are notified "
@@ -187,14 +192,20 @@ def test_scan_params(client, default_control_state, component_name,
 
 
 def test_scan(client, default_control_state, component_name,
-              sub_scan_state, sub_scan, timeout_ms):
+              sub_scan, sub_scan_state, timeout_ms):
     logger.info("Validate we can start a scan, and receive one on finish.")
     logger.info("First, validate we *do not* have an initial scan (in the "
-                "cache).")
+                "cache), and *do* have an initial scan state (SS_FREE).")
+
+    scan_state_msg = scan_pb2.ScanStateMsg(
+        scan_state=scan_pb2.ScanState.SS_FREE)
+
     # Hack around, make poll short for this.
     tmp_timeout_ms = sub_scan.poll_timeout_ms
     sub_scan.poll_timeout_ms = timeout_ms
     assert not sub_scan.poll_and_store()
+    assert_sub_received_proto(sub_scan_state,
+                              scan_state_msg)
     sub_scan.poll_timeout_ms = tmp_timeout_ms  # Return to prior
 
     logger.info("Next, validate that we can start a scan and are notified "
