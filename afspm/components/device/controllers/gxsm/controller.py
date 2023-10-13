@@ -57,6 +57,7 @@ class GxsmController(DeviceController):
         self.gxsm_physical_units = gxsm_physical_units  # TODO: read from gxsm
         self.last_scan_fname = ''
         self.last_scan_state = scan_pb2.ScanState.SS_UNDEFINED
+        self.old_scans = []
 
         super().__init__(**kwargs)
 
