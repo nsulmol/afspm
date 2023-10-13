@@ -33,6 +33,7 @@ component = true
 class = 'afspm.components.device.controllers.gxsm.controller.GxsmController'
 publisher = 'pub'
 control_server = 'server'
+read_use_physical_units = 'False'  # TODO: Test with!
 
 [afspmcon]
 component = true
