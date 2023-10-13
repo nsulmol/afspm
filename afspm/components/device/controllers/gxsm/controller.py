@@ -39,14 +39,15 @@ class GxsmController(DeviceController):
     MOTOR_RUNNING_THRESH = -2
 
     MAX_NUM_CHANNELS = 6
+    CHFNAME_ERROR_STR = 'EE: invalid channel'
 
     # NOTE: I'm thinking each side is responsible for converting the data to the
     # units they want
     def __init__(self,
-                 read_channels_config_path: str = "./channels_config.toml",
-                 read_use_physical_units: bool = "True",
-                 read_allow_convert_from_metadata: bool = "False",
-                 read_simplify_metadata: bool = "True",
+                 read_channels_config_path: str = None,
+                 read_use_physical_units: bool = True,
+                 read_allow_convert_from_metadata: bool = False,
+                 read_simplify_metadata: bool = True,
                  gxsm_physical_units: str = 'angstrom', **kwargs):
         self.read_channels_config_path = read_channels_config_path
         self.read_use_physical_units = read_use_physical_units
@@ -103,21 +104,27 @@ class GxsmController(DeviceController):
 
     def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
         # TODO: Update to provide data units
-        return self._get_current_scan_params(self.gxsm_phys_units)
+        return self._get_current_scan_params(self.gxsm_physical_units)
 
     def poll_scans(self) -> [scan_pb2.Scan2d]:
         channel_idx = 0
         fnames = []
         try:
-            # Get the filename for the first channel scan
-            fname = gxsm.chfname(channel_idx)
+            while channel_idx < self.MAX_NUM_CHANNELS:
+                fname = gxsm.chfname(channel_idx)
 
-            if fname != self.last_scan_fname:
-                self.last_scan_fname = fname
-                while channel_idx < self.MAX_NUM_CHANNELS:
-                    fnames.append(fname)
-                    channel_idx += 1
-                    fname = gxsm.chfname(channel_idx)
+                # Handle comparing against last scan
+                if channel_idx == 0:
+                    if fname == self.last_scan_fname:
+                        break
+                    self.last_scan_fname = fname
+
+                # Break if on last 'set' channel
+                if fname == self.CHFNAME_ERROR_STR:
+                    break
+
+                fnames.append(fname)
+                channel_idx += 1
         except Exception as exc:
             logger.trace("Exception with requesting channel %s: %s",
                          channel_idx, str(exc))
