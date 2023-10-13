@@ -1,5 +1,6 @@
 """Handles device communication with the gxsm3 controller."""
 
+import os.path
 import logging
 from typing import Any
 import zmq
@@ -123,7 +124,9 @@ class GxsmController(DeviceController):
                 if fname == self.CHFNAME_ERROR_STR:
                     break
 
-                fnames.append(fname)
+                # Only append actually saved files
+                if os.path.isfile(fname):
+                    fnames.append(fname)
                 channel_idx += 1
         except Exception as exc:
             logger.trace("Exception with requesting channel %s: %s",
@@ -134,10 +137,15 @@ class GxsmController(DeviceController):
             scans = []
             for fname in fnames:
                 ts = get_file_modification_datetime(fname)
-                ds = read.open_dataset(fname, self.read_channels_config_path,
-                                       self.read_use_physical_units,
-                                       self.read_allow_convert_from_metadata,
-                                       self.read_simplify_metadata)
+                try:
+                    ds = read.open_dataset(fname, self.read_channels_config_path,
+                                           self.read_use_physical_units,
+                                           self.read_allow_convert_from_metadata,
+                                           self.read_simplify_metadata)
+                except Exception as exc:
+                    logger.error("Could not read scan fname %s, got error %s.",
+                                 fname, exc)
+                    continue
                 scan = conv.convert_xarray_to_scan_pb2(
                     ds[list(ds.data_vars)[0]])
                 scan.timestamp.FromDatetime(ts)
