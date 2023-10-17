@@ -37,11 +37,11 @@
 
   #+RESULTS:
   :results:
-  [[file:images/experiment_no_automation.png]]
+  [[file:images/experiment_no_automation.svg]]
   :end:
 * SPM-Specific Automation
 
-#+begin_src plantuml :file images/experiment_with_script.png
+#+begin_src plantuml :file images/experiment_with_script.svg
   skinparam componentStyle rectangle
   skinparam defaultTextAlignment center
   skinparam wrapWidth 200
@@ -63,12 +63,12 @@
 
   #+RESULTS:
   :results:
-  [[file:images/experiment_with_script.png]]
+  [[file:images/experiment_with_script.svg]]
   :end:
 
 * afspm High-Level Diagram
 
-#+begin_src plantuml :file images/afspm_hl_diagram.png
+#+begin_src plantuml :file images/afspm_hl_diagram.svg
   skinparam componentStyle rectangle
   skinparam defaultTextAlignment center
   skinparam wrapWidth 200
@@ -104,12 +104,12 @@
 
   #+RESULTS:
   :results:
-  [[file:images/afspm_hl_diagram.png]]
+  [[file:images/afspm_hl_diagram.svg]]
   :end:
 
 * afspm Network framework
 
-#+begin_src plantuml :file images/network_framework.png
+#+begin_src plantuml :file images/network_framework.svg
   skinparam componentStyle rectangle
 
   component "Component A" as comp_a {
@@ -146,11 +146,13 @@
   #+end_src
 
   #+RESULTS:
-  [[file:images/network_framework.png]]
+  :results:
+  [[file:images/network_framework.svg]]
+  :end:
 * afspm without afspm controller
 
 #+header: :post attr_fit_width(data=*this*, org_percent=75, latex_percent=90)
-#+begin_src plantuml :file images/afspm_without_afspmcon.png
+#+begin_src plantuml :file images/afspm_without_afspmcon.svg
   skinparam componentStyle rectangle
   skinparam defaultTextAlignment center
   skinparam wrapWidth 200
@@ -199,10 +201,17 @@
 
   #+end_src
 
+  #+RESULTS:
+  :results:
+  #+attr_org: :width 75%
+  #+attr_latex: :width .90\linewidth
+  [[file:images/afspm_without_afspmcon.svg]]
+  :end:
+
 * afspm control
 
 #+header: :post attr_fit_width(data=*this*, org_percent=80, latex_percent=90)
-#+begin_src plantuml :file images/afspm_control.png
+#+begin_src plantuml :file images/afspm_control.svg
   left to right direction
   skinparam componentStyle rectangle
   skinparam defaultTextAlignment center
@@ -281,5 +290,5 @@
   :results:
   #+attr_org: :width 80%
   #+attr_latex: :width .90\linewidth
-  [[file:images/afspm_control.png]]
+  [[file:images/afspm_control.svg]]
   :end:
