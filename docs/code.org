@@ -41,7 +41,7 @@
   :end:
 * SPM-Specific Automation
 
-#+begin_src plantuml :file images/experiment_with_script.svg
+#+begin_src plantuml :file images/experiment_with_script.png
   skinparam componentStyle rectangle
   skinparam defaultTextAlignment center
   skinparam wrapWidth 200
@@ -68,7 +68,7 @@
 
 * afspm High-Level Diagram
 
-#+begin_src plantuml :file images/afspm_hl_diagram.svg
+#+begin_src plantuml :file images/afspm_hl_diagram.png
   skinparam componentStyle rectangle
   skinparam defaultTextAlignment center
   skinparam wrapWidth 200
@@ -109,7 +109,7 @@
 
 * afspm Network framework
 
-#+begin_src plantuml :file images/network_framework.svg
+#+begin_src plantuml :file images/network_framework.png
   skinparam componentStyle rectangle
 
   component "Component A" as comp_a {
@@ -152,7 +152,7 @@
 * afspm without afspm controller
 
 #+header: :post attr_fit_width(data=*this*, org_percent=75, latex_percent=90)
-#+begin_src plantuml :file images/afspm_without_afspmcon.svg
+#+begin_src plantuml :file images/afspm_without_afspmcon.png
   skinparam componentStyle rectangle
   skinparam defaultTextAlignment center
   skinparam wrapWidth 200
@@ -211,7 +211,7 @@
 * afspm control
 
 #+header: :post attr_fit_width(data=*this*, org_percent=80, latex_percent=90)
-#+begin_src plantuml :file images/afspm_control.svg
+#+begin_src plantuml :file images/afspm_control.png
   left to right direction
   skinparam componentStyle rectangle
   skinparam defaultTextAlignment center
