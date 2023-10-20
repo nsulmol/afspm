@@ -60,6 +60,8 @@ def default_control_state():
     return cs
 
 
+# Note: topics use 'base' CacheLogic, so we catch all messages of each
+# type (even though our PSC is using PBCScanLogic to set the envelopes).
 @pytest.fixture(scope="module")
 def topics_scan():
     return [cl.CacheLogic.get_envelope_for_proto(scan_pb2.Scan2d())]
@@ -191,8 +193,8 @@ def test_scan_params(client, default_control_state, component_name,
     assert last_params == initial_params
 
 
-def test_scan(client, default_control_state, component_name,
-              sub_scan, sub_scan_state, timeout_ms):
+def test_run_scan(client, default_control_state, component_name,
+                  sub_scan, sub_scan_state, timeout_ms):
     logger.info("Validate we can start a scan, and receive one on finish.")
     logger.info("First, validate we *do not* have an initial scan (in the "
                 "cache), and *do* have an initial scan state (SS_FREE).")
@@ -218,6 +220,6 @@ def test_scan(client, default_control_state, component_name,
 
     logger.info("Lastly, wait for a predetermined 'long-enough' period, "
                 "and validate the scan finishes.")
+    assert sub_scan.poll_and_store()
     scan_state_msg.scan_state = scan_pb2.ScanState.SS_FREE
     assert_sub_received_proto(sub_scan_state, scan_state_msg)
-    assert sub_scan.poll_and_store()
