@@ -42,7 +42,22 @@ class ProtoBasedCacheLogic(CacheLogic):
 
     def extract_proto(self, msg: list[bytes]) -> Message:
         envelope, contents = msg
-        proto = copy.deepcopy(self.envelope_to_proto_map[envelope.decode()])
+        envelope = envelope.decode()
+        if envelope not in self.envelope_to_proto_map:
+            logger.trace("Envelope %s not in envelope_to_proto_map. Trying "
+                         "to find 'base' envelope that matches.", envelope)
+            env_changed = False
+            for key in list(self.envelope_to_proto_map.keys()):
+                if key in envelope:
+                    logger.trace("'Base' envelop %s found, using.", key)
+                    envelope = key
+                    env_changed = True
+
+            if not env_changed:
+                raise KeyError("Envelope not found in extract_proto. Check "
+                               "your cache settings.")
+
+        proto = copy.deepcopy(self.envelope_to_proto_map[envelope])
         proto.ParseFromString(contents)
         return proto
 
