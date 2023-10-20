@@ -139,10 +139,12 @@ class GxsmController(DeviceController):
             for fname in fnames:
                 ts = get_file_modification_datetime(fname)
                 try:
-                    ds = read.open_dataset(fname, self.read_channels_config_path,
-                                           self.read_use_physical_units,
-                                           self.read_allow_convert_from_metadata,
-                                           self.read_simplify_metadata)
+                    ds = read.open_dataset(
+                        fname, self.read_channels_config_path,
+                        self.read_use_physical_units,
+                        self.read_allow_convert_from_metadata,
+                        self.read_simplify_metadata,
+                        engine='scipy')
                 except Exception as exc:
                     logger.error("Could not read scan fname %s, got error %s.",
                                  fname, exc)
