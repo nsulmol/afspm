@@ -56,7 +56,6 @@ class GxsmController(DeviceController):
         self.read_simplify_metadata = read_simplify_metadata
         self.gxsm_physical_units = gxsm_physical_units  # TODO: read from gxsm
         self.last_scan_fname = ''
-        self.last_scan_state = scan_pb2.ScanState.SS_UNDEFINED
         self.old_scans = []
 
         super().__init__(**kwargs)
@@ -97,11 +96,12 @@ class GxsmController(DeviceController):
 
     def poll_scan_state(self) -> scan_pb2.ScanState:
         """Returns current scan state in accordance with system model."""
+        # Note: updating self.scan_state is handled by the calling method
+        # in DeviceController.
         state = self._get_current_scan_state()
-        if (self.last_scan_state == scan_pb2.ScanState.SS_SCANNING and
+        if (self.scan_state == scan_pb2.ScanState.SS_SCANNING and
                 state  == scan_pb2.ScanState.SS_FREE):
             gxsm.autosave()  # Save the images we have recorded
-            self.last_scan_state = state
         return state
 
     def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
