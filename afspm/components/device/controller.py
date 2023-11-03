@@ -10,7 +10,7 @@ from types import MappingProxyType
 import zmq
 from google.protobuf.message import Message
 
-from ..afspm import component as afspmc
+from .. import component as afspmc
 
 from ...io import common
 from ...io.pubsub import publisher as pub

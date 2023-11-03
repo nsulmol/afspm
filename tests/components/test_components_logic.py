@@ -12,7 +12,7 @@ from google.protobuf.timestamp_pb2 import Timestamp
 
 from afspm.components.device.controller import DeviceController
 from afspm.components.afspm.controller import AfspmController
-from afspm.components.afspm.component import AfspmComponentBase
+from afspm.components.component import AfspmComponentBase
 
 
 from afspm.io import common

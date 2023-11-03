@@ -7,9 +7,9 @@ from typing import Callable
 import multiprocessing as mp
 import zmq
 
-from ...io import common
-from ...io.heartbeat.heartbeat import HeartbeatListener, get_heartbeat_url
-from ...utils.parser import construct_and_run_component
+from ..io import common
+from ..io.heartbeat.heartbeat import HeartbeatListener, get_heartbeat_url
+from ..utils.parser import construct_and_run_component
 
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ class AfspmComponentsMonitor:
 
     For example:
     'SampleAfspmComponent': {
-        class: 'afspm.components.afspm.component.AfspmComponent',
+        class: 'afspm.components.component.AfspmComponent',
         loop_sleep_s: 0,
         beat_period_s: 5,
         subscriber: {

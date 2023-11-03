@@ -116,7 +116,7 @@ def afspm_component_params_dict():
     cache_kwargs = {"cache_logic":
                     'afspm.io.pubsub.logic.pbc_logic.ProtoBasedCacheLogic()'}
     return {
-        'class': 'afspm.components.afspm.component.AfspmComponent',
+        'class': 'afspm.components.component.AfspmComponent',
         'name': 'BananaHammock',
         'loop_sleep_s': 0,
         'beat_period_s': 5,
@@ -171,7 +171,7 @@ def test_construct_component(afspm_component_params_dict,
     """
     afspm_component_params_dict['ctx'] = zmq.Context.instance()
     res = parser._construct_component(afspm_component_params_dict)
-    from afspm.components.afspm.component import AfspmComponent
+    from afspm.components.component import AfspmComponent
     assert isinstance(res, AfspmComponent)
 
     visualizer_params_dict['ctx'] = zmq.Context.instance()

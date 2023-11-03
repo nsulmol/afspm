@@ -4,7 +4,7 @@ import logging
 import zmq
 from google.protobuf.message import Message
 
-from . import component as afspmc
+from .. import component as afspmc
 
 from ...io import common
 from ...io.pubsub import cache as pbc

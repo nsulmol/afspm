@@ -12,7 +12,7 @@ from ...io import common
 from ...io.pubsub import subscriber as sub
 from ...io.control import client as ctrl_client
 
-from .component import AfspmComponent
+from ..component import AfspmComponentBase
 from ...io.protos.generated import control_pb2
 from ...io.protos.generated import scan_pb2
 
@@ -40,7 +40,7 @@ TOPICS_TO_SUB_KEY = 'topics_to_sub'
 ALL_TOPICS = ""
 
 
-class AfspmControlUI(AfspmComponent):
+class AfspmControlUI(AfspmComponentBase):
     """Simple UI class to present info from, and control, the afspm controller.
 
     This class will present a simple UI to show current ControlState/ScanState

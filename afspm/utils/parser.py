@@ -147,7 +147,7 @@ def construct_and_run_component(params_dict: dict):
 
     Thus, our params_dict may look like, for example:
     {
-        class: 'afspm.components.afspm.component.AfspmComponent',
+        class: 'afspm.components.component.AfspmComponent',
         loop_sleep_s: 0,
         beat_period_s: 5,
         subscriber: {
@@ -199,7 +199,7 @@ def _evaluate_values_recursively(params_dict: dict) -> dict:
 
     With, for example:
     {
-        class: 'afspm.components.afspm.component.AfspmComponent',
+        class: 'afspm.components.component.AfspmComponent',
         loop_sleep_s: 0,
         beat_period_s: 5,
         subscriber: {

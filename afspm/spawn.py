@@ -9,7 +9,7 @@ import fire
 
 # TODO: Figure out why this can't be relative?
 from afspm.utils.parser import expand_variables_in_dict
-from afspm.components.afspm.monitor import AfspmComponentsMonitor
+from afspm.components.monitor import AfspmComponentsMonitor
 
 
 logger = logging.getLogger(__name__)
