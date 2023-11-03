@@ -105,8 +105,8 @@ def device_controller_routine(pub_url, server_url, psc_url,
     devcon.run()
 
     # Forcing closure of bound sockets (for pytests)
-    pub.publisher.close()
-    server.server.close()
+    pub._publisher.close()
+    server._server.close()
 
 
 
@@ -128,5 +128,5 @@ def afspm_controller_routine(psc_url, pub_url, server_url, router_url,
     controller.run()
 
     # Forcing closure of bound sockets (for pytests)
-    psc.backend.close()
-    router.frontend.close()
+    psc._backend.close()
+    router._frontend.close()

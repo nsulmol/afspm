@@ -29,18 +29,18 @@ class ControlClient:
     of the zmq guide (called lpclient.py). It is almost exactly the same.
 
     Attributes:
-        url: address of the server we are to connect to.
-        ctx: zmq Context
-        uuid: the socket's uuid string. By providing it, it allows any class
+        _url: address of the server we are to connect to.
+        _ctx: zmq Context
+        _uuid: the socket's uuid string. By providing it, it allows any class
             using it to 'restart' properly after a crash. The reason this
             happens is simply: the next time we reconnect to a ROUTER, we have
             the same id as before. Thus, any 'state' is preserverd. If you *do
             not* provide a uuid and the crashed client was 'under control',
             this ControlClient will have in principle blocked the ControlRouter
             we are connected to!
-        request_retries: how many times we will retry sending a message before
+        _request_retries: how many times we will retry sending a message before
             giving up and returning a connection error.
-        request_timeout_ms: how long we wait between request tries.
+        _request_timeout_ms: how long we wait between request tries.
     """
 
     def __init__(self, url: str, ctx: zmq.Context = None,
@@ -63,35 +63,35 @@ class ControlClient:
         if not ctx:
             ctx = zmq.Context.instance()
 
-        self.url = url
-        self.ctx = ctx
-        self.uuid = uuid
-        self.request_retries = request_retries
-        self.request_timeout_ms = request_timeout_ms
+        self._url = url
+        self._ctx = ctx
+        self._uuid = uuid
+        self._request_retries = request_retries
+        self._request_timeout_ms = request_timeout_ms
 
-        self.retries_left = request_retries
+        self._retries_left = request_retries
 
-        self.client = None
+        self._client = None
         self._init_client()
 
         common.sleep_on_socket_startup()
 
     def _init_client(self):
         """Starts up (or restarts) the client socket."""
-        if self.client and not self.client.closed:
+        if self._client and not self._client.closed:
             logger.error("Client init, but exists and is not closed. "
                          "Do nothing.")
             return
-        self.client = self.ctx.socket(zmq.REQ)
+        self._client = self._ctx.socket(zmq.REQ)
         # Set identity (if provided)
-        if self.uuid:
-            self.client.setsockopt(zmq.IDENTITY, self.uuid.encode())
-        self.client.connect(self.url)
+        if self._uuid:
+            self._client.setsockopt(zmq.IDENTITY, self._uuid.encode())
+        self._client.connect(self._url)
 
     def _close_client(self):
         """Closes the client socket."""
-        self.client.setsockopt(zmq.LINGER, 0)
-        self.client.close()
+        self._client.setsockopt(zmq.LINGER, 0)
+        self._client.close()
 
     def _try_send_req(self, msg: list[list[bytes]]
                       ) -> control_pb2.ControlResponse:
@@ -104,15 +104,16 @@ class ControlClient:
         Returns:
             RequestResponse enum indicating the response to our request.
         """
-        retries_left = self.request_retries
-        self.client.send_multipart(msg)
+        retries_left = self._request_retries
+        self._client.send_multipart(msg)
 
         while True:
-            if (self.client.poll(self.request_timeout_ms) & zmq.POLLIN) != 0:
+            if (self._client.poll(self._request_timeout_ms) & zmq.POLLIN) != 0:
                 # Response is expected to be int
-                rep = cmd.parse_response(self.client.recv())
+                rep = cmd.parse_response(self._client.recv())
                 logger.debug("Received reply: %s",
-                             common.get_enum_str(control_pb2.ControlResponse, rep))
+                             common.get_enum_str(control_pb2.ControlResponse,
+                                                 rep))
                 return rep
             retries_left -= 1
             logger.debug("No response from server")
@@ -126,7 +127,7 @@ class ControlClient:
 
             logger.debug("Reconnecting to server")
             self._init_client()
-            self.client.send_multipart(msg)
+            self._client.send_multipart(msg)
 
     def start_scan(self) -> control_pb2.ControlResponse:
         """Request start a scan.
@@ -207,7 +208,8 @@ class ControlClient:
             Response received from server.
         """
         logger.debug("Sending add_exp_prblm with problem: %s",
-                     common.get_enum_str(control_pb2.ExperimentProblem, problem))
+                     common.get_enum_str(control_pb2.ExperimentProblem,
+                                         problem))
         msg = cmd.serialize_req_obj(
             control_pb2.ControlRequest.REQ_ADD_EXP_PRBLM, problem)
         return self._try_send_req(msg)
@@ -223,9 +225,10 @@ class ControlClient:
             Response received from server.
         """
         logger.debug("Sending rmv_exp_prblm with problem: %s",
-                     common.get_enum_str(control_pb2.ExperimentProblem, problem))
-        msg = cmd.serialize_req_obj(control_pb2.ControlRequest.REQ_RMV_EXP_PRBLM,
-                                    problem)
+                     common.get_enum_str(control_pb2.ExperimentProblem,
+                                         problem))
+        msg = cmd.serialize_req_obj(
+            control_pb2.ControlRequest.REQ_RMV_EXP_PRBLM, problem)
         return self._try_send_req(msg)
 
 
@@ -252,8 +255,8 @@ class AdminControlClient(ControlClient):
         """
         logger.debug("Sending set_control_mode with mode: %s",
                      common.get_enum_str(control_pb2.ControlMode, mode))
-        msg = cmd.serialize_req_obj(control_pb2.ControlRequest.REQ_SET_CONTROL_MODE,
-                                    mode)
+        msg = cmd.serialize_req_obj(
+            control_pb2.ControlRequest.REQ_SET_CONTROL_MODE, mode)
         return self._try_send_req(msg)
 
     def end_experiment(self) -> control_pb2.ControlResponse:
@@ -263,5 +266,6 @@ class AdminControlClient(ControlClient):
         connected components to close.
         """
         logger.debug("Sending end_experiment.")
-        msg = cmd.serialize_req_obj(control_pb2.ControlRequest.REQ_END_EXPERIMENT)
+        msg = cmd.serialize_req_obj(
+            control_pb2.ControlRequest.REQ_END_EXPERIMENT)
         return self._try_send_req(msg)

@@ -21,6 +21,13 @@ class Publisher:
     More particularly, this encapsulates the proto-to-envelope mapping
     (get_envelope_for_proto), so the method using it can simply feed the
     desired proto.
+
+    Attributes:
+        _publisher: the zmq PUB socket for sending messages out.
+        _get_envelope_for_proto: method that maps from proto message to
+            our desired publisher 'envelope' string.
+        _get_envelope_kwargs: any additional arguments to be fed to
+            get_envelope_for_proto.
     """
 
     def __init__(self, url: str,
@@ -39,19 +46,18 @@ class Publisher:
             get_envelope_kwargs: any additional arguments to be fed to
                 get_envelope_for_proto.
         """
-        self.get_envelope_for_proto = get_envelope_for_proto
-        self.get_envelope_kwargs = (get_envelope_kwargs if get_envelope_kwargs
+        self._get_envelope_for_proto = get_envelope_for_proto
+        self._get_envelope_kwargs = (get_envelope_kwargs if get_envelope_kwargs
                                     else {})
 
         if not ctx:
             ctx = zmq.Context.instance()
 
-        self.publisher = ctx.socket(zmq.PUB)
-        self.publisher.setsockopt(zmq.LINGER, 0)  # Never linger on closure
-        self.publisher.bind(url)
+        self._publisher = ctx.socket(zmq.PUB)
+        self._publisher.setsockopt(zmq.LINGER, 0)  # Never linger on closure
+        self._publisher.bind(url)
 
         common.sleep_on_socket_startup()
-
 
     def send_msg(self, proto: Message):
         """ Send message via publisher.
@@ -63,8 +69,13 @@ class Publisher:
             proto: protobuf message to send.
         """
 
-        envelope = self.get_envelope_for_proto(proto,
-                                               **self.get_envelope_kwargs)
+        envelope = self._get_envelope_for_proto(proto,
+                                               **self._get_envelope_kwargs)
         logger.debug("Sending message %s", envelope)
-        self.publisher.send_multipart([envelope.encode(),
+        self._publisher.send_multipart([envelope.encode(),
                                        proto.SerializeToString()])
+
+    def send_kill_signal(self):
+        """Send a kill signal to subscribers."""
+        logger.debug("Sending kill signal.")
+        self._publisher.send_multipart([common.KILL_SIGNAL.encode()])

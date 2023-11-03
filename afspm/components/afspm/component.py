@@ -104,17 +104,17 @@ class AfspmComponent:
         instance). If so, it will also check the
         """
         if self.subscriber:
-            msg = self.subscriber.poll_and_store()
+            messages = self.subscriber.poll_and_store()
 
             # If the last value indicates shutdown was requested, stop
             # looping
-            if self.subscriber.was_shutdown_requested():
+            if self.subscriber.shutdown_was_requested:
                 logger.info("%s: Shutdown received. Stopping.", self.name)
                 self.heartbeater.handle_closing()
                 self.stay_alive = False  # Shutdown self
-            elif msg:
-                self.on_message_received(msg[0], msg[1])
-
+            elif messages:
+                for msg in messages:
+                    self.on_message_received(msg[0], msg[1])
 
     def run_per_loop(self):
         """Method that is run on every iteration of the main loop.

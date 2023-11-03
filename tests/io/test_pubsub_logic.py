@@ -268,7 +268,7 @@ def pubsubcache_routine(psc_url, pub_url, comm_url, short_wait_ms,
 
     logging.debug("Dying, closing sockets")
     # Close bound sockets
-    psc.backend.close()
+    psc._backend.close()
 
 @pytest.fixture
 def thread_psc(psc_url, pub_url, comm_url, short_wait_ms, ctx, wait_ms,
@@ -300,12 +300,12 @@ def test_pubsubcache_kill_signal(sub_all_topics_psc, wait_ms, wait_count,
                                  comm_pub, thread_psc):
     """Validate that a kill signal is received by a subscriber."""
     assert not sub_all_topics_psc.poll_and_store()
-    assert not sub_all_topics_psc.was_shutdown_requested()
+    assert not sub_all_topics_psc.shutdown_was_requested
 
     kill_and_wait(comm_pub, wait_ms, wait_count, thread_psc)
 
     sub_all_topics_psc.poll_and_store()
-    assert sub_all_topics_psc.was_shutdown_requested()
+    assert sub_all_topics_psc.shutdown_was_requested
 
 
 def test_pubsubcache_interaction(psc_url, cache_kwargs, ctx, pub, topics_both,
@@ -357,3 +357,25 @@ def test_pubsubcache_interaction(psc_url, cache_kwargs, ctx, pub, topics_both,
     assert_sub_received_proto(sub_scan, sample_scan)
 
     kill_and_wait(comm_pub, wait_ms, wait_count, thread_psc)
+
+
+# --------------------- ComboSubscriber tests -------------------- #
+@pytest.fixture
+def sub_combo(sub_scan_pub, sub_control_state_pub):
+    return subscriber.ComboSubscriber([sub_scan_pub,
+                                       sub_control_state_pub])
+
+
+def test_combo_subscriber(pub, sub_combo, sample_scan, control_state,
+                          topics_scan2d, topics_control_state):
+    pub.send_msg(sample_scan)
+    pub.send_msg(control_state)
+
+    messages = sub_combo.poll_and_store()
+    assert messages and len(messages) == 2
+    assert topics_scan2d[0] in sub_combo.cache.keys()
+    assert topics_control_state[0] in sub_combo.cache.keys()
+
+    pub.send_kill_signal()
+    messages = sub_combo.poll_and_store()
+    assert sub_combo.shutdown_was_requested

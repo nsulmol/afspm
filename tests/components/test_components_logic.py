@@ -213,7 +213,7 @@ def end_experiment(afspm_component: AfspmComponent):
     rep = afspm_component.control_client.end_experiment()
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
     afspm_component.subscriber.poll_and_store()
-    assert afspm_component.subscriber.was_shutdown_requested()
+    assert afspm_component.subscriber.shutdown_was_requested
 
 
 def wait_on_threads(thread_device_controller: threading.Thread,

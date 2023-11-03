@@ -54,25 +54,26 @@ class PubSubCache:
     guide (Chapter 5).
 
     Attributes:
-        sub_extract_proto: method which extracts the proto message from a
+        cache: the cache, where we store data according to update_cache.
+
+        _sub_extract_proto: method which extracts the proto message from a
             message received from the sub. It must therefore know the
             envelope-to-proto mapping.
-        extract_proto_kwargs: any additional arguments to be fed to
+        _extract_proto_kwargs: any additional arguments to be fed to
             sub_extract_proto.
-        pub_get_envelope_for_proto: method that maps from proto message to
+        _pub_get_envelope_for_proto: method that maps from proto message to
             our desired publisher 'envelope' string.
-        get_envelope_kwargs: any additional arguments to be fed to
+        _get_envelope_kwargs: any additional arguments to be fed to
             pub_get_envelope_given_proto.
-        update_cache: method that updates our cache.
-        update_cache_kwargs: any additional arguments to be fed to
+        _update_cache: method that updates our cache.
+        _update_cache_kwargs: any additional arguments to be fed to
             update_cache.
-        poll_timeout_ms: the poll timeout, in milliseconds. If None,
+        _poll_timeout_ms: the poll timeout, in milliseconds. If None,
             we do not poll and do a blocking receive instead.
 
-        frontend: SUB socket connected to the publisher.
-        backend: XPUB socket, the publisher end
-        cache: the cache, where we store data according to update_cache.
-        poller: zmq Poller, to poll frontend and backend.
+        _frontend: SUB socket connected to the publisher.
+        _backend: XPUB socket, the publisher end
+        _poller: zmq Poller, to poll frontend and backend.
     """
 
     def __init__(self, url: str, sub_url: str,
@@ -114,37 +115,37 @@ class PubSubCache:
             poll_timeout_ms: the poll timeout, in milliseconds. If None,
                 we do not poll and do a blocking receive instead.
         """
-        self.sub_extract_proto = sub_extract_proto
-        self.extract_proto_kwargs = (extract_proto_kwargs if
-                                     extract_proto_kwargs else {})
-        self.pub_get_envelope_for_proto = pub_get_envelope_for_proto
-        self.get_envelope_kwargs = (get_envelope_kwargs if
-                                    get_envelope_kwargs else {})
-        self.update_cache = update_cache
-        self.update_cache_kwargs = (update_cache_kwargs if
-                                    update_cache_kwargs else {})
-        self.poll_timeout_ms = poll_timeout_ms
+        self._sub_extract_proto = sub_extract_proto
+        self._extract_proto_kwargs = (extract_proto_kwargs if
+                                      extract_proto_kwargs else {})
+        self._pub_get_envelope_for_proto = pub_get_envelope_for_proto
+        self._get_envelope_kwargs = (get_envelope_kwargs if
+                                     get_envelope_kwargs else {})
+        self._update_cache = update_cache
+        self._update_cache_kwargs = (update_cache_kwargs if
+                                     update_cache_kwargs else {})
+        self._poll_timeout_ms = poll_timeout_ms
 
         if not ctx:
             ctx = zmq.Context.instance()
 
-        self.frontend = ctx.socket(zmq.SUB)
-        self.frontend.connect(sub_url)
+        self._frontend = ctx.socket(zmq.SUB)
+        self._frontend.connect(sub_url)
 
-        self.backend = ctx.socket(zmq.XPUB)
+        self._backend = ctx.socket(zmq.XPUB)
         # Receive all subscription notifications
-        self.backend.setsockopt(zmq.XPUB_VERBOSE, True)
-        self.backend.bind(url)
+        self._backend.setsockopt(zmq.XPUB_VERBOSE, True)
+        self._backend.bind(url)
 
         # Subscribe to every single envelope from publisher
-        self.frontend.setsockopt(zmq.SUBSCRIBE, b"")
+        self._frontend.setsockopt(zmq.SUBSCRIBE, b"")
 
         # Initialize our cache
         self.cache = {}
 
-        self.poller = zmq.Poller()
-        self.poller.register(self.frontend, zmq.POLLIN)
-        self.poller.register(self.backend, zmq.POLLIN)
+        self._poller = zmq.Poller()
+        self._poller.register(self._frontend, zmq.POLLIN)
+        self._poller.register(self._backend, zmq.POLLIN)
 
         common.sleep_on_socket_startup()
 
@@ -156,21 +157,21 @@ class PubSubCache:
         Note: poll() *does not* handle KeyboardInterruption exceptions,
         please make sure your calling code does.
         """
-        events = dict(self.poller.poll(self.poll_timeout_ms))
+        events = dict(self._poller.poll(self._poll_timeout_ms))
 
         # Handle subscriptions
         # (when we get a subscription, we pull data from the cache)
         # I think this means we re-send cache data to *everyone* subscribed :/.
-        if self.backend in events:
-            event = self.backend.recv()
+        if self._backend in events:
+            event = self._backend.recv()
             # Event is one byte 0=unsub or 1=sub, followed by envelope
             if event[0] == 1:
                 envelope = event[1:].decode()
                 self._on_new_subscription(envelope)
 
         # Any new envelope data we cache and then forward
-        if self.frontend in events:
-            msg = self.frontend.recv_multipart()
+        if self._frontend in events:
+            msg = self._frontend.recv_multipart()
             self._on_message_received(msg)
 
 
@@ -181,7 +182,7 @@ class PubSubCache:
             msg: list of bytes corresponding to the message received by the
                 frontend.
         """
-        proto = self.sub_extract_proto(msg, **self.extract_proto_kwargs)
+        proto = self._sub_extract_proto(msg, **self._extract_proto_kwargs)
         return self.send_message(proto)
 
     def _on_new_subscription(self, envelope: str):
@@ -206,8 +207,8 @@ class PubSubCache:
                 logger.info("Subscription: cache for %s being sent out.",
                             env)
                 for proto in self.cache[env]:
-                    self.backend.send_multipart([env.encode(),
-                                                 proto.SerializeToString()])
+                    self._backend.send_multipart([env.encode(),
+                                                  proto.SerializeToString()])
 
     def send_message(self, proto: Message):
         """Cache message and pass on to subscribers.
@@ -215,15 +216,15 @@ class PubSubCache:
         Args:
             proto: protobuf Message.
         """
-        envelope = self.pub_get_envelope_for_proto(
-            proto, **self.get_envelope_kwargs)
-        self.update_cache(proto, self.cache,
-                          **self.update_cache_kwargs)
+        envelope = self._pub_get_envelope_for_proto(
+            proto, **self._get_envelope_kwargs)
+        self._update_cache(proto, self.cache,
+                           **self._update_cache_kwargs)
         logger.debug("Sending message %s", envelope)
-        self.backend.send_multipart([envelope.encode(),
-                                     proto.SerializeToString()])
+        self._backend.send_multipart([envelope.encode(),
+                                      proto.SerializeToString()])
 
     def send_kill_signal(self):
         """Send a kill signal to subscribers."""
         logger.debug("Sending kill signal.")
-        self.backend.send_multipart([common.KILL_SIGNAL.encode()])
+        self._backend.send_multipart([common.KILL_SIGNAL.encode()])
