@@ -1,9 +1,7 @@
 """Holds common I/O logic."""
+import time
 
 from google.protobuf.internal.enum_type_wrapper import EnumTypeWrapper
-
-import time
-import numpy as np
 
 from ..io.protos.generated import scan_pb2
 from ..io.protos.generated import control_pb2

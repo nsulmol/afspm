@@ -2,21 +2,22 @@
 
 import logging
 import time
-import tempfile
+from typing import Callable
 import zmq
 
 from google.protobuf.message import Message
 
 from ...io import common
-from ...io.heartbeat.heartbeat import Heartbeater
+from ...io.heartbeat.heartbeat import Heartbeater, get_heartbeat_url
 from ...io.pubsub import subscriber as sub
+from ...io.pubsub import publisher as pub
 from ...io.control import client as ctrl_client
 
 
 logger = logging.getLogger(__name__)
 
 
-class AfspmComponent:
+class AfspmComponentBase:
     """Base class for afspm component.
 
     This serves as the base class for any component added to an afspm system.
@@ -54,7 +55,6 @@ class AfspmComponent:
         stay_alive: boolean indicating whether we should continue looping in
             run(). In other words, if False, run() ends.
     """
-
     def __init__(self, name: str,
                  subscriber: sub.Subscriber = None,
                  control_client: ctrl_client.ControlClient = None,
@@ -145,6 +145,52 @@ class AfspmComponent:
         pass
 
 
-def get_heartbeat_url(name: str):
-    """Create a hearbeat url, given a component name."""
-    return "ipc://" + tempfile.gettempdir() + '/' + name
+class AfspmComponent(AfspmComponentBase):
+    """Component with hooks for external methods to be called.
+
+    An AfspmComponent differs from AfspmComponentBase in that:
+    - An optional publisher can be provided, to allow publishing analysis of
+    received messages.
+    - An optional callable message_received_method() can be provided, which is
+    called in on_message_received().
+    - An optional callable per_loop_method() can be provided, which is called
+    in run_per_loop().
+
+    The latter two allow component logic to be controlled via some simple
+    methods provided (rather than having to define a new class).
+
+    Attributes:
+        publisher: publisher instance, to be used to publish analysis results.
+        message_received_method: method called on_message_received(), used to
+            perform analysis/actions based on new messages.
+        message_received_kwargs: any additional arguments to be fed to
+            message_received_method.
+        per_loop_method: method called oin run_per_loop(), used to perform any
+            additional logic desired while the component is running.
+        per_loop_kwargs: any additional arguments to be fed to per_loop_method.
+    """
+    def __init__(self, publisher: pub.Publisher = None,
+                 message_received_method: Callable = None,
+                 message_received_kwargs: dict = None,
+                 per_loop_method: Callable = None,
+                 per_loop_kwargs: dict = None, **kwargs):
+
+        self.publisher = publisher
+        self.message_received_method = message_received_method
+        self.message_received_kwargs = (message_received_kwargs if
+                                        message_received_kwargs else {})
+        self.per_loop_method = per_loop_method
+        self.per_loop_kwargs = (per_loop_kwargs if
+                                per_loop_kwargs else {})
+
+        super().__init__(**kwargs)
+
+    def run_per_loop(self):
+        """Override to run per_loop_method"""
+        if self.per_loop_method:
+            self.per_loop_method(self, **self.per_loop_kwargs)
+
+    def on_message_received(self, envelope: str, proto: Message):
+        """Override to run message_received_method."""
+        if self.message_received_method:
+            self.message_received_method(self, **self.per_loop_kwargs)

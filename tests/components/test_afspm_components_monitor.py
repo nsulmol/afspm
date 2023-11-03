@@ -6,7 +6,7 @@ import logging
 import pytest
 import zmq
 
-from afspm.components.afspm.component import AfspmComponent
+from afspm.components.afspm.component import AfspmComponentBase
 from afspm.components.afspm.monitor import AfspmComponentsMonitor
 
 
@@ -59,7 +59,7 @@ def time_to_wait_s(beat_period_s, missed_beats_before_dead):
 
 
 # ----- Classes for Testing ----- #
-class CrashingComponent(AfspmComponent):
+class CrashingComponent(AfspmComponentBase):
     """A simple component that crashes after some time."""
     def __init__(self, time_to_crash_s: float, **kwargs):
         self.time_to_crash_s = time_to_crash_s
@@ -72,7 +72,7 @@ class CrashingComponent(AfspmComponent):
             raise SystemExit
 
 
-class ExitingComponent(AfspmComponent):
+class ExitingComponent(AfspmComponentBase):
     """A simple component that exits purposefully after some time."""
     def __init__(self, time_to_exit_s: float, **kwargs):
         self.time_to_exit_s = time_to_exit_s
@@ -127,7 +127,7 @@ def test_two_basic_components(ctx, kwargs, loop_sleep_s,
                               comp_name, missed_beats_before_dead,
                               time_to_wait_s, poll_timeout_ms):
     """Ensure 2 standard components stay alive for the test lifetime."""
-    kwargs['class'] = 'afspm.components.afspm.component.AfspmComponent'
+    kwargs['class'] = 'afspm.components.afspm.component.AfspmComponentBase'
 
     kwargs2 = copy.deepcopy(kwargs)
     comp_name2 = comp_name + "2"

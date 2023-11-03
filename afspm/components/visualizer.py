@@ -9,7 +9,7 @@ import xarray as xr
 
 from google.protobuf.message import Message
 
-from .afspm.component import AfspmComponent
+from .afspm.component import AfspmComponentBase
 from ..io.protos.generated import scan_pb2
 from ..io.pubsub.defaults import SCAN_ID
 from ..utils import array_converters as ac
@@ -33,7 +33,7 @@ class VisualizationStyle(Enum):
 
 
 # TODO: Write unit test for this.
-class Visualizer(AfspmComponent):
+class Visualizer(AfspmComponentBase):
     """Base visualizer, to display scans from cache.
 
     This base component allows easy visualization of 2D data from the

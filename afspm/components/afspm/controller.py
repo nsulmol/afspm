@@ -16,7 +16,7 @@ from ...io.protos.generated import control_pb2
 logger = logging.getLogger(__name__)
 
 
-class AfspmController(afspmc.AfspmComponent):
+class AfspmController(afspmc.AfspmComponentBase):
     """Manages communication between DeviceController and multiple clients.
 
     The AfspmController serves as an intermediary between the DeviceController

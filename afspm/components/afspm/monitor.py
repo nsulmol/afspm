@@ -8,8 +8,7 @@ import multiprocessing as mp
 import zmq
 
 from ...io import common
-from ...io.heartbeat.heartbeat import HeartbeatListener
-from .component import AfspmComponent, get_heartbeat_url
+from ...io.heartbeat.heartbeat import HeartbeatListener, get_heartbeat_url
 from ...utils.parser import construct_and_run_component
 
 

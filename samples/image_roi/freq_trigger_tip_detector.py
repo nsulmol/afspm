@@ -12,7 +12,7 @@ from afspm.io.protos.generated import control_pb2
 logger = logging.getLogger(__name__)
 
 
-class FreqTriggerTipDetector(AfspmComponent):
+class FreqTriggerTipDetector(AfspmComponentBase):
     """Fake tip detector, will throw  tip problem after a preset # images.
 
     Attributes:

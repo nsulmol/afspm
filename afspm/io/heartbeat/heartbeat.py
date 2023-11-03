@@ -1,6 +1,7 @@
 """Contains heartbeating logic (to check for frozen/crashed components)."""
 
 import time
+import tempfile
 import logging
 from enum import Enum
 
@@ -157,3 +158,8 @@ class HeartbeatListener:
         """Reset internal logic following a restart of Heartbeater."""
         self._last_beat_ts = time.time()
         self.received_kill_signal = False
+
+
+def get_heartbeat_url(name: str):
+    """Create a hearbeat url, given a component name."""
+    return "ipc://" + tempfile.gettempdir() + '/' + name

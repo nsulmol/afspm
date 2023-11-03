@@ -25,7 +25,7 @@ from ...io.protos.generated import control_pb2
 logger = logging.getLogger(__name__)
 
 
-class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
+class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
     """Handles communicating with SPM device and handling requests.
 
     The DeviceController is the principal node for communicating with an SPM
