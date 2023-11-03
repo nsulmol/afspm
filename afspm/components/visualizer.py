@@ -181,9 +181,9 @@ class Visualizer(AfspmComponent):
     def on_message_received(self, envelope: str, proto: Message):
         """Override; we update the visualization data on new scans."""
         if isinstance(proto, scan_pb2.Scan2d):
-            self.update_visualization_data()
+            self._update_visualization_data()
 
-    def update_visualization_data(self):
+    def _update_visualization_data(self):
         """For every cache key, updates visualization data."""
         if self.visualize_undeclared_scans:
             keys = [key for key in self.subscriber.cache if self.scan_id in

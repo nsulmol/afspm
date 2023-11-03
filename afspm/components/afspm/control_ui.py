@@ -57,9 +57,9 @@ class AfspmControlUI(AfspmComponent):
     I/O constituents).
 
     Attributes:
-        self.mode_buttons: a list of strings corresponding to the control mode
+        mode_buttons: a list of strings corresponding to the control mode
             buttons.
-        self.map_mode_button_to_mode
+        map_mode_button_to_mode
         ui_timeout_ms: the ui read timeout used to poll ui elements, in
             milliseconds.
     """
@@ -109,7 +109,7 @@ class AfspmControlUI(AfspmComponent):
 
     def _handle_ui_event_loop(self):
         #self.layout[ERROR_LOG_KEY].update(value="")  # Clear error log
-        event, values = self.window.read(timeout=self.ui_timeout_ms)
+        event, __ = self.window.read(timeout=self.ui_timeout_ms)
 
         req_methods = []
         req_args = []
