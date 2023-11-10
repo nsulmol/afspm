@@ -59,6 +59,9 @@ class AfspmComponentsMonitor:
         component_params_dict: a dict of the component constructor params, with
             the component.name being used as a key. The format of this dict
             is the same as the input provided to the constructor.
+        vars_dict: a dict containing other objects *referenced* in
+            component_params_dict, which may need to be instantiated when
+            spawning a given component.
         component_processes_dict: a dict of the currently running processes,
             with the component.name being used as a key.
         listeners_dict: a dict of the currently running HeartbeatListeners,
@@ -66,6 +69,7 @@ class AfspmComponentsMonitor:
     """
     def __init__(self,
                  component_params_dict: dict[str, dict],
+                 vars_dict: dict[str, dict],
                  poll_timeout_ms: int = common.POLL_TIMEOUT_MS,
                  loop_sleep_s: float = common.LOOP_SLEEP_S,
                  missed_beats_before_dead: int = common.BEATS_BEFORE_DEAD,
@@ -76,6 +80,9 @@ class AfspmComponentsMonitor:
             component_params_dict: a dict of key:vals where the key is a
                 component's name and the val is a dict of construction
                 parameters.
+            vars_dict: a dict containing other objects *referenced* in
+                component_params_dict, which may need to be instantiated when
+                spawning a given component.
             poll_timeout_ms: how long to wait when polling the listener.
             loop_sleep_s: how many seconds we sleep for between every loop.
             missed_beats_before_dead: how many missed beats we will allow
@@ -88,6 +95,7 @@ class AfspmComponentsMonitor:
         self.ctx = ctx
 
         self.component_params_dict = component_params_dict
+        self.vars_dict = vars_dict
         self.poll_timeout_ms = poll_timeout_ms
         self.loop_sleep_s = loop_sleep_s
         self.missed_beats_before_dead = missed_beats_before_dead
@@ -113,7 +121,8 @@ class AfspmComponentsMonitor:
         # Not calling super().__del__() because there is no super.
 
     @staticmethod
-    def _startup_component(params_dict: dict) -> mp.Process:
+    def _startup_component(component_dict: dict,
+                           vars_dict: dict) -> mp.Process:
         """Start up an AfspmComponent in a Process.
 
         Note: This method *does not* feed a zmq context! The zmq guide
@@ -125,29 +134,35 @@ class AfspmComponentsMonitor:
         ipc sockets of more than 1 child process. So it is crucial to
         spawn a new context for every process.
 
-        Args:
-            params_dict: dictionary of parameters to feed the constructor.
+        Partially because of this, we also pass a dict containing info about
+        other classes that are referenced in component_dict.
 
+        Args:
+            component_dict: dictionary of parameters to feed the constructor.
+            vars_dict: a dict containing other objects *referenced* in
+                component_dict, which may need to be instantiated when
+                spawning a given component.
         Returns:
             Process spawned.
         """
-        params_dict = copy.deepcopy(params_dict)
-        params_dict['ctx'] = None
-        logger.info("Creating process for component %s", params_dict['name'])
+        component_dict = copy.deepcopy(component_dict)
+        component_dict['ctx'] = None
+        logger.info("Creating process for component %s", component_dict['name'])
         proc = mp.Process(target=construct_and_run_component,
-                          kwargs={'params_dict': params_dict},
+                          kwargs={'component_dict': component_dict,
+                                  'vars_dict': vars_dict},
                           daemon=True)  # Ensures we try to kill on main exit
         proc.start()
         return proc
 
     @staticmethod
-    def _startup_listener(params_dict: dict, missed_beats_before_dead: int,
+    def _startup_listener(component_dict: dict, missed_beats_before_dead: int,
                           poll_timeout_ms: int, ctx: zmq.Context
                           ) -> HeartbeatListener:
         """Start up a HeartbeatListener to monitor an AfspmComponent.
 
         Args:
-            params_dict: dictionary of parameters to feed the
+            component_dict: dictionary of parameters to feed the
                 AfspmComponent's constructor.
             missed_beats_before_dead: how many missed beats we will allow
                 before we consider the Heartbeater dead.
@@ -157,19 +172,20 @@ class AfspmComponentsMonitor:
         Returns:
             The created HeartbeatListener instance.
         """
-        params_dict = copy.deepcopy(params_dict)
-        params_dict['url'] = get_heartbeat_url(params_dict['name'])
-        params_dict['poll_timeout_ms'] = poll_timeout_ms
+        component_dict = copy.deepcopy(component_dict)
+        component_dict['url'] = get_heartbeat_url(component_dict['name'])
+        component_dict['missed_beats_before_dead'] = missed_beats_before_dead
+        component_dict['poll_timeout_ms'] = poll_timeout_ms
 
-        logger.info("Creating listener for component %s", params_dict['name'])
-        return HeartbeatListener(**params_dict)
+        logger.info("Creating listener for component %s", component_dict['name'])
+        return HeartbeatListener(**component_dict)
 
     def _startup_processes_and_listeners(self) -> bool:
         """Startup component processes and their associated listeners."""
         succeeded = True
         for name in self.component_params_dict:
             self.component_processes[name] = self._startup_component(
-                self.component_params_dict[name])
+                self.component_params_dict[name], self.vars_dict)
             # Starting listener second because it will wait for startup
             # time (_startup_component() will not, due to it spawning a
             # process).
@@ -242,7 +258,7 @@ class AfspmComponentsMonitor:
         self.component_processes[key].terminate()
         self.listeners[key].reset()
         self.component_processes[key] = self._startup_component(
-            self.component_params_dict[key])
+            self.component_params_dict[key], self.vars_dict)
 
     def _remove_process(self, key: str):
         """Terminate the process and listener with the provided key."""

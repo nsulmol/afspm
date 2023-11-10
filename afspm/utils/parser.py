@@ -1,7 +1,7 @@
 """Config file parsing (and populating) methods.
 
 The two main methods here are:
-- expand_variables_in_dict()
+- filter_components_and_vars()
 - construct_and_run_component().
 
 All other methods are used within these and thus private.
@@ -22,41 +22,136 @@ URL_CHAR = ':'
 INST_CHARS = '()'
 ARG_SEP = ','
 
-# Constant expected key indicating something is a class and should be
-# instantiated
+# Indicates a class/method
 CLASS_KEY = 'class'
 
+# Indicates a component
+COMPONENT_KEY = 'component'
 
-def expand_variables_in_dict(config_dict: dict) -> dict:
-    """Replaces any 'variable' values in a dict with their values.
 
-    Given a dictionary of key:val pairs where some values correspond to other
-    keys, this method will replace all variables with their value (in effect
-    'expanding' out the variables).
+def construct_and_run_component(component_dict: dict,
+                                vars_dict: dict = None):
+    """Method to build and run an AfspmComponent, for use with multiprocess.
 
-    E.g.: Given:
-        pub_url: 'tcp://127.0.0.1:5555'
-        publisher:
-            url: 'pub_url'
-            get_envelope_given_proto: 'afspm.io.pubsub.logic.cache_logic.
-                CacheLogic.get_envelope_for_proto'
-    , it will expand out into:
-        pub_url: 'tcp://127.0.0.1:5555'
-        publisher:
-            url: 'tcp://127.0.0.1:5555'
-            get_envelope_for_proto: 'afspm.io.pubsub.logic.cache_logic.
-                CacheLogic.get_envelope_for_proto'
+    This method functions as the process method fed to each mp.Process
+    constructor, to start up a component and run it.
+
+    Given (i) a dictionary of parameters necessary to construct a component
+    component_dict; and (ii)  a dictionary of additional variables vars_dict
+    that may be referenced in component_dict; we proceed via the following steps:
+    1. Expand out key:val pairs in vars_dict, copying instantiated classes
+    where referenced.
+    2. Evaluate
+    2. Recursively go through variables_dict importing and (possibly)
+    instantiating any necessary objects/methods.
+    3. Merge vars_dict and component_dict, so we have these instantiated variables
+    in a common dict. Expand out this merged dict, and then update the
+    component_dict keys with these ones. Now, we have a component_dict with
+    instantiated vars expanded out into it!
+    4. Perform (2) on component_dict, copying instantiated classes where
+    referenced.
+    5. Perform (3) on component_dict, instantiating any missing objects/methods.
+    6. Construct our AfspmComponent with this kwargs dict.
+
+    Thus, our component_dict may look like, for example:
+    {
+        class: 'afspm.components.component.AfspmComponent',
+        loop_sleep_s: 0,
+        beat_period_s: 5,
+        subscriber: 'sub'
+    }
+
+    and our vars_dict like:
+    {
+        'sub' : {
+            class: 'afspm.io.pubsub.subscriber.Subscriber',
+            sub_url: 'tcp://127.0.0.1:5555'
+            sub_extract_proto:
+            'afspm.io.pubsub.logic.cache_logic.extract_proto',
+            [...]
+        }
+    }
+
+    Step (1) will do nothing here, because there are no key:val pairs in
+    vars_dict requiring expansion.
+
+    Step (2) will:
+    a) Convert vars_dict['subscriber']['sub_extract_proto'] from a string to
+    a Callable by evaluating the string and importing it.
+    b) Convert vars_dict['subscriber']['class'] from a string to a 'type'
+    instance, so it can be constructed later.
+    c) Convert vars_dict['subscriber'] to a Subscriber instance by
+    calling component_dict['subscriber']['class'](component_dict['subscriber']),
+    i.e. using the other values in component_dict['subscriber'] as the kwargs to
+    the constructor.
+
+    Step (4) will copy the Subscriber instance into component_dict['subscriber'].
+
+    With this done, we can instantiate our actual AfspmComponent instance using
+    a kwargs dict consisting of the other values in this component_dict.
 
     Args:
-        config_dict: dictionary to expand variables in.
-
-    Returns:
-        dictionary, with variables expanded out.
+        component_dict: dictionary of parameters to feed the
+            AfspmComponent's constructor.
+        vars_dict: dictionary of other variables which may be referenced in
+            component_dict (and thus require being expanded over).
     """
-    return _expand_variables_recursively(config_dict, None)
+    component = _construct_component(component_dict, vars_dict)
+    logger.error("Component: %s", component)
+    logger.error("Subscriber: %s", component.subscriber)
+    component.run()
 
 
-def _expand_variables_recursively(config_dict: dict, sub_dict: dict) -> dict:
+def _construct_component(component_dict: dict, vars_dict: dict) -> Any:
+    """Method to build a component from a dict of params and one of vars.
+
+    See construct_and_run_component() for full documentation.
+    """
+    assert CLASS_KEY in component_dict
+    vars_dict = _expand_variables_recursively(vars_dict)
+    vars_dict = _evaluate_values_recursively(vars_dict)
+    vars_dict = _instantiate_classes_recursively(vars_dict)
+
+    logger.error("Vars Dict Subscriber: %s", vars_dict['sub_spm'])
+    logger.error("Vars Dict Subscriber socket: %s", vars_dict['sub_spm']._subscriber)
+
+    vars_dict['sub_spm'].poll_and_store()
+
+    # Combine dictionaries, so we can expand the variables from vars_dict
+    # into component_dict. Then, update the keys in component_dict with the
+    # final merged values.
+    #merged_dict = component_dict | vars_dict  #{**component_dict, **vars_dict}
+    merged_dict = component_dict.copy()
+    merged_dict.update(vars_dict)
+
+    logger.error("Trying to poll...")
+    merged_dict['sub_spm'].poll_and_store()
+
+    merged_dict = _expand_variables_recursively(merged_dict)
+
+    logger.error("Trying to poll after expansion")
+    merged_dict['subscriber'].poll_and_store()
+
+    logger.error("Merged dict subscriber: %s", merged_dict['subscriber'])
+    component_dict.update((k, merged_dict[k]) for k in component_dict.keys())
+
+    logger.error("Merged Subscriber: %s", merged_dict['subscriber'])
+    logger.error("Merged Subscriber socket: %s",
+                 merged_dict['subscriber']._subscriber)
+
+    logger.error("Subscriber: %s", component_dict['subscriber'])
+    logger.error("Subscriber socket: %s", component_dict['subscriber']._subscriber)
+
+    logger.debug("Merged Dict: %s", merged_dict)
+    logger.debug("Component dict: %s", component_dict)
+    logger.debug("Vars dict: %s", vars_dict)
+
+    component_dict = _evaluate_values_recursively(component_dict)
+    return  _instantiate_classes_recursively(component_dict)
+
+
+def _expand_variables_recursively(config_dict: dict,
+                                  sub_dict: dict = None) -> dict:
     """Recursively go through config_dict, expanding variables out.
 
     This method will recurse through a dictionary, comparing the values of
@@ -64,6 +159,8 @@ def _expand_variables_recursively(config_dict: dict, sub_dict: dict) -> dict:
     (implying a top-level variable), it will replace the value of that
     key:val pair with the top-level key's value. See expand_variables_in_dict
     for an example.
+
+    TODO: Add example from removed method!!!
 
     Args:
         config_dict: top-level dictionary we are fixing.
@@ -90,9 +187,10 @@ def _expand_variables_recursively(config_dict: dict, sub_dict: dict) -> dict:
             elif (isinstance(sub_dict[key], str) and
                   sub_dict[key] in config_dict):  # Expand variable
                 logger.debug("Expanding %s into %s.", sub_dict[key],
-                            config_dict[sub_dict[key]])
+                             config_dict[sub_dict[key]])
                 sub_dict[key] = config_dict[sub_dict[key]]
             else:  # Copy value over (this is not a variable)
+                # TODO: This is not necessary with copy, right???
                 logger.trace("Keeping %s for key %s", sub_dict[key], key)
                 sub_dict[key] = sub_dict[key]
     except Exception as exc:
@@ -127,67 +225,6 @@ def _expand_variables_list_recursively(config_dict: dict, in_list: list
             in_list[idx] = config_dict[in_list[idx]]
 
     return in_list
-
-
-def construct_and_run_component(params_dict: dict):
-    """Method to build and run an AfspmComponent, for use with multiprocess.
-
-    This method functions as the process method fed to each mp.Process
-    constructor, to start up a component and run it.
-
-    Given a dictionary of parameters necessary to construct a component,
-    we proceed via the following steps:
-    1. We recursively go through the dictionary, evaluating keys so as to
-    import and (possibly) instantiate any necessary objects/methods. At this
-    point, we will actually have a kwargs dict.
-    2. Construct our AfspmComponent with this kwargs dict.
-
-    We leave importing/instantiation in (1) until this method to ensure all
-    such memory usage is limited to the process spawned.
-
-    Thus, our params_dict may look like, for example:
-    {
-        class: 'afspm.components.component.AfspmComponent',
-        loop_sleep_s: 0,
-        beat_period_s: 5,
-        subscriber: {
-            class: 'afspm.io.pubsub.subscriber.Subscriber',
-            sub_url: 'tcp://127.0.0.1:5555'
-            sub_extract_proto:
-            'afspm.io.pubsub.logic.cache_logic.extract_proto',
-            [...]
-        }
-    }
-
-    Step (1) will:
-    a) Convert params_dict['subscriber']['sub_extract_proto'] from a string to
-    a Callable by evaluating the string and importing it.
-    b) Convert params_dict['subscriber']['class'] from a string to a 'type'
-    instance, so it can be constructed later.
-    c) Convert params_dict['subscriber'] to a Subscriber instance by
-    calling params_dict['subscriber']['class'](params_dict['subscriber']),
-    i.e. using the other values in params_dict['subscriber'] as the kwargs to
-    the constructor.
-
-    With this done, we can instantiate our actual AfspmComponent instance using
-    a kwargs dict consisting of the other values in this params_dict.
-
-    Args:
-        params_dict: dictionary of parameters to feed the
-            AfspmComponent's constructor.
-    """
-    component = _construct_component(params_dict)
-    component.run()
-
-
-def _construct_component(params_dict: dict) -> Any:  # Fix typing here!!!
-    """Method to build a component from a dict of parameters.
-
-    See construct_and_run_component() for full documentation.
-    """
-    assert CLASS_KEY in params_dict
-    evaluated_dict = _evaluate_values_recursively(params_dict)
-    return  _instantiate_classes_recursively(evaluated_dict)
 
 
 def _evaluate_values_recursively(params_dict: dict) -> dict:

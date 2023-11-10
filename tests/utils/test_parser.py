@@ -43,7 +43,7 @@ def expected_expanded_dict():
 
 def test_expand_variables(sample_dict, expected_expanded_dict):
     """Validate we are expanding variables out properly."""
-    expanded_dict = parser.expand_variables_in_dict(sample_dict)
+    expanded_dict = parser._expand_variables_recursively(sample_dict)
     assert expanded_dict == expected_expanded_dict
 
 
@@ -112,9 +112,7 @@ def test_evaluate_value_str(control_client_str, sample_url,
 
 
 @pytest.fixture
-def afspm_component_params_dict():
-    cache_kwargs = {"cache_logic":
-                    'afspm.io.pubsub.logic.pbc_logic.ProtoBasedCacheLogic()'}
+def afspm_component_dict():
     return {
         'class': 'afspm.components.component.AfspmComponent',
         'name': 'BananaHammock',
@@ -128,30 +126,26 @@ def afspm_component_params_dict():
             'topics_to_sub': [],
             'update_cache':
             'afspm.io.pubsub.logic.cache_logic.update_cache',
-            'extract_proto_kwargs': cache_kwargs,
-            'update_cache_kwargs': cache_kwargs
+            'extract_proto_kwargs': 'cache_kwargs',
+            'update_cache_kwargs': 'cache_kwargs'
         }
     }
+
 
 @pytest.fixture
 def scan_size():
     return [200, 200]
 
-@pytest.fixture
-def visualizer_params_dict(scan_size):
-    full_scan_origin = [0, 0]
-    full_scan_id = {
-        'class': 'afspm.io.pubsub.logic.pbc_logic.create_roi_scan_envelope',
-        'size': scan_size
-    }
 
+@pytest.fixture
+def visualizer_dict():
     return {
         'class': 'afspm.components.visualizer.Visualizer',
         'name': 'TheMasterOfTheUniverse',
-        'list_keys': [full_scan_id],
+        'list_keys': ['full_scan_id'],
         'cache_meaning_list':  ['temporal'],
-        'scan_phys_origin_list': [full_scan_origin],
-        'scan_phys_size_list': [scan_size],
+        'scan_phys_origin_list': ['full_scan_origin'],
+        'scan_phys_size_list': ['scan_size'],
         'visualization_style_list': [False],  # Default
         'visualization_colormap_list': [False],  # Default
         'visualize_undeclared_scans': True,
@@ -161,21 +155,35 @@ def visualizer_params_dict(scan_size):
     }
 
 
-def test_construct_component(afspm_component_params_dict,
-                             visualizer_params_dict,
-                             scan_size):
+@pytest.fixture
+def vars_dict(scan_size):
+    return {
+        'cache_kwargs': {
+            'cache_logic':
+            'afspm.io.pubsub.logic.pbc_logic.ProtoBasedCacheLogic()'},
+        'full_scan_origin': [0, 0],
+        'full_scan_id':  {
+            'class':
+            'afspm.io.pubsub.logic.pbc_logic.create_roi_scan_envelope',
+            'size': scan_size}
+    }
+
+
+def test_construct_component(afspm_component_dict,
+                             visualizer_dict,
+                             vars_dict, scan_size):
     """Confirm we can construct a component from a dict.
 
     This tests _construct_component() *without* testing the run()
     part.
     """
-    afspm_component_params_dict['ctx'] = zmq.Context.instance()
-    res = parser._construct_component(afspm_component_params_dict)
+    afspm_component_dict['ctx'] = zmq.Context.instance()
+    res = parser._construct_component(afspm_component_dict, vars_dict)
     from afspm.components.component import AfspmComponent
     assert isinstance(res, AfspmComponent)
 
-    visualizer_params_dict['ctx'] = zmq.Context.instance()
-    res = parser._construct_component(visualizer_params_dict)
+    visualizer_dict['ctx'] = zmq.Context.instance()
+    res = parser._construct_component(visualizer_dict, vars_dict)
     from afspm.components.visualizer import Visualizer
     assert isinstance(res, Visualizer)
 

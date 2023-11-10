@@ -3,7 +3,7 @@
 import pytest
 import copy
 from afspm import spawn
-from afspm.utils.parser import expand_variables_in_dict
+from afspm.utils.parser import COMPONENT_KEY
 
 
 @pytest.fixture
@@ -46,36 +46,40 @@ def good_config_dict(component1_name, component2_name,
     return {
         key_to_expand_from: 'inproc://banana',
         component1_name: {
-            spawn.IS_COMPONENT_KEY: True,
+            COMPONENT_KEY: True,
             'hello': 'world',
             key_to_expand: key_to_expand_from
         },
         component2_name: {
-            spawn.IS_COMPONENT_KEY: True,
+            COMPONENT_KEY: True,
             'hola': 'mundo',
             key_to_expand: key_to_expand_from
         }
     }
 
+@pytest.fixture
+def filter_params(component1_name, component2_name):
+    return [None, [component1_name], [component2_name],
+            [component1_name, component2_name]]
+
 
 def test_prepare_dict_for_spawning(good_config_dict, component1_name,
-                                   component2_name):
+                                   component2_name, filter_params,
+                                   key_to_expand, key_to_expand_from):
     """Validate variable expansion and filtering works as expected."""
-    filter_params = [None, [component1_name], [component2_name],
-                     [component1_name, component2_name]]
-
     for filter in filter_params:
-        expanded_dict = expand_variables_in_dict(good_config_dict)
-        res_dict = spawn._filter_requested_components(expanded_dict, filter)
+        test_dict = copy.deepcopy(good_config_dict)
+        comp_dict, vars_dict = spawn._filter_components_and_vars(
+            test_dict, filter)
         filter = ([component1_name, component2_name] if filter is None
                   else filter)
+        assert key_to_expand_from in vars_dict
+        assert key_to_expand_from not in comp_dict
         for key in filter:
-            assert res_dict[key]['banana'] == good_config_dict['url']
-            assert key in res_dict
+            assert key in comp_dict
 
     # Test KeyError case!
-    del good_config_dict[component1_name][spawn.IS_COMPONENT_KEY]
+    del good_config_dict[component1_name][COMPONENT_KEY]
     with pytest.raises(KeyError):
-        expanded_dict = expand_variables_in_dict(good_config_dict)
-        res_dict = spawn._filter_requested_components(expanded_dict,
-                                                      [component1_name])
+        comp_dict, vars_dict = spawn._filter_components_and_vars(
+            good_config_dict, [component1_name])

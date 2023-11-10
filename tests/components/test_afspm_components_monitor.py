@@ -44,6 +44,11 @@ def kwargs(comp_name, loop_sleep_s, beat_period_s):
 
 
 @pytest.fixture
+def vars_dict():
+    return {}  # Empty dict, no vars being referenced
+
+
+@pytest.fixture
 def missed_beats_before_dead():
     return 5
 
@@ -98,13 +103,14 @@ def monitor_and_wait(monitor: AfspmComponentsMonitor,
 
 
 # ----- Tests ----- #
-def test_basic_component(ctx, kwargs, loop_sleep_s,
+def test_basic_component(ctx, kwargs, loop_sleep_s, vars_dict,
                          comp_name, missed_beats_before_dead,
                          time_to_wait_s, poll_timeout_ms):
     """Ensure a standard component stays alive for the test lifetime."""
     kwargs['class'] = 'afspm.components.component.AfspmComponent'
     components_params_dict = {comp_name: kwargs}
     monitor = AfspmComponentsMonitor(components_params_dict,
+                                     vars_dict,
                                      poll_timeout_ms,
                                      loop_sleep_s,
                                      missed_beats_before_dead,
@@ -123,7 +129,7 @@ def test_basic_component(ctx, kwargs, loop_sleep_s,
     assert original_pid == monitor.component_processes[comp_name].pid
 
 
-def test_two_basic_components(ctx, kwargs, loop_sleep_s,
+def test_two_basic_components(ctx, kwargs, loop_sleep_s, vars_dict,
                               comp_name, missed_beats_before_dead,
                               time_to_wait_s, poll_timeout_ms):
     """Ensure 2 standard components stay alive for the test lifetime."""
@@ -137,6 +143,7 @@ def test_two_basic_components(ctx, kwargs, loop_sleep_s,
                               comp_name2: kwargs2}
 
     monitor = AfspmComponentsMonitor(components_params_dict,
+                                     vars_dict,
                                      poll_timeout_ms,
                                      loop_sleep_s,
                                      missed_beats_before_dead,
@@ -160,7 +167,7 @@ def test_two_basic_components(ctx, kwargs, loop_sleep_s,
 
 
 def test_crashing_component(ctx, kwargs, loop_sleep_s, beat_period_s,
-                            comp_name, missed_beats_before_dead,
+                            vars_dict, comp_name, missed_beats_before_dead,
                             time_to_wait_s, poll_timeout_ms):
     """Ensure a crashing component is restarted in the test lifetime."""
     kwargs['time_to_crash_s'] = 2 * beat_period_s
@@ -168,6 +175,7 @@ def test_crashing_component(ctx, kwargs, loop_sleep_s, beat_period_s,
                        + 'CrashingComponent')
     components_params_dict = {comp_name: kwargs}
     monitor = AfspmComponentsMonitor(components_params_dict,
+                                     vars_dict,
                                      poll_timeout_ms,
                                      loop_sleep_s,
                                      missed_beats_before_dead,
@@ -187,7 +195,7 @@ def test_crashing_component(ctx, kwargs, loop_sleep_s, beat_period_s,
 
 
 def test_exiting_component(ctx, kwargs, loop_sleep_s, beat_period_s,
-                           comp_name, missed_beats_before_dead,
+                           vars_dict, comp_name, missed_beats_before_dead,
                            time_to_wait_s, poll_timeout_ms):
     """Ensure a purposefully exiting component is *not* restarted."""
     kwargs['time_to_exit_s'] = 2 * beat_period_s
@@ -196,6 +204,7 @@ def test_exiting_component(ctx, kwargs, loop_sleep_s, beat_period_s,
                        + 'ExitingComponent')
     components_params_dict = {comp_name: kwargs}
     monitor = AfspmComponentsMonitor(components_params_dict,
+                                     vars_dict,
                                      poll_timeout_ms,
                                      loop_sleep_s,
                                      missed_beats_before_dead,

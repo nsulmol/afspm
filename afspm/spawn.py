@@ -8,15 +8,14 @@ import tomli
 import fire
 
 # TODO: Figure out why this can't be relative?
-from afspm.utils.parser import expand_variables_in_dict
 from afspm.components.monitor import AfspmComponentsMonitor
+from afspm.utils.parser import COMPONENT_KEY  # TODO Remove me once moved
 
 
 logger = logging.getLogger(__name__)
 
 
 LOGGER_ROOT = 'afspm'
-IS_COMPONENT_KEY = 'component'
 MONITOR_KEY = 'afspm_components_monitor'
 TRACE_LOG_LEVEL = logging.DEBUG - 5
 
@@ -109,14 +108,15 @@ def spawn_components(config_file: str,
     with open(config_file, 'rb') as file:
         config_dict = tomli.load(file)
 
-        expanded_dict = expand_variables_in_dict(config_dict)
-        filtered_dict = _filter_requested_components(expanded_dict,
-                                                     components_to_spawn)
-        if MONITOR_KEY in expanded_dict:
-            monitor = AfspmComponentsMonitor(filtered_dict,
-                                             **expanded_dict[MONITOR_KEY])
+        components_dict, vars_dict = _filter_components_and_vars(
+            config_dict, components_to_spawn)
+        if MONITOR_KEY in vars_dict:
+            monitor = AfspmComponentsMonitor(components_dict,
+                                             vars_dict,
+                                             **vars_dict[MONITOR_KEY])
         else:
-            monitor = AfspmComponentsMonitor(filtered_dict)
+            monitor = AfspmComponentsMonitor(components_dict,
+                                             vars_dict)
 
     if monitor:
         monitor.run()
@@ -150,22 +150,22 @@ def _set_up_logging(log_file: str, log_to_stdout: bool, log_level: str):
         root.addHandler(handler)
 
 
-def _filter_requested_components(config_dict: dict,
-                                 components_to_spawn: list[str] = None,
-                                 ) -> dict:
-    """Iterate through config_dict, filtering out requested components only.
+# TODO: Move to parser?
+def _filter_components_and_vars(config_dict: dict,
+                                components_to_spawn: list[str] = None,
+                                ) -> (dict, dict):
+    """Iterate through config_dict, separating components and other vars.
 
-    This will return a new dict consisting only of the requested components. It
-    confirms each requested component is an 'actual' AfspmComponent via a hack:
-    it expects such a dict to contain a key:val 'component': True.
+    This will return a dict consisting only of the requested components
+    and one with all non-component key:vals, for later expansion/instantiation.
+    It confirms each requested component is an 'actual' AfspmComponent via
+    the key:val pair 'component': True.
 
-    If the no list of components are provided, we iterate through all keys in
-    the config dict and accept all key:vals that contain a 'component': True
-    key:val.
+    If the no list of components are provided, we accept all 'components'.
 
-    Note: we also copy the parent key (which is the name) into a 'name' key in
-    the sub-dict. This is for convenience elsewhere, where we use the 'name'
-    key to determine the component's name.
+    Note: for each component, we also copy the parent key (which is the name)
+    into a 'name' key in the sub-dict. This is for convenience elsewhere, where
+    we use the 'name' key to determine the component's name.
 
     Args:
         config_dict: dictionary to analyze.
@@ -175,24 +175,30 @@ def _filter_requested_components(config_dict: dict,
             a key:val of 'component': True for us to parse it properly!
 
     Returns:
-        A new dict consisting only of the key:val pairs associated with the
-            components we want to spawn.
+        - A dict with the key:val pairs of components we do not want removed;
+        - A dict with the key:val pairs of all other variables.
     """
-    filtered_dict = {}
+    components_dict = {}
+    vars_dict = {}
     for key in config_dict:
-        if (isinstance(config_dict[key], dict) and
-                (components_to_spawn is None or key in components_to_spawn)):
-            if IS_COMPONENT_KEY in config_dict[key]:
-                config_dict[key].pop(IS_COMPONENT_KEY, None)
+        is_dict = isinstance(config_dict[key], dict)
+        if is_dict and COMPONENT_KEY in config_dict[key]:
+            spawn_component = config_dict[key][COMPONENT_KEY]
+            component_in_list = (not components_to_spawn or key in
+                                 components_to_spawn)
+            if spawn_component and component_in_list:
+                config_dict[key].pop(COMPONENT_KEY, None)
                 config_dict[key]['name'] = key
-                filtered_dict[key] = config_dict[key]
-            elif components_to_spawn is not None:
-                msg = ("Requested component %s, but this is not a "
-                       "component (does not have 'component': True "
-                       "key:val pair)!" % key)
-                logger.error(msg)
-                raise KeyError(msg)
-    return filtered_dict
+                components_dict[key] = config_dict[key]
+        elif is_dict and components_to_spawn and key in components_to_spawn:
+            msg = ("Requested component %s, but this is not a "
+                   "component (does not have 'component': True "
+                   "key:val pair)!" % key)
+            logger.error(msg)
+            raise KeyError(msg)
+        else:
+            vars_dict[key] = config_dict[key]
+    return components_dict, vars_dict
 
 
 def cli():
