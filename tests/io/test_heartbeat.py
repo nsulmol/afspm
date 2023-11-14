@@ -44,7 +44,7 @@ def beat_period_s():
 
 @pytest.fixture
 def hb_listener_timeout_ms(beat_period_s, comm_timeout_ms):
-    return comm_timeout_ms + 2 * (beat_period_s * 1000)
+    return 2 * (comm_timeout_ms + (beat_period_s * 1000))
 
 
 @pytest.fixture
