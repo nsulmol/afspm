@@ -110,7 +110,8 @@ class Subscriber(ABCSubscriber):
                 topics_to_sub: list of topics we wish to subscribe to.
                 update_cache: method that updates our cache based on
                     the provided 'topic' and proto.
-                ctx: zmq Context; if not provided, we will create a new instance.
+                ctx: zmq Context; if not provided, we will create a new
+                    instance.
                 extract_proto_kwargs: any additional arguments to be fed to
                     sub_extract_proto.
                 update_cache_kwargs: any additional arguments to be fed to
@@ -216,7 +217,7 @@ class ComboSubscriber(ABCSubscriber):
         for sub in self._subs:
             msg = sub.poll_and_store()
             if msg:
-                messages.append(msg)
+                messages.extend(msg)
             self._cache |= sub.cache  # Update combined cache!
         return messages if len(messages) > 0 else None
 
