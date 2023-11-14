@@ -231,6 +231,20 @@ class ControlClient:
             control_pb2.ControlRequest.REQ_RMV_EXP_PRBLM, problem)
         return self._try_send_req(msg)
 
+    def set_uuid(self, uuid: str):
+        """Explicit uuid for socket connection.
+
+        If already created, will close and restart socket with new uuid.
+
+        Args:
+            uuid: new desired socket uuid.
+        """
+        if self._client:
+            self._close_client()
+
+        self._uuid = uuid
+        self._init_client()
+
 
 class AdminControlClient(ControlClient):
     """Encapsulates logic for extra Administrator AFSPM requests.

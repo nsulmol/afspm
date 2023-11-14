@@ -60,6 +60,7 @@ class AfspmComponentBase:
                  control_client: ctrl_client.ControlClient = None,
                  loop_sleep_s: float = common.LOOP_SLEEP_S,
                  beat_period_s: float = common.HEARTBEAT_PERIOD_S,
+                 override_client_uuid: bool = True,
                  ctx: zmq.Context = None):
         """Initialize our AfspmComponent.
 
@@ -70,6 +71,9 @@ class AfspmComponentBase:
             subscriber: subscriber instance, to receive data from the
                 DeviceController.
             control_client: client to ControlServer, to allow sending requests.
+            override_client_uuid: boolean indicating whether we will restart
+                the provided ControlClient with the component's name as its
+                UUID. Default is true.
             ctx: zmq context.
         """
         logger.debug("Initializing component %s", name)
@@ -83,6 +87,10 @@ class AfspmComponentBase:
         self.subscriber = subscriber
         self.control_client = control_client
         self.stay_alive = True
+
+        if self.control_client and override_client_uuid:
+            self.control_client.set_uuid(self.name)
+
 
     def run(self):
         """Main loop."""
@@ -163,34 +171,32 @@ class AfspmComponent(AfspmComponentBase):
         publisher: publisher instance, to be used to publish analysis results.
         message_received_method: method called on_message_received(), used to
             perform analysis/actions based on new messages.
-        message_received_kwargs: any additional arguments to be fed to
-            message_received_method.
         per_loop_method: method called oin run_per_loop(), used to perform any
             additional logic desired while the component is running.
-        per_loop_kwargs: any additional arguments to be fed to per_loop_method.
+        methods_kwargs: any additional arguments to be fed to
+            message_received_method and per_loop_method.
     """
     def __init__(self, publisher: pub.Publisher = None,
                  message_received_method: Callable = None,
-                 message_received_kwargs: dict = None,
                  per_loop_method: Callable = None,
-                 per_loop_kwargs: dict = None, **kwargs):
+                 methods_kwargs: dict = None,
+                 **kwargs):
 
         self.publisher = publisher
         self.message_received_method = message_received_method
-        self.message_received_kwargs = (message_received_kwargs if
-                                        message_received_kwargs else {})
+        self.methods_kwargs = (methods_kwargs if
+                               methods_kwargs else {})
         self.per_loop_method = per_loop_method
-        self.per_loop_kwargs = (per_loop_kwargs if
-                                per_loop_kwargs else {})
 
         super().__init__(**kwargs)
 
     def run_per_loop(self):
         """Override to run per_loop_method"""
         if self.per_loop_method:
-            self.per_loop_method(self, **self.per_loop_kwargs)
+            self.per_loop_method(self, **self.methods_kwargs)
 
     def on_message_received(self, envelope: str, proto: Message):
         """Override to run message_received_method."""
         if self.message_received_method:
-            self.message_received_method(self, **self.per_loop_kwargs)
+            self.message_received_method(self, envelope, proto,
+                                         **self.methods_kwargs)
