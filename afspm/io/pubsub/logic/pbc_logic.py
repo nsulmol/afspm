@@ -1,5 +1,6 @@
 """Proto-Based Cache Logic classes."""
 
+import numpy as np
 import logging
 import copy
 from collections.abc import Iterable
@@ -100,7 +101,7 @@ class PBCScanLogic(ProtoBasedCacheLogic):
                 not force_parent):
             return (PBCScanLogic.scan_id + PBCScanLogic.divider +
                     proto.channel + PBCScanLogic.divider +
-                    str(proto.params.spatial.roi.size.x))
+                    str(np.round(proto.params.spatial.roi.size.x)))
         return ProtoBasedCacheLogic.get_envelope_for_proto(proto)
 
     def update_cache(self, proto: Message, cache: dict[str, Iterable]
