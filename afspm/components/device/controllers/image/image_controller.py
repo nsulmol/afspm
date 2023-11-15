@@ -1,26 +1,24 @@
 """DeviceController that shows scans from an image."""
 
-import copy
 import time
 import logging
-
-from google.protobuf.message import Message
-
-from afspm.spawn import LOGGER_ROOT
-from afspm.components.device.controller import DeviceController
-from afspm.io.protos.generated import scan_pb2
-from afspm.io.protos.generated import control_pb2
-from afspm.utils import array_converters as ac
+from pathlib import Path
+from os import sep
 
 import xarray as xr
 import numpy as np
 import imageio.v3 as iio
 
+from ...controller import DeviceController
+from .....io.protos.generated import scan_pb2
+from .....io.protos.generated import control_pb2
+from .....utils import array_converters as ac
 
-logger = logging.getLogger(LOGGER_ROOT + ".examples.image_roi." + __name__)
+
+logger = logging.getLogger(__name__)
 
 
-class ImageDeviceController(DeviceController):
+class ImageController(DeviceController):
     """Simulates a DeviceController with an individual image.
 
     This controller loads a single image as if it was a 2D scan, allowing
@@ -36,11 +34,14 @@ class ImageDeviceController(DeviceController):
         move_time_s: how long changing scan paramters should take, in seconds.
         start_ts: a timestamp for timing the scan and move durations.
     """
-    def __init__(self, img_path: str,
-                 physical_origin: tuple[float, float],
+    _DEFAULT_IMG_PATH = (str(Path(__file__).parent.resolve()) + sep + "data" +
+                         sep + "peppers.tiff")
+
+    def __init__(self, physical_origin: tuple[float, float],
                  physical_size: tuple[float, float],
                  physical_units: str, data_units: str,
-                 scan_time_s: float, move_time_s: float, **kwargs):
+                 scan_time_s: float, move_time_s: float,
+                 img_path: str = _DEFAULT_IMG_PATH, **kwargs):
         """Initialize controller.
 
         Args:
@@ -74,7 +75,7 @@ class ImageDeviceController(DeviceController):
                                     size: tuple[float, float],
                                     physical_units: str, data_units: str):
         """Create an xarray from the provided image and physical units data."""
-        img = np.asarray(iio.imread(img_path))[:, :, 0]  # Only grab one channel
+        img = np.asarray(iio.imread(img_path))[:, :, 0]  # Grab single channel
 
         x = np.linspace(tl[0], tl[0] + size[0], img.shape[0])
         y = np.linspace(tl[1], tl[1] + size[1], img.shape[1])
