@@ -91,7 +91,6 @@ class AfspmComponentBase:
         if self.control_client and override_client_uuid:
             self.control_client.set_uuid(self.name)
 
-
     def run(self):
         """Main loop."""
         logger.info("Starting main loop for component %s", self.name)
