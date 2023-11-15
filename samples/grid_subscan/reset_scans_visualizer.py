@@ -11,7 +11,7 @@ from afspm.components.visualizer import Visualizer
 from afspm.io.protos.generated import scan_pb2
 
 
-logger = logging.getLogger(LOGGER_ROOT + '.samples.image_roi.' + __name__)
+logger = logging.getLogger(LOGGER_ROOT + '.samples.grid_subscan.' + __name__)
 
 
 class ResetScansVisualizer(Visualizer):
