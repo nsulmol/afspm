@@ -9,7 +9,7 @@ import xarray as xr
 
 from google.protobuf.message import Message
 
-from .component import AfspmComponentBase
+from .component import AfspmComponent
 from ..io.protos.generated import scan_pb2
 from ..io.pubsub.defaults import SCAN_ID
 from ..utils import array_converters as ac
@@ -33,7 +33,7 @@ class VisualizationStyle(Enum):
 
 
 # TODO: Write unit test for this.
-class Visualizer(AfspmComponentBase):
+class Visualizer(AfspmComponent):
     """Base visualizer, to display scans from cache.
 
     This base component allows easy visualization of 2D data from the
@@ -106,6 +106,8 @@ class Visualizer(AfspmComponentBase):
         Args:
             list_keys: the keys associated to the following lists, which will
                 be used to create our maps.
+            cache_meaning_list: list of values, with keys in list_keys.
+                determines how data is visualized.
             scan_phys_origin_list: list of values, with keys in list_keys.
                 creates scan_phys_origin_map.
             scan_phys_size_list: list of values, with keys in list_keys.
@@ -174,12 +176,14 @@ class Visualizer(AfspmComponentBase):
 
     def run_per_loop(self):
         """Override to update figures every loop."""
+        super().run_per_loop()
         for __, fig in self.plt_figures_map.items():
             fig.canvas.draw_idle()
             fig.canvas.flush_events()
 
     def on_message_received(self, envelope: str, proto: Message):
         """Override; we update the visualization data on new scans."""
+        super().on_message_received(envelope, proto)
         if isinstance(proto, scan_pb2.Scan2d):
             self._update_visualization_data()
 
@@ -263,6 +267,9 @@ class Visualizer(AfspmComponentBase):
         sample_phys_size = np.array([np.ptp(sample_scan.x.data),
                                      np.ptp(sample_scan.y.data)])
         sample_data_res = np.array(sample_scan.data.shape)
+
+        # Note: this assumes subscans are same size always, constant ratio
+        # of full res.
         full_res = sample_data_res * (scan_phys_size / sample_phys_size)
         full_res = full_res.astype(int)
 
@@ -277,10 +284,12 @@ class Visualizer(AfspmComponentBase):
         xarr.y.attrs['units'] = phys_units
 
         for scan in cache_list:
-            origin = np.array([scan.params.spatial.roi.top_left.x,
-                               scan.params.spatial.roi.top_left.y])
-            size = np.array([scan.params.spatial.roi.size.x,
-                             scan.params.spatial.roi.size.y])
+            # It appears rounding is necessary to account for how we select
+            # via slice() below. TODO: Investigate further.
+            origin = np.round(np.array([scan.params.spatial.roi.top_left.x,
+                                        scan.params.spatial.roi.top_left.y]))
+            size = np.round(np.array([scan.params.spatial.roi.size.x,
+                                      scan.params.spatial.roi.size.y]))
 
             data = np.array(scan.values, dtype=np.float64)
             data = data.reshape((scan.params.data.shape.x,
