@@ -77,13 +77,10 @@ router_url = 'router_url'
 [experiment_client]
 class = 'afspm.io.control.client.ControlClient'
 url = 'router_url'
-uuid = 'client_for_experiment'
-request_retries = 1
 
 [ui_client]
 class = 'afspm.io.control.client.AdminControlClient'
 url = 'router_url'
-uuid = 'client_for_ui'
 
 
 # ----- Components ----- #
@@ -99,7 +96,6 @@ data_units = 'data_units'
 sub_rois_per_dim = 'sub_rois_per_dim'
 sub_scan_res = 'small_scan_res'
 sub_scans_per_full_scan = 'sscans_per_fscan'
-get_envelope_for_proto = 'afspm.io.pubsub.logic.pbc_logic.PBCScanLogic.get_envelope_for_proto'
 rerun_wait_s = 5
 
 subscriber = 'experiment_sub'
@@ -147,9 +143,8 @@ router = 'controller_router'
 
 [dev_con]
 component = true
-class = 'image_device_controller.ImageDeviceController'
+class = 'afspm.components.device.controllers.image.image_controller.ImageController'
 
-img_path = 'peppers.tiff'
 physical_origin = 'full_scan_origin'
 physical_size = 'full_scan_size'
 physical_units = 'physical_units'
