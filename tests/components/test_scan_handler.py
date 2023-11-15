@@ -16,7 +16,7 @@ from afspm.io.pubsub.subscriber import Subscriber
 
 from afspm.io import common
 
-from afspm.components.helpers.scan_handler import ScanHandler
+from afspm.components.scan_handler import ScanHandler
 from tests.components import sample_components as sc
 
 

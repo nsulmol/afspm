@@ -7,13 +7,14 @@ from typing import Callable, Any
 
 from google.protobuf.message import Message
 
-from ...io import common
+from .component import AfspmComponent
+from ..io import common
 
-from ...io.protos.generated import geometry_pb2
-from ...io.protos.generated import scan_pb2
-from ...io.protos.generated import control_pb2
+from ..io.protos.generated import geometry_pb2
+from ..io.protos.generated import scan_pb2
+from ..io.protos.generated import control_pb2
 
-from ...io.control.client import ControlClient
+from ..io.control.client import ControlClient
 
 
 logger = logging.getLogger(__name__)
@@ -36,9 +37,13 @@ class ScanHandler:
     retry the full request (ensuring parameters are set) between sleeps of
     rerun_wait_s.
 
+    If self.get_next_params() returns None (i.e. it is not ready to provide
+    the next scan parameters), it will log this and retry requesting between
+    sleeps of rerun_wait_s.
+
     To use within an AfspmComponent:
     - Call on_message_received() within the component's on_message_received().
-    - Call handle_resends() within the component's run_per_loop().
+    - Call handle_issues() within the component's run_per_loop().
 
     Attributes:
         rerun_wait_s: how long to wait before rerunning our scan (on issues
@@ -59,7 +64,8 @@ class ScanHandler:
     """
 
     def __init__(self, rerun_wait_s: int,
-                 get_next_params: Callable[[Any], scan_pb2.ScanParameters2d],
+                 get_next_params: Callable[[Any],
+                                           scan_pb2.ScanParameters2d],
                  next_params_kwargs: dict = None,
                  control_mode: control_pb2.ControlMode =
                  control_pb2.ControlMode.CM_AUTOMATED):
@@ -73,8 +79,6 @@ class ScanHandler:
         self._scan_params = scan_pb2.ScanParameters2d()
         self._scan_state = scan_pb2.ScanState.SS_UNDEFINED
         self._desired_scan_state = scan_pb2.ScanState.SS_UNDEFINED
-
-        self._rerun_scanning_logic = False
         self._rerun_sleep_ts = None
 
     def on_message_received(self, proto: Message,
@@ -89,7 +93,7 @@ class ScanHandler:
 
         Args:
             proto: Protobuf message received by the AfspmComponent.
-            control_client: AfspmComponent's control_client.
+            component: AfspmComponent instance.
         """
         if isinstance(proto, control_pb2.ControlState):
             self._control_mode = proto.control_mode
@@ -97,8 +101,13 @@ class ScanHandler:
             self._handle_scan_state_receipt(proto)
             self._perform_scanning_logic(control_client)
 
-    def handle_resends(self, control_client: ControlClient):
-        """Handle resending requests on DeviceController delays/issues.
+    def handle_issues(self, control_client: ControlClient):
+        """Handle issues requiring us to re-request things.
+
+        Two issues can arrise:
+        - DeviceController delays/issues. Here, we need to restart a scan.
+        - self.get_next_params() is not ready and has returned None. In this
+        case, we need to re-request new params until we receive some.
 
         This will handle resending requests if we receive delays/issues from
         the DeviceController. It should be called in the associated
@@ -112,14 +121,17 @@ class ScanHandler:
         """
         in_desired_control_mode = (self.control_mode_to_run ==
                                    self._control_mode)
-        if in_desired_control_mode and self._rerun_scanning_logic:
-            need_to_wait = self._rerun_sleep_ts is not None
-            enough_time_has_passed = (need_to_wait and
-                                      (time.time() - self._rerun_sleep_ts >
-                                       self.rerun_wait_s))
-            if not need_to_wait or enough_time_has_passed:
+        if in_desired_control_mode and self._rerun_sleep_ts is not None:
+            enough_time_has_passed = (time.time() - self._rerun_sleep_ts >
+                                      self.rerun_wait_s)
+            if enough_time_has_passed:
                 self._rerun_sleep_ts = None
-                self._rerun_scanning_logic = False
+
+                # If scan params were not available yet, re-request.
+                if not self._scan_params:
+                    self._scan_params = self.get_next_params(
+                        **self.next_params_kwargs)
+
                 self._perform_scanning_logic(control_client)
 
     def _handle_scan_state_receipt(self, proto: scan_pb2.ScanStateMsg):
@@ -179,7 +191,7 @@ class ScanHandler:
         if scan_state_undefined or not in_desired_control_mode:
             logger.debug("Not performing scanning logic because ScanState "
                          "undefined or ControlMode not desired one.")
-            self._rerun_scanning_logic = True
+            self._handle_rerun(True)
             return  # Early return, we're not ready yet.
 
         # Handle sending requests (not guaranteed it will work!)
@@ -194,7 +206,7 @@ class ScanHandler:
                     logger.info("Cannot send scan params, because "
                                 "get_next_params returned None."
                                 "Sleeping and retrying.")
-                    self._rerun_scanning_logic = True
+                    self._handle_rerun(True)
                     return
                 rep = control_client.set_scan_params(self._scan_params)
             elif self._desired_scan_state == scan_pb2.ScanState.SS_SCANNING:
@@ -207,7 +219,6 @@ class ScanHandler:
             logger.info("Request failed with rep %s!",
                         common.get_enum_str(control_pb2.ControlResponse,
                                             rep))
-            self._rerun_scanning_logic = True
 
             if rep == control_pb2.ControlResponse.REP_NOT_IN_CONTROL:
                 # We failed due to a control issue. Try to resolve.
@@ -216,8 +227,51 @@ class ScanHandler:
                     control_pb2.ControlMode.CM_AUTOMATED)
                 if rep == control_pb2.ControlResponse.REP_SUCCESS:
                     logger.info("Control received. Retrying...")
-                    self._rerun_sleep_ts = None
+                    self._perform_scanning_logic(control_client)
                     return
 
             logger.info("Sleeping and retrying later.")
+            self._handle_rerun(True)
+
+    def _handle_rerun(self, perform_rerun: bool):
+        if perform_rerun:
             self._rerun_sleep_ts = time.time()
+        else:
+            self._rerun_sleep_ts = None
+
+
+class ScanningComponent(AfspmComponent):
+    """Component that sends scan commands to controller.
+
+    This class automatically handles sending scans to the DeviceController,
+    decided via its get_next_params() method. This is effectively an easier
+    way to run a scanning component, if you are only interested in using
+    the ScanHandler.
+
+    Note that the get_next_params() method is explicitly fed the component
+    as an argument (i.e. component: AfspmComponent is an input argument).
+
+    Attributes:
+        scan_handler: ScanHandler instance.
+    """
+    def __init__(self, rerun_wait_s: int,
+                 get_next_params: Callable[[AfspmComponent, Any],
+                                           scan_pb2.ScanParameters2d],
+                 next_params_kwargs: dict = None,
+                 control_mode: control_pb2.ControlMode =
+                 control_pb2.ControlMode.CM_AUTOMATED, **kwargs):
+        # Pass self as 'component' to next params method.
+        next_params_kwargs['component'] = self
+        self.scan_handler = ScanHandler(rerun_wait_s, get_next_params,
+                                        next_params_kwargs, control_mode)
+        super().__init__(**kwargs)
+
+    def run_per_loop(self):
+        """Override to udpate ScanHandler."""
+        self.scan_handler.handle_issues(self.control_client)
+        super().run_per_loop()
+
+    def on_message_received(self, envelope: str, proto: Message):
+        """Override to run ScanHandler."""
+        self.scan_handler.on_message_received(proto, self.control_client)
+        super().on_message_received(envelope, proto)
