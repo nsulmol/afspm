@@ -4,6 +4,7 @@ import time
 import logging
 
 from afspm.components.device.controller import DeviceController
+from afspm.components.device.params import DeviceParameter
 from afspm.components.afspm.controller import AfspmController
 
 from afspm.io.pubsub.subscriber import Subscriber
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 class SampleDeviceController(DeviceController):
 
     def __init__(self, scan_time_s, move_time_s, **kwargs):
+        self.operating_mode = 'AM-AFM'
         self.start_ts = None
         self.dev_scan_state = scan_pb2.ScanState.SS_FREE
         self.dev_scan_params = scan_pb2.ScanParameters2d()
@@ -35,6 +37,11 @@ class SampleDeviceController(DeviceController):
         self.move_time_s = move_time_s
         kwargs['name'] = 'dev_con'
         super().__init__(**kwargs)
+
+        self.param_method_map = {DeviceParameter.OPERATING_MODE:
+                                 self.handle_operating_mode,
+                                 DeviceParameter.TIP_VIBRATING_AMPL:
+                                 self.fail_on_vib_ampl}
 
     def on_start_scan(self):
         self.start_ts = time.time()
@@ -61,6 +68,42 @@ class SampleDeviceController(DeviceController):
 
     def poll_scans(self) -> list[scan_pb2.Scan2d]:
         return [self.dev_scan] if self.dev_scan else []
+
+    def handle_operating_mode(self, set_value: str = None
+                              ) -> (control_pb2.ControlResponse, str):
+        """Get/set operating mode.
+
+        Arguments:
+            set_value: if not None, the value we should set
+                our operating mode to (as a str).
+        Returns:
+            - success/failure of operation
+            - the value of operating mode at the end of the method.
+        """
+        if set_value:
+            self.operating_mode = set_value
+        return (control_pb2.ControlResponse.REP_SUCCESS, self.operating_mode)
+
+
+    def fail_on_vib_ampl(self, set_value: str = None
+                         ) -> (control_pb2.ControlResponse, str):
+        """Get/set with failure case.
+
+        This simulates a 'supported' param which fails on setting.
+        We simply want to ensure the failure is passed on.
+
+        Arguments:
+            set_value: if not None, the value we should set our operating
+                mode to (as a str).
+        Returns:
+            - success/failure of operation
+            - the value of operating mode at the end of the method. On failure,
+            return set_value.
+        """
+        if set_value:
+            return (control_pb2.ControlResponse.REP_PARAM_ERROR, set_value)
+        else:
+            return (control_pb2.ControlResponse.REP_SUCCESS, "25")
 
     def run_per_loop(self):
         if self.start_ts:

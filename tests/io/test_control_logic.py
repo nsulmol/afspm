@@ -125,9 +125,14 @@ def server_routine(server_url, comm_url, timeout_ms, ctx):
             rep = control_pb2.ControlResponse.REP_CMD_NOT_SUPPORTED
             if req in [control_pb2.ControlRequest.REQ_START_SCAN,
                        control_pb2.ControlRequest.REQ_STOP_SCAN,
-                       control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS]:
+                       control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS,
+                       control_pb2.ControlRequest.REQ_PARAM]:
                 rep = control_pb2.ControlResponse.REP_SUCCESS
-            server.reply(rep)
+
+            obj = None
+            if req == control_pb2.ControlRequest.REQ_PARAM:
+                obj = control_pb2.ParameterMsg()
+            server.reply(rep, obj)
 
 
 def router_routine(server_url, router_url, comm_url, timeout_ms, ctx):
@@ -164,7 +169,8 @@ class TestServerWithClient:
     def srv_client_server_methods(self, srv_client):
         return [(srv_client.start_scan, None),
                 (srv_client.stop_scan, None),
-                (srv_client.set_scan_params, scan_pb2.ScanParameters2d())]
+                (srv_client.set_scan_params, scan_pb2.ScanParameters2d()),
+                (srv_client.request_parameter, control_pb2.ParameterMsg())]
     @pytest.fixture
     def srv_client_router_methods(self, srv_client, problem):
         return [(srv_client.request_control, control_pb2.ControlMode.CM_AUTOMATED),
@@ -177,7 +183,13 @@ class TestServerWithClient:
         """Ensure server calls suceed."""
         for method, proto in srv_client_server_methods:
             rep = method(proto) if proto else method()
-            assert rep == control_pb2.ControlResponse.REP_SUCCESS
+
+            # Handle special case of parameter set/get, where an obj is
+            # returned.
+            if isinstance(proto, control_pb2.ParameterMsg):
+                assert rep[0] == control_pb2.ControlResponse.REP_SUCCESS
+            else:
+                assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
     def test_router_calls(self, ctx, server_url, comm_url, comm_pub,
                           timeout_ms, thread_srv, srv_client,

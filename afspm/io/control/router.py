@@ -204,7 +204,8 @@ class ControlRouter:
         return control_pb2.ControlResponse.REP_SUCCESS
 
     def _handle_send_req(self, req: control_pb2.ControlRequest,
-                         proto: Message) -> control_pb2.ControlResponse:
+                         proto: Message) -> (control_pb2.ControlResponse,
+                                             Message | int | None):
         """Try to send a request to the ControlServer.
 
         For a request received from the client under control, try to forward
@@ -218,22 +219,24 @@ class ControlRouter:
             proto: the associated protobuf message, if applicable.
 
         Returns:
-            ControlResponse received from the ControlServer.
+            (ControlResponse, obj) received from the ControlServer. Note that
+            in all but a few cases, obj will be None as there is no associated
+            obj.
         """
         logger.debug("Handling send request: %s, %s",
                      common.get_enum_str(control_pb2.ControlRequest, req), proto)
-        msg = cmd.serialize_req_obj(req, proto)  # No need for empty envelope
+        msg = cmd.serialize_request(req, proto)  # No need for empty envelope
         self.backend.send_multipart(msg)
 
         if (self.backend.poll(self.request_timeout_ms) & zmq.POLLIN) != 0:
-            return cmd.parse_response(self.backend.recv())
+            return cmd.parse_response(req, self.backend.recv_multipart())
 
         logger.error("Backend did not respond in time, likely timeout issue."
                      "Restarting socket. ")
         self._close_backend()
         self._init_backend()
 
-        return control_pb2.ControlResponse.REP_NO_RESPONSE
+        return (control_pb2.ControlResponse.REP_NO_RESPONSE, None)
 
     def _handle_set_control_mode(self, control_mode: control_pb2.ControlMode
                                  ) -> control_pb2.ControlResponse:
@@ -262,7 +265,8 @@ class ControlRouter:
         return control_pb2.ControlResponse.REP_SUCCESS
 
     def _on_request(self, client: str, req: control_pb2.ControlRequest,
-                    obj: Message | int) -> control_pb2.ControlResponse:
+                    obj: Message | int) -> (control_pb2.ControlResponse,
+                                            Message | int | None):
         """Handle a request received by a ControlClient.
 
         Args:
@@ -271,24 +275,26 @@ class ControlRouter:
             obj: protobuf message or int enum linked to request, if applicable.
 
         Returns:
-            ControlResponse to the request.
+            (ControlResponse, obj) to the request. Note that in all but a few
+            cases, obj will be None as there is no returned obj to the request.
         """
         if req == control_pb2.ControlRequest.REQ_REQUEST_CTRL:
-            return self._handle_control_request(client, obj)
+            return (self._handle_control_request(client, obj), None)
         if req == control_pb2.ControlRequest.REQ_RELEASE_CTRL:
-            return self._handle_control_release(client)
+            return (self._handle_control_release(client), None)
         if req in [control_pb2.ControlRequest.REQ_ADD_EXP_PRBLM,
                    control_pb2.ControlRequest.REQ_RMV_EXP_PRBLM]:
-            return self._handle_experiment_problem(
-                req == control_pb2.ControlRequest.REQ_ADD_EXP_PRBLM, obj)
+            return (self._handle_experiment_problem(
+                req == control_pb2.ControlRequest.REQ_ADD_EXP_PRBLM, obj),
+                    None)
         if req == control_pb2.ControlRequest.REQ_SET_CONTROL_MODE:
-            return self._handle_set_control_mode(obj)
+            return (self._handle_set_control_mode(obj), None)
         if req == control_pb2.ControlRequest.REQ_END_EXPERIMENT:
-            return self._handle_end_experiment()
+            return (self._handle_end_experiment(), None)
         if (self.client_in_control_id
                 and client == self.client_in_control_id):
             return self._handle_send_req(req, obj)
-        return control_pb2.ControlResponse.REP_NOT_IN_CONTROL
+        return (control_pb2.ControlResponse.REP_NOT_IN_CONTROL, None)
 
     def poll_and_handle(self):
         """Poll for ControlClient requests and handle.
@@ -304,14 +310,17 @@ class ControlRouter:
             client = msg[0]
             client_id = self._parse_client_id(client)
             req, obj = cmd.parse_request(msg[2:])  # client, __, ...
+
             logger.debug("Message received from client %s: %s, %s", client_id,
                          common.get_enum_str(control_pb2.ControlRequest, req), obj)
 
-            rep = self._on_request(client_id, req, obj)
-            logger.debug("Sending reply to %s: %s", client_id,
-                         common.get_enum_str(control_pb2.ControlResponse, rep))
-            self.frontend.send_multipart([client, b"",
-                                          cmd.serialize_response(rep)])
+            rep, obj = self._on_request(client_id, req, obj)
+
+            logger.debug("Sending reply to %s: %s, %s", client_id,
+                         common.get_enum_str(control_pb2.ControlResponse, rep),
+                         obj)
+            self.frontend.send_multipart([client, b""] +  # Concat lists
+                                         cmd.serialize_response(rep, obj))
 
     def get_control_state(self):
         """Creates and returns a ControState instance from current state."""
