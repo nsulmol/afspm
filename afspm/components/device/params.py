@@ -15,10 +15,8 @@ from enum import Enum
 class DeviceParameter(str, Enum):
     OPERATING_MODE = 'operating-mode'
 
-    ZCTRL_FB_ENABLED = 'zctrl-fb-enabled'
+    # Note: Rest of Z Control Feedback is in feedback_pb2 message.
     ZCTRL_FB_SETPOINT = 'zctrl-fb-setpoint'
-    ZCTRL_FB_PGAIN = 'zctrl-fb-pgain'
-    ZCTRL_FB_IGAIN = 'zctrl-fb-igain'
     ZCTRL_FB_ERRORGAIN = 'zctrl-fb-errorgain'
 
     TIP_BIAS_VOLTAGE = 'tip-bias-voltage'
@@ -40,14 +38,9 @@ DESCRIPTIONS = {
     DeviceParameter.OPERATING_MODE:
     "The current system operating mode (e.g. FM-AFM). str expected.",
 
-    DeviceParameter.ZCTRL_FB_ENABLED:
-    "Whether or not the z-ctrl feedback system is on.",
+    # Note: Rest of Z Control Feedback is in feedback_pb2 message.
     DeviceParameter.ZCTRL_FB_SETPOINT:
     "Set point of z-controller feedback. Unit dependent on mode.",
-    DeviceParameter.ZCTRL_FB_PGAIN:
-    "Gain of the proportional component of PI system. Units in X.",
-    DeviceParameter.ZCTRL_FB_IGAIN:
-    "Gain of the integral component of PI system. Units in X.",
     DeviceParameter.ZCTRL_FB_ERRORGAIN:
     "Gain applied to error b/w input signal and setpoint, before feeding to"
     "PI controller. Units in X.",

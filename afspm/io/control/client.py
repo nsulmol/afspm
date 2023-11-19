@@ -11,6 +11,7 @@ from google.protobuf.message import Message
 
 from ..protos.generated import control_pb2
 from ..protos.generated import scan_pb2
+from ..protos.generated import feedback_pb2
 
 
 logger = logging.getLogger(__name__)
@@ -174,6 +175,21 @@ class ControlClient:
         logger.debug("Sending set_scan_params with: %s", scan_params)
         msg = cmd.serialize_request(
             control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS, scan_params)
+        return self._try_send_req(msg)
+
+    def set_zctrl_params(self, zctrl_params: feedback_pb2.ZCtrlParameters
+                         ) -> control_pb2.ControlResponse:
+        """Try to set the Z-Control Feedback parameters for the SPM device.
+
+        Args:
+            zctrl_params: the desired feedback params for the device.
+
+        Returns:
+            The received RequestResponse.
+        """
+        logger.debug("Sending set_zctrl_params with: %s", zctrl_params)
+        msg = cmd.serialize_request(
+            control_pb2.ControlRequest.REQ_SET_ZCTRL_PARAMS, zctrl_params)
         return self._try_send_req(msg)
 
     def request_control(self, control_mode: control_pb2.ControlMode

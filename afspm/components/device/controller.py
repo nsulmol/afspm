@@ -20,6 +20,7 @@ from ...io.control import server as ctrl_srvr
 
 from ...io.protos.generated import scan_pb2
 from ...io.protos.generated import control_pb2
+from ...io.protos.generated import feedback_pb2
 
 
 logger = logging.getLogger(__name__)
@@ -153,6 +154,8 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         self.scan_params = scan_pb2.ScanParameters2d()
         self.scans = []
 
+        self.zctrl_params = feedback_pb2.ZCtrlParameters()
+
         self.param_method_map = {}
 
         # AfspmComponent constructor: no control_client provided, as that
@@ -169,6 +172,8 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             control_pb2.ControlRequest.REQ_STOP_SCAN:  self.on_stop_scan,
             control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS:
                 self.on_set_scan_params,
+            control_pb2.ControlRequest.REQ_SET_ZCTRL_PARAMS:
+                self.on_set_zctrl_params,
             control_pb2.ControlRequest.REQ_PARAM: self._handle_param_request,
         })
 
@@ -187,12 +192,28 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         """Handle a request to change the scan parameters."""
 
     @abstractmethod
+    def on_set_zctrl_params(self, zctrl_params: feedback_pb2.ZCtrlParameters
+                            ) -> control_pb2.ControlResponse:
+        """Handle a request to change the Z-Controller Feedback parameters.
+
+        If not supported, return REP_CMD_NOT_SUPPORTED.
+        """
+
+    @abstractmethod
     def poll_scan_state(self) -> scan_pb2.ScanState:
         """Poll the controller for the current scan state."""
 
     @abstractmethod
     def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
         """Poll the controller for the current scan parameters."""
+
+    @abstractmethod
+    def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
+        """Poll the controller for the current Z-Control parameters.
+
+        If not supported, return a new ZCtrlParameters instance:
+            return feedback_pb2.ZCtrlParameters()
+        """
 
     @abstractmethod
     def poll_scans(self) -> list[scan_pb2.Scan2d]:
@@ -256,6 +277,12 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         if old_scan_params != self.scan_params:
             logger.info("New scan_params, sending out.")
             self.publisher.send_msg(self.scan_params)
+
+        old_zctrl_params = copy.deepcopy(self.zctrl_params)
+        self.zctrl_params = self.poll_zctrl_params()
+        if old_zctrl_params != self.zctrl_params:
+            logger.info("New zctrl_params, sending out.")
+            self.publisher.send_msg(self.zctrl_params)
 
         # Scan state changes sent *last*!
         if old_scan_state != self.scan_state:

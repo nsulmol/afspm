@@ -11,6 +11,7 @@ enum ControlRequest {
     REQ_START_SCAN = 1;
     REQ_STOP_SCAN = 2;
     REQ_SET_SCAN_PARAMS = 3;
+    REQ_SET_ZCTRL_PARAMS = 11;
     REQ_PARAM = 10;
     // The below are specific to ControlRouter
     REQ_REQUEST_CTRL = 4;

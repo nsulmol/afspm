@@ -12,6 +12,7 @@ import imageio.v3 as iio
 from ...controller import DeviceController
 from .....io.protos.generated import scan_pb2
 from .....io.protos.generated import control_pb2
+from .....io.protos.generated import feedback_pb2
 from .....utils import array_converters as ac
 
 
@@ -105,11 +106,20 @@ class ImageController(DeviceController):
         self.dev_scan_params = scan_params
         return control_pb2.ControlResponse.REP_SUCCESS
 
+    def on_set_zctrl_params(self, zctrl_params: feedback_pb2.ZCtrlParameters
+                            ) -> control_pb2.ControlResponse:
+        """Z-Ctrl doesn't do anything with images, not supported."""
+        return control_pb2.ControlResponse.REP_CMD_NOT_SUPPORTED
+
     def poll_scan_state(self) -> scan_pb2.ScanState:
         return self.dev_scan_state
 
     def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
         return self.dev_scan_params
+
+    def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
+        """Z-Ctrl doesn't do anything with images, not supported."""
+        return feedback_pb2.ZCtrlParameters()
 
     def poll_scans(self) -> [scan_pb2.Scan2d]:
         return [self.dev_scan] if self.dev_scan else []

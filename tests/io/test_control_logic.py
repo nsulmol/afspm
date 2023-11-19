@@ -13,6 +13,7 @@ from afspm.io.control import router as ctrl_rtr
 
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
+from afspm.io.protos.generated import feedback_pb2
 
 
 # ----- General Test Fixtures ----- #
@@ -126,6 +127,7 @@ def server_routine(server_url, comm_url, timeout_ms, ctx):
             if req in [control_pb2.ControlRequest.REQ_START_SCAN,
                        control_pb2.ControlRequest.REQ_STOP_SCAN,
                        control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS,
+                       control_pb2.ControlRequest.REQ_SET_ZCTRL_PARAMS,
                        control_pb2.ControlRequest.REQ_PARAM]:
                 rep = control_pb2.ControlResponse.REP_SUCCESS
 
@@ -170,6 +172,7 @@ class TestServerWithClient:
         return [(srv_client.start_scan, None),
                 (srv_client.stop_scan, None),
                 (srv_client.set_scan_params, scan_pb2.ScanParameters2d()),
+                (srv_client.set_zctrl_params, feedback_pb2.ZCtrlParameters()),
                 (srv_client.request_parameter, control_pb2.ParameterMsg())]
     @pytest.fixture
     def srv_client_router_methods(self, srv_client, problem):
@@ -209,7 +212,8 @@ class TestRouterServerClient:
     def rtr_client_server_methods(self, rtr_client):
         return [(rtr_client.start_scan, None),
                 (rtr_client.stop_scan, None),
-                (rtr_client.set_scan_params, scan_pb2.ScanParameters2d())]
+                (rtr_client.set_scan_params, scan_pb2.ScanParameters2d()),
+                (rtr_client.set_zctrl_params, feedback_pb2.ZCtrlParameters())]
     @pytest.fixture
     def srv_client_router_methods(self, rtr_client, problem):
         return [(rtr_client.request_control, control_pb2.ControlMode.CM_AUTOMATED),
