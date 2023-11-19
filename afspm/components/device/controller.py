@@ -25,8 +25,6 @@ from ...io.protos.generated import control_pb2
 logger = logging.getLogger(__name__)
 
 
-
-
 class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
     """Handles communicating with SPM device and handling requests.
 
@@ -76,6 +74,10 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
     set/get a particular parameter, the controller calls self.param_method_map
     (see ParamMethod below for more info). If a parameter ID is not in these
     maps, it is not supported.
+
+    If setting a param is not immediate (i.e. takes time), you can set
+    self.scan_state to SS_BUSY_PARAM *within* the method. If doing so, you will
+    need to set it to SS_FREE once ready.
 
     Setting/getting an operating mode is the same as setting any other
     parameter! We make no special checks; it is assumed that an operating mode
@@ -303,6 +305,12 @@ class DeviceController(afspmc.AfspmComponent, metaclass=ABCMeta):
 
         Respond to a ParameterMsg request. This method depends entirely on the
         param_method_map, which maps set/get methods to given parameters.
+
+        Note: if a parameter SET is requested which induces some delay, change
+        self.scan_state to SS_BUSY_PARAM within the associated set method, and
+        ensure it is updated in poll_scan_state() once ready. This class does
+        no special checks for this state, so be careful not to cause your
+        controller to get stuck in this state!
 
         Args:
             param: ParameterMsg request; if value is not provided, treated as
