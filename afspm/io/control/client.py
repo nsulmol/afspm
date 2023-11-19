@@ -7,6 +7,8 @@ import zmq
 from . import commands as cmd
 from .. import common
 
+from google.protobuf.message import Message
+
 from ..protos.generated import control_pb2
 from ..protos.generated import scan_pb2
 
@@ -93,28 +95,38 @@ class ControlClient:
         self._client.setsockopt(zmq.LINGER, 0)
         self._client.close()
 
-    def _try_send_req(self, msg: list[list[bytes]]
-                      ) -> control_pb2.ControlResponse:
+    def _try_send_req(self, msg: list[list[bytes]],
+                      keep_obj: bool = False
+                      ) -> (control_pb2.ControlResponse,
+                            Message | int | None):
         """Send provided message to server over client socket.
 
         Args:
             msg: list of bytes list (some messages may be multi-part). If your
                 specific message is a single part, simply pass a 1-value list.
+            keep_obj: if True, we will return the response *and* returned obj,
+                as a tuple. Since there are very few replies that include an
+                obj, the default here is False.
 
         Returns:
-            RequestResponse enum indicating the response to our request.
+            - RequestResponse enum indicating the response to our request.
+            - If requested (and applicable), the returned obj. This may be None
+            if the reply did not contain one!
         """
         retries_left = self._request_retries
         self._client.send_multipart(msg)
 
         while True:
             if (self._client.poll(self._request_timeout_ms) & zmq.POLLIN) != 0:
-                # Response is expected to be int
-                rep = cmd.parse_response(self._client.recv())
-                logger.debug("Received reply: %s",
+                # Need our request to properly parse response (it is
+                # request-specific).
+                req, obj = cmd.parse_request(msg)
+                rep, obj = cmd.parse_response(req,
+                                              self._client.recv_multipart())
+                logger.debug("Received reply: %s %s",
                              common.get_enum_str(control_pb2.ControlResponse,
-                                                 rep))
-                return rep
+                                                 rep), obj)
+                return (rep, obj) if keep_obj else rep
             retries_left -= 1
             logger.debug("No response from server")
             # Socket is confused. Close and remove it.
@@ -136,7 +148,7 @@ class ControlClient:
             The received RequestResponse.
         """
         logger.debug("Sending start_scan request.")
-        msg = cmd.serialize_req_obj(control_pb2.ControlRequest.REQ_START_SCAN)
+        msg = cmd.serialize_request(control_pb2.ControlRequest.REQ_START_SCAN)
         return self._try_send_req(msg)
 
     def stop_scan(self) -> control_pb2.ControlResponse:
@@ -146,7 +158,7 @@ class ControlClient:
             The received RequestResponse.
         """
         logger.debug("Sending stop_scan request.")
-        msg = cmd.serialize_req_obj(control_pb2.ControlRequest.REQ_STOP_SCAN)
+        msg = cmd.serialize_request(control_pb2.ControlRequest.REQ_STOP_SCAN)
         return self._try_send_req(msg)
 
     def set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
@@ -160,8 +172,8 @@ class ControlClient:
             The received RequestResponse.
         """
         logger.debug("Sending set_scan_params with: %s", scan_params)
-        msg = cmd.serialize_req_obj(control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS,
-                                    scan_params)
+        msg = cmd.serialize_request(
+            control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS, scan_params)
         return self._try_send_req(msg)
 
     def request_control(self, control_mode: control_pb2.ControlMode
@@ -183,8 +195,8 @@ class ControlClient:
         """
         logger.debug("Sending request_ctrl with mode: %s",
                      common.get_enum_str(control_pb2.ControlMode, control_mode))
-        msg = cmd.serialize_req_obj(control_pb2.ControlRequest.REQ_REQUEST_CTRL,
-                                    control_mode)
+        msg = cmd.serialize_request(
+            control_pb2.ControlRequest.REQ_REQUEST_CTRL, control_mode)
         return self._try_send_req(msg)
 
     def release_control(self) -> control_pb2.ControlResponse:
@@ -194,7 +206,8 @@ class ControlClient:
             Response received from server.
         """
         logger.debug("Sending release_ctrl.")
-        msg = cmd.serialize_req_obj(control_pb2.ControlRequest.REQ_RELEASE_CTRL)
+        msg = cmd.serialize_request(
+            control_pb2.ControlRequest.REQ_RELEASE_CTRL)
         return self._try_send_req(msg)
 
     def add_experiment_problem(self, problem: control_pb2.ExperimentProblem,
@@ -210,7 +223,7 @@ class ControlClient:
         logger.debug("Sending add_exp_prblm with problem: %s",
                      common.get_enum_str(control_pb2.ExperimentProblem,
                                          problem))
-        msg = cmd.serialize_req_obj(
+        msg = cmd.serialize_request(
             control_pb2.ControlRequest.REQ_ADD_EXP_PRBLM, problem)
         return self._try_send_req(msg)
 
@@ -227,7 +240,7 @@ class ControlClient:
         logger.debug("Sending rmv_exp_prblm with problem: %s",
                      common.get_enum_str(control_pb2.ExperimentProblem,
                                          problem))
-        msg = cmd.serialize_req_obj(
+        msg = cmd.serialize_request(
             control_pb2.ControlRequest.REQ_RMV_EXP_PRBLM, problem)
         return self._try_send_req(msg)
 
@@ -244,6 +257,24 @@ class ControlClient:
 
         self._uuid = uuid
         self._init_client()
+
+    def request_parameter(self, param: control_pb2.ParameterMsg
+                          ) -> (control_pb2.ControlResponse,
+                                control_pb2.ParameterMsg):
+        """ Get or set a device parameter.
+
+        Args:
+            param: parameter message containing parameter to get/set and
+                set value (if applicable).
+
+        Returns:
+            tuple of ControlResponse and a ParameterMsg response, corresponding
+                to a final get call on the parameter.
+        """
+        logger.debug("Sending parameter request with: %s", param)
+        msg = cmd.serialize_request(
+            control_pb2.ControlRequest.REQ_PARAM, param)
+        return self._try_send_req(msg, keep_obj=True)
 
 
 class AdminControlClient(ControlClient):
@@ -269,7 +300,7 @@ class AdminControlClient(ControlClient):
         """
         logger.debug("Sending set_control_mode with mode: %s",
                      common.get_enum_str(control_pb2.ControlMode, mode))
-        msg = cmd.serialize_req_obj(
+        msg = cmd.serialize_request(
             control_pb2.ControlRequest.REQ_SET_CONTROL_MODE, mode)
         return self._try_send_req(msg)
 
@@ -280,6 +311,6 @@ class AdminControlClient(ControlClient):
         connected components to close.
         """
         logger.debug("Sending end_experiment.")
-        msg = cmd.serialize_req_obj(
+        msg = cmd.serialize_request(
             control_pb2.ControlRequest.REQ_END_EXPERIMENT)
         return self._try_send_req(msg)

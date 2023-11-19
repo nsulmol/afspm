@@ -11,6 +11,7 @@ enum ControlRequest {
     REQ_START_SCAN = 1;
     REQ_STOP_SCAN = 2;
     REQ_SET_SCAN_PARAMS = 3;
+    REQ_PARAM = 10;
     // The below are specific to ControlRouter
     REQ_REQUEST_CTRL = 4;
     REQ_RELEASE_CTRL = 5;
@@ -31,6 +32,8 @@ enum ControlResponse {
     REP_WRONG_CONTROL_MODE = 5;
     REP_NOT_IN_CONTROL = 6;
     REP_NOT_FREE = 7;
+    REP_PARAM_NOT_SUPPORTED = 8; // Parameter does not exist/could not be found.
+    REP_PARAM_ERROR = 9; //  Trying to get/set the param failed.
 }
 
 /* Enum holding the current control mode of afspm. */
@@ -57,4 +60,10 @@ message ControlState {
     optional ControlMode control_mode = 1;
     optional string client_in_control_id = 2;
     repeated ExperimentProblem problems_set = 3;
+}
+
+/* Get/set a system parameter. See afspm.components.device.params.py.*/
+message ParameterMsg {
+    optional string parameter = 1;
+    optional string value = 2;  // If not provided, we treat as a get.
 }

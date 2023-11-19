@@ -68,7 +68,8 @@ class ControlServer:
             return (req, obj)
         return (None, None)
 
-    def reply(self, rep: control_pb2.ControlResponse):
+    def reply(self, rep: control_pb2.ControlResponse,
+              obj: Message | int | None = None):
         """Send the reply to a request received.
 
         This method is expected to be called right after receiving a req.
@@ -76,7 +77,10 @@ class ControlServer:
         Args:
             rep: control_pb2.ControlResponse we wish to send as response to the prior
                 req received.
+            obj: (optional) object to return with the reply. In all but a few cases,
+                this will be None as there is nothing to add to our response.
         """
-        logger.debug("Sending reply: %s",
-                     common.get_enum_str(control_pb2.ControlResponse, rep))
-        self._server.send(cmd.serialize_response(rep))
+        logger.debug("Sending reply: %s, %s",
+                     common.get_enum_str(control_pb2.ControlResponse, rep),
+                     obj)
+        self._server.send_multipart(cmd.serialize_response(rep, obj))
