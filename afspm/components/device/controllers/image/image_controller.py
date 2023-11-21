@@ -7,7 +7,6 @@ from os import sep
 
 import xarray as xr
 import numpy as np
-import imageio.v3 as iio
 
 from ...controller import DeviceController
 from .....io.protos.generated import scan_pb2
@@ -60,34 +59,17 @@ class ImageController(DeviceController):
         self.scan_time_s = scan_time_s
         self.move_time_s = move_time_s
 
-        self.dev_img = self.create_xarray_from_img_path(img_path,
-                                                        physical_origin,
-                                                        physical_size,
-                                                        physical_units,
-                                                        data_units)
+        self.dev_img = ac.create_xarray_from_img_path(img_path,
+                                                      physical_origin,
+                                                      physical_size,
+                                                      physical_units,
+                                                      data_units)
         self.dev_scan_state = scan_pb2.ScanState.SS_FREE
         self.dev_scan_params = scan_pb2.ScanParameters2d()
         self.dev_scan = None
         super().__init__(**kwargs)
 
     # TODO: Move to array converters?
-    def create_xarray_from_img_path(self, img_path: str,
-                                    tl: tuple[float, float],
-                                    size: tuple[float, float],
-                                    physical_units: str, data_units: str):
-        """Create an xarray from the provided image and physical units data."""
-        img = np.asarray(iio.imread(img_path))[:, :, 0]  # Grab single channel
-
-        x = np.linspace(tl[0], tl[0] + size[0], img.shape[0])
-        y = np.linspace(tl[1], tl[1] + size[1], img.shape[1])
-
-        da = xr.DataArray(data=img, dims=['y', 'x'],
-                          coords={'y': y, 'x': x},
-                          attrs={'units': data_units})
-        da.x.attrs['units'] = physical_units
-        da.y.attrs['units'] = physical_units
-
-        return da
 
     def on_start_scan(self):
         self.start_ts = time.time()

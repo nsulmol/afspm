@@ -2,6 +2,7 @@
 
 import xarray as xr
 import numpy as np
+import imageio.v3 as iio
 from ..io.protos.generated import scan_pb2
 from ..io.protos.generated import geometry_pb2
 
@@ -157,3 +158,30 @@ def convert_sidpy_to_scan_pb2(ds: Dataset) -> scan_pb2.Scan2d:
                            channel=ds.name,
                            values=ds.compute().ravel().tolist())
     return scan
+
+
+def create_xarray_from_img_path(img_path: str,
+                                tl: tuple[float, float] = None,
+                                size: tuple[float, float] = None,
+                                physical_units: str = None,
+                                data_units: str = None):
+    """Create an xarray from the provided image and physical units data."""
+    img = np.asarray(iio.imread(img_path))[:, :, 0]  # Grab single channel
+
+    coords = {}
+    if tl and size:
+        y = np.linspace(tl[0], tl[0] + size[0], img.shape[0]) # col, row
+        x = np.linspace(tl[1], tl[1] + size[1], img.shape[1])
+        coords = {'y': y, 'x': x}
+
+    attrs = {}
+    if data_units:
+        attrs = {'units': data_units}
+
+    da = xr.DataArray(data=img, dims=['y', 'x'],
+                      coords=coords, attrs=attrs)
+    if physical_units:
+        da.x.attrs['units'] = physical_units
+        da.y.attrs['units'] = physical_units
+
+    return da
