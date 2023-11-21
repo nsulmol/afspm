@@ -267,7 +267,7 @@ class ScanningComponent(AfspmComponent):
         super().__init__(**kwargs)
 
     def run_per_loop(self):
-        """Override to udpate ScanHandler."""
+        """Override to update ScanHandler."""
         self.scan_handler.handle_issues(self.control_client)
         super().run_per_loop()
 
