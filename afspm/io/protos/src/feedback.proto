@@ -1,0 +1,24 @@
+/*
+This file holds the Z-Control Feedback messages.
+*/
+
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+
+message ZCtrlParameters {
+  optional bool feedbackOn = 1;
+  optional float proportionalGain = 2;
+  optional float integralGain = 3;
+
+  // UUID attributes fo associated scan.
+  optional google.protobuf.Timestamp timestamp = 4; // Should match scan timestamp
+}
+
+
+// Linked to Feedback Analysis
+message FeedbackAnalysis {
+  optional float proportionOverThreshold = 1;  // In range [0.0, 1.0]
+  optional float proportionUnderThreshold = 2;  // In range [0.0, 1.0]
+}

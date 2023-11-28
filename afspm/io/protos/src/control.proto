@@ -54,6 +54,8 @@ enum ExperimentProblem {
     EP_NONE = 0;
     EP_TIP_SHAPE_CHANGED = 1;
     EP_DEVICE_MALFUNCTION = 2;
+    EP_FEEDBACK_OVER_SET = 3;
+    EP_FEEDBACK_UNDER_SET = 4;
 }
 
 /* Contains the current overall SPM status. */
