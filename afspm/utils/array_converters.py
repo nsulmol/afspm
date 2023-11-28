@@ -35,8 +35,8 @@ def convert_scan_pb2_to_xarray(scan: scan_pb2.Scan2d) -> xr.DataArray:
     y = np.linspace(roi.top_left.y, roi.top_left.y + roi.size.y,
                     scan.params.data.shape.y)
     data = np.array(scan.values, dtype=np.float64)
-    data = data.reshape((scan.params.data.shape.x,
-                         scan.params.data.shape.y))
+    data = data.reshape((scan.params.data.shape.y,
+                         scan.params.data.shape.x))
 
     da = xr.DataArray(data=data, dims=['y', 'x'],
                       coords={'y': y, 'x': x},
@@ -72,9 +72,12 @@ def convert_xarray_to_scan_pb2(da: xr.DataArray) -> scan_pb2.Scan2d:
     top_left = geometry_pb2.Point2d(**tl)
     size = geometry_pb2.Size2d(**size)
     roi = geometry_pb2.Rect2d(top_left=top_left, size=size)
+    physical_units = (da[da.dims[0]].units if 'units' in da[da.dims[0]].attrs
+                      else None)
     spatial_aspects = scan_pb2.SpatialAspects(roi=roi,
-                                              units=da[da.dims[0]].units)
-    data_aspects = scan_pb2.DataAspects(shape=da_shape, units=da.units)
+                                              units=physical_units)
+    data_units = da.units if 'units' in da.attrs else None
+    data_aspects = scan_pb2.DataAspects(shape=da_shape, units=data_units)
     scan_params = scan_pb2.ScanParameters2d(spatial=spatial_aspects,
                                             data=data_aspects)
     scan = scan_pb2.Scan2d(params=scan_params,
@@ -104,8 +107,8 @@ def convert_scan_pb2_to_sidpy(scan: scan_pb2.Scan2d) -> Dataset:
     y = np.linspace(roi.top_left.y, roi.top_left.y + roi.size.y,
                     scan.params.data.shape.y)
     data = np.array(scan.values, dtype=np.float64)
-    data = data.reshape((scan.params.data.shape.x,
-                         scan.params.data.shape.y))
+    data = data.reshape((scan.params.data.shape.y,
+                         scan.params.data.shape.x))
 
     dset = sidpy.Dataset.from_array(data)
     dset.data_type = 'image'
@@ -170,7 +173,7 @@ def create_xarray_from_img_path(img_path: str,
 
     coords = {}
     if tl and size:
-        y = np.linspace(tl[0], tl[0] + size[0], img.shape[0]) # col, row
+        y = np.linspace(tl[0], tl[0] + size[0], img.shape[0])  # row, col
         x = np.linspace(tl[1], tl[1] + size[1], img.shape[1])
         coords = {'y': y, 'x': x}
 
