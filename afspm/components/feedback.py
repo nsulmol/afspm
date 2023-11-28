@@ -80,40 +80,6 @@ def analyze_feedback_on_scan(scan: scan_pb2.Scan2d,
         proportionUnderThreshold=under_proportion)
 
 
-# Pink = 1/f
-# def func_pink(x, a, b):
-#     return (a / x) + b
-
-
-# def feedback_on_arr2(arr: np.ndarray,
-#                      config: FeedbackAnalysisConfig,
-#                      ) -> (float, float):
-
-#     x_f, y_f = convert_freq_domain(arr, config.use_hanning_window)
-
-#     # Remove first value, often x=0, which breaks fitting
-#     x_f = x_f[1:]
-#     y_f = y_f[1:]
-
-#     from scipy.optimize import curve_fit
-#     fit, pcov = curve_fit(func_pink, x_f, y_f)
-#     print(f'Fit: {fit}')
-#     y_fit = func_pink(x_f, *fit)
-
-#     over_fit = fit * [config.over_slope_factor, config.over_offset_factor]
-#     over_y = func_pink(x_f, *over_fit)
-#     over_y_bool = y_f > over_y
-
-#     under_fit = fit * [config.under_slope_factor, config.under_offset_factor]
-#     under_y = func_pink(x_f, *under_fit)
-#     under_y_bool = y_f < under_y
-
-#     if config.visualize_analysis:
-#         visualize_analysis(x_f, y_f, y_fit, over_y, under_y,
-#                            config.viz_block_plot, config.viz_plot_log)
-
-
-
 def analyze_feedback_on_arr(arr: np.ndarray,
                             config: FeedbackAnalysisConfig
                             ) -> (float, float):
@@ -161,18 +127,6 @@ def analyze_feedback_on_arr(arr: np.ndarray,
         over_under_y_bool.append(y_f > over_under_y[-1])
 
     over_under_y_bool[1] = 1 - over_under_y_bool[1]
-
-    # offset_factor = (config.over_offset_factor if fit[0] > 0 else
-    #                  1 / config.over_offset_factor)
-    # over_fit = fit * [offset_factor, config.over_slope_factor]
-    # over_y = np.polynomial.polynomial.polyval(x_inv_f, over_fit)
-    # over_y_bool = y_f > over_y
-
-    # offset_factor = (config.under_offset_factor if fit[0] > 0 else
-    #                  1 / config.under_offset_factor)
-    # under_fit = fit * [offset_factor, config.under_slope_factor]
-    # under_y = np.polynomial.polynomial.polyval(x_inv_f, under_fit)
-    # under_y_bool = y_f < under_y
 
     if config.visualize_analysis:
         y_fit = np.polynomial.polynomial.polyval(x_inv_f, fit)
