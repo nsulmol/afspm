@@ -195,6 +195,8 @@ class ScanHandler:
             return  # Early return, we're not ready yet.
 
         # Handle sending requests (not guaranteed it will work!)
+        req_to_call = None
+        req_params = {}
         if self._scan_state != self._desired_scan_state:
             logger.info("In state %s, wanting state %s; requesting.",
                         common.get_enum_str(scan_pb2.ScanState,
@@ -208,10 +210,15 @@ class ScanHandler:
                                 "Sleeping and retrying.")
                     self._handle_rerun(True)
                     return
-                rep = control_client.set_scan_params(self._scan_params)
+                req_to_call = control_client.set_scan_params
+                req_params['scan_params'] = (self._scan_params)
             elif self._desired_scan_state == scan_pb2.ScanState.SS_SCANNING:
-                rep = control_client.start_scan()
+                req_to_call = control_client.start_scan
 
+            if not req_to_call:
+                return
+
+            rep = req_to_call(**req_params)
             if rep == control_pb2.ControlResponse.REP_SUCCESS:
                 logger.info("Request succeeded.")
                 return
@@ -224,11 +231,14 @@ class ScanHandler:
                 # We failed due to a control issue. Try to resolve.
                 logger.info("Requesting control...")
                 rep = control_client.request_control(
-                    control_pb2.ControlMode.CM_AUTOMATED)
+                    self.control_mode_to_run)
                 if rep == control_pb2.ControlResponse.REP_SUCCESS:
                     logger.info("Control received. Retrying...")
-                    self._perform_scanning_logic(control_client)
-                    return
+                    rep = req_to_call(**req_params)
+                    if rep == control_pb2.ControlResponse.REP_SUCCESS:
+                        logger.info("Succeeded.")
+                        return
+                    logger.info("Failed.")
 
             logger.info("Sleeping and retrying later.")
             self._handle_rerun(True)
