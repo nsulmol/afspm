@@ -1,6 +1,7 @@
 """Handles control requests to the AFSPM."""
 
 import logging
+from typing import Callable
 
 import zmq
 
@@ -330,3 +331,35 @@ class AdminControlClient(ControlClient):
         msg = cmd.serialize_request(
             control_pb2.ControlRequest.REQ_END_EXPERIMENT)
         return self._try_send_req(msg)
+
+
+def send_req_handle_ctrl(client: ControlClient,
+                         req_method: Callable, params: dict,
+                         control_mode: control_pb2.ControlMode
+                         ) -> control_pb2.ControlResponse:
+    """Send a request, trying to gain control if needed.
+
+    We try to send a request. If it fails due to lack of control,
+    we attempt to gain control, and resend the request. If at any
+    point we fail in a way we cannot continue, we stop and return.
+
+    Args:
+        client: Control Client to use for the request.
+        req_method: Control Client Callable fo the method to call.
+        params: dictionary of parameters to feed to the req_method.
+        control_mode: ControlMode we are requesting control from.
+
+    Returns:
+        Final response to this request.
+    """
+    rep = req_method(**params)
+
+    if rep == control_pb2.ControlResponse.REP_NOT_IN_CONTROL:
+        logger.info("Request failed due to not being in control. "
+                    "Requesting control.")
+        rep = client.request_control(control_mode)
+        if rep == control_pb2.ControlResponse.REP_SUCCESS:
+            logger.info("Control received, retrying request.")
+            return req_method(**params)
+        logger.info("Control request failed.")
+    return rep

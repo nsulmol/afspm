@@ -14,7 +14,7 @@ from ..io.protos.generated import geometry_pb2
 from ..io.protos.generated import scan_pb2
 from ..io.protos.generated import control_pb2
 
-from ..io.control.client import ControlClient
+from ..io.control.client import ControlClient, send_req_handle_ctrl
 
 
 logger = logging.getLogger(__name__)
@@ -218,30 +218,11 @@ class ScanHandler:
             if not req_to_call:
                 return
 
-            rep = req_to_call(**req_params)
-            if rep == control_pb2.ControlResponse.REP_SUCCESS:
-                logger.info("Request succeeded.")
-                return
-
-            logger.info("Request failed with rep %s!",
-                        common.get_enum_str(control_pb2.ControlResponse,
-                                            rep))
-
-            if rep == control_pb2.ControlResponse.REP_NOT_IN_CONTROL:
-                # We failed due to a control issue. Try to resolve.
-                logger.info("Requesting control...")
-                rep = control_client.request_control(
-                    self.control_mode_to_run)
-                if rep == control_pb2.ControlResponse.REP_SUCCESS:
-                    logger.info("Control received. Retrying...")
-                    rep = req_to_call(**req_params)
-                    if rep == control_pb2.ControlResponse.REP_SUCCESS:
-                        logger.info("Succeeded.")
-                        return
-                    logger.info("Failed.")
-
-            logger.info("Sleeping and retrying later.")
-            self._handle_rerun(True)
+            rep = send_req_handle_ctrl(control_client, req_to_call,
+                                       req_params, self.control_mode_to_run)
+            if rep != control_pb2.ControlResponse.REP_SUCCESS:
+                logger.info("Sleeping and retrying later.")
+                self._handle_rerun(True)
 
     def _handle_rerun(self, perform_rerun: bool):
         if perform_rerun:
