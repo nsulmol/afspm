@@ -158,6 +158,7 @@ def test_cancel_scan(client, default_control_state, component_name,
                               scan_state_msg)
 
     assert not sub_scan_state.poll_and_store()
+    del client  # Explicitly kill to avoid zmq weirdness.
 
 
 def test_scan_params(client, default_control_state, component_name,
@@ -191,6 +192,7 @@ def test_scan_params(client, default_control_state, component_name,
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
     __, last_params = sub_scan_params.poll_and_store()
     assert last_params == initial_params
+    del client  # Explicitly kill to avoid zmq weirdness.
 
 
 def test_run_scan(client, default_control_state, component_name,
@@ -223,3 +225,4 @@ def test_run_scan(client, default_control_state, component_name,
     assert sub_scan.poll_and_store()
     scan_state_msg.scan_state = scan_pb2.ScanState.SS_FREE
     assert_sub_received_proto(sub_scan_state, scan_state_msg)
+    del client  # Explicitly kill to avoid zmq weirdness.
