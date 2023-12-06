@@ -13,7 +13,7 @@ from google.protobuf.timestamp_pb2 import Timestamp
 from afspm.components.device.controller import DeviceController
 from afspm.components.device.params import DeviceParameter
 from afspm.components.afspm.controller import AfspmController
-from afspm.components.afspm.component import AfspmComponent
+from afspm.components.component import AfspmComponentBase
 
 
 from afspm.io import common
@@ -172,7 +172,8 @@ def component_name():
 
 @pytest.fixture
 def afspm_component(sub_scan_state, admin_client, component_name, ctx):
-    return AfspmComponent(component_name, sub_scan_state, admin_client, ctx)
+    return AfspmComponentBase(component_name, sub_scan_state, admin_client,
+                              ctx)
 
 
 # -------------------- Helper Methods -------------------- #
@@ -209,12 +210,12 @@ def request_control(afspm_component: AfspmController,
     assert_sub_received_proto(afspm_component.subscriber, cs)
 
 
-def end_experiment(afspm_component: AfspmComponent):
+def end_experiment(afspm_component: AfspmComponentBase):
     """End the experiment, so associated threads shut down."""
     rep = afspm_component.control_client.end_experiment()
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
     afspm_component.subscriber.poll_and_store()
-    assert afspm_component.subscriber.was_shutdown_requested()
+    assert afspm_component.subscriber.shutdown_was_requested
 
 
 def wait_on_threads(thread_device_controller: threading.Thread,
@@ -232,7 +233,7 @@ def startup_and_req_ctrl(afspm_component: AfspmController,
                     component_name)
 
 
-def end_and_wait_threads(afspm_component: AfspmComponent,
+def end_and_wait_threads(afspm_component: AfspmComponentBase,
                          thread_device_controller: threading.Thread,
                          thread_afspm_controller: threading.Thread):
     end_experiment(afspm_component)

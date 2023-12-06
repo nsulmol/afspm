@@ -4,6 +4,9 @@ This file holds general geometric types, for more complex messages.
 
 syntax = "proto3";
 
+// TODO: Standardize this better? Should There be IntVal and DoubleVal,
+// with value and units?
+
 /* 2D unsigned integer point. */
 message Point2u {
   optional uint32 x = 1;
@@ -40,3 +43,12 @@ message Rect2d {
   optional Point2d top_left = 1;
   optional Size2d size = 2;
 }
+
+/* ROI Rectangle, integer. */
+message Rect2i {
+  optional Point2u top_left = 1;
+  optional Size2u size = 2;
+}
+
+
+// Coordinates (points + units)

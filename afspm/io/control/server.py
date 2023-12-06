@@ -22,19 +22,19 @@ class ControlServer:
     as soon as possible.
 
     Attributes:
-        server: the REP socket associated with our server
-        poll_timeout_ms: how long to wait when polling for messages.
+        _server: the REP socket associated with our server
+        _poll_timeout_ms: how long to wait when polling for messages.
             If None, we do not poll and do a blocking receive instead.
     """
 
     def __init__(self, url: str, ctx: zmq.Context = None,
                  poll_timeout_ms: int = common.POLL_TIMEOUT_MS):
-        self.poll_timeout_ms = poll_timeout_ms
+        self._poll_timeout_ms = poll_timeout_ms
         if not ctx:
             ctx = zmq.Context.instance()
 
-        self.server = ctx.socket(zmq.REP)
-        self.server.bind(url)
+        self._server = ctx.socket(zmq.REP)
+        self._server.bind(url)
 
         common.sleep_on_socket_startup()
 
@@ -54,16 +54,17 @@ class ControlServer:
             If no request was received, both will be None.
         """
         msg = None
-        if self.poll_timeout_ms:
-            if self.server.poll(self.poll_timeout_ms, zmq.POLLIN):
-                msg = self.server.recv_multipart(zmq.NOBLOCK)
+        if self._poll_timeout_ms:
+            if self._server.poll(self._poll_timeout_ms, zmq.POLLIN):
+                msg = self._server.recv_multipart(zmq.NOBLOCK)
         else:
-            msg = self.server.recv_multipart()
+            msg = self._server.recv_multipart()
 
         if msg:
             req, obj = cmd.parse_request(msg)
             logger.debug("Message received: %s, %s",
-                         common.get_enum_str(control_pb2.ControlRequest, req), obj)
+                         common.get_enum_str(control_pb2.ControlRequest, req),
+                         obj)
             return (req, obj)
         return (None, None)
 
@@ -82,4 +83,4 @@ class ControlServer:
         logger.debug("Sending reply: %s, %s",
                      common.get_enum_str(control_pb2.ControlResponse, rep),
                      obj)
-        self.server.send_multipart(cmd.serialize_response(rep, obj))
+        self._server.send_multipart(cmd.serialize_response(rep, obj))

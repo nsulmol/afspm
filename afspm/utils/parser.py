@@ -95,11 +95,9 @@ def _expand_variables_recursively(config_dict: dict, sub_dict: dict) -> dict:
             else:  # Copy value over (this is not a variable)
                 logger.trace("Keeping %s for key %s", sub_dict[key], key)
                 sub_dict[key] = sub_dict[key]
-    except Exception as exc:
-        msg = ("Exception for key:val = %s : %s, exception: %s" %
-               (key, sub_dict[key], str(exc)))
-        logger.error(msg)
-        raise exc
+    except Exception as error:
+        logger.error("Exception for key:val = %s : %s", key, sub_dict[key])
+        logger.exception(error)
     return sub_dict
 
 
@@ -147,7 +145,7 @@ def construct_and_run_component(params_dict: dict):
 
     Thus, our params_dict may look like, for example:
     {
-        class: 'afspm.components.afspm.component.AfspmComponent',
+        class: 'afspm.components.component.AfspmComponent',
         loop_sleep_s: 0,
         beat_period_s: 5,
         subscriber: {
@@ -176,8 +174,11 @@ def construct_and_run_component(params_dict: dict):
         params_dict: dictionary of parameters to feed the
             AfspmComponent's constructor.
     """
-    component = _construct_component(params_dict)
-    component.run()
+    try:
+        component = _construct_component(params_dict)
+        component.run()
+    except Exception as error:
+        logger.exception(error)
 
 
 def _construct_component(params_dict: dict) -> Any:  # Fix typing here!!!
@@ -187,7 +188,7 @@ def _construct_component(params_dict: dict) -> Any:  # Fix typing here!!!
     """
     assert CLASS_KEY in params_dict
     evaluated_dict = _evaluate_values_recursively(params_dict)
-    return  _instantiate_classes_recursively(evaluated_dict)
+    return _instantiate_classes_recursively(evaluated_dict)
 
 
 def _evaluate_values_recursively(params_dict: dict) -> dict:
@@ -199,7 +200,7 @@ def _evaluate_values_recursively(params_dict: dict) -> dict:
 
     With, for example:
     {
-        class: 'afspm.components.afspm.component.AfspmComponent',
+        class: 'afspm.components.component.AfspmComponent',
         loop_sleep_s: 0,
         beat_period_s: 5,
         subscriber: {

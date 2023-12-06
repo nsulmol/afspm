@@ -3,7 +3,13 @@
 import afspm.utils.array_converters as conv
 import xarray as xr
 import numpy as np
+from pathlib import Path
+from os import sep
 import pytest
+
+
+TEST_IMG_PATH = (str(Path(__file__).parent.parent.resolve()) + sep + "data" +
+                     sep + "sample.png")
 
 
 class TestConverters:
@@ -44,3 +50,44 @@ class TestConverters:
         dset2 = conv.convert_scan_pb2_to_sidpy(scan)
 
         assert dset == dset2
+
+
+@pytest.fixture
+def tl():
+    return [-5, -2]
+
+
+@pytest.fixture
+def size():
+    return [20, 15]
+
+
+@pytest.fixture
+def physical_units():
+    return 'nm'
+
+
+@pytest.fixture
+def data_units():
+    return 'banana'
+
+
+def test_create_from_img(tl, size, physical_units, data_units):
+    res = conv.create_xarray_from_img_path(TEST_IMG_PATH)
+    assert res is not None
+    for val in ('x', 'y'):
+        assert val in res.dims
+    assert not res.coords
+    assert not res.attrs
+
+    res = conv.create_xarray_from_img_path(TEST_IMG_PATH,
+                                           tl=tl,
+                                           size=size,
+                                           physical_units=physical_units,
+                                           data_units=data_units)
+    assert res is not None
+    for val in ('x', 'y'):
+        assert val in res.dims
+        assert val in res.coords
+    assert 'units' in res.attrs and res.units == data_units
+    assert 'units' in res.x.attrs and res.x.units == physical_units

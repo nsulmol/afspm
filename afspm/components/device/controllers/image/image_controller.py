@@ -1,26 +1,24 @@
 """DeviceController that shows scans from an image."""
 
-import copy
 import time
 import logging
-
-from google.protobuf.message import Message
-
-from afspm.spawn import LOGGER_ROOT
-from afspm.components.device.controller import DeviceController
-from afspm.io.protos.generated import scan_pb2
-from afspm.io.protos.generated import control_pb2
-from afspm.utils import array_converters as ac
+from pathlib import Path
+from os import sep
 
 import xarray as xr
 import numpy as np
-import imageio.v3 as iio
+
+from ...controller import DeviceController
+from .....io.protos.generated import scan_pb2
+from .....io.protos.generated import control_pb2
+from .....io.protos.generated import feedback_pb2
+from .....utils import array_converters as ac
 
 
-logger = logging.getLogger(LOGGER_ROOT + ".examples.image_roi." + __name__)
+logger = logging.getLogger(__name__)
 
 
-class ImageDeviceController(DeviceController):
+class ImageController(DeviceController):
     """Simulates a DeviceController with an individual image.
 
     This controller loads a single image as if it was a 2D scan, allowing
@@ -36,11 +34,14 @@ class ImageDeviceController(DeviceController):
         move_time_s: how long changing scan paramters should take, in seconds.
         start_ts: a timestamp for timing the scan and move durations.
     """
-    def __init__(self, img_path: str,
-                 physical_origin: tuple[float, float],
+    _DEFAULT_IMG_PATH = (str(Path(__file__).parent.resolve()) + sep + "data" +
+                         sep + "peppers.tiff")
+
+    def __init__(self, physical_origin: tuple[float, float],
                  physical_size: tuple[float, float],
                  physical_units: str, data_units: str,
-                 scan_time_s: float, move_time_s: float, **kwargs):
+                 scan_time_s: float, move_time_s: float,
+                 img_path: str = _DEFAULT_IMG_PATH, **kwargs):
         """Initialize controller.
 
         Args:
@@ -58,34 +59,17 @@ class ImageDeviceController(DeviceController):
         self.scan_time_s = scan_time_s
         self.move_time_s = move_time_s
 
-        self.dev_img = self.create_xarray_from_img_path(img_path,
-                                                        physical_origin,
-                                                        physical_size,
-                                                        physical_units,
-                                                        data_units)
+        self.dev_img = ac.create_xarray_from_img_path(img_path,
+                                                      physical_origin,
+                                                      physical_size,
+                                                      physical_units,
+                                                      data_units)
         self.dev_scan_state = scan_pb2.ScanState.SS_FREE
         self.dev_scan_params = scan_pb2.ScanParameters2d()
         self.dev_scan = None
         super().__init__(**kwargs)
 
     # TODO: Move to array converters?
-    def create_xarray_from_img_path(self, img_path: str,
-                                    tl: tuple[float, float],
-                                    size: tuple[float, float],
-                                    physical_units: str, data_units: str):
-        """Create an xarray from the provided image and physical units data."""
-        img = np.asarray(iio.imread(img_path))[:, :, 0]  # Only grab one channel
-
-        x = np.linspace(tl[0], tl[0] + size[0], img.shape[0])
-        y = np.linspace(tl[1], tl[1] + size[1], img.shape[1])
-
-        da = xr.DataArray(data=img, dims=['y', 'x'],
-                          coords={'y': y, 'x': x},
-                          attrs={'units': data_units})
-        da.x.attrs['units'] = physical_units
-        da.y.attrs['units'] = physical_units
-
-        return da
 
     def on_start_scan(self):
         self.start_ts = time.time()
@@ -104,11 +88,20 @@ class ImageDeviceController(DeviceController):
         self.dev_scan_params = scan_params
         return control_pb2.ControlResponse.REP_SUCCESS
 
+    def on_set_zctrl_params(self, zctrl_params: feedback_pb2.ZCtrlParameters
+                            ) -> control_pb2.ControlResponse:
+        """Z-Ctrl doesn't do anything with images, not supported."""
+        return control_pb2.ControlResponse.REP_CMD_NOT_SUPPORTED
+
     def poll_scan_state(self) -> scan_pb2.ScanState:
         return self.dev_scan_state
 
     def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
         return self.dev_scan_params
+
+    def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
+        """Z-Ctrl doesn't do anything with images, not supported."""
+        return feedback_pb2.ZCtrlParameters()
 
     def poll_scans(self) -> [scan_pb2.Scan2d]:
         return [self.dev_scan] if self.dev_scan else []

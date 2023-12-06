@@ -11,6 +11,7 @@ enum ControlRequest {
     REQ_START_SCAN = 1;
     REQ_STOP_SCAN = 2;
     REQ_SET_SCAN_PARAMS = 3;
+    REQ_SET_ZCTRL_PARAMS = 11;
     REQ_PARAM = 10;
     // The below are specific to ControlRouter
     REQ_REQUEST_CTRL = 4;
@@ -54,6 +55,7 @@ enum ExperimentProblem {
     EP_NONE = 0;
     EP_TIP_SHAPE_CHANGED = 1;
     EP_DEVICE_MALFUNCTION = 2;
+    EP_FEEDBACK_NON_OPTIMAL = 3;
 }
 
 /* Contains the current overall SPM status. */

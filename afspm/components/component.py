@@ -2,21 +2,22 @@
 
 import logging
 import time
-import tempfile
+from typing import Callable
 import zmq
 
 from google.protobuf.message import Message
 
-from ...io import common
-from ...io.heartbeat.heartbeat import Heartbeater
-from ...io.pubsub import subscriber as sub
-from ...io.control import client as ctrl_client
+from ..io import common
+from ..io.heartbeat.heartbeat import Heartbeater, get_heartbeat_url
+from ..io.pubsub import subscriber as sub
+from ..io.pubsub import publisher as pub
+from ..io.control import client as ctrl_client
 
 
 logger = logging.getLogger(__name__)
 
 
-class AfspmComponent:
+class AfspmComponentBase:
     """Base class for afspm component.
 
     This serves as the base class for any component added to an afspm system.
@@ -54,12 +55,12 @@ class AfspmComponent:
         stay_alive: boolean indicating whether we should continue looping in
             run(). In other words, if False, run() ends.
     """
-
     def __init__(self, name: str,
                  subscriber: sub.Subscriber = None,
                  control_client: ctrl_client.ControlClient = None,
                  loop_sleep_s: float = common.LOOP_SLEEP_S,
                  beat_period_s: float = common.HEARTBEAT_PERIOD_S,
+                 override_client_uuid: bool = True,
                  ctx: zmq.Context = None):
         """Initialize our AfspmComponent.
 
@@ -70,6 +71,9 @@ class AfspmComponent:
             subscriber: subscriber instance, to receive data from the
                 DeviceController.
             control_client: client to ControlServer, to allow sending requests.
+            override_client_uuid: boolean indicating whether we will restart
+                the provided ControlClient with the component's name as its
+                UUID. Default is true.
             ctx: zmq context.
         """
         logger.debug("Initializing component %s", name)
@@ -83,6 +87,9 @@ class AfspmComponent:
         self.subscriber = subscriber
         self.control_client = control_client
         self.stay_alive = True
+
+        if self.control_client and override_client_uuid:
+            self.control_client.set_uuid(self.name)
 
     def run(self):
         """Main loop."""
@@ -104,17 +111,17 @@ class AfspmComponent:
         instance). If so, it will also check the
         """
         if self.subscriber:
-            msg = self.subscriber.poll_and_store()
+            messages = self.subscriber.poll_and_store()
 
             # If the last value indicates shutdown was requested, stop
             # looping
-            if self.subscriber.was_shutdown_requested():
+            if self.subscriber.shutdown_was_requested:
                 logger.info("%s: Shutdown received. Stopping.", self.name)
                 self.heartbeater.handle_closing()
                 self.stay_alive = False  # Shutdown self
-            elif msg:
-                self.on_message_received(msg[0], msg[1])
-
+            elif messages:
+                for msg in messages:
+                    self.on_message_received(msg[0], msg[1])
 
     def run_per_loop(self):
         """Method that is run on every iteration of the main loop.
@@ -145,6 +152,50 @@ class AfspmComponent:
         pass
 
 
-def get_heartbeat_url(name: str):
-    """Create a hearbeat url, given a component name."""
-    return "ipc://" + tempfile.gettempdir() + '/' + name
+class AfspmComponent(AfspmComponentBase):
+    """Component with hooks for external methods to be called.
+
+    An AfspmComponent differs from AfspmComponentBase in that:
+    - An optional publisher can be provided, to allow publishing analysis of
+    received messages.
+    - An optional callable message_received_method() can be provided, which is
+    called in on_message_received().
+    - An optional callable per_loop_method() can be provided, which is called
+    in run_per_loop().
+
+    The latter two allow component logic to be controlled via some simple
+    methods provided (rather than having to define a new class).
+
+    Attributes:
+        publisher: publisher instance, to be used to publish analysis results.
+        message_received_method: method called on_message_received(), used to
+            perform analysis/actions based on new messages.
+        per_loop_method: method called oin run_per_loop(), used to perform any
+            additional logic desired while the component is running.
+        methods_kwargs: any additional arguments to be fed to
+            message_received_method and per_loop_method.
+    """
+    def __init__(self, publisher: pub.Publisher = None,
+                 message_received_method: Callable = None,
+                 per_loop_method: Callable = None,
+                 methods_kwargs: dict = None,
+                 **kwargs):
+
+        self.publisher = publisher
+        self.message_received_method = message_received_method
+        self.methods_kwargs = (methods_kwargs if
+                               methods_kwargs else {})
+        self.per_loop_method = per_loop_method
+
+        super().__init__(**kwargs)
+
+    def run_per_loop(self):
+        """Override to run per_loop_method"""
+        if self.per_loop_method:
+            self.per_loop_method(self, **self.methods_kwargs)
+
+    def on_message_received(self, envelope: str, proto: Message):
+        """Override to run message_received_method."""
+        if self.message_received_method:
+            self.message_received_method(self, envelope, proto,
+                                         **self.methods_kwargs)

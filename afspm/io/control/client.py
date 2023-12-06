@@ -1,6 +1,7 @@
 """Handles control requests to the AFSPM."""
 
 import logging
+from typing import Callable
 
 import zmq
 
@@ -11,6 +12,7 @@ from google.protobuf.message import Message
 
 from ..protos.generated import control_pb2
 from ..protos.generated import scan_pb2
+from ..protos.generated import feedback_pb2
 
 
 logger = logging.getLogger(__name__)
@@ -31,18 +33,18 @@ class ControlClient:
     of the zmq guide (called lpclient.py). It is almost exactly the same.
 
     Attributes:
-        url: address of the server we are to connect to.
-        ctx: zmq Context
-        uuid: the socket's uuid string. By providing it, it allows any class
+        _url: address of the server we are to connect to.
+        _ctx: zmq Context
+        _uuid: the socket's uuid string. By providing it, it allows any class
             using it to 'restart' properly after a crash. The reason this
             happens is simply: the next time we reconnect to a ROUTER, we have
             the same id as before. Thus, any 'state' is preserverd. If you *do
             not* provide a uuid and the crashed client was 'under control',
             this ControlClient will have in principle blocked the ControlRouter
             we are connected to!
-        request_retries: how many times we will retry sending a message before
+        _request_retries: how many times we will retry sending a message before
             giving up and returning a connection error.
-        request_timeout_ms: how long we wait between request tries.
+        _request_timeout_ms: how long we wait between request tries.
     """
 
     def __init__(self, url: str, ctx: zmq.Context = None,
@@ -65,35 +67,35 @@ class ControlClient:
         if not ctx:
             ctx = zmq.Context.instance()
 
-        self.url = url
-        self.ctx = ctx
-        self.uuid = uuid
-        self.request_retries = request_retries
-        self.request_timeout_ms = request_timeout_ms
+        self._url = url
+        self._ctx = ctx
+        self._uuid = uuid
+        self._request_retries = request_retries
+        self._request_timeout_ms = request_timeout_ms
 
-        self.retries_left = request_retries
+        self._retries_left = request_retries
 
-        self.client = None
+        self._client = None
         self._init_client()
 
         common.sleep_on_socket_startup()
 
     def _init_client(self):
         """Starts up (or restarts) the client socket."""
-        if self.client and not self.client.closed:
+        if self._client and not self._client.closed:
             logger.error("Client init, but exists and is not closed. "
                          "Do nothing.")
             return
-        self.client = self.ctx.socket(zmq.REQ)
+        self._client = self._ctx.socket(zmq.REQ)
         # Set identity (if provided)
-        if self.uuid:
-            self.client.setsockopt(zmq.IDENTITY, self.uuid.encode())
-        self.client.connect(self.url)
+        if self._uuid:
+            self._client.setsockopt(zmq.IDENTITY, self._uuid.encode())
+        self._client.connect(self._url)
 
     def _close_client(self):
         """Closes the client socket."""
-        self.client.setsockopt(zmq.LINGER, 0)
-        self.client.close()
+        self._client.setsockopt(zmq.LINGER, 0)
+        self._client.close()
 
     def _try_send_req(self, msg: list[list[bytes]],
                       keep_obj: bool = False
@@ -113,16 +115,16 @@ class ControlClient:
             - If requested (and applicable), the returned obj. This may be None
             if the reply did not contain one!
         """
-        retries_left = self.request_retries
-        self.client.send_multipart(msg)
+        retries_left = self._request_retries
+        self._client.send_multipart(msg)
 
         while True:
-            if (self.client.poll(self.request_timeout_ms) & zmq.POLLIN) != 0:
+            if (self._client.poll(self._request_timeout_ms) & zmq.POLLIN) != 0:
                 # Need our request to properly parse response (it is
                 # request-specific).
                 req, obj = cmd.parse_request(msg)
                 rep, obj = cmd.parse_response(req,
-                                              self.client.recv_multipart())
+                                              self._client.recv_multipart())
                 logger.debug("Received reply: %s %s",
                              common.get_enum_str(control_pb2.ControlResponse,
                                                  rep), obj)
@@ -139,7 +141,7 @@ class ControlClient:
 
             logger.debug("Reconnecting to server")
             self._init_client()
-            self.client.send_multipart(msg)
+            self._client.send_multipart(msg)
 
     def start_scan(self) -> control_pb2.ControlResponse:
         """Request start a scan.
@@ -174,6 +176,21 @@ class ControlClient:
         logger.debug("Sending set_scan_params with: %s", scan_params)
         msg = cmd.serialize_request(
             control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS, scan_params)
+        return self._try_send_req(msg)
+
+    def set_zctrl_params(self, zctrl_params: feedback_pb2.ZCtrlParameters
+                         ) -> control_pb2.ControlResponse:
+        """Try to set the Z-Control Feedback parameters for the SPM device.
+
+        Args:
+            zctrl_params: the desired feedback params for the device.
+
+        Returns:
+            The received RequestResponse.
+        """
+        logger.debug("Sending set_zctrl_params with: %s", zctrl_params)
+        msg = cmd.serialize_request(
+            control_pb2.ControlRequest.REQ_SET_ZCTRL_PARAMS, zctrl_params)
         return self._try_send_req(msg)
 
     def request_control(self, control_mode: control_pb2.ControlMode
@@ -221,7 +238,8 @@ class ControlClient:
             Response received from server.
         """
         logger.debug("Sending add_exp_prblm with problem: %s",
-                     common.get_enum_str(control_pb2.ExperimentProblem, problem))
+                     common.get_enum_str(control_pb2.ExperimentProblem,
+                                         problem))
         msg = cmd.serialize_request(
             control_pb2.ControlRequest.REQ_ADD_EXP_PRBLM, problem)
         return self._try_send_req(msg)
@@ -237,10 +255,25 @@ class ControlClient:
             Response received from server.
         """
         logger.debug("Sending rmv_exp_prblm with problem: %s",
-                     common.get_enum_str(control_pb2.ExperimentProblem, problem))
+                     common.get_enum_str(control_pb2.ExperimentProblem,
+                                         problem))
         msg = cmd.serialize_request(
             control_pb2.ControlRequest.REQ_RMV_EXP_PRBLM, problem)
         return self._try_send_req(msg)
+
+    def set_uuid(self, uuid: str):
+        """Explicit uuid for socket connection.
+
+        If already created, will close and restart socket with new uuid.
+
+        Args:
+            uuid: new desired socket uuid.
+        """
+        if self._client:
+            self._close_client()
+
+        self._uuid = uuid
+        self._init_client()
 
     def request_parameter(self, param: control_pb2.ParameterMsg
                           ) -> (control_pb2.ControlResponse,
@@ -298,3 +331,35 @@ class AdminControlClient(ControlClient):
         msg = cmd.serialize_request(
             control_pb2.ControlRequest.REQ_END_EXPERIMENT)
         return self._try_send_req(msg)
+
+
+def send_req_handle_ctrl(client: ControlClient,
+                         req_method: Callable, params: dict,
+                         control_mode: control_pb2.ControlMode
+                         ) -> control_pb2.ControlResponse:
+    """Send a request, trying to gain control if needed.
+
+    We try to send a request. If it fails due to lack of control,
+    we attempt to gain control, and resend the request. If at any
+    point we fail in a way we cannot continue, we stop and return.
+
+    Args:
+        client: Control Client to use for the request.
+        req_method: Control Client Callable fo the method to call.
+        params: dictionary of parameters to feed to the req_method.
+        control_mode: ControlMode we are requesting control from.
+
+    Returns:
+        Final response to this request.
+    """
+    rep = req_method(**params)
+
+    if rep == control_pb2.ControlResponse.REP_NOT_IN_CONTROL:
+        logger.info("Request failed due to not being in control. "
+                    "Requesting control.")
+        rep = client.request_control(control_mode)
+        if rep == control_pb2.ControlResponse.REP_SUCCESS:
+            logger.info("Control received, retrying request.")
+            return req_method(**params)
+        logger.info("Control request failed.")
+    return rep

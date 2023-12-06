@@ -1,6 +1,7 @@
 """Contains heartbeating logic (to check for frozen/crashed components)."""
 
 import time
+import tempfile
 import logging
 from enum import Enum
 
@@ -28,9 +29,9 @@ class Heartbeater:
     or crashed component.
 
     Attributes:
-        publisher: zmq PUB socket, used to send our heartbeats.
-        beat_period_s: how frequently we should send a heartbeat.
-        last_beat_ts: a timestamp of the last time we sent a
+        _publisher: zmq PUB socket, used to send our heartbeats.
+        _beat_period_s: how frequently we should send a heartbeat.
+        _last_beat_ts: a timestamp of the last time we sent a
             heartbeat.
     """
     def __init__(self, url: str,
@@ -48,28 +49,28 @@ class Heartbeater:
         if not ctx:
             ctx = zmq.Context.instance()
 
-        self.publisher = ctx.socket(zmq.PUB)
-        self.publisher.bind(url)
-        self.beat_period_s = beat_period_s
+        self._publisher = ctx.socket(zmq.PUB)
+        self._publisher.bind(url)
+        self._beat_period_s = beat_period_s
 
         self.last_beat_ts = time.time()
 
         common.sleep_on_socket_startup()
 
         # Send a startup beat, to indicate we have initialized.
-        self.publisher.send(HBMessage.HEARTBEAT.value.to_bytes(1, 'big'))
+        self._publisher.send(HBMessage.HEARTBEAT.value.to_bytes(1, 'big'))
 
     def handle_beat(self):
         """Send a beat if sufficient time has elapsed."""
         curr_ts = time.time()
 
-        if curr_ts - self.last_beat_ts >= self.beat_period_s:
-            self.publisher.send(HBMessage.HEARTBEAT.value.to_bytes(1, 'big'))
-            self.last_beat_ts = curr_ts
+        if curr_ts - self.last_beat_ts >= self._beat_period_s:
+            self._publisher.send(HBMessage.HEARTBEAT.value.to_bytes(1, 'big'))
+            self._last_beat_ts = curr_ts
 
     def handle_closing(self):
         """Inform any listeners that we are closing."""
-        self.publisher.send(HBMessage.KILL.value.to_bytes(1, 'big'))
+        self._publisher.send(HBMessage.KILL.value.to_bytes(1, 'big'))
 
 
 class HeartbeatListener:
@@ -86,13 +87,14 @@ class HeartbeatListener:
     appears to have died but *did not* tell us it planned to.
 
     Attributes:
-        subscriber: zmq SUB socket, used to listen for heartbeats.
-        time_before_dead_s: how long we will allow before we consider the
-            Heartbeater dead.
-        last_beat_ts: the timestamp of the last beat.
         received_kill_signal: whether we received a KILL signal from the
             Heartbeater (implying they died on purpose).
-        poll_timeout_ms: the poll timeout, in milliseconds.
+        received_first_beat: whether we received the first heartbeat.
+        _subscriber: zmq SUB socket, used to listen for heartbeats.
+        _time_before_dead_s: how long we will allow before we consider the
+            Heartbeater dead.
+        _last_beat_ts: the timestamp of the last beat.
+        _poll_timeout_ms: the poll timeout, in milliseconds.
     """
     def __init__(self, url: str, beat_period_s: int = common.HEARTBEAT_PERIOD_S,
                  missed_beats_before_dead: int = common.BEATS_BEFORE_DEAD,
@@ -113,13 +115,14 @@ class HeartbeatListener:
         if not ctx:
             ctx = zmq.Context.instance()
 
-        self.subscriber = ctx.socket(zmq.SUB)
-        self.subscriber.connect(url)
-        self.subscriber.setsockopt(zmq.SUBSCRIBE, b"")  # Subscribe to all
+        self._subscriber = ctx.socket(zmq.SUB)
+        self._subscriber.connect(url)
+        self._subscriber.setsockopt(zmq.SUBSCRIBE, b"")  # Subscribe to all
 
-        self.time_before_dead_s = missed_beats_before_dead * beat_period_s
-        self.poll_timeout_ms = poll_timeout_ms
-        self.last_beat_ts = time.time()
+        self._time_before_dead_s = missed_beats_before_dead * beat_period_s
+        self._poll_timeout_ms = poll_timeout_ms
+        self._last_beat_ts = time.time()
+
         self.received_kill_signal = False
         self.received_first_beat = False
 
@@ -135,23 +138,28 @@ class HeartbeatListener:
             whether or not the Hearbeater is dead.
         """
         curr_ts = time.time()
-        if self.subscriber.poll(self.poll_timeout_ms, zmq.POLLIN):
-            msg = self.subscriber.recv(zmq.NOBLOCK)
+        if self._subscriber.poll(self._poll_timeout_ms, zmq.POLLIN):
+            msg = self._subscriber.recv(zmq.NOBLOCK)
             msg_enum = HBMessage(int.from_bytes(msg, 'big'))
             if msg_enum == HBMessage.HEARTBEAT:
                 self.received_first_beat = True
-                self.last_beat_ts = curr_ts
+                self._last_beat_ts = curr_ts
             elif msg_enum == HBMessage.KILL:
                 self.received_kill_signal = True
             else:
                 logger.warning("Received non-HBMessage message. Ignoring.")
 
-        if (curr_ts - self.last_beat_ts >= self.time_before_dead_s or
+        if (curr_ts - self._last_beat_ts >= self._time_before_dead_s or
                 self.received_kill_signal):
             return False
         return True
 
     def reset(self):
         """Reset internal logic following a restart of Heartbeater."""
-        self.last_beat_ts = time.time()
+        self._last_beat_ts = time.time()
         self.received_kill_signal = False
+
+
+def get_heartbeat_url(name: str):
+    """Create a hearbeat url, given a component name."""
+    return "ipc://" + tempfile.gettempdir() + '/' + name

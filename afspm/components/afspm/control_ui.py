@@ -12,7 +12,7 @@ from ...io import common
 from ...io.pubsub import subscriber as sub
 from ...io.control import client as ctrl_client
 
-from .component import AfspmComponent
+from ..component import AfspmComponentBase
 from ...io.protos.generated import control_pb2
 from ...io.protos.generated import scan_pb2
 
@@ -40,7 +40,7 @@ TOPICS_TO_SUB_KEY = 'topics_to_sub'
 ALL_TOPICS = ""
 
 
-class AfspmControlUI(AfspmComponent):
+class AfspmControlUI(AfspmComponentBase):
     """Simple UI class to present info from, and control, the afspm controller.
 
     This class will present a simple UI to show current ControlState/ScanState
@@ -57,9 +57,9 @@ class AfspmControlUI(AfspmComponent):
     I/O constituents).
 
     Attributes:
-        self.mode_buttons: a list of strings corresponding to the control mode
+        mode_buttons: a list of strings corresponding to the control mode
             buttons.
-        self.map_mode_button_to_mode
+        map_mode_button_to_mode
         ui_timeout_ms: the ui read timeout used to poll ui elements, in
             milliseconds.
     """
@@ -109,7 +109,7 @@ class AfspmControlUI(AfspmComponent):
 
     def _handle_ui_event_loop(self):
         #self.layout[ERROR_LOG_KEY].update(value="")  # Clear error log
-        event, values = self.window.read(timeout=self.ui_timeout_ms)
+        event, __ = self.window.read(timeout=self.ui_timeout_ms)
 
         req_methods = []
         req_args = []

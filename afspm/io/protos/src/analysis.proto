@@ -1,0 +1,50 @@
+/*
+  This file holds analysis message types.
+*/
+
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+import "geometry.proto";
+import "scan.proto";
+
+// TODO: Should be in metric!!! Not points 2d
+
+message SpatialROIWithScore {
+  optional float score = 1;
+  optional SpatialAspects spatial = 2;
+}
+
+/* List of scan ROIs with scores. */
+message SpatialROIWithScoreList {
+  repeated SpatialROIWithScore spatials = 1;
+
+  // UUID attributes for associated scan.
+  optional google.protobuf.Timestamp timestamp = 2;  // Should match scan timestamp
+  optional string channel = 3;  // Should match scan channel
+}
+
+// TODO: Standardize this better... See notes in geometry.proto
+message SpatialPoint {
+  optional Point2d point = 1;
+  optional string units = 2; // Units for y- and x- dimensions
+}
+
+message SpatialPointWithScore {
+  optional float score = 1;
+  optional SpatialPoint spatial = 2;
+}
+
+/* List of scan points with scores. */
+message SpatialPointWithScoreList {
+  repeated SpatialPointWithScore spatials = 1;
+
+  // UUID attributes for associated scan.
+  optional google.protobuf.Timestamp timestamp = 2;  // Should match scan timestamp
+  optional string channel = 3;  // Should match scan channel
+}
+
+// TODO: Introduce segmentation mask. Here, the data should be 3D
+// [y][x][c], with c being the class and the value being its probability.
+// For this, need to update DataAspects s.t. shape is Size3u and units is split
+// into data_units and 3rd dimension units.

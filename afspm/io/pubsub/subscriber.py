@@ -2,6 +2,7 @@
 
 from typing import Callable
 from collections.abc import Iterable
+from abc import ABC, abstractmethod
 import logging
 
 import zmq
@@ -15,7 +16,44 @@ from . import defaults
 logger = logging.getLogger(__name__)
 
 
-class Subscriber:
+class ABCSubscriber(ABC):
+    """Abstract subscriber class.
+
+    The main accessor is poll_and_store(), by which we check a subscriber node
+    for messages having been received. These are stored in the cache property.
+
+    There is a hardcoded KILL_SIGNAL which we check for. Its state is held in
+    the property shutdown_was_requested.
+    """
+
+    @abstractmethod
+    def poll_and_store(self) -> list[(str, Message)] | None:
+        """Receive message and store in cache.
+
+        Returns:
+            - A list of tuples containing the envelope key of th emessage
+                and the protobuf.Message received; or
+            - None, if no message received.
+        """
+
+    @property
+    @abstractmethod
+    def cache(self):
+        """Holds messages received, in mapping type.
+
+        We expect our cache to consist of:
+        - keys that are strings, equivalent to the topics we send.
+        - values that are iterables. So, even if only storing 1 object, make
+        sure it is in an iterable format.
+        """
+
+    @property
+    @abstractmethod
+    def shutdown_was_requested(self):
+        """Whether or not a kill signal has been received."""
+
+
+class Subscriber(ABCSubscriber):
     """Encapsulates subscriber node logic.
 
     More particularly, encapsulates:
@@ -23,34 +61,26 @@ class Subscriber:
     message we have received.
     - a caching mechanism, to store the results as we receive them.
 
-    The main accessor is recv(), though you can choose to grab the subscriber
-    socket directly for polling externally. In such a scenario, call
-    on_message_received() to handle message decoding and caching.
-
-    Regarding the cache: we expect our cache to consist of:
-    - keys that are strings, equivalent to the topics we send.
-    - values that are iterables. So, even if only storing 1 object, make sure
-    it is in an iterable format.
-
-    Lastly: we have a hardcoded KILL_SIGNAL which we check for. If this signal
-    is received, we set a member variable to hold this state, and a getter
-    method will return True.
+    The main accessor is poll_and_store(), though you can choose to grab the
+    _subscriber socket directly for polling externally. In such a scenario,
+    call _on_message_received() to handle message decoding and caching.
 
     Attributes:
-        sub_extract_proto: method which extracts the proto message from a
-            message received from the sub. It must therefore know the
-            topic-to-proto mapping.
-        extract_proto_kwargs: any additional arguments to be fed to
-            sub_extract_proto.
-        update_cache: method that updates our cache based on
-            the provided 'topic' and proto.
-        update_cache_kwargs: any additional arguments to be fed to
-            update_cache.
-        subscriber: the zmq SUB socket for connecting to the publisher.
         cache: the cache, where we store results according to update_cache.
         shutdown_was_requested: bool, indicating whether or not a kill signal
             has been received.
-        poll_timeout_ms: the poll timeout, in milliseconds. If None,
+
+        _sub_extract_proto: method which extracts the proto message from a
+            message received from the sub. It must therefore know the
+            topic-to-proto mapping.
+        _extract_proto_kwargs: any additional arguments to be fed to
+            sub_extract_proto.
+        _update_cache: method that updates our cache based on
+            the provided 'topic' and proto.
+        _update_cache_kwargs: any additional arguments to be fed to
+            update_cache.
+        _subscriber: the zmq SUB socket for connecting to the publisher.
+        _poll_timeout_ms: the poll timeout, in milliseconds. If None,
             we do not poll and do a blocking receive instead.
     """
 
@@ -70,76 +100,86 @@ class Subscriber:
                  poll_timeout_ms: int = common.POLL_TIMEOUT_MS):
         """Initializes the caching logic and subscribes.
 
-        Args:
-            sub_url: the address of the publisher we will subscribe to, in
-                zmq format.
+            Args:
+                sub_url: the address of the publisher we will subscribe to, in
+                    zmq format.
 
-            sub_extract_proto: method which extracts the proto message from a
-                message received from the sub. It must therefore know the
-                topic-to-proto mapping.
-            topics_to_sub: list of topics we wish to subscribe to.
-            update_cache: method that updates our cache based on
-                the provided 'topic' and proto.
-            ctx: zmq Context; if not provided, we will create a new instance.
-            extract_proto_kwargs: any additional arguments to be fed to
-                sub_extract_proto.
-            update_cache_kwargs: any additional arguments to be fed to
-                update_cache.
-            poll_timeout_ms: the poll timeout, in milliseconds. If None,
-                we do not poll and do a blocking receive instead.
+                sub_extract_proto: method which extracts the proto message from a
+                    message received from the sub. It must therefore know the
+                    topic-to-proto mapping.
+                topics_to_sub: list of topics we wish to subscribe to.
+                update_cache: method that updates our cache based on
+                    the provided 'topic' and proto.
+                ctx: zmq Context; if not provided, we will create a new
+                    instance.
+                extract_proto_kwargs: any additional arguments to be fed to
+                    sub_extract_proto.
+                update_cache_kwargs: any additional arguments to be fed to
+                    update_cache.
+                poll_timeout_ms: the poll timeout, in milliseconds. If None,
+                    we do not poll and do a blocking receive instead.
         """
-        self.sub_extract_proto = sub_extract_proto
-        self.extract_proto_kwargs = (extract_proto_kwargs if
-                                     extract_proto_kwargs else {})
-        self.update_cache = update_cache
-        self.update_cache_kwargs = (update_cache_kwargs if
-                                    update_cache_kwargs else {})
-        self.poll_timeout_ms = poll_timeout_ms
+        self._cache = {}
+        self._shutdown_was_requested = False
+
+        self._sub_extract_proto = sub_extract_proto
+        self._extract_proto_kwargs = (extract_proto_kwargs if
+                                      extract_proto_kwargs else {})
+        self._update_cache = update_cache
+        self._update_cache_kwargs = (update_cache_kwargs if
+                                     update_cache_kwargs else {})
+        self._poll_timeout_ms = poll_timeout_ms
 
         if not ctx:
             ctx = zmq.Context.instance()
 
-        self.subscriber = ctx.socket(zmq.SUB)
-        self.subscriber.connect(sub_url)
+        self._subscriber = ctx.socket(zmq.SUB)
+        self._subscriber.connect(sub_url)
 
         # Subscribe to all our topics
         for topic in topics_to_sub:
-            self.subscriber.setsockopt(zmq.SUBSCRIBE, topic.encode())
-        # Everyone *must* subscribe to the kill signal
-        self.subscriber.setsockopt(zmq.SUBSCRIBE, common.KILL_SIGNAL.encode())
+            self._subscriber.setsockopt(zmq.SUBSCRIBE, topic.encode())
 
-        self.cache = {}
-        self.shutdown_was_requested = False
+        # Everyone *must* subscribe to the kill signal
+        self._subscriber.setsockopt(zmq.SUBSCRIBE, common.KILL_SIGNAL.encode())
 
         common.sleep_on_socket_startup()
 
+    @property
+    def cache(self):
+        return self._cache
 
-    def poll_and_store(self) -> (str, Message):
+    @property
+    def shutdown_was_requested(self):
+        return self._shutdown_was_requested
+
+    def poll_and_store(self) -> list[(str, Message)] | None:
         """Receive message and store in cache.
 
-        We use a poll() first, to ensure there is a message to receive.
-        If self.poll_timeout_ms is None, we do a blocking receive.
+            We use a poll() first, to ensure there is a message to receive.
+            If self.poll_timeout_ms is None, we do a blocking receive.
 
-        Note: recv() *does not* handle KeyboardInterruption exceptions,
-        please make sure your calling code does.
+            Note: recv() *does not* handle KeyboardInterruption exceptions,
+            please make sure your calling code does.
 
-        Returns:
-            - a tuple containing the envelope/cache key of the message and
-                the protobuf.Message received; or
-            - None, if no message received.
+            Returns:
+                - a tuple containing the envelope/cache key of the message and
+                    the protobuf.Message received; or
+                - None, if no message received.
         """
         msg = None
-        if self.poll_timeout_ms:
-            if self.subscriber.poll(self.poll_timeout_ms, zmq.POLLIN):
-                msg = self.subscriber.recv_multipart(zmq.NOBLOCK)
+        if self._poll_timeout_ms:
+            if self._subscriber.poll(self._poll_timeout_ms, zmq.POLLIN):
+                msg = self._subscriber.recv_multipart(zmq.NOBLOCK)
         else:
-            msg = self.subscriber.recv_multipart()
+            msg = self._subscriber.recv_multipart()
 
         if msg:
-            return self.on_message_received(msg)
+            return self._on_message_received(msg)
         return None
 
-    def on_message_received(self, msg: list[bytes]) -> (str, Message):
+    def _on_message_received(self, msg: list[bytes]
+                             ) -> list[(str, Message)] | None:
         """Decode message and update cache.
 
         Args:
@@ -154,16 +194,38 @@ class Subscriber:
         envelope = msg[0].decode()
         if envelope == common.KILL_SIGNAL:
             logger.info("Shutdown was requested!")
-            self.shutdown_was_requested = True
+            self._shutdown_was_requested = True
             return None
 
-        proto = self.sub_extract_proto(msg, **self.extract_proto_kwargs)
+        proto = self._sub_extract_proto(msg, **self._extract_proto_kwargs)
         logger.debug("Message received %s", envelope)
-        self.update_cache(proto, self.cache,
-                          **self.update_cache_kwargs)
-        return envelope, proto
+        self._update_cache(proto, self._cache,
+                           **self._update_cache_kwargs)
+        return [(envelope, proto)]
 
 
-    def was_shutdown_requested(self):
-        """Returns if a shutdown was requested."""
-        return self.shutdown_was_requested
+class ComboSubscriber(ABCSubscriber):
+    """Contains multiple subscribers."""
+
+    def __init__(self, subs: list[Subscriber]):
+        self._subs = subs
+        self._cache = {}
+
+    def poll_and_store(self) -> list[(str, Message)] | None:
+        self._cache = {}
+        messages = []
+        for sub in self._subs:
+            msg = sub.poll_and_store()
+            if msg:
+                messages.extend(msg)
+            self._cache |= sub.cache  # Update combined cache!
+        return messages if len(messages) > 0 else None
+
+    @property
+    def shutdown_was_requested(self):
+        shutdowns_reqd = [sub.shutdown_was_requested for sub in self._subs]
+        return any(shutdowns_reqd)
+
+    @property
+    def cache(self):
+        return self._cache

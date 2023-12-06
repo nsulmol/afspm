@@ -4,7 +4,7 @@ import logging
 
 from google.protobuf.message import Message
 
-from afspm.components.afspm.component import AfspmComponent
+from afspm.components.component import AfspmComponent
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
 

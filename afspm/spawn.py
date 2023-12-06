@@ -9,7 +9,7 @@ import fire
 
 # TODO: Figure out why this can't be relative?
 from afspm.utils.parser import expand_variables_in_dict
-from afspm.components.afspm.monitor import AfspmComponentsMonitor
+from afspm.components.monitor import AfspmComponentsMonitor
 from afspm.utils.parser import construct_and_run_component
 
 
@@ -190,7 +190,7 @@ def _set_up_logging(log_file: str, log_to_stdout: bool, log_level: str):
     root = logging.getLogger(LOGGER_ROOT)
     log_level = LOG_LEVEL_STR_TO_VAL[log_level.upper()]
     root.setLevel(log_level)
-    formatter = logging.Formatter('%(asctime)s.%(msecs)03d- %(name)s - '
+    formatter = logging.Formatter('%(asctime)s - %(name)s - '
                                   '%(levelname)s:%(lineno)s - %(message)s')
 
     handlers = []

@@ -4,20 +4,19 @@ import logging
 import zmq
 from google.protobuf.message import Message
 
-from . import component as afspmc
+from .. import component as afspmc
 
 from ...io import common
 from ...io.pubsub import cache as pbc
 from ...io.control import router as ctrl_rtr
 
-from ...io.protos.generated import scan_pb2
 from ...io.protos.generated import control_pb2
 
 
 logger = logging.getLogger(__name__)
 
 
-class AfspmController(afspmc.AfspmComponent):
+class AfspmController(afspmc.AfspmComponentBase):
     """Manages communication between DeviceController and multiple clients.
 
     The AfspmController serves as an intermediary between the DeviceController
@@ -90,7 +89,7 @@ class AfspmController(afspmc.AfspmComponent):
         We check if the request was sent by a ControlClient, and advertise the
         fact via the publisher (i.e. pubsubcache).
         """
-        if self.router.was_shutdown_requested():
+        if self.router.shutdown_was_requested:
             logger.info("Shutdown requested, sending kill signal out.")
             self.pubsubcache.send_kill_signal()
             self.heartbeater.handle_closing()

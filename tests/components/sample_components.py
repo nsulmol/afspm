@@ -18,6 +18,7 @@ from afspm.io.control.router import ControlRouter
 
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
+from afspm.io.protos.generated import feedback_pb2
 
 
 logger = logging.getLogger(__name__)
@@ -60,6 +61,10 @@ class SampleDeviceController(DeviceController):
         self.dev_scan_params = scan_params
         return control_pb2.ControlResponse.REP_SUCCESS
 
+    def on_set_zctrl_params(self, zctrl_params: feedback_pb2.ZCtrlParameters
+                            ) -> control_pb2.ControlResponse:
+        return control_pb2.ControlResponse.REP_CMD_NOT_SUPPORTED
+
     def poll_scan_state(self) -> scan_pb2.ScanState:
         return self.dev_scan_state
 
@@ -68,6 +73,9 @@ class SampleDeviceController(DeviceController):
 
     def poll_scans(self) -> list[scan_pb2.Scan2d]:
         return [self.dev_scan] if self.dev_scan else []
+
+    def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
+        return feedback_pb2.ZCtrlParameters()
 
     def handle_operating_mode(self, set_value: str = None
                               ) -> (control_pb2.ControlResponse, str):
@@ -148,8 +156,8 @@ def device_controller_routine(pub_url, server_url, psc_url,
     devcon.run()
 
     # Forcing closure of bound sockets (for pytests)
-    pub.publisher.close()
-    server.server.close()
+    pub._publisher.close()
+    server._server.close()
 
 
 
@@ -171,5 +179,5 @@ def afspm_controller_routine(psc_url, pub_url, server_url, router_url,
     controller.run()
 
     # Forcing closure of bound sockets (for pytests)
-    psc.backend.close()
-    router.frontend.close()
+    psc._backend.close()
+    router._frontend.close()
