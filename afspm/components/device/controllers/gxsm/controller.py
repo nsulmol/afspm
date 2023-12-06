@@ -97,14 +97,16 @@ class GxsmController(DeviceController):
                       scan_params.spatial.units,
                       scan_params.spatial.units,
                       scan_params.spatial.units,
-                      scan_params.data.units,
-                      scan_params.data.units]
+                      None, None]
         gxsm_units = [self.gxsm_physical_units,
                       self.gxsm_physical_units,
                       self.gxsm_physical_units,
                       self.gxsm_physical_units,
-                      None, None]  # TODO: Update with data units
+                      None, None]
 
+        # Note: when setting scan params, data units don't matter! These
+        # are only important in explicit scans. When setting scan params,
+        # we only care about the data shape, which is pixel-units.
         if self._gxsm_set_list(attrs, vals, attr_units, gxsm_units):
             return control_pb2.ControlResponse.REP_SUCCESS
         return control_pb2.ControlResponse.REP_ATTRIB_ERROR
@@ -171,7 +173,7 @@ class GxsmController(DeviceController):
                                  fname, exc)
                     continue
                 scan = conv.convert_xarray_to_scan_pb2(
-                    ds[list(ds.data_vars)[0]])
+                    ds[list(ds.data_vars)[0]])  # Grabbing first data variable
                 scan.timestamp.FromDatetime(ts)
                 scans.append(scan)
             self.old_scans = scans
