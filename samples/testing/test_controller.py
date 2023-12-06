@@ -4,6 +4,7 @@ import logging
 import copy
 import pytest
 import zmq
+import time
 
 from google.protobuf.message import Message
 
@@ -28,27 +29,27 @@ def ctx():
     return zmq.Context.instance()
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def component_name():
     return "TestComponent"
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def timeout_ms():
     return 5000
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def scan_wait_ms():
     return 180000
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def psc_url():
     return "tcp://127.0.0.1:7778"
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def server_url():
     return "tcp://127.0.0.1:7777"
 
@@ -113,6 +114,20 @@ def assert_sub_received_proto(sub: Subscriber, proto: Message):
             == proto)
 
 
+def stop_client(client: ControlClient):
+    """Close client and wait a bit to ensure it closes.
+
+    This appears to be an issue with ZMQ, where the client is not killed
+    in time for the next test. This should not be an issue in the real world,
+    as we should be restarting the full process whenever we set up a component.
+
+    TODO: You should investigate this further. I hate magic sleeps :(.
+    """
+    client._close_client()
+    del client  # Explicitly kill to avoid zmq weirdness.
+    time.sleep(1)
+
+
 # -------------------- Tests -------------------- #
 def test_cancel_scan(client, default_control_state, component_name,
                      sub_scan, sub_scan_state, timeout_ms):
@@ -158,7 +173,7 @@ def test_cancel_scan(client, default_control_state, component_name,
                               scan_state_msg)
 
     assert not sub_scan_state.poll_and_store()
-    del client  # Explicitly kill to avoid zmq weirdness.
+    stop_client(client)
 
 
 def test_scan_params(client, default_control_state, component_name,
@@ -192,7 +207,8 @@ def test_scan_params(client, default_control_state, component_name,
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
     __, last_params = sub_scan_params.poll_and_store()
     assert last_params == initial_params
-    del client  # Explicitly kill to avoid zmq weirdness.
+
+    stop_client(client)
 
 
 def test_run_scan(client, default_control_state, component_name,
@@ -225,4 +241,5 @@ def test_run_scan(client, default_control_state, component_name,
     assert sub_scan.poll_and_store()
     scan_state_msg.scan_state = scan_pb2.ScanState.SS_FREE
     assert_sub_received_proto(sub_scan_state, scan_state_msg)
-    del client  # Explicitly kill to avoid zmq weirdness.
+
+    stop_client(client)
