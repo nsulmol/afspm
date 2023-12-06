@@ -62,7 +62,7 @@ class GxsmController(DeviceController):
 
     def on_start_scan(self):
         gxsm.startscan()
-        return  control_pb2.ControlResponse.REP_SUCCESS
+        return control_pb2.ControlResponse.REP_SUCCESS
 
     def on_stop_scan(self):
         gxsm.stopscan()
