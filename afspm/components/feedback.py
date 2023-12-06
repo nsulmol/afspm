@@ -224,14 +224,24 @@ class FeedbackAnalyzer(AfspmComponent):
 
     Attributes:
         config: AnalysisConfig, defining how the analysis should run.
+        _zctrl_params: store ZCtrlParams, as we only want to run our
+            analysis if the feedback is actually on.
     """
     def __init__(self, config: AnalysisConfig, **kwargs):
         self.config = config
+        self._zctrl_params = None
         super().__init__(**kwargs)
 
     def on_message_received(self, envelope: str, proto: Message):
         """Override to analyze received scans."""
-        if isinstance(proto, scan_pb2.Scan2d):
+        if isinstance(proto, feedback_pb2.ZCtrlParameters):
+            self._zctrl_params = proto
+        elif isinstance(proto, scan_pb2.Scan2d):
+            is_feedback_on = (self._zctrl_params and
+                              self._zctrl_params.feedbackOn)
+            if not is_feedback_on:
+                return
+
             res = analyze_feedback_on_scan(proto, self.config)
 
             # TODO: Consider proportion under threshold as well?
