@@ -1,4 +1,11 @@
-"""This test suite exists to validate device controller functionality."""
+"""This test suite exists to validate device controller functionality.
+
+Ideally, you should set your controller's scan parameters to scan quickly
+before running these tests. For example, increase your scan speed and
+decrease your ROI size to pass the test more quickly.
+
+Note that the scan_wait_ms is only 180s!
+"""
 
 import logging
 import copy
