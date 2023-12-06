@@ -15,6 +15,7 @@ from afspm.utils import units
 from afspm.utils import array_converters as conv
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
+from afspm.io.protos.generated import feedback_pb2
 
 import gxsm  # Dynamic DLL, so not in pyproject.
 from gxsmread import read
@@ -24,7 +25,16 @@ logger = logging.getLogger(__name__)
 
 
 class GxsmController(DeviceController):
-    """handles device communication with the gxsm3 controller.
+    """Handles device communication with the gxsm3 controller.
+
+    Note that GXSM does not currently feed the following info via its remote
+    API:
+    - Chosen physical units: this could be angstrom, nm, etc. This is set in
+    Preferences->User->User/XYUnit.
+    - Whether the z-control feedback is currently on/off. This is set in
+    DSP->Advanced->Z-Control->Enable feedback controller.
+
+    Since these cannot be set via the API, we read these via the constructor.
     """
 
     GET_FAILURE = '\x04'
@@ -35,6 +45,8 @@ class GxsmController(DeviceController):
     RES_X = 'PointsX'
     RES_Y = 'PointsY'
     SCAN_SPEED_UNITS_S = 'dsp-fbs-scan-speed-scan'
+    CP = 'dsp-fbs-cp'
+    CI = 'dsp-fbs-ci'
 
     STATE_RUNNING_THRESH = 0
     MOTOR_RUNNING_THRESH = -2
@@ -49,12 +61,15 @@ class GxsmController(DeviceController):
                  read_use_physical_units: bool = True,
                  read_allow_convert_from_metadata: bool = False,
                  read_simplify_metadata: bool = True,
-                 gxsm_physical_units: str = 'angstrom', **kwargs):
+                 gxsm_physical_units: str = 'angstrom',
+                 is_zctrl_feedback_on: bool = True, **kwargs):
         self.read_channels_config_path = read_channels_config_path
         self.read_use_physical_units = read_use_physical_units
         self.read_allow_convert_from_metadata = read_allow_convert_from_metadata
         self.read_simplify_metadata = read_simplify_metadata
-        self.gxsm_physical_units = gxsm_physical_units  # TODO: read from gxsm
+        self.gxsm_physical_units = gxsm_physical_units  # TODO: read from gxsm?
+        self.is_zctrl_feedback_on = is_zctrl_feedback_on  # TODO: read from gxsm?
+
         self.last_scan_fname = ''
         self.old_scans = []
 
@@ -94,6 +109,13 @@ class GxsmController(DeviceController):
             return control_pb2.ControlResponse.REP_SUCCESS
         return control_pb2.ControlResponse.REP_ATTRIB_ERROR
 
+    def on_set_zctrl_params(self, zctrl_params: feedback_pb2.ZCtrlParameters
+                            ) -> control_pb2.ControlResponse:
+        """Note: there is no error handling, so always return success."""
+        self._gxsm_set(self.CP, zctrl_params.proportionalGain)
+        self._gxsm_set(self.CI, zctrl_params.integralGain)
+        return control_pb2.ControlResponse.REP_SUCCESS
+
     def poll_scan_state(self) -> scan_pb2.ScanState:
         """Returns current scan state in accordance with system model."""
         # Note: updating self.scan_state is handled by the calling method
@@ -105,7 +127,6 @@ class GxsmController(DeviceController):
         return state
 
     def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
-        # TODO: Update to provide data units
         return self._get_current_scan_params(self.gxsm_physical_units)
 
     def poll_scans(self) -> [scan_pb2.Scan2d]:
@@ -157,14 +178,25 @@ class GxsmController(DeviceController):
             return scans
         return self.old_scans
 
+    def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
+        """Poll the controller for the current Z-Control parameters."""
+        return self._get_current_zctrl_params(self.is_zctrl_feedback_on)
+
+    @staticmethod
+    def _get_current_zctrl_params(is_zctrl_feedback_on: bool):
+        """Poll gxsm for current ZCtrl Params and fill object."""
+        zctrl_params = feedback_pb2.ZCtrlParameters()
+        zctrl_params.feedbackOn = is_zctrl_feedback_on
+        zctrl_params.proportionalGain = gxsm.get(GxsmController.CP)
+        zctrl_params.integralGain = gxsm.get(GxsmController.CI)
+        return zctrl_params
 
     # TODO: Should this just be poll_scan_params???
     @staticmethod
-    def _get_current_scan_params(gxsm_phys_units: str,
-                                 gxsm_data_units: str = ''):
+    def _get_current_scan_params(gxsm_phys_units: str
+                                 ) -> scan_pb2.ScanParameters:
         """Poll gxsm for current scan parameters and fill object."""
         scan_params = scan_pb2.ScanParameters2d()
-        # TODO: how to handle units??  For now, just send out how they are received?
         scan_params.spatial.roi.top_left.x = gxsm.get(GxsmController.TL_X)
         scan_params.spatial.roi.top_left.y = gxsm.get(GxsmController.TL_Y)
         scan_params.spatial.roi.size.x = gxsm.get(GxsmController.SZ_X)
@@ -174,7 +206,7 @@ class GxsmController(DeviceController):
         # Note: all gxsm attributes returned as float, must convert to int
         scan_params.data.shape.x = int(gxsm.get(GxsmController.RES_X))
         scan_params.data.shape.y = int(gxsm.get(GxsmController.RES_Y))
-        scan_params.data.units = gxsm_data_units
+        # Not setting data uits, as these are linked to scan channel
 
         return scan_params
 
