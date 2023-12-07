@@ -196,7 +196,7 @@ class GxsmController(DeviceController):
     # TODO: Should this just be poll_scan_params???
     @staticmethod
     def _get_current_scan_params(gxsm_phys_units: str
-                                 ) -> scan_pb2.ScanParameters:
+                                 ) -> scan_pb2.ScanParameters2d:
         """Poll gxsm for current scan parameters and fill object."""
         scan_params = scan_pb2.ScanParameters2d()
         scan_params.spatial.roi.top_left.x = gxsm.get(GxsmController.TL_X)
