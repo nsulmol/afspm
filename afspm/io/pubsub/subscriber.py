@@ -31,7 +31,7 @@ class ABCSubscriber(ABC):
         """Receive message and store in cache.
 
         Returns:
-            - A list of tuples containing the envelope key of th emessage
+            - A list of tuples containing the envelope key of the emessage
                 and the protobuf.Message received; or
             - None, if no message received.
         """
