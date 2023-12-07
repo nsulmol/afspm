@@ -85,6 +85,8 @@ class GxsmController(DeviceController):
 
     def on_set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
                            ) -> control_pb2.ControlResponse:
+        # We *must* set x-values before y-values, because gxsm will scale the
+        # linked y when its x is set. Somewhat confusing, in my opinion.
         attrs = [self.TL_X, self.TL_Y, self.SZ_X, self.SZ_Y, self.RES_X,
                  self.RES_Y]
         vals = [scan_params.spatial.roi.top_left.x,
@@ -114,8 +116,10 @@ class GxsmController(DeviceController):
     def on_set_zctrl_params(self, zctrl_params: feedback_pb2.ZCtrlParameters
                             ) -> control_pb2.ControlResponse:
         """Note: there is no error handling, so always return success."""
-        self._gxsm_set(self.CP, zctrl_params.proportionalGain)
+        # We *must* set CI before CP, because gxsm will scale CP when
+        # CI is set. Somewhat confusing, in my opinion.
         self._gxsm_set(self.CI, zctrl_params.integralGain)
+        self._gxsm_set(self.CP, zctrl_params.proportionalGain)
         return control_pb2.ControlResponse.REP_SUCCESS
 
     def poll_scan_state(self) -> scan_pb2.ScanState:
