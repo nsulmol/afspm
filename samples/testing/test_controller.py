@@ -134,6 +134,7 @@ def sub_scan_params(ctx, topics_scan_params, timeout_ms, psc_url):
                       poll_timeout_ms=timeout_ms)
 
 
+@pytest.fixture
 def sub_zctrl(ctx, topics_zctrl, timeout_ms, psc_url):
     return Subscriber(psc_url,
                       topics_to_sub=topics_zctrl,
@@ -174,6 +175,12 @@ def startup_grab_control(client: ControlClient,
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
 
+def end_test(client: ControlClient):
+    """Release control at end of test."""
+    rep = client.release_control()
+    assert rep == control_pb2.ControlResponse.REP_SUCCESS
+
+
 # -------------------- Tests -------------------- #
 def test_cancel_scan(client, default_control_state,
                      sub_scan, sub_scan_state, timeout_ms,
@@ -187,12 +194,12 @@ def test_cancel_scan(client, default_control_state,
         scan_state=scan_pb2.ScanState.SS_FREE)
 
     # Hack around, make poll short for this.
-    tmp_timeout_ms = sub_scan.poll_timeout_ms
-    sub_scan.poll_timeout_ms = timeout_ms
+    tmp_timeout_ms = sub_scan._poll_timeout_ms
+    sub_scan._poll_timeout_ms = timeout_ms
     assert not sub_scan.poll_and_store()
     assert_sub_received_proto(sub_scan_state,
                               scan_state_msg)
-    sub_scan.poll_timeout_ms = tmp_timeout_ms  # Return to prior
+    sub_scan._poll_timeout_ms = tmp_timeout_ms  # Return to prior
 
     logger.info("Next, validate that we can start a scan and are notified "
                 "scanning has begun.")
@@ -222,6 +229,7 @@ def test_cancel_scan(client, default_control_state,
                               scan_state_msg)
 
     assert not sub_scan_state.poll_and_store()
+    end_test(client)
     stop_client(client)
 
 
@@ -259,6 +267,7 @@ def test_scan_params(client, default_control_state,
     __, last_params = sub_scan_params.poll_and_store()
     assert last_params == initial_params
 
+    end_test(client)
     stop_client(client)
 
 
@@ -274,12 +283,12 @@ def test_run_scan(client, default_control_state,
         scan_state=scan_pb2.ScanState.SS_FREE)
 
     # Hack around, make poll short for this.
-    tmp_timeout_ms = sub_scan.poll_timeout_ms
-    sub_scan.poll_timeout_ms = timeout_ms
+    tmp_timeout_ms = sub_scan._poll_timeout_ms
+    sub_scan._poll_timeout_ms = timeout_ms
     assert not sub_scan.poll_and_store()
     assert_sub_received_proto(sub_scan_state,
                               scan_state_msg)
-    sub_scan.poll_timeout_ms = tmp_timeout_ms  # Return to prior
+    sub_scan._poll_timeout_ms = tmp_timeout_ms  # Return to prior
 
     logger.info("Next, validate that we can start a scan and are notified "
                 "scanning has begun.")
@@ -295,6 +304,7 @@ def test_run_scan(client, default_control_state,
     scan_state_msg.scan_state = scan_pb2.ScanState.SS_FREE
     assert_sub_received_proto(sub_scan_state, scan_state_msg)
 
+    end_test(client)
     stop_client(client)
 
 
@@ -328,4 +338,5 @@ def test_handle_zctrl(client, default_control_state,
     __, last_params = sub_zctrl.poll_and_store()
     assert last_params == initial_params
 
+    end_test(client)
     stop_client(client)
