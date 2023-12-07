@@ -30,7 +30,7 @@ from afspm.io.pubsub.subscriber import Subscriber
 from afspm.io.pubsub.logic import cache_logic as cl
 from afspm.io.control.client import ControlClient, AdminControlClient
 
-from afspm.components.afspm.component import AfspmComponent
+from afspm.components.component import AfspmComponent
 from afspm.components.afspm.controller import AfspmController
 
 from afspm.io.protos.generated import scan_pb2
@@ -41,20 +41,12 @@ from afspm.io.protos.generated import feedback_pb2
 logger = logging.getLogger(__name__)
 
 
-def pytest_addoption(parser):
-    parser.addoption("config_path", action="store", default="./config.toml",
-                     help="Path to config file, from which to load params.")
-
 
 # -------------------- Fixtures -------------------- #
 @pytest.fixture(scope="session")
-def config_path(request):
-    return request.config.get_option("--config_path")
-
-
-@pytest.fixture(scope="session")
 def config_dict(config_path):
-    return tomli.load(config_path)
+    with open(config_path, 'rb') as file:
+        return tomli.load(file)
 
 
 # --- General / Urls --- #
@@ -69,22 +61,22 @@ def component_name():
 
 
 @pytest.fixture(scope="module")
-def timeout_ms():
+def timeout_ms(config_dict):
     return config_dict['timeout_ms']
 
 
 @pytest.fixture(scope="module")
-def scan_wait_ms():
+def scan_wait_ms(config_dict):
     return config_dict['scan_wait_ms']
 
 
 @pytest.fixture(scope="module")
-def psc_url():
+def psc_url(config_dict):
     return config_dict['psc_url']
 
 
 @pytest.fixture(scope="module")
-def router_url():
+def router_url(config_dict):
     return config_dict['router_url']
 
 @pytest.fixture(scope="module")
