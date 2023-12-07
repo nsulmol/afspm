@@ -7,6 +7,7 @@ from google.protobuf.message import Message
 
 from ..protos.generated import scan_pb2
 from ..protos.generated import control_pb2
+from ..protos.generated import feedback_pb2
 
 
 logger = logging.getLogger(__name__)
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 # Only requests with objects linked need to be listed here.
 REQ_TO_OBJ_MAP = MappingProxyType({
     control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS: scan_pb2.ScanParameters2d(),
+    control_pb2.ControlRequest.REQ_SET_ZCTRL_PARAMS: feedback_pb2.ZCtrlParameters(),
     control_pb2.ControlRequest.REQ_REQUEST_CTRL:
         control_pb2.ControlMode.CM_UNDEFINED,
     control_pb2.ControlRequest.REQ_ADD_EXP_PRBLM:
