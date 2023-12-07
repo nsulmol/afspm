@@ -131,7 +131,7 @@ class ControlRouter:
                 control_mode of request and the one the ControlClient is
                 currently under.
         """
-        if self._client_in_control_id:
+        if self._client_in_control_id and self._client_in_control_id != client:
             logger.debug("%s requested control, but already under control",
                          client)
             return control_pb2.ControlResponse.REP_ALREADY_UNDER_CONTROL
