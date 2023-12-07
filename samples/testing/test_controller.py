@@ -109,7 +109,7 @@ def topics_scan_state():
 
 @pytest.fixture(scope="module")
 def topics_zctrl():
-    return [cl.CacheLogic.get_envelope_for_proto(feedback_pb2.ZCtrlParameters)]
+    return [cl.CacheLogic.get_envelope_for_proto(feedback_pb2.ZCtrlParameters())]
 
 
 # --- I/O Classes (Subscribers, Clients) --- #
@@ -181,6 +181,13 @@ def end_test(client: ControlClient):
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
 
+def assert_and_return_message(sub: Subscriber):
+    """Assert that the subscriber received one message and return proto."""
+    messages = sub.poll_and_store()
+    assert len(messages) == 1
+    return messages[0][1]
+
+
 # -------------------- Tests -------------------- #
 def test_cancel_scan(client, default_control_state,
                      sub_scan, sub_scan_state, timeout_ms,
@@ -240,9 +247,7 @@ def test_scan_params(client, default_control_state,
                 "cache).")
     startup_grab_control(client, control_mode)
 
-    __, initial_params = sub_scan_params.poll_and_store()
-    assert initial_params
-
+    initial_params = assert_and_return_message(sub_scan_params)
     modified_params = copy.deepcopy(initial_params)
     modified_params.spatial.roi.top_left.x *= 1.1
     modified_params.spatial.roi.top_left.y *= 1.1
@@ -258,13 +263,13 @@ def test_scan_params(client, default_control_state,
 
     logger.info("Next, validate that our subscriber receives these new "
                 "params.")
-    __, last_params = sub_scan_params.poll_and_store()
+    last_params = assert_and_return_message(sub_scan_params)
     assert last_params == modified_params
 
     logger.info("Now, return to our initial parameters.")
     rep = client.set_scan_params(initial_params)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
-    __, last_params = sub_scan_params.poll_and_store()
+    last_params = assert_and_return_message(sub_scan_params)
     assert last_params == initial_params
 
     end_test(client)
@@ -316,8 +321,7 @@ def test_handle_zctrl(client, default_control_state,
     startup_grab_control(client, control_mode)
 
     logger.info("First, ensure we receive initial ZCtrlParams.")
-    __, initial_params = sub_zctrl.poll_and_store()
-    assert initial_params
+    initial_params = assert_and_return_message(sub_zctrl)
 
     modified_params = copy.deepcopy(initial_params)
     modified_params.proportionalGain *= 1.1
@@ -329,13 +333,13 @@ def test_handle_zctrl(client, default_control_state,
 
     logger.info("Next, validate that our subscriber receives these new "
                 "params.")
-    __, last_params = sub_zctrl.poll_and_store()
+    last_params = assert_and_return_message(sub_zctrl)
     assert last_params == modified_params
 
     logger.info("Now, return to our initial parameters.")
     rep = client.set_zctrl_params(initial_params)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
-    __, last_params = sub_zctrl.poll_and_store()
+    last_params = assert_and_return_message(sub_zctrl)
     assert last_params == initial_params
 
     end_test(client)
