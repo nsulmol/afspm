@@ -30,7 +30,7 @@ CONFIG_FILE = './config.toml'
 GXSM_ID = 'devcon'
 LOG_FILE = 'log.txt'
 LOG_TO_STDOUT = 'True'
-LOG_LEVEL = 'INFO'
+LOG_LEVEL = 'DEBUG'
 
 
 if __name__ == '__main__':
