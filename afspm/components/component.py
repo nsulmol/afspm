@@ -43,6 +43,7 @@ class AfspmComponentBase:
     for the duration of the experiment
 
     Attributes:
+        ctx: ZMQ context, kept so we can force-close everything when ending.
         name: the chosen component 'name'.
         heartbeater: Heatbeater instance, to send heartbeats to any monitoring
             listener.
@@ -80,6 +81,7 @@ class AfspmComponentBase:
         if not ctx:
             ctx = zmq.Context.instance()
 
+        self.ctx = ctx
         self.name = name
         hb_url = get_heartbeat_url(self.name)
         self.heartbeater = Heartbeater(hb_url, beat_period_s, ctx)
@@ -103,6 +105,9 @@ class AfspmComponentBase:
                 time.sleep(self.loop_sleep_s)
         except (KeyboardInterrupt, SystemExit):
             logger.warning("%s: Interrupt received. Stopping.", self.name)
+
+        # Terminate (not so gracefully)
+        self.ctx.destroy()
 
     def _handle_subscriber(self):
         """Poll subscriber and check for a shutdown request.

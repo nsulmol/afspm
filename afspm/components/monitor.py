@@ -212,6 +212,9 @@ class AfspmComponentsMonitor:
         except (KeyboardInterrupt, SystemExit):
             logger.warning("Interrupt received. Stopping.")
 
+        # Terminate not so gracefully
+        self.ctx.destroy()
+
     def run_per_loop(self):
         """The method that is run on every iteration of the main loop.
 
