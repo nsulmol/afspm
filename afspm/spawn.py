@@ -188,6 +188,10 @@ def _set_up_logging(log_file: str, log_to_stdout: bool, log_level: str):
         log_level: the log level to use. Default is INFO.
     """
     root = logging.getLogger(LOGGER_ROOT)
+
+    if root.hasHandlers():  # Delete existing handlers before adding ours
+        root.handlers.clear()
+
     log_level = LOG_LEVEL_STR_TO_VAL[log_level.upper()]
     root.setLevel(log_level)
     formatter = logging.Formatter('%(asctime)s - %(name)s - '
