@@ -26,12 +26,14 @@ import zmq
 
 from google.protobuf.message import Message
 
+from afspm.io import common
 from afspm.io.pubsub.subscriber import Subscriber
 from afspm.io.pubsub.logic import cache_logic as cl
 from afspm.io.control.client import ControlClient, AdminControlClient
 
 from afspm.components.component import AfspmComponent
 from afspm.components.afspm.controller import AfspmController
+from afspm.components.device import params
 
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
@@ -40,6 +42,10 @@ from afspm.io.protos.generated import feedback_pb2
 
 logger = logging.getLogger(__name__)
 
+
+# Constants for config
+PHYS_SIZE_KEY = 'phys_size_nm'
+DATA_SHAPE_KEY = 'data_shape'
 
 
 # -------------------- Fixtures -------------------- #
@@ -188,6 +194,78 @@ def assert_and_return_message(sub: Subscriber):
     return messages[0][1]
 
 
+# ----- test_run_scan specific methods ----- #
+def get_config_scan_time(config_dict: dict,
+                         client: ControlClient) -> (float, float) | None:
+    """Determines if we are initing scan time (for a faster scan).
+
+    Checks if a desired scan time was provided via the config, and the client
+    supports setting scan time. If so, we return the desired scan time and
+    the current/init scan time the device controller has set.
+
+    Args:
+        config_dict: configuration dictionary for our tests.
+        client: ControlClient we use to query the DeviceController.
+
+    Returns:
+        (float, float) tuple, containing (desired_val, init_val).
+    """
+    if params.DeviceParameters.SCAN_TIME_S in config_dict:
+        desired_param = config_dict[params.DeviceParameters.SCAN_TIME_S]
+        param_msg = control_pb2.ParameterMsg(
+            parameter=params.DeviceParameters.SCAN_TIME_S)
+        rep, init_scan_msg = client.request_parameter(param_msg)
+        if rep == control_pb2.ControlResponse.REP_SUCCESS:
+            return desired_param, float(init_scan_msg.value)
+        logger.info("Controller does not support setting/getting scan time, "
+                    "returned response: %s",
+                    common.get_enum_str(control_pb2.ControlResponse, rep))
+    return None
+
+
+def get_config_phys_size_nm(config_dict: dict) -> [float, float] | None:
+    """Returns desired physical size from config_dict, None if not set."""
+    if PHYS_SIZE_KEY in config_dict:
+        return config_dict[PHYS_SIZE_KEY]
+    return None
+
+
+def get_config_data_shape(config_dict: dict) -> [int, int] | None:
+    """Returns desired data shape from config_dict, None if not set."""
+    if DATA_SHAPE_KEY in config_dict:
+        return config_dict[DATA_SHAPE_KEY]
+    return None
+
+
+def set_scan_time(client: ControlClient, scan_time_s: float):
+    param_msg = control_pb2.ParameterMsg(
+        parameter=params.DeviceParameters.SCAN_TIME_S,
+        value=scan_time_s)
+
+    logger.info("Setting scan time to desired to: %s",
+                scan_time_s)
+    rep, return_msg = client.request_parameter(param_msg)
+    assert rep == control_pb2.ControlResponse.REP_SUCCESS
+
+
+def set_scan_params(client: ControlClient,
+                    orig_params: scan_pb2.ScanParameters2d,
+                    phys_size_nm: [float, float] | None,
+                    data_shape: [int, int] | None):
+    desired_params = copy.deepcopy(orig_params)
+    if phys_size_nm:
+        desired_params.spatial.roi.x = phys_size_nm[0]
+        desired_params.spatial.roi.y = phys_size_nm[1]
+    if data_shape:
+        desired_params.data.shape.x = data_shape[0]
+        desired_params.data.shape.y = data_shape[1]
+
+    logger.info("Setting scan params to: %s",
+                desired_params)
+    rep = client.set_scan_params(desired_params)
+    assert rep == control_pb2.ControlResponse.REP_SUCCESS
+
+
 # -------------------- Tests -------------------- #
 def test_cancel_scan(client, default_control_state,
                      sub_scan, sub_scan_state, timeout_ms,
@@ -277,10 +355,27 @@ def test_scan_params(client, default_control_state,
 
 
 def test_run_scan(client, default_control_state,
-                  sub_scan, sub_scan_state, timeout_ms,
-                  control_mode):
+                  sub_scan, sub_scan_state, sub_scan_params, timeout_ms,
+                  control_mode, config_dict):
     logger.info("Validate we can start a scan, and receive one on finish.")
-    logger.info("First, validate we *do not* have an initial scan (in the "
+
+    logger.info("First, check if we provided specific scan parameters "
+                "(so the scan is not super long)")
+    scan_time_tuple = get_config_scan_time(config_dict, client)
+    orig_scan_time_s = None
+    if scan_time_tuple:
+        orig_scan_time_s = scan_time_tuple[1]
+        set_scan_time(client, scan_time_tuple[0])
+
+    desired_phys_size_nm = get_config_phys_size_nm(config_dict)
+    desired_data_shape = get_config_data_shape(config_dict)
+    orig_scan_params = None
+    if desired_phys_size_nm or desired_data_shape:
+        orig_scan_params = assert_and_return_message(sub_scan_params)
+        set_scan_params(client, orig_scan_params, desired_phys_size_nm,
+                        desired_data_shape)
+
+    logger.info("Validate we *do not* have an initial scan (in the "
                 "cache), and *do* have an initial scan state (SS_FREE).")
     startup_grab_control(client, control_mode)
 
@@ -295,7 +390,7 @@ def test_run_scan(client, default_control_state,
                               scan_state_msg)
     sub_scan._poll_timeout_ms = tmp_timeout_ms  # Return to prior
 
-    logger.info("Next, validate that we can start a scan and are notified "
+    logger.info("Validate that we can start a scan and are notified "
                 "scanning has begun.")
     rep = client.start_scan()
     scan_state_msg = scan_pb2.ScanStateMsg(
@@ -303,11 +398,18 @@ def test_run_scan(client, default_control_state,
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
     assert_sub_received_proto(sub_scan_state, scan_state_msg)
 
-    logger.info("Lastly, wait for a predetermined 'long-enough' period, "
+    logger.info("Wait for a predetermined 'long-enough' period, "
                 "and validate the scan finishes.")
     assert sub_scan.poll_and_store()
     scan_state_msg.scan_state = scan_pb2.ScanState.SS_FREE
     assert_sub_received_proto(sub_scan_state, scan_state_msg)
+
+    if orig_scan_time_s or orig_scan_params:
+        logger.info("Reset our scan settings to what they were before this test.")
+        if orig_scan_time_s:
+            set_scan_time(client, orig_scan_time_s)
+        if orig_scan_params:
+            set_scan_params(client, orig_scan_params)
 
     end_test(client)
     stop_client(client)
