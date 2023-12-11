@@ -217,7 +217,7 @@ def get_config_scan_time(config_dict: dict,
         rep, init_scan_msg = client.request_parameter(param_msg)
         if rep == control_pb2.ControlResponse.REP_SUCCESS:
             return desired_param, float(init_scan_msg.value)
-        logger.info("Controller does not support setting/getting scan time, "
+        logger.info("Controller failed setting/getting scan time, "
                     "returned response: %s",
                     common.get_enum_str(control_pb2.ControlResponse, rep))
     return None
@@ -358,6 +358,7 @@ def test_run_scan(client, default_control_state,
                   sub_scan, sub_scan_state, sub_scan_params, timeout_ms,
                   control_mode, config_dict):
     logger.info("Validate we can start a scan, and receive one on finish.")
+    startup_grab_control(client, control_mode)
 
     logger.info("First, check if we provided specific scan parameters "
                 "(so the scan is not super long)")
@@ -377,8 +378,6 @@ def test_run_scan(client, default_control_state,
 
     logger.info("Validate we *do not* have an initial scan (in the "
                 "cache), and *do* have an initial scan state (SS_FREE).")
-    startup_grab_control(client, control_mode)
-
     scan_state_msg = scan_pb2.ScanStateMsg(
         scan_state=scan_pb2.ScanState.SS_FREE)
 
