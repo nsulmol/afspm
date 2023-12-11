@@ -257,6 +257,7 @@ def set_scan_params(client: ControlClient,
     if phys_size_nm:
         desired_params.spatial.roi.size.x = phys_size_nm[0]
         desired_params.spatial.roi.size.y = phys_size_nm[1]
+        desired_params.spatial.units = 'nm'
     if data_shape:
         desired_params.data.shape.x = data_shape[0]
         desired_params.data.shape.y = data_shape[1]
