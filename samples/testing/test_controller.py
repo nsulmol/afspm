@@ -45,8 +45,8 @@ logger = logging.getLogger(__name__)
 
 
 # Constants for config
-PHYS_SIZE_KEY = 'phys_size_nm'
-DATA_SHAPE_KEY = 'data_shape'
+PHYS_SIZE_KEY = 'phys-size-nm'
+DATA_SHAPE_KEY = 'data-shape'
 
 
 # -------------------- Fixtures -------------------- #

@@ -10,8 +10,16 @@ psc_url = 'tcp://127.0.0.1:7778'
 router_url = 'tcp://127.0.0.1:7779'
 
 # --- Timing --- #
+# Note: could make these shorter if using a short scan time.
 timeout_ms = 5000
 scan_wait_ms = 180000
+
+# --- (Optional) Scan Settings --- #
+# Parameters we try to set to, for a faster scan.
+# Uncomment if desired
+#scan-time-s = 10000
+#phys-size-nm = [36.0, 36.0]
+data-shape = [10, 10]
 
 
 # ----- PubSub ----- #
@@ -41,7 +49,6 @@ component = true
 class = 'afspm.components.device.controllers.gxsm.controller.GxsmController'
 publisher = 'pub'
 control_server = 'server'
-read_use_physical_units = 'False'
 
 [afspmcon]
 component = true
