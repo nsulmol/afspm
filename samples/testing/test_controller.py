@@ -17,6 +17,7 @@ before running these tests. For example, increase your scan speed and
 decrease your ROI size to pass the test more quickly.
 """
 
+from typing import Optional
 import logging
 import copy
 import time
@@ -196,7 +197,7 @@ def assert_and_return_message(sub: Subscriber):
 
 # ----- test_run_scan specific methods ----- #
 def get_config_scan_time(config_dict: dict,
-                         client: ControlClient) -> (float, float) | None:
+                         client: ControlClient) -> Optional[tuple[float, float]]:
     """Determines if we are initing scan time (for a faster scan).
 
     Checks if a desired scan time was provided via the config, and the client
@@ -210,10 +211,10 @@ def get_config_scan_time(config_dict: dict,
     Returns:
         (float, float) tuple, containing (desired_val, init_val).
     """
-    if params.DeviceParameters.SCAN_TIME_S in config_dict:
-        desired_param = config_dict[params.DeviceParameters.SCAN_TIME_S]
+    if params.DeviceParameter.SCAN_TIME_S in config_dict:
+        desired_param = config_dict[params.DeviceParameter.SCAN_TIME_S]
         param_msg = control_pb2.ParameterMsg(
-            parameter=params.DeviceParameters.SCAN_TIME_S)
+            parameter=params.DeviceParameter.SCAN_TIME_S)
         rep, init_scan_msg = client.request_parameter(param_msg)
         if rep == control_pb2.ControlResponse.REP_SUCCESS:
             return desired_param, float(init_scan_msg.value)
@@ -223,14 +224,14 @@ def get_config_scan_time(config_dict: dict,
     return None
 
 
-def get_config_phys_size_nm(config_dict: dict) -> [float, float] | None:
+def get_config_phys_size_nm(config_dict: dict) -> Optional[list[float, float]]:
     """Returns desired physical size from config_dict, None if not set."""
     if PHYS_SIZE_KEY in config_dict:
         return config_dict[PHYS_SIZE_KEY]
     return None
 
 
-def get_config_data_shape(config_dict: dict) -> [int, int] | None:
+def get_config_data_shape(config_dict: dict) -> Optional[list[int, int]]:
     """Returns desired data shape from config_dict, None if not set."""
     if DATA_SHAPE_KEY in config_dict:
         return config_dict[DATA_SHAPE_KEY]
@@ -239,7 +240,7 @@ def get_config_data_shape(config_dict: dict) -> [int, int] | None:
 
 def set_scan_time(client: ControlClient, scan_time_s: float):
     param_msg = control_pb2.ParameterMsg(
-        parameter=params.DeviceParameters.SCAN_TIME_S,
+        parameter=params.DeviceParameter.SCAN_TIME_S,
         value=scan_time_s)
 
     logger.info("Setting scan time to desired to: %s",
@@ -250,8 +251,8 @@ def set_scan_time(client: ControlClient, scan_time_s: float):
 
 def set_scan_params(client: ControlClient,
                     orig_params: scan_pb2.ScanParameters2d,
-                    phys_size_nm: [float, float] | None,
-                    data_shape: [int, int] | None):
+                    phys_size_nm: Optional[list[float, float]],
+                    data_shape: Optional[list[int, int]]):
     desired_params = copy.deepcopy(orig_params)
     if phys_size_nm:
         desired_params.spatial.roi.x = phys_size_nm[0]
