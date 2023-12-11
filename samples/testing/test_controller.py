@@ -251,12 +251,12 @@ def set_scan_time(client: ControlClient, scan_time_s: float):
 
 def set_scan_params(client: ControlClient,
                     orig_params: scan_pb2.ScanParameters2d,
-                    phys_size_nm: Optional[list[float, float]],
-                    data_shape: Optional[list[int, int]]):
+                    phys_size_nm: Optional[list[float, float]] = None,
+                    data_shape: Optional[list[int, int]] = None):
     desired_params = copy.deepcopy(orig_params)
     if phys_size_nm:
-        desired_params.spatial.roi.x = phys_size_nm[0]
-        desired_params.spatial.roi.y = phys_size_nm[1]
+        desired_params.spatial.roi.size.x = phys_size_nm[0]
+        desired_params.spatial.roi.size.y = phys_size_nm[1]
     if data_shape:
         desired_params.data.shape.x = data_shape[0]
         desired_params.data.shape.y = data_shape[1]
