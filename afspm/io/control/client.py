@@ -306,7 +306,8 @@ class AdminControlClient(ControlClient):
     same control protocol for ease/development convenience. Put another way:
     we are allowing the user of this tool to break this tool; be caferul!
     """
-    def set_control_mode(self, mode: control_pb2.ControlMode) -> control_pb2.ControlResponse:
+    def set_control_mode(self, mode: control_pb2.ControlMode
+                         ) -> control_pb2.ControlResponse:
         """Try to change the current control mode of the afspm system.
 
         Args:
