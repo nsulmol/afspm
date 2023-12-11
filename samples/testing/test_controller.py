@@ -272,10 +272,10 @@ def test_cancel_scan(client, default_control_state,
                      sub_scan, sub_scan_state, timeout_ms,
                      control_mode):
     logger.info("Validate we can start and cancel a scan.")
-    logger.info("First, validate we *do not* have an initial scan (in the "
-                "cache), and *do* have an initial scan state (SS_FREE).")
     startup_grab_control(client, control_mode)
 
+    logger.info("First, validate we *do not* have an initial scan (in the "
+                "cache), and *do* have an initial scan state (SS_FREE).")
     scan_state_msg = scan_pb2.ScanStateMsg(
         scan_state=scan_pb2.ScanState.SS_FREE)
 
@@ -322,10 +322,10 @@ def test_cancel_scan(client, default_control_state,
 def test_scan_params(client, default_control_state,
                      sub_scan_params, control_mode):
     logger.info("Validate we can set scan parameters.")
-    logger.info("First, validate we have initial scan params (from the "
-                "cache).")
     startup_grab_control(client, control_mode)
 
+    logger.info("First, validate we have initial scan params (from the "
+                "cache).")
     initial_params = assert_and_return_message(sub_scan_params)
     modified_params = copy.deepcopy(initial_params)
     modified_params.spatial.roi.top_left.x *= 1.1
@@ -419,7 +419,6 @@ def test_handle_zctrl(client, default_control_state,
                       sub_zctrl, timeout_ms,
                       control_mode):
     logger.info("Validate we recieve and can set ZCtrlParams.")
-
     startup_grab_control(client, control_mode)
 
     logger.info("First, ensure we receive initial ZCtrlParams.")
