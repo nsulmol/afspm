@@ -17,12 +17,6 @@ effect of this is that:
 - We cannot spawn a new process and expect 'import gxsm' to work; it won't!
 Therefore, we cannot use spawn_components(), as it places each component into
 its own process.
-
-- We *may* not be able to kill a new process via SIGINT. I'm not sure why this
-is, but it certainly does not seem possible with how the script is run now.
-Trying to ensure SIGINT is passed along via signal.signal() does not work,
-since it appears that our remote script is run within its own thread (python
-complains that signal.signal only works in main thread Python).
 """
 
 
