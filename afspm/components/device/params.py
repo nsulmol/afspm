@@ -33,12 +33,9 @@ class DeviceParameter(str, Enum):
     PLL_FB_PGAIN = 'freq-fb-pgain'
     PLL_FB_IGAIN = 'freq-fb-igain'
 
-    # Speed by which we run: how long we take scan a scanline.
-    # Converted to appropriate units based on controller's settings
-    # and units.
-    # NOTE: If a controller supports this, it should ensure it changes
-    # the speed whenever the scan dimensions are changed!
-    TIME_SCANLINE_S = 'time-scanline-s'
+    # Duration to scan one scanline, in one direction (forward or backward).
+    # Scanning in both forward and backward direction will take 2x this.
+    SCAN_TIME_S = 'scan-time-s'
 
 
 DESCRIPTIONS = {
@@ -77,7 +74,6 @@ DESCRIPTIONS = {
     "Gain of the proportional component. Units in X.",
     DeviceParameter.PLL_FB_IGAIN:
     "Gain of the integral component. Units in X.",
-    DeviceParameter.TIME_SCANLINE_S:
-    "Duration taken to scan a single scanline (alternative to speed). Units "
-    "in seconds."
+    DeviceParameter.SCAN_TIME_S:
+    "Duration taken to scan a single scanline (one direction). Units in secs."
 }
