@@ -30,7 +30,7 @@ REQ_TO_OBJ_MAP = MappingProxyType({
 })
 
 # Mapping from request to proto/enum *returned* from it (if applicable).
-# Only replies eith objects linked need to be listed here.
+# Only replies with objects linked need to be listed here.
 REQ_TO_RETURN_OBJ_MAP = MappingProxyType({
     control_pb2.ControlRequest.REQ_PARAM: control_pb2.ParameterMsg()
 })
@@ -93,7 +93,7 @@ def parse_response(req: control_pb2.ControlRequest,
     """
     rep = int.from_bytes(msg[0], 'big')
     obj = REQ_TO_RETURN_OBJ_MAP[req] if req in REQ_TO_RETURN_OBJ_MAP else None
-    if obj is not None:
+    if obj is not None and len(msg) > 1:  # If req failed, no obj passed
         if isinstance(obj, Message):
             obj.ParseFromString(msg[1])
         else:
