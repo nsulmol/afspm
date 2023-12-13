@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 # ----- Gxsm Params ----- #
-class GxsmParameter(enum.Enum, str):
+class GxsmParameter(str, enum.Enum):
     """Gxsm internal parameters."""
     TL_X = 'OffsetX'
     TL_Y = 'OffsetY'
