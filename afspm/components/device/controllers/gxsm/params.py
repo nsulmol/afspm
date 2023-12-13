@@ -171,7 +171,7 @@ def get_param_list(attrs: list[str]) -> list[str] | None:
     vals = []
     for attr in attrs:
         ret = get_param(attr)
-        if not ret:
+        if ret is not None:
             return None
         vals.append(ret)
     return vals
