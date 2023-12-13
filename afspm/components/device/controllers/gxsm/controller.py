@@ -141,7 +141,7 @@ class GxsmController(DeviceController):
         vals = get_param_list([GxsmParameter.TL_X, GxsmParameter.TL_Y,
                                GxsmParameter.SZ_X, GxsmParameter.SZ_Y,
                                GxsmParameter.RES_X, GxsmParameter.RES_Y])
-        if not vals:
+        if vals is None:
             msg = "Polling for scan params failed!"
             logger.error(msg)
             raise ParameterError(msg)
@@ -212,7 +212,7 @@ class GxsmController(DeviceController):
     def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
         """Poll the controller for the current Z-Control parameters."""
         vals = get_param_list([GxsmParameter.CP, GxsmParameter.CI])
-        if not vals:
+        if vals is None:
             msg = "Polling for CP/CI failed!"
             logger.error(msg)
             raise ParameterError(msg)
@@ -242,7 +242,7 @@ class GxsmController(DeviceController):
 
         # TODO: investigate motor logic further...
         val = get_param(GxsmParameter.MOTOR)
-        if not val:
+        if val is None:
             msg = "Failed querying gxsm for dsp-fbs-motor param."
             logger.error(msg)
             raise ParameterError(msg)

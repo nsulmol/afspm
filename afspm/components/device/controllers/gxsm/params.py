@@ -147,7 +147,7 @@ def get_param(attr: str) -> str | None:
     """Get gxsm parameter.
 
     Gets the current value for the provided parameter. On error, returns
-    REP_PARAM_ERROR.
+    None.
 
     Args:
         attr: name of the attribute, in gxsm terminology.

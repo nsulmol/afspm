@@ -257,63 +257,60 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         differently: any client should get all other changes *before* the
         state change.
         """
-        try:
-            old_scan_state = copy.deepcopy(self.scan_state)
-            self.scan_state = self.poll_scan_state()
+        old_scan_state = copy.deepcopy(self.scan_state)
+        self.scan_state = self.poll_scan_state()
 
-            if (old_scan_state == scan_pb2.ScanState.SS_SCANNING and
-                    self.scan_state != scan_pb2.ScanState.SS_SCANNING):
-                old_scans = copy.deepcopy(self.scans)
-                self.scans = self.poll_scans()
+        if (old_scan_state == scan_pb2.ScanState.SS_SCANNING and
+                self.scan_state != scan_pb2.ScanState.SS_SCANNING):
+            old_scans = copy.deepcopy(self.scans)
+            self.scans = self.poll_scans()
 
-                # If scans are different, assume now and send out!
-                # Test timestamps if they exist. Otherwise, compare
-                # data arrays.
-                send_scan = False
+            # If scans are different, assume now and send out!
+            # Test timestamps if they exist. Otherwise, compare
+            # data arrays.
+            send_scan = False
 
-                both_have_scans = len(self.scans) > 0 and len(old_scans) > 0
-                only_new_has_scans = (len(self.scans) > 0 and
-                                      len(old_scans) == 0)
-                timestamps_different = (
-                    both_have_scans and
-                    self.scans[0].HasField(self.TIMESTAMP_ATTRIB) and
-                    old_scans[0].HasField(self.TIMESTAMP_ATTRIB) and
-                    self.scans[0].timestamp != old_scans[0].timestamp)
-                values_different = (
-                    both_have_scans and self.scans[0].values !=
-                    old_scans[0].values)
+            both_have_scans = len(self.scans) > 0 and len(old_scans) > 0
+            only_new_has_scans = (len(self.scans) > 0 and
+                                    len(old_scans) == 0)
+            timestamps_different = (
+                both_have_scans and
+                self.scans[0].HasField(self.TIMESTAMP_ATTRIB) and
+                old_scans[0].HasField(self.TIMESTAMP_ATTRIB) and
+                self.scans[0].timestamp != old_scans[0].timestamp)
+            values_different = (
+                both_have_scans and self.scans[0].values !=
+                old_scans[0].values)
 
-                if (only_new_has_scans or (timestamps_different or
-                                           values_different)):
-                    send_scan = True
+            if (only_new_has_scans or (timestamps_different or
+                                        values_different)):
+                send_scan = True
 
-                if send_scan:
-                    logger.info("New scans, sending out.")
-                    for scan in self.scans:
-                        self.publisher.send_msg(scan)
+            if send_scan:
+                logger.info("New scans, sending out.")
+                for scan in self.scans:
+                    self.publisher.send_msg(scan)
 
-            old_scan_params = copy.deepcopy(self.scan_params)
-            self.scan_params = self.poll_scan_params()
-            if old_scan_params != self.scan_params:
-                logger.info("New scan_params, sending out.")
-                self.publisher.send_msg(self.scan_params)
+        old_scan_params = copy.deepcopy(self.scan_params)
+        self.scan_params = self.poll_scan_params()
+        if old_scan_params != self.scan_params:
+            logger.info("New scan_params, sending out.")
+            self.publisher.send_msg(self.scan_params)
 
-            old_zctrl_params = copy.deepcopy(self.zctrl_params)
-            self.zctrl_params = self.poll_zctrl_params()
-            if old_zctrl_params != self.zctrl_params:
-                logger.info("New zctrl_params, sending out.")
-                self.publisher.send_msg(self.zctrl_params)
+        old_zctrl_params = copy.deepcopy(self.zctrl_params)
+        self.zctrl_params = self.poll_zctrl_params()
+        if old_zctrl_params != self.zctrl_params:
+            logger.info("New zctrl_params, sending out.")
+            self.publisher.send_msg(self.zctrl_params)
 
-            # Scan state changes sent *last*!
-            if old_scan_state != self.scan_state:
-                logger.info("New scan state %s, sending out.",
-                            common.get_enum_str(scan_pb2.ScanState,
-                                                self.scan_state))
-                scan_state_msg = scan_pb2.ScanStateMsg(
-                    scan_state=self.scan_state)
-                self.publisher.send_msg(scan_state_msg)
-        except ParameterError:
-            logger.error("Parameter error caught, continuing.")
+        # Scan state changes sent *last*!
+        if old_scan_state != self.scan_state:
+            logger.info("New scan state %s, sending out.",
+                        common.get_enum_str(scan_pb2.ScanState,
+                                            self.scan_state))
+            scan_state_msg = scan_pb2.ScanStateMsg(
+                scan_state=self.scan_state)
+            self.publisher.send_msg(scan_state_msg)
 
     def _handle_incoming_requests(self):
         """Polls control_server for requests and responds to them."""
