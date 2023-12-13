@@ -151,7 +151,7 @@ class GxsmController(DeviceController):
         scan_params.spatial.roi.top_left.y = vals[1]
         scan_params.spatial.roi.size.x = vals[2]
         scan_params.spatial.roi.size.y = vals[3]
-        scan_params.spatial.units = self.gxsm_phys_units
+        scan_params.spatial.units = self.gxsm_physical_units
 
         # Note: all gxsm attributes returned as float, must convert to int
         scan_params.data.shape.x = int(vals[4])
