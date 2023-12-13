@@ -8,7 +8,11 @@ from google.protobuf.message import Message
 
 from afspm.components.device.controller import (DeviceController,
                                                 get_file_modification_datetime)
-from afspm.components.device.controllers.gxsm import params
+from afspm.components.device.controllers.gxsm.params import (
+    PARAM_METHOD_MAP, get_param_list, set_param_list, GxsmParameter,
+    get_param, set_param, handle_get_set_scan_time)
+from afspm.components.device.params import DeviceParameter
+
 
 from afspm.utils import units
 from afspm.utils import array_converters as conv
@@ -42,10 +46,6 @@ class GxsmController(DeviceController):
     MAX_NUM_CHANNELS = 6
     CHFNAME_ERROR_STR = 'EE: invalid channel'
 
-    PARAM_METHOD_MAP = {
-        params.DeviceParameter.SCAN_TIME_S: self.set_scan_time_s
-    }
-
     # NOTE: I'm thinking each side is responsible for converting the data to the
     # units they want
     def __init__(self,
@@ -65,7 +65,7 @@ class GxsmController(DeviceController):
         self.last_scan_fname = ''
         self.old_scans = []
 
-        self.param_method_map = params.PARAM_METHOD_MAP
+        self.param_method_map = PARAM_METHOD_MAP
         super().__init__(**kwargs)
 
     def on_start_scan(self):
@@ -80,8 +80,9 @@ class GxsmController(DeviceController):
                            ) -> control_pb2.ControlResponse:
         # We *must* set x-values before y-values, because gxsm will scale the
         # linked y when its x is set. Somewhat confusing, in my opinion.
-        attrs = [params.TL_X, params.TL_Y, params.SZ_X, params.SZ_Y,
-                 params.RES_X, params.RES_Y]
+        attrs = [GxsmParameter.TL_X, GxsmParameter.TL_Y,
+                 GxsmParameter.SZ_X, GxsmParameter.SZ_Y,
+                 GxsmParameter.RES_X, GxsmParameter.RES_Y]
         vals = [scan_params.spatial.roi.top_left.x,
                 scan_params.spatial.roi.top_left.y,
                 scan_params.spatial.roi.size.x,
@@ -99,10 +100,18 @@ class GxsmController(DeviceController):
                       self.gxsm_physical_units,
                       None, None]
 
+        # If scan time has been set previously, need to reset on scan params
+        # changing (since gxsm stores as scan speed).
+        if DeviceParameter.SCAN_TIME_S in self.set_param_map:
+            res, __ = handle_get_set_scan_time(
+                self.set_param_map[DeviceParameter.SCAN_TIME_S])
+            if res != control_pb2.ControlResponse.REP_SUCCESS:
+                return control_pb2.ControlResponse.REP_PARAM_ERROR
+
         # Note: when setting scan params, data units don't matter! These
         # are only important in explicit scans. When setting scan params,
         # we only care about the data shape, which is pixel-units.
-        if params.set_list(attrs, vals, attr_units, gxsm_units):
+        if set_param_list(attrs, vals, attr_units, gxsm_units):
             return control_pb2.ControlResponse.REP_SUCCESS
         return control_pb2.ControlResponse.REP_PARAM_ERROR
 
@@ -111,9 +120,10 @@ class GxsmController(DeviceController):
         """Note: there is no error handling, so always return success."""
         # We *must* set CI before CP, because gxsm will scale CP when
         # CI is set. Somewhat confusing, in my opinion.
-        if params.set_param_list([self.CI, self.CP],
-                                 [zctrl_params.integralGain,
-                                  zctrl_params.proportionalGain]):
+        nones = [None, None]
+        if set_param_list([GxsmParameter.CI, GxsmParameter.CP],
+                          [zctrl_params.integralGain,
+                           zctrl_params.proportionalGain], nones, nones):
             return control_pb2.ControlResponse.REP_SUCCESS
         return control_pb2.ControlResponse.REP_PARAM_ERROR
 
@@ -128,9 +138,9 @@ class GxsmController(DeviceController):
         return state
 
     def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
-        vals = params.get_param_list([params.TL_X, params.TL_Y,
-                                      params.SZ_X, params.SZ_Y,
-                                      params.RES_X, params.RES_Y])
+        vals = get_param_list([GxsmParameter.TL_X, GxsmParameter.TL_Y,
+                               GxsmParameter.SZ_X, GxsmParameter.SZ_Y,
+                               GxsmParameter.RES_X, GxsmParameter.RES_Y])
         if not vals:
             logger.error("Polling for scan params failed! Returning None.")
             return None
@@ -200,7 +210,7 @@ class GxsmController(DeviceController):
 
     def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
         """Poll the controller for the current Z-Control parameters."""
-        vals = params.get_param_list([params.CP, params.CI])
+        vals = get_param_list([GxsmParameter.CP, GxsmParameter.CI])
         if not vals:
             logger.error("Polling for CP/CI failed! Returning None.")
             return None
@@ -229,7 +239,7 @@ class GxsmController(DeviceController):
         moving = s & 16 > GxsmController.STATE_RUNNING_THRESH
 
         # TODO: investigate motor logic further...
-        val = params.get_param(params.MOTOR)
+        val = get_param(GxsmParameter.MOTOR)
         if not val:
             return None
 
