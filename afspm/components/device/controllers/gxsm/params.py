@@ -122,7 +122,7 @@ def set_param_list(attrs: list[str], vals: list[Any],
     """Convert a list of values to gxsm units and set them.
 
     Note: different from set_param in that we validate all conversions
-    can be doen *before* setting them.
+    can be done *before* setting them.
     """
     converted_vals = []
     for val, curr_unit, gxsm_unit in zip(vals, curr_units, gxsm_units):
@@ -132,7 +132,7 @@ def set_param_list(attrs: list[str], vals: list[Any],
                     units.convert(val, curr_unit, gxsm_unit))
             except UndefinedUnitError:
                 logger.error("Unable to convert %s from %s to %s.",
-                                val, curr_unit, gxsm_unit)
+                             val, curr_unit, gxsm_unit)
                 return False
         else:
             converted_vals.append(val)

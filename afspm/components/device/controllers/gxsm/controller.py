@@ -104,16 +104,18 @@ class GxsmController(DeviceController):
         # we only care about the data shape, which is pixel-units.
         if params.set_list(attrs, vals, attr_units, gxsm_units):
             return control_pb2.ControlResponse.REP_SUCCESS
-        return control_pb2.ControlResponse.REP_ATTRIB_ERROR
+        return control_pb2.ControlResponse.REP_PARAM_ERROR
 
     def on_set_zctrl_params(self, zctrl_params: feedback_pb2.ZCtrlParameters
                             ) -> control_pb2.ControlResponse:
         """Note: there is no error handling, so always return success."""
         # We *must* set CI before CP, because gxsm will scale CP when
         # CI is set. Somewhat confusing, in my opinion.
-        self._gxsm_set(self.CI, zctrl_params.integralGain)
-        self._gxsm_set(self.CP, zctrl_params.proportionalGain)
-        return control_pb2.ControlResponse.REP_SUCCESS
+        if params.set_param_list([self.CI, self.CP],
+                                 [zctrl_params.integralGain,
+                                  zctrl_params.proportionalGain]):
+            return control_pb2.ControlResponse.REP_SUCCESS
+        return control_pb2.ControlResponse.REP_PARAM_ERROR
 
     def poll_scan_state(self) -> scan_pb2.ScanState:
         """Returns current scan state in accordance with system model."""

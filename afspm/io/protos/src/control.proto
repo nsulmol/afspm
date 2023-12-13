@@ -33,7 +33,6 @@ enum ControlResponse {
     REP_WRONG_CONTROL_MODE = 5;
     REP_NOT_IN_CONTROL = 6;
     REP_NOT_FREE = 7;
-    REP_ATTRIB_ERROR = 8; // Could not perform action due to attribute error
     REP_PARAM_NOT_SUPPORTED = 9; // Parameter does not exist/could not be found.
     REP_PARAM_ERROR = 10; //  Trying to get/set the param failed.
 }
