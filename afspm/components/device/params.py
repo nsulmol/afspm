@@ -77,3 +77,8 @@ DESCRIPTIONS = {
     DeviceParameter.SCAN_TIME_S:
     "Duration taken to scan a single scanline (one direction). Units in secs."
 }
+
+
+class ParameterError(Exception):
+    """Controller failed at getting or setting a parameter."""
+    pass
