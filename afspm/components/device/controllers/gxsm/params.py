@@ -18,16 +18,18 @@ logger = logging.getLogger(__name__)
 
 
 # ----- Gxsm Params ----- #
-TL_X = 'OffsetX'
-TL_Y = 'OffsetY'
-SZ_X = 'RangeX'
-SZ_Y = 'RangeY'
-RES_X = 'PointsX'
-RES_Y = 'PointsY'
-SCAN_SPEED_UNITS_S = 'dsp-fbs-scan-speed-scan'
-CP = 'dsp-fbs-cp'
-CI = 'dsp-fbs-ci'
-MOTOR = 'dsp-fbs-motor'
+class GxsmParameter(enum.Enum, str):
+    """Gxsm internal parameters."""
+    TL_X = 'OffsetX'
+    TL_Y = 'OffsetY'
+    SZ_X = 'RangeX'
+    SZ_Y = 'RangeY'
+    RES_X = 'PointsX'
+    RES_Y = 'PointsY'
+    SCAN_SPEED_UNITS_S = 'dsp-fbs-scan-speed-scan'
+    CP = 'dsp-fbs-cp'
+    CI = 'dsp-fbs-ci'
+    MOTOR = 'dsp-fbs-motor'
 
 
 GET_FAILURE = '\x04'
@@ -71,43 +73,43 @@ def handle_get_set_scan_time(val: Optional[str] = None
                              ) -> (control_pb2.ControlResponse, str):
     """Get/set scantime."""
     if val:
-        val = scantime_to_scan_speed(val)
-    res = handle_get_set(SCAN_SPEED_UNITS_S, val)
-    return res[0], scan_speed_to_scantime(res[1])
+        val = scan_time_to_scan_speed(val)
+    res = handle_get_set(GxsmParameter.SCAN_SPEED_UNITS_S, val)
+    return res[0], scan_speed_to_scan_time(res[1])
 
 
-def scantime_to_scan_speed(val: float) -> float:
+def scan_time_to_scan_speed(val: float) -> float:
     """Converts from s / scanline to units / s."""
-    scanline_size = gxsm.get(SZ_X)
+    scanline_size = gxsm.get(GxsmParameter.SZ_X)
     return pow(scanline_size * val, -1)
 
 
-def scan_speed_to_scantime(val: float) -> float:
+def scan_speed_to_scan_time(val: float) -> float:
     """Converts from units / s to s / scanline.
 
     Same as prior, copying for ease.
     """
-    return scantime_to_scan_speed(val)
+    return scan_time_to_scan_speed(val)
 
 
-def set_param(attr: str, val: Any, curr_units: str = None,
-              gxsm_units: str = None) -> bool:
+def set_param(attr: str, val: Any, curr_unit: str = None,
+              gxsm_unit: str = None) -> bool:
     """Convert a value to gxsm units and set it.
 
-    If curr_units and gxsm_units are provided, units.convert is used to try
+    If curr_unit and gxsm_unit are provided, units.convert is used to try
     and convert to desired units.
 
     Args:
         attr: name of the attribute, in gxsm terminology.
         val: optional value to set it to.
-        curr_units: units of provided value. optional.
-        gxsm_units: units gxsm expects for this value. optional.
+        curr_unit: unit of provided value. optional.
+        gxsm_unit: unit gxsm expects for this value. optional.
 
     """
-    if curr_units and gxsm_units and curr_units != gxsm_units:
+    if curr_unit and gxsm_unit and curr_unit != gxsm_unit:
         try:
-            val = units.convert(val, curr_units,
-                                gxsm_units)
+            val = units.convert(val, curr_unit,
+                                gxsm_unit)
         except UndefinedUnitError:
             logger.error("Unable to convert %s from %s to %s.",
                          val, curr_unit, gxsm_unit)
