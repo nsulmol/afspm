@@ -108,6 +108,12 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             set/get of that parameter. The method should accept an optional
             str input, corresponding to the 'set' value. If none is provided,
             only a 'get' is requested. We expect a (REP, str) as return val.
+        set_param_map: a mapping from param id to the last value that was set.
+            This is useful if you have to convert from DeviceController format
+            to some internal format, and change the parameter based on other
+            settings being set. E.g., in gxsm, scantime is stored as scan speed
+            (in units/s); thus, whenever the physical scan size is changed, we
+            need to update the scan speed.
     """
     TIMESTAMP_ATTRIB = 'timestamp'
     PARAM_VALUE_ATTRIB = 'value'
@@ -156,6 +162,7 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         self.zctrl_params = feedback_pb2.ZCtrlParameters()
 
         self.param_method_map = {}
+        self.set_param_map = {}
 
         # AfspmComponent constructor: no control_client provided, as that
         # logic is handled by the control_server.
@@ -348,12 +355,14 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             return (control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED,
                     param)
 
-        set_value = (param.value if param.HasField(self.PARAM_VALUE_ATTRIB)
-                     else None)
-        rep, new_val = self.param_method_map[param.parameter](set_value)
+        if param.HasField(self.PARAM_VALUE_ATTRIB):
+            self.set_param_map[param.parameter] = param.value  # Store set val
+            rep, new_val = self.param_method_map[param.parameter](param.value)
+        else:
+            rep, new_val = self.param_method_map[param.parameter]()
+
         if new_val:
             param.value = new_val
-
         return (rep, param)
 
     def run_per_loop(self):
