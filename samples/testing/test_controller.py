@@ -241,11 +241,11 @@ def get_config_data_shape(config_dict: dict) -> Optional[list[int, int]]:
 def set_scan_time(client: ControlClient, scan_time_s: float):
     param_msg = control_pb2.ParameterMsg(
         parameter=params.DeviceParameter.SCAN_TIME_S,
-        value=scan_time_s)
+        value=str(scan_time_s))
 
     logger.info("Setting scan time to desired to: %s",
                 scan_time_s)
-    rep, return_msg = client.request_parameter(param_msg)
+    rep, __ = client.request_parameter(param_msg)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
 
