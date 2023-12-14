@@ -73,20 +73,30 @@ def handle_get_set_scan_time(val: Optional[str] = None
                              ) -> (control_pb2.ControlResponse, str):
     """Get/set scantime."""
     if val:
+        logger.debug("Scantime to set: %s", val)
         val = scan_time_to_scan_speed(val)
+        logger.debug("Setting Scan speed: %s", val)
     res = handle_get_set(GxsmParameter.SCAN_SPEED_UNITS_S, val)
-    return res[0], scan_speed_to_scan_time(res[1])
+    logger.debug("Gotten scan speed: %s", res[1])
+    val = scan_speed_to_scan_time(res[1])
+    logger.debug("Gotten scantime: %s", val)
+    return res[0], val
 
 
-def scan_time_to_scan_speed(val: float) -> float:
-    """Converts from s / scanline to units / s."""
-    scanline_size = gxsm.get(GxsmParameter.SZ_X)
-    return pow(scanline_size * val, -1)
+def scan_time_to_scan_speed(val: str) -> str:
+    """Converts from s / scanline to units / s.
+
+    Receive and return in str; we do the conversion in float within.
+    """
+    # TODO: Does this support rotations??
+    scanline = gxsm.get(GxsmParameter.SZ_X)
+    return str(pow(float(val) / scanline, -1))
 
 
-def scan_speed_to_scan_time(val: float) -> float:
+def scan_speed_to_scan_time(val: str) -> str:
     """Converts from units / s to s / scanline.
 
+    Receive and return in str; we do the conversion in float within.
     Same as prior, copying for ease.
     """
     return scan_time_to_scan_speed(val)
