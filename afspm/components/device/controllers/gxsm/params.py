@@ -4,8 +4,6 @@ import enum
 import logging
 from typing import Optional, Any
 
-from pint import UndefinedUnitError
-
 from afspm.components.device import params
 from afspm.utils import units
 
@@ -111,43 +109,32 @@ def set_param(attr: str, val: Any, curr_unit: str = None,
 
     Args:
         attr: name of the attribute, in gxsm terminology.
-        val: optional value to set it to.
+        val: value to set it to.
         curr_unit: unit of provided value. optional.
         gxsm_unit: unit gxsm expects for this value. optional.
 
     """
-    if curr_unit and gxsm_unit and curr_unit != gxsm_unit:
-        try:
-            val = units.convert(val, curr_unit,
-                                gxsm_unit)
-        except UndefinedUnitError:
-            logger.error("Unable to convert %s from %s to %s.",
-                         val, curr_unit, gxsm_unit)
-            return False
+    val = units.convert(val, curr_unit, gxsm_unit)
+    if not val:
+        return False
+
     gxsm.set(attr, str(val))
     return True
 
 
 def set_param_list(attrs: list[str], vals: list[Any],
-                   curr_units: list[str | None],
-                   gxsm_units: list[str | None]) -> bool:
+                   curr_units: tuple[str | None],
+                   gxsm_units: tuple[str | None]) -> bool:
     """Convert a list of values to gxsm units and set them.
 
     Note: different from set_param in that we validate all conversions
     can be done *before* setting them.
     """
-    converted_vals = []
-    for val, curr_unit, gxsm_unit in zip(vals, curr_units, gxsm_units):
-        if curr_unit and gxsm_unit and curr_unit != gxsm_unit:
-            try:
-                converted_vals.append(
-                    units.convert(val, curr_unit, gxsm_unit))
-            except UndefinedUnitError:
-                logger.error("Unable to convert %s from %s to %s.",
-                             val, curr_unit, gxsm_unit)
-                return False
-        else:
-            converted_vals.append(val)
+
+    converted_vals = units.convert_list(vals, curr_units, gxsm_units)
+    if not converted_vals:
+        return False
+
     for val, attr in zip(converted_vals, attrs):
         gxsm.set(attr, str(val))
     return True
