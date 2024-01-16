@@ -99,18 +99,19 @@ def convert_python_path_to_igor_path(python_path: str) -> str:
 
 
 def create_call_string(method_name: str,
-                       param: Optional[float | str] = None) -> (str, str):
+                       params: Optional[tuple[float | str]] = None
+                       ) -> (str, str):
     """Create a JSON 'call string' for the provided method and params.
 
     Args:
         method_name: name of method to call, as a string.
-        param: parameter to send, if applicable.
+        params: parameters to send, if applicable.
 
     Returns:
         (message_id, json_encoded_str), where:
         - message_id is the id we have provided to this message. Used to
         ensure we grab the proper response (which will also have this id).
-        - json_encoded_str is the.. JSON encoded string of the call, in the
+        - json_encoded_str is the JSON encoded string of the call, in the
         format applicable for the zmq-xop interface.
     """
     message_id = _create_message_id()
@@ -118,8 +119,8 @@ def create_call_string(method_name: str,
                  MSG_ID_KEY: message_id}
 
     method_dict = {CALL_NAME_KEY: method_name}
-    if param:
-        method_dict[CALL_PARAMS_KEY] = [param]
+    if params:
+        method_dict[CALL_PARAMS_KEY] = list(params)
     structure[CALL_KEY] = method_dict
 
     return message_id, json.dumps(structure)

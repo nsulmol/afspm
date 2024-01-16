@@ -51,7 +51,7 @@ def expected_json():
 def test_create_call_string(sample_method_call, sample_method_param,
                             expected_json):
     err_code, json_str = xop.create_call_string(sample_method_call,
-                                                sample_method_param)
+                                                [sample_method_param])
     print(f"expected json: {expected_json}")
     print(f"calced json: {json_str}")
     assert json_str == expected_json
