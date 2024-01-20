@@ -1,6 +1,7 @@
 # afspm
 
 An Automation Framework for Scanning Probe Microscopy.
+
 TODO Finish me
 
 ## Set up and compile protobuffer files
@@ -12,7 +13,7 @@ We use Google protobuffers to serialize/deserialize data between the various sys
 Now, there is one aspect that could be construed as either a pro or con: *protobuf messages are not human readable*. While human readability is, in principle, a huge plus, it tends to go hand-in-hand with a lack of type safety/easy schema violations. What we mean by this: a user can easily unintentionally send a broken message when they are able to create it with a simple text editor. Thus, we will *accept* this 'con' given our perceived larger 'pro'.
 
 ### Set up Google Protobuf Compiler
-Download the protobuf compiler. The easiest way is to download the latest precompiled binaries from their releases: [[https://github.com/protocolbuffers/protobuf/releases][protobuf releases]].
+Download the protobuf compiler. The easiest way is to download the latest precompiled binaries from their releases: https://github.com/protocolbuffers/protobuf/releases.
 
 Once downloaded, you will need to copy the executable and included well-known types to appropriate locations (so they are automatically detected):
 - Copy/link/move the files in ./bin to /usr/local/bin.
