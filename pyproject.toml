@@ -3,7 +3,7 @@ name = "afspm"
 version = "0.1.0"
 description = "Automation Framework for SPM"
 authors = ["Nick Sullivan <nsulmol@gmail.com>"]
-license = "MIT"
+license = "GPL"
 readme = "README.org"
 
 [tool.poetry.dependencies]
