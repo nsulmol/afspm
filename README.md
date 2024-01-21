@@ -71,15 +71,13 @@ We will assume you are dealing in Python by default, since this whole project is
 
 ``` sh
   cd /path/to/afspm/afspm/
-  protoc --protoc_path=./io/protos/src --python_out=./io/protos/generated/ ./io/protos/src/*.proto
+  protoc --proto_path=./io/protos/src --python_out=./io/protos/generated/ ./io/protos/src/*.proto
   # Fix absolute to relative imports
   # Linux/Mac OSX:
   sed -i ./io/protos/generated/*_pb2.py -e 's/^import [^ ]*_pb2/from . \0/'
   # Windows (PowerShell):
   gci ./io/protos/generated/*_pb2.py -recurse | ForEach-Object { (Get-Content $_) | ForEach-Object { $_ -replace "^(import [^ ]*_pb2)", "from . `$0" } | Set-Content $_ }
 ```
-
-
 
 ### Unit testing
 
@@ -104,11 +102,14 @@ You can review some sample experiments in the samples directory.
 
 To start an experiment, you can call the 'spawn' command with a provided config file. Additionally, you can define the subset of components you wish to spawn; this allows components to be separated on different computers (if desired).
 
-You can find out the expected arguments for spawn by calling (in your virtual environment):
+You can find out the expected arguments for spawn by calling:
 
 ``` sh
-spawn --help
+spawn --help  # Already in virtual environment
+poetry run spawn --help  # Outside of virtual environment
 ```
+
+Note: if your experiment depends on local scripts, ensure you call your script within that directory (e.g. if you have an 'experiment.py' you will use, ensure it is in the directory where you call spawn; this assumes any class within is defined as "class = 'experiment.className' in your config.toml).
 
 Whenever spawn is run, a components monitor is created to monitor all spawned components. This monitor communicates with components over an ipc connection, expecting heartbeats at a regular cadence. If a component does not send a heartbeat in a pre-alloted time, the monitor assumes the component has crashed or is frozen, and proceeds to kill and restart it. Upon restart, 'sufficient' prior data sent to the component will be resent via a cache mechanism within the afspm controller, allowing the component to return to the previous state it was in and continue functioning. The definition of 'sufficient' data is defined by the user in their configuration file. In some cases, it may be as simple as sending the last scan, scan parameters, scan state, etc. However, for more complicated logic, a more involved cache will be necessary.
 
