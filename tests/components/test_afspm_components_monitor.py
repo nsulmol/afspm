@@ -7,7 +7,7 @@ import pytest
 import zmq
 
 from afspm.components.component import AfspmComponentBase
-from afspm.components.monitor import AfspmComponentsMonitor
+from afspm.components.monitor import AfspmComponentsMonitor, SPAWN_DELAY_S
 
 
 logger = logging.getLogger(__name__)
@@ -62,7 +62,7 @@ def time_to_wait_s(beat_period_s, missed_beats_before_dead):
 class CrashingComponent(AfspmComponentBase):
     """A simple component that crashes after some time."""
     def __init__(self, time_to_crash_s: float, **kwargs):
-        self.time_to_crash_s = time_to_crash_s
+        self.time_to_crash_s = SPAWN_DELAY_S + time_to_crash_s
         self.start_ts = time.time()
         super().__init__(**kwargs)
 
@@ -75,7 +75,7 @@ class CrashingComponent(AfspmComponentBase):
 class ExitingComponent(AfspmComponentBase):
     """A simple component that exits purposefully after some time."""
     def __init__(self, time_to_exit_s: float, **kwargs):
-        self.time_to_exit_s = time_to_exit_s
+        self.time_to_exit_s = SPAWN_DELAY_S + time_to_exit_s
         self.start_ts = time.time()
         super().__init__(**kwargs)
 

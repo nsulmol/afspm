@@ -15,6 +15,17 @@ from ..utils.parser import construct_and_run_component
 logger = logging.getLogger(__name__)
 
 
+# The amount of time we sleep between starting a process and returning
+# from the spawning method. We do this because we are using the 'spawn'
+# process approach of multiprocessing, which is slower to start than
+# a simple 'fork' (we cannot 'fork' on Windows). This keeps the system
+# behaviour consistent acros OSses, at the cost of a slower startup time
+# (1s per component).
+# Note: in the future, we could consider an OS-specific constant, as it seems
+# Windows is the slowest to start up.
+SPAWN_DELAY_S = 1.0
+
+
 class AfspmComponentsMonitor:
     """Monitoring class to startup components and restart them if they crash.
 
@@ -135,18 +146,13 @@ class AfspmComponentsMonitor:
         params_dict['ctx'] = None
         logger.info("Creating process for component %s", params_dict['name'])
 
-        # Force spawning to be consistent acros OSes.
+        # Force 'spawning' to be consistent acros OSes.
         ctx = mp.get_context('spawn')
         proc = ctx.Process(target=construct_and_run_component,
                            kwargs={'params_dict': params_dict},
                            daemon=True)  # Ensures we try to kill on main exit
         proc.start()
-
-        # Need to delay due to 'spawn' based multiprocessing. If this starts
-        # acting up, switch to 0.1s. Note: I hate magic numbers as much as
-        # the next guy, but this seems the easiest way to reliably wait until
-        # the process has started.
-        time.sleep(0.01)
+        time.sleep(SPAWN_DELAY_S)
         return proc
 
     @staticmethod
