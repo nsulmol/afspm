@@ -134,10 +134,19 @@ class AfspmComponentsMonitor:
         params_dict = copy.deepcopy(params_dict)
         params_dict['ctx'] = None
         logger.info("Creating process for component %s", params_dict['name'])
-        proc = mp.Process(target=construct_and_run_component,
-                          kwargs={'params_dict': params_dict},
-                          daemon=True)  # Ensures we try to kill on main exit
+
+        # Force spawning to be consistent acros OSes.
+        ctx = mp.get_context('spawn')
+        proc = ctx.Process(target=construct_and_run_component,
+                           kwargs={'params_dict': params_dict},
+                           daemon=True)  # Ensures we try to kill on main exit
         proc.start()
+
+        # Need to delay due to 'spawn' based multiprocessing. If this starts
+        # acting up, switch to 0.1s. Note: I hate magic numbers as much as
+        # the next guy, but this seems the easiest way to reliably wait until
+        # the process has started.
+        time.sleep(0.01)
         return proc
 
     @staticmethod
