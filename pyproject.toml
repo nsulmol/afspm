@@ -9,7 +9,10 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.9"
 xarray = "^2023.7.0"
-pyzmq = "^25.1.0"
+pyzmq = [
+      {version = "^25.1.0", markers = 'sys_platform != "win32"'},
+      {version = "~23.2.1", markers = 'sys_platform == "win32"'}
+]
 numpy = "^1.25.1"
 protobuf = "^4.23.4"
 fire = "^0.5.0"
