@@ -1,7 +1,6 @@
 """Base visualizer component to display scans from cache."""
 
 import logging
-from typing import Callable
 from enum import Enum
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,12 +18,14 @@ logger = logging.getLogger(__name__)
 
 class CacheMeaning(Enum):
     """Holds cache meaning for visualization purposes."""
+
     TEMPORAL = 1  # Only display the latest scan
     REGIONS = 2  # Treat all scans in cache key as regions.
 
 
 class VisualizationStyle(Enum):
     """Holds visualization style."""
+
     COLORMESH = 1  # xarray.plot.pcolormesh()
     IMSHOW = 2  # xarray.plot.imshow()
     CONTOUR = 3  # xarray.plot.countour()
@@ -88,6 +89,7 @@ class Visualizer(AfspmComponent):
         plt_figures_map: dictionary containing scan_envelope:pyplot_figure
             pairs. Part of matplotlib backend, used for visualization.
     """
+
     def __init__(self, list_keys: list[str] = [],
                  cache_meaning_list: list[str] = [],
                  scan_phys_origin_list: tuple[float, float] = [],
@@ -96,7 +98,7 @@ class Visualizer(AfspmComponent):
                  visualization_colormap_list: list[str] = [],
                  visualize_undeclared_scans: bool = True,
                  scan_id: str = SCAN_ID, **kwargs):
-        """ Initializes visualizer.
+        """Initialize visualizer.
 
         Primarily, it creats maps for the lists fed in. Note that we use lists
         because this makes it easier to expand variables in our config file
@@ -121,7 +123,6 @@ class Visualizer(AfspmComponent):
             visualize_undeclared_scans: see class attribute.
             scan_id: see class attribute.
         """
-
         # Validate lists match in size and populate map
         for vals_list in [cache_meaning_list, scan_phys_origin_list,
                           scan_phys_size_list, visualization_style_list,
@@ -138,7 +139,6 @@ class Visualizer(AfspmComponent):
             self.scan_phys_origin_map[key] = scan_phys_origin_list[idx]
             self.scan_phys_size_map[key] = scan_phys_size_list[idx]
 
-
             # Special cases since viz stuff can be None (using matplotlib
             # defaults).
             style = visualization_style_list[idx]
@@ -154,7 +154,7 @@ class Visualizer(AfspmComponent):
         super().__init__(**kwargs)
 
     def _set_up_visualization(self):
-        """Initializes plt and figures for each cache key provided."""
+        """Initialize plt and figures for each cache key provided."""
         for key in self.cache_meaning_map:
             if (self.cache_meaning_map[key].upper() ==
                     CacheMeaning.REGIONS.name and
@@ -170,7 +170,7 @@ class Visualizer(AfspmComponent):
         plt.show(block=False)
 
     def run(self):
-        """Overriding to set up visualization."""
+        """Override to set up visualization."""
         self._set_up_visualization()
         super().run()
 
@@ -246,7 +246,7 @@ class Visualizer(AfspmComponent):
             viz_method(ax=axes, cmap=cmap)
 
     def _create_regions_xarray(self, key: str) -> xr.DataArray:
-        """Creates a 'regions' xarray, for visualization.
+        """Create a 'regions' xarray, for visualization.
 
         A 'regions' image is an image where we merge all cached scans from a
         key, treating them as ROIs in a larger image. The scan_phys_origin and

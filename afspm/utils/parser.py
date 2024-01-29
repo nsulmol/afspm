@@ -28,7 +28,7 @@ CLASS_KEY = 'class'
 
 
 def expand_variables_in_dict(config_dict: dict) -> dict:
-    """Replaces any 'variable' values in a dict with their values.
+    """Replace any 'variable' values in a dict with their values.
 
     Given a dictionary of key:val pairs where some values correspond to other
     keys, this method will replace all variables with their value (in effect
@@ -121,14 +121,14 @@ def _expand_variables_list_recursively(config_dict: dict, in_list: list
         elif (isinstance(in_list[idx], str) and
               in_list[idx] in config_dict):  # Expand variable
             logger.debug("Expanding %s into %s.", in_list[idx],
-                        config_dict[in_list[idx]])
+                         config_dict[in_list[idx]])
             in_list[idx] = config_dict[in_list[idx]]
 
     return in_list
 
 
 def construct_and_run_component(params_dict: dict):
-    """Method to build and run an AfspmComponent, for use with multiprocess.
+    """Build and run an AfspmComponent, for use with multiprocess.
 
     This method functions as the process method fed to each mp.Process
     constructor, to start up a component and run it.
@@ -181,8 +181,8 @@ def construct_and_run_component(params_dict: dict):
         logger.exception(error)
 
 
-def _construct_component(params_dict: dict) -> Any:  # Fix typing here!!!
-    """Method to build a component from a dict of parameters.
+def _construct_component(params_dict: dict) -> Any:
+    """Build a component from a dict of parameters.
 
     See construct_and_run_component() for full documentation.
     """
@@ -261,7 +261,7 @@ def _evaluate_values_list_recursively(values_list: list) -> list:
 
 
 def _instantiate_classes_recursively(params_dict: dict) -> Any | dict:
-    """Recursively instantiate classes within a provided dict.
+    """Instantiate classes recursively within a provided dict.
 
     This method will recursively search through a dictionary, finding
     dictionaries containing a 'class' key and instantiating them using that
@@ -276,7 +276,6 @@ def _instantiate_classes_recursively(params_dict: dict) -> Any | dict:
         - The input dictionary, with all values handled, or
         - An instantiated class.
     """
-
     final_dict = {}
     for key in params_dict:
         if isinstance(params_dict[key], dict):  # Go deeper in 'tree'
@@ -388,7 +387,6 @@ def _import_from_string(obj_path: str) -> Any:
     Returns:
         The imported object.
     """
-
     top_mod_path, _, top_obj = obj_path.rpartition('.')
     sub_mod_path, _, sub_obj = top_mod_path.rpartition('.')
 

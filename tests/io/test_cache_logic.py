@@ -7,12 +7,12 @@ from collections import deque
 from afspm.io.pubsub.logic import cache_logic as cl
 from afspm.io.pubsub.logic import pbc_logic as pbc
 from afspm.io.protos.generated import scan_pb2
-from afspm.io.protos.generated import control_pb2
 
 
 @pytest.fixture
 def cache():
     return {}
+
 
 @pytest.fixture
 def proto_5nm():
@@ -21,12 +21,14 @@ def proto_5nm():
     proto.params.spatial.roi.size.x = 5
     return proto
 
+
 @pytest.fixture
 def proto_10nm():
     proto = scan_pb2.Scan2d()
     proto.channel = 'hammock'
     proto.params.spatial.roi.size.x = 10
     return proto
+
 
 @pytest.fixture
 def proto_5nm_hist():
@@ -148,7 +150,7 @@ def test_pbc_with_roi_logic(cache, proto_5nm, proto_10nm,
             assert cache_val == expected_hist[idx]
 
         tmp = copy.deepcopy(proto)
-        tmp.values.append(200) # Just differentiate from the end
+        tmp.values.append(200)  # Just differentiate from the end
 
         logic.update_cache(tmp, cache)
         # Append to end and remove first item (simulating deque)

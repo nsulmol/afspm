@@ -10,7 +10,7 @@ from . import commands as cmd
 from .. import common
 
 from ..protos.generated import control_pb2
-from ..protos.generated import scan_pb2
+
 
 logger = logging.getLogger(__name__)
 
@@ -257,7 +257,7 @@ class ControlRouter:
         return control_pb2.ControlResponse.REP_SUCCESS
 
     def _handle_end_experiment(self) -> control_pb2.ControlResponse:
-        """Ends the experiment.
+        """End the experiment.
 
         This call will update internal logic indicating a shutdown was
         requested. It may be used externally to shutdown/pass the request
@@ -300,8 +300,7 @@ class ControlRouter:
         return (control_pb2.ControlResponse.REP_NOT_IN_CONTROL, None)
 
     def poll_and_handle(self):
-        """Poll for ControlClient requests and handle.
-        """
+        """Poll for ControlClient requests and handle."""
         msg = None
         if self._poll_timeout_ms:
             if self._frontend.poll(self._poll_timeout_ms, zmq.POLLIN):
@@ -327,7 +326,7 @@ class ControlRouter:
                                           cmd.serialize_response(rep, obj))
 
     def get_control_state(self):
-        """Creates and returns a ControState instance from current state."""
+        """Create and return a ControState instance from current state."""
         state = control_pb2.ControlState()
         state.control_mode = self._control_mode
         if self._client_in_control_id:

@@ -13,6 +13,8 @@ from enum import Enum
 
 
 class DeviceParameter(str, Enum):
+    """Holds parameters that can be set."""
+
     OPERATING_MODE = 'operating-mode'
 
     # Note: Rest of Z Control Feedback is in feedback_pb2 message.
@@ -81,4 +83,5 @@ DESCRIPTIONS = {
 
 class ParameterError(Exception):
     """Controller failed at getting or setting a parameter."""
+
     pass

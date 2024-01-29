@@ -1,4 +1,4 @@
-"""Simple method using pint to convert"""
+"""Simple method using pint to convert units."""
 
 import logging
 from typing import Any
@@ -17,7 +17,7 @@ Q_ = ureg.Quantity
 
 
 def convert(val: Any, unit: str, desired_unit: str) -> Any:
-    """Uses pint to convert a value from one unit to another.
+    """Convert a value from one unit to another using pint.
 
     Args:
         val: input value, of a type that pint supports.

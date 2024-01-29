@@ -81,7 +81,7 @@ class ControlClient:
         common.sleep_on_socket_startup()
 
     def _init_client(self):
-        """Starts up (or restarts) the client socket."""
+        """Start up (or restarts) the client socket."""
         if self._client and not self._client.closed:
             logger.error("Client init, but exists and is not closed. "
                          "Do nothing.")
@@ -93,7 +93,7 @@ class ControlClient:
         self._client.connect(self._url)
 
     def _close_client(self):
-        """Closes the client socket."""
+        """Close the client socket."""
         self._client.setsockopt(zmq.LINGER, 0)
         self._client.close()
 
@@ -278,7 +278,7 @@ class ControlClient:
     def request_parameter(self, param: control_pb2.ParameterMsg
                           ) -> (control_pb2.ControlResponse,
                                 control_pb2.ParameterMsg):
-        """ Get or set a device parameter.
+        """Get or set a device parameter.
 
         Args:
             param: parameter message containing parameter to get/set and
@@ -306,6 +306,7 @@ class AdminControlClient(ControlClient):
     same control protocol for ease/development convenience. Put another way:
     we are allowing the user of this tool to break this tool; be caferul!
     """
+
     def set_control_mode(self, mode: control_pb2.ControlMode
                          ) -> control_pb2.ControlResponse:
         """Try to change the current control mode of the afspm system.

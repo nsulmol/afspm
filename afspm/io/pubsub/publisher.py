@@ -1,7 +1,6 @@
-""" Holds our Publisher logic."""
+"""Holds our Publisher logic."""
 
 from typing import Callable
-from collections.abc import Iterable
 import logging
 
 import zmq
@@ -36,7 +35,7 @@ class Publisher:
                  ctx: zmq.Context = None,
                  get_envelope_kwargs: dict =
                  defaults.PUBLISHER_ENVELOPE_KWARGS):
-        """ Initializes the publisher.
+        """Initialize the publisher.
 
         Args:
             url: our publishing address, in zmq format.
@@ -48,7 +47,7 @@ class Publisher:
         """
         self._get_envelope_for_proto = get_envelope_for_proto
         self._get_envelope_kwargs = (get_envelope_kwargs if get_envelope_kwargs
-                                    else {})
+                                     else {})
 
         if not ctx:
             ctx = zmq.Context.instance()
@@ -60,7 +59,7 @@ class Publisher:
         common.sleep_on_socket_startup()
 
     def send_msg(self, proto: Message):
-        """ Send message via publisher.
+        """Send message via publisher.
 
         It uses get_envelope_for_proto to determine the envelope of our
         message.
@@ -68,9 +67,8 @@ class Publisher:
         Args:
             proto: protobuf message to send.
         """
-
         envelope = self._get_envelope_for_proto(proto,
-                                               **self._get_envelope_kwargs)
+                                                **self._get_envelope_kwargs)
         logger.debug("Sending message %s", envelope)
         self._publisher.send_multipart([envelope.encode(),
                                        proto.SerializeToString()])

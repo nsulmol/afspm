@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 # ----- Gxsm Params ----- #
 class GxsmParameter(str, enum.Enum):
     """Gxsm internal parameters."""
+
     TL_X = 'OffsetX'
     TL_Y = 'OffsetY'
     SZ_X = 'RangeX'
@@ -49,7 +50,7 @@ class GxsmChannelIds(enum.Enum):
     OFF = -4
     ACTIVE = enum.auto()
     ON = enum.auto()
-    MATH =  enum.auto()
+    MATH = enum.auto()
     X = enum.auto()
     TOPO = enum.auto()
     MIX1 = enum.auto()
@@ -84,7 +85,7 @@ def handle_get_set_scan_time(val: Optional[str] = None
 
 
 def scan_time_to_scan_speed(val: str) -> str:
-    """Converts from s / scanline to units / s.
+    """Convert from s / scanline to units / s.
 
     Receive and return in str; we do the conversion in float within.
     """
@@ -94,7 +95,7 @@ def scan_time_to_scan_speed(val: str) -> str:
 
 
 def scan_speed_to_scan_time(val: str) -> str:
-    """Converts from units / s to s / scanline.
+    """Convert from units / s to s / scanline.
 
     Receive and return in str; we do the conversion in float within.
     Same as prior, copying for ease.

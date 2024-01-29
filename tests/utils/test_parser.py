@@ -56,6 +56,7 @@ def control_client_str():
 def sample_url():
     return 'inproc://banana'
 
+
 def test_import_from_string(control_client_str, sample_url):
     """Validate class importing ability."""
 
@@ -133,9 +134,11 @@ def afspm_component_params_dict():
         }
     }
 
+
 @pytest.fixture
 def scan_size():
     return [200, 200]
+
 
 @pytest.fixture
 def visualizer_params_dict(scan_size):

@@ -270,10 +270,12 @@ def _filter_requested_components(config_dict: dict,
 
 
 def cli_spawn():
+    """Call spawn via command-line interface."""
     fire.Fire(spawn_components)
 
 
 def cli_spawn_monitorless():
+    """Call spawn_monitorless via command-line interface."""
     fire.Fire(spawn_monitorless_component)
 
 

@@ -7,7 +7,8 @@ import logging
 
 
 def addLoggingLevel(levelName, levelNum, methodName=None):
-    """
+    """Add a new logging level to our logger, for filtering.
+
     Comprehensively adds a new logging level to the `logging` module and the
     currently configured logging class.
 
@@ -28,18 +29,19 @@ def addLoggingLevel(levelName, levelNum, methodName=None):
     >>> logging.getLogger(__name__).trace('that worked')
     >>> logging.trace('so did this')
     >>> logging.TRACE
-    5
-
     """
     if not methodName:
         methodName = levelName.lower()
 
     if hasattr(logging, levelName):
-        raise AttributeError('{} already defined in logging module'.format(levelName))
+        raise AttributeError('{} already defined in logging module'.format(
+            levelName))
     if hasattr(logging, methodName):
-        raise AttributeError('{} already defined in logging module'.format(methodName))
+        raise AttributeError('{} already defined in logging module'.format(
+            methodName))
     if hasattr(logging.getLoggerClass(), methodName):
-        raise AttributeError('{} already defined in logger class'.format(methodName))
+        raise AttributeError('{} already defined in logger class'.format(
+            methodName))
 
     # This method was inspired by the answers to Stack Overflow post
     # http://stackoverflow.com/q/2183233/2988730, especially
