@@ -1,4 +1,4 @@
-""" Holds our PubSubCache logic."""
+"""Holds our PubSubCache logic."""
 
 from typing import Callable
 from collections.abc import Iterable
@@ -93,7 +93,7 @@ class PubSubCache:
                  update_cache_kwargs: dict =
                  defaults.PUBSUBCACHE_UPDATE_CACHE_KWARGS,
                  poll_timeout_ms: int = common.POLL_TIMEOUT_MS):
-        """Initializes the caching logic and connects our nodes.
+        """Initialize the caching logic and connects our nodes.
 
         Args:
             url: the address of our publisher end, in zmq format.
@@ -149,10 +149,8 @@ class PubSubCache:
 
         common.sleep_on_socket_startup()
 
-
     def poll(self):
         """Poll and handle communication between pub and subs.
-
 
         Note: poll() *does not* handle KeyboardInterruption exceptions,
         please make sure your calling code does.
@@ -173,7 +171,6 @@ class PubSubCache:
         if self._frontend in events:
             msg = self._frontend.recv_multipart()
             self._on_message_received(msg)
-
 
     def _on_message_received(self, msg: list[bytes]):
         """Decode message, cache it, and pass on to subscribers.

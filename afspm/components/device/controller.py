@@ -116,6 +116,7 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             (in units/s); thus, whenever the physical scan size is changed, we
             need to update the scan speed.
     """
+
     TIMESTAMP_ATTRIB = 'timestamp'
     PARAM_VALUE_ATTRIB = 'value'
 
@@ -184,7 +185,6 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             control_pb2.ControlRequest.REQ_PARAM: self._handle_param_request,
         })
 
-
     @abstractmethod
     def on_start_scan(self) -> control_pb2.ControlResponse:
         """Handle a request to start a scan."""
@@ -250,7 +250,7 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         """
 
     def _handle_polling_device(self):
-        """Polls aspects of device, and publishes changes (including scans).
+        """Poll aspects of device, and publishes changes (including scans).
 
         Note: we expect scan state to be sent *last*, so that any client has
         the ability to validate the expected changes have taken effect. Put
@@ -313,7 +313,7 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             self.publisher.send_msg(scan_state_msg)
 
     def _handle_incoming_requests(self):
-        """Polls control_server for requests and responds to them."""
+        """Poll control_server for requests and responds to them."""
         req, proto = self.control_server.poll()
         if req:  # Ensure we received something
             # Refuse most requests while moving/scanning (not free)

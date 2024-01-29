@@ -64,7 +64,6 @@ def convert_xarray_to_scan_pb2(da: xr.DataArray) -> scan_pb2.Scan2d:
     Raises:
         None.
     """
-
     da_shape = geometry_pb2.Size2u(x=da.shape[0],
                                    y=da.shape[1])
 

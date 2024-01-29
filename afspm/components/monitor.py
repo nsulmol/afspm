@@ -3,7 +3,6 @@
 import copy
 import logging
 import time
-from typing import Callable
 import multiprocessing as mp
 import zmq
 
@@ -75,6 +74,7 @@ class AfspmComponentsMonitor:
         listeners_dict: a dict of the currently running HeartbeatListeners,
             with the component.name being used as a key.
     """
+
     def __init__(self,
                  component_params_dict: dict[str, dict],
                  poll_timeout_ms: int = common.POLL_TIMEOUT_MS,
@@ -193,7 +193,6 @@ class AfspmComponentsMonitor:
                 self.missed_beats_before_dead,
                 self.poll_timeout_ms, self.ctx)
 
-
             # wait until we get our first heartbeat
             is_alive = True
             while (not self.listeners[name].received_first_beat and is_alive):
@@ -214,7 +213,7 @@ class AfspmComponentsMonitor:
         return succeeded
 
     def run(self):
-        """Main loop."""
+        """Run the main loop."""
         logger.info("Starting main loop for components monitor.")
         continue_running = self._startup_processes_and_listeners()
         try:
@@ -231,7 +230,7 @@ class AfspmComponentsMonitor:
         self.ctx.destroy()
 
     def run_per_loop(self):
-        """The method that is run on every iteration of the main loop.
+        """Run on every iteration of the main loop.
 
         We monitor every listener to see if it's associated heartbeat indicates
         it has died/frozen. If it stopped intentionally, we get rid of our

@@ -1,4 +1,4 @@
-""" Holds our Subscriber logic."""
+"""Holds our Subscriber logic."""
 
 from typing import Callable
 from collections.abc import Iterable
@@ -98,26 +98,26 @@ class Subscriber(ABCSubscriber):
                  update_cache_kwargs: dict =
                  defaults.SUBSCRIBER_UPDATE_CACHE_KWARGS,
                  poll_timeout_ms: int = common.POLL_TIMEOUT_MS):
-        """Initializes the caching logic and subscribes.
+        """Initialize the caching logic and subscribes.
 
-            Args:
-                sub_url: the address of the publisher we will subscribe to, in
-                    zmq format.
+        Args:
+            sub_url: the address of the publisher we will subscribe to, in
+                zmq format.
 
-                sub_extract_proto: method which extracts the proto message from a
-                    message received from the sub. It must therefore know the
-                    topic-to-proto mapping.
-                topics_to_sub: list of topics we wish to subscribe to.
-                update_cache: method that updates our cache based on
-                    the provided 'topic' and proto.
-                ctx: zmq Context; if not provided, we will create a new
-                    instance.
-                extract_proto_kwargs: any additional arguments to be fed to
-                    sub_extract_proto.
-                update_cache_kwargs: any additional arguments to be fed to
-                    update_cache.
-                poll_timeout_ms: the poll timeout, in milliseconds. If None,
-                    we do not poll and do a blocking receive instead.
+            sub_extract_proto: method which extracts the proto message from a
+                message received from the sub. It must therefore know the
+                topic-to-proto mapping.
+            topics_to_sub: list of topics we wish to subscribe to.
+            update_cache: method that updates our cache based on
+                the provided 'topic' and proto.
+            ctx: zmq Context; if not provided, we will create a new
+                instance.
+            extract_proto_kwargs: any additional arguments to be fed to
+                sub_extract_proto.
+            update_cache_kwargs: any additional arguments to be fed to
+                update_cache.
+            poll_timeout_ms: the poll timeout, in milliseconds. If None,
+                we do not poll and do a blocking receive instead.
         """
         self._cache = {}
         self._shutdown_was_requested = False
@@ -147,25 +147,27 @@ class Subscriber(ABCSubscriber):
 
     @property
     def cache(self):
+        """Overload parent."""
         return self._cache
 
     @property
     def shutdown_was_requested(self):
+        """Overload parent."""
         return self._shutdown_was_requested
 
     def poll_and_store(self) -> list[(str, Message)] | None:
         """Receive message and store in cache.
 
-            We use a poll() first, to ensure there is a message to receive.
-            If self.poll_timeout_ms is None, we do a blocking receive.
+        We use a poll() first, to ensure there is a message to receive.
+        If self.poll_timeout_ms is None, we do a blocking receive.
 
-            Note: recv() *does not* handle KeyboardInterruption exceptions,
-            please make sure your calling code does.
+        Note: recv() *does not* handle KeyboardInterruption exceptions,
+        please make sure your calling code does.
 
-            Returns:
-                - a tuple containing the envelope/cache key of the message and
-                    the protobuf.Message received; or
-                - None, if no message received.
+        Returns:
+            - a tuple containing the envelope/cache key of the message and
+                the protobuf.Message received; or
+            - None, if no message received.
         """
         msg = None
         if self._poll_timeout_ms:
@@ -208,10 +210,12 @@ class ComboSubscriber(ABCSubscriber):
     """Contains multiple subscribers."""
 
     def __init__(self, subs: list[Subscriber]):
+        """Init combosubscriber."""
         self._subs = subs
         self._cache = {}
 
     def poll_and_store(self) -> list[(str, Message)] | None:
+        """Overload parent class."""
         self._cache = {}
         messages = []
         for sub in self._subs:
@@ -223,9 +227,11 @@ class ComboSubscriber(ABCSubscriber):
 
     @property
     def shutdown_was_requested(self):
+        """Overload parent class."""
         shutdowns_reqd = [sub.shutdown_was_requested for sub in self._subs]
         return any(shutdowns_reqd)
 
     @property
     def cache(self):
+        """Overload parent class."""
         return self._cache

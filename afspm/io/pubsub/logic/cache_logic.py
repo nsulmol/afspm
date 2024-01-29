@@ -1,10 +1,8 @@
 """Holds abc class and overarching helper methods for cache handling."""
 
-import string
-from typing import Mapping, Callable
+from typing import Mapping
 from abc import ABCMeta, abstractmethod
 from collections.abc import Iterable
-from collections import deque
 from google.protobuf.message import Message
 
 from ...protos.generated import scan_pb2
@@ -24,10 +22,12 @@ DEFAULT_PROTO_WITH_HIST_SEQ = ((scan_pb2.Scan2d(), 1),
 
 
 class CacheLogic(metaclass=ABCMeta):
-    """ Abstract class for cache logic.
+    """Abstract class for cache logic.
+
     This class defines the 3 expected methods for a CacheLogic class, which
     can be used by the equivalently named non-class methods.
     """
+
     @abstractmethod
     def extract_proto(self, msg: list[bytes]) -> Message:
         """Extract protobuf structure from provided message.
@@ -85,5 +85,6 @@ def update_cache(proto: Message, cache: dict[str, Iterable],
                  cache_logic: CacheLogic):
     """Non-class method for updating the cache for a particular proto.
 
-    see CacheLogic.update_cache() for more info."""
+    see CacheLogic.update_cache() for more info.
+    """
     cache_logic.update_cache(proto, cache)

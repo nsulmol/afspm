@@ -8,25 +8,17 @@ import pytest
 import zmq
 
 from google.protobuf.message import Message
-from google.protobuf.timestamp_pb2 import Timestamp
 
-from afspm.components.device.controller import DeviceController
 from afspm.components.device.params import DeviceParameter
 from afspm.components.afspm.controller import AfspmController
 from afspm.components.component import AfspmComponentBase
 
-
 from afspm.io import common
 from afspm.io.pubsub.subscriber import Subscriber
-from afspm.io.pubsub.publisher import Publisher
-from afspm.io.pubsub.cache import PubSubCache
 from afspm.io.pubsub.logic import cache_logic as cl
 from afspm.io.pubsub.logic import pbc_logic as pbc
 
-
-from afspm.io.control.server import ControlServer
-from afspm.io.control.router import ControlRouter
-from afspm.io.control.client import ControlClient, AdminControlClient
+from afspm.io.control.client import AdminControlClient
 
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
@@ -75,6 +67,7 @@ def default_control_state():
 @pytest.fixture(scope="module")
 def wait_count():
     return 3
+
 
 @pytest.fixture(scope="module")
 def wait_ms():

@@ -1,7 +1,6 @@
 """Tests main spawn logic."""
 
 import pytest
-import copy
 from afspm import spawn
 from afspm.utils.parser import expand_variables_in_dict
 
@@ -14,10 +13,6 @@ def good_monitor_dict():
             'missed_beats_before_dead': 2
         }
     }
-
-
-def test_set_up_logging():
-    b = 2
 
 
 @pytest.fixture

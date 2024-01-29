@@ -49,6 +49,7 @@ def pub(pub_url):
     return publisher.Publisher(pub_url,
                                cl.CacheLogic.get_envelope_for_proto)
 
+
 @pytest.fixture(scope="module")
 def topics_scan2d():
     return [cl.CacheLogic.get_envelope_for_proto(scan_pb2.Scan2d())]
@@ -106,6 +107,7 @@ def sub_scan_psc(ctx, psc_url, topics_scan2d, cache_kwargs, wait_ms):
         update_cache_kwargs=cache_kwargs,
         poll_timeout_ms=wait_ms)
 
+
 @pytest.fixture
 def sub_control_state_psc(ctx, psc_url, topics_control_state, cache_kwargs,
                           wait_ms):
@@ -117,6 +119,7 @@ def sub_control_state_psc(ctx, psc_url, topics_control_state, cache_kwargs,
         extract_proto_kwargs=cache_kwargs,
         update_cache_kwargs=cache_kwargs,
         poll_timeout_ms=wait_ms)
+
 
 @pytest.fixture
 def sample_scan():
@@ -216,6 +219,7 @@ def comm_pub(ctx, comm_url):
 def short_wait_ms():
     return common.POLL_TIMEOUT_MS
 
+
 @pytest.fixture(scope="module")
 def wait_count():
     return 3
@@ -269,6 +273,7 @@ def pubsubcache_routine(psc_url, pub_url, comm_url, short_wait_ms,
     logging.debug("Dying, closing sockets")
     # Close bound sockets
     psc._backend.close()
+
 
 @pytest.fixture
 def thread_psc(psc_url, pub_url, comm_url, short_wait_ms, ctx, wait_ms,
