@@ -30,18 +30,18 @@ from google.protobuf.message import Message
 from afspm.io import common
 from afspm.io.pubsub.subscriber import Subscriber
 from afspm.io.pubsub.logic import cache_logic as cl
-from afspm.io.control.client import ControlClient, AdminControlClient
+from afspm.io.control.client import ControlClient
 
-from afspm.components.component import AfspmComponent
-from afspm.components.afspm.controller import AfspmController
 from afspm.components.device import params
+from afspm.utils.log import LOGGER_ROOT
 
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
 from afspm.io.protos.generated import feedback_pb2
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(LOGGER_ROOT + '.samples.testing.test_controller.' +
+                           __name__)
 
 
 # Constants for config
@@ -86,6 +86,7 @@ def psc_url(config_dict):
 def router_url(config_dict):
     return config_dict['router_url']
 
+
 @pytest.fixture(scope="module")
 def control_mode():
     return control_pb2.ControlMode.CM_AUTOMATED
@@ -113,6 +114,7 @@ def topics_scan_params():
 @pytest.fixture(scope="module")
 def topics_scan_state():
     return [cl.CacheLogic.get_envelope_for_proto(scan_pb2.ScanStateMsg())]
+
 
 @pytest.fixture(scope="module")
 def topics_zctrl():
@@ -174,6 +176,7 @@ def stop_client(client: ControlClient):
     client._close_client()
     del client  # Explicitly kill to avoid zmq weirdness.
     time.sleep(1)
+
 
 def startup_grab_control(client: ControlClient,
                          control_mode: control_pb2.ControlMode.CM_AUTOMATED):
