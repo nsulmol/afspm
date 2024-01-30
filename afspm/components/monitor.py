@@ -3,6 +3,7 @@
 import copy
 import logging
 import time
+from typing import Callable
 import multiprocessing as mp
 import zmq
 
@@ -66,6 +67,10 @@ class AfspmComponentsMonitor:
         missed_beats_before_dead: how many missed beats we will allow
             before we consider the Heartbeater dead.
         loop_sleep_s: how many seconds we sleep for between every loop.
+        log_init_method: Callable to be run whenever a new AfspmComponent is
+            constructed in its own Process (to set up log parameters properly)
+            This is necessary since we use 'spawn' mode of Process creation.
+        log_init_args: arguments to pass to log_init_method.
         component_params_dict: a dict of the component constructor params, with
             the component.name being used as a key. The format of this dict
             is the same as the input provided to the constructor.
@@ -80,7 +85,9 @@ class AfspmComponentsMonitor:
                  poll_timeout_ms: int = common.POLL_TIMEOUT_MS,
                  loop_sleep_s: float = common.LOOP_SLEEP_S,
                  missed_beats_before_dead: int = common.BEATS_BEFORE_DEAD,
-                 ctx: zmq.Context = None):
+                 ctx: zmq.Context = None,
+                 log_init_method: Callable = None, log_init_args: tuple = None,
+                 ):
         """Initialize the components monitor.
 
         Args:
@@ -102,6 +109,8 @@ class AfspmComponentsMonitor:
         self.poll_timeout_ms = poll_timeout_ms
         self.loop_sleep_s = loop_sleep_s
         self.missed_beats_before_dead = missed_beats_before_dead
+        self.log_init_method = log_init_method
+        self.log_init_args = log_init_args
 
         self.component_processes = {}
         self.listeners = {}
@@ -124,7 +133,9 @@ class AfspmComponentsMonitor:
         # Not calling super().__del__() because there is no super.
 
     @staticmethod
-    def _startup_component(params_dict: dict) -> mp.Process:
+    def _startup_component(params_dict: dict,
+                           log_init_method: Callable = None,
+                           log_init_args: tuple = None) -> mp.Process:
         """Start up an AfspmComponent in a Process.
 
         Note: This method *does not* feed a zmq context! The zmq guide
@@ -138,6 +149,9 @@ class AfspmComponentsMonitor:
 
         Args:
             params_dict: dictionary of parameters to feed the constructor.
+            log_init_method: method to pass to Process, for setting up
+                logger properly.
+            log_init_args: arguments to pass to log_init_method.
 
         Returns:
             Process spawned.
@@ -148,8 +162,15 @@ class AfspmComponentsMonitor:
 
         # Force 'spawning' to be consistent acros OSes.
         ctx = mp.get_context('spawn')
+
+        kwargs_dict = {'params_dict': params_dict}
+        if log_init_method is not None:
+            kwargs_dict['log_init_method'] = log_init_method
+        if log_init_args is not None:
+            kwargs_dict['log_init_args'] = log_init_args
+
         proc = ctx.Process(target=construct_and_run_component,
-                           kwargs={'params_dict': params_dict},
+                           kwargs=kwargs_dict,
                            daemon=True)  # Ensures we try to kill on main exit
         proc.start()
         time.sleep(SPAWN_DELAY_S)
@@ -184,7 +205,8 @@ class AfspmComponentsMonitor:
         succeeded = True
         for name in self.component_params_dict:
             self.component_processes[name] = self._startup_component(
-                self.component_params_dict[name])
+                self.component_params_dict[name], self.log_init_method,
+                self.log_init_args)
             # Starting listener second because it will wait for startup
             # time (_startup_component() will not, due to it spawning a
             # process).

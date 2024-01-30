@@ -4,6 +4,22 @@ Taken directly from: https://stackoerflow.com/a/35804945.
 """
 
 import logging
+import sys
+from types import MappingProxyType  # Immutable dict
+
+
+LOGGER_ROOT = 'afspm'
+TRACE_LOG_LEVEL = logging.DEBUG - 5
+
+LOG_LEVEL_STR_TO_VAL = MappingProxyType({
+    'NOTSET': logging.NOTSET,
+    'TRACE': TRACE_LOG_LEVEL,
+    'DEBUG': logging.DEBUG,
+    'INFO': logging.INFO,
+    'WARNING': logging.WARNING,
+    'ERROR': logging.ERROR,
+    'CRITICAL': logging.CRITICAL
+})
 
 
 def addLoggingLevel(levelName, levelNum, methodName=None):
@@ -57,3 +73,35 @@ def addLoggingLevel(levelName, levelNum, methodName=None):
     setattr(logging, levelName, levelNum)
     setattr(logging.getLoggerClass(), methodName, logForLevel)
     setattr(logging, methodName, logToRoot)
+
+
+def set_up_logging(log_file: str, log_to_stdout: bool, log_level: str):
+    """Set up logging logic.
+
+    Args:
+        log_file: a file path to save the process log. Default is 'log.txt'.
+            To not log to file, set to None.
+        log_to_std_out: whether or not we print to std out as well. Default is
+            True.
+        log_level: the log level to use. Default is INFO.
+    """
+    root = logging.getLogger(LOGGER_ROOT)
+
+    if root.hasHandlers():  # Delete existing handlers before adding ours
+        root.handlers.clear()
+
+    log_level = LOG_LEVEL_STR_TO_VAL[log_level.upper()]
+    root.setLevel(log_level)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - '
+                                  '%(levelname)s:%(lineno)s - %(message)s')
+
+    handlers = []
+    if log_file:
+        handlers.append(logging.FileHandler(log_file))
+    if log_to_stdout:
+        handlers.append(logging.StreamHandler(sys.stdout))
+
+    for handler in handlers:
+        handler.setLevel(log_level)
+        handler.setFormatter(formatter)
+        root.addHandler(handler)

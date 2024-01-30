@@ -1,12 +1,10 @@
 """Visualizer that resets all scans in cache at an interval."""
 
 import logging
-from typing import Callable
-import numpy as np
 
 from google.protobuf.message import Message
 
-from afspm.spawn import LOGGER_ROOT
+from afspm.utils.log import LOGGER_ROOT
 from afspm.components.visualizer import Visualizer
 from afspm.io.protos.generated import scan_pb2
 

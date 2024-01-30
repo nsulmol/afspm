@@ -10,7 +10,7 @@ All other methods are used within these and thus private.
 import copy
 import logging
 from importlib import import_module
-from typing import Any
+from typing import Any, Callable
 
 
 logger = logging.getLogger(__name__)
@@ -90,7 +90,7 @@ def _expand_variables_recursively(config_dict: dict, sub_dict: dict) -> dict:
             elif (isinstance(sub_dict[key], str) and
                   sub_dict[key] in config_dict):  # Expand variable
                 logger.debug("Expanding %s into %s.", sub_dict[key],
-                            config_dict[sub_dict[key]])
+                             config_dict[sub_dict[key]])
                 sub_dict[key] = config_dict[sub_dict[key]]
             else:  # Copy value over (this is not a variable)
                 logger.trace("Keeping %s for key %s", sub_dict[key], key)
@@ -127,7 +127,9 @@ def _expand_variables_list_recursively(config_dict: dict, in_list: list
     return in_list
 
 
-def construct_and_run_component(params_dict: dict):
+def construct_and_run_component(params_dict: dict,
+                                log_init_method: Callable = None,
+                                log_init_args: tuple = None):
     """Build and run an AfspmComponent, for use with multiprocess.
 
     This method functions as the process method fed to each mp.Process
@@ -170,10 +172,18 @@ def construct_and_run_component(params_dict: dict):
     With this done, we can instantiate our actual AfspmComponent instance using
     a kwargs dict consisting of the other values in this params_dict.
 
+    Note: we also receive an optional log_init_method (and input args), to
+    initialize the logger of this new component.
+
     Args:
         params_dict: dictionary of parameters to feed the
             AfspmComponent's constructor.
+        log_init_method: optional method to run, to set up logging parameters.
+        log_init_args: optional arguments to pass to log_init_method.
     """
+    if log_init_method is not None and log_init_args is not None:
+        log_init_method(*log_init_args)
+
     try:
         component = _construct_component(params_dict)
         component.run()

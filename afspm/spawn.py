@@ -1,8 +1,6 @@
 """Top-level module, to spawn afspm components for an experiment."""
 
 import logging
-import sys
-from types import MappingProxyType  # Immutable dict
 
 import tomli
 import fire
@@ -11,25 +9,14 @@ import fire
 from afspm.utils.parser import expand_variables_in_dict
 from afspm.components.monitor import AfspmComponentsMonitor
 from afspm.utils.parser import construct_and_run_component
+from afspm.utils.log import set_up_logging
 
 
 logger = logging.getLogger(__name__)
 
 
-LOGGER_ROOT = 'afspm'
 IS_COMPONENT_KEY = 'component'
 MONITOR_KEY = 'afspm_components_monitor'
-TRACE_LOG_LEVEL = logging.DEBUG - 5
-
-LOG_LEVEL_STR_TO_VAL = MappingProxyType({
-    'NOTSET': logging.NOTSET,
-    'TRACE': TRACE_LOG_LEVEL,
-    'DEBUG': logging.DEBUG,
-    'INFO': logging.INFO,
-    'WARNING': logging.WARNING,
-    'ERROR': logging.ERROR,
-    'CRITICAL': logging.CRITICAL
-})
 
 
 def spawn_components(config_file: str,
@@ -108,7 +95,8 @@ def spawn_components(config_file: str,
             True.
         log_level: the log level to use. Default is INFO.
     """
-    _set_up_logging(log_file, log_to_stdout, log_level)
+    set_up_logging(log_file, log_to_stdout, log_level)
+    log_args = (log_file, log_to_stdout, log_level)
 
     monitor = None
     with open(config_file, 'rb') as file:
@@ -121,9 +109,13 @@ def spawn_components(config_file: str,
 
         if MONITOR_KEY in expanded_dict:
             monitor = AfspmComponentsMonitor(filtered_dict,
-                                             **expanded_dict[MONITOR_KEY])
+                                             **expanded_dict[MONITOR_KEY],
+                                             log_init_method=set_up_logging,
+                                             log_init_args=log_args)
         else:
-            monitor = AfspmComponentsMonitor(filtered_dict)
+            monitor = AfspmComponentsMonitor(filtered_dict,
+                                             log_init_method=set_up_logging,
+                                             log_init_args=log_args)
 
     if monitor:
         monitor.run()
@@ -155,7 +147,7 @@ def spawn_monitorless_component(config_file: str,
             True.
         log_level: the log level to use. Default is INFO.
     """
-    _set_up_logging(log_file, log_to_stdout, log_level)
+    set_up_logging(log_file, log_to_stdout, log_level)
 
     with open(config_file, 'rb') as file:
         config_dict = tomli.load(file)
@@ -175,38 +167,6 @@ def spawn_monitorless_component(config_file: str,
 
         logger.info("Creating process for component %s", component_to_spawn)
         construct_and_run_component(filtered_dict[keys[0]])
-
-
-def _set_up_logging(log_file: str, log_to_stdout: bool, log_level: str):
-    """Set up logging logic.
-
-    Args:
-        log_file: a file path to save the process log. Default is 'log.txt'.
-            To not log to file, set to None.
-        log_to_std_out: whether or not we print to std out as well. Default is
-            True.
-        log_level: the log level to use. Default is INFO.
-    """
-    root = logging.getLogger(LOGGER_ROOT)
-
-    if root.hasHandlers():  # Delete existing handlers before adding ours
-        root.handlers.clear()
-
-    log_level = LOG_LEVEL_STR_TO_VAL[log_level.upper()]
-    root.setLevel(log_level)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - '
-                                  '%(levelname)s:%(lineno)s - %(message)s')
-
-    handlers = []
-    if log_file:
-        handlers.append(logging.FileHandler(log_file))
-    if log_to_stdout:
-        handlers.append(logging.StreamHandler(sys.stdout))
-
-    for handler in handlers:
-        handler.setLevel(log_level)
-        handler.setFormatter(formatter)
-        root.addHandler(handler)
 
 
 def _filter_requested_components(config_dict: dict,

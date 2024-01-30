@@ -4,12 +4,13 @@ import logging
 
 from google.protobuf.message import Message
 
+from afspm.utils.log import LOGGER_ROOT
 from afspm.components.component import AfspmComponent
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(LOGGER_ROOT + '.samples.grid_subscan.' + __name__)
 
 
 class FreqTriggerTipDetector(AfspmComponent):
