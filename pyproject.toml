@@ -23,6 +23,7 @@ pint = "^0.22"
 gxsmread = {path = "../gxsmread", optional = true, extras = ["gxsm"]}
 scipy = "^1.12.0"
 matplotlib = "^3.8.2"
+colorlog = "^6.8.2"
 
 [tool.poetry.group.dev.dependencies]
 debugpy = "^1.6.7"

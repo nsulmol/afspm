@@ -4,6 +4,7 @@ Taken directly from: https://stackoerflow.com/a/35804945.
 """
 
 import logging
+from colorlog import ColoredFormatter
 import sys
 from types import MappingProxyType  # Immutable dict
 
@@ -92,8 +93,10 @@ def set_up_logging(log_file: str, log_to_stdout: bool, log_level: str):
 
     log_level = LOG_LEVEL_STR_TO_VAL[log_level.upper()]
     root.setLevel(log_level)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - '
-                                  '%(levelname)s:%(lineno)s - %(message)s')
+    formatter = ColoredFormatter(
+        '%(asctime)s | %(name)s | '
+        '%(log_color)s%(levelname)s%(reset)s:%(lineno)s | '
+        '%(log_color)s%(message)s%(reset)s')
 
     handlers = []
     if log_file:
