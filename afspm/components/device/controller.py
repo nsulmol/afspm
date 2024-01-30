@@ -10,7 +10,6 @@ from types import MappingProxyType
 import zmq
 from google.protobuf.message import Message
 
-from .params import ParameterError
 from .. import component as afspmc
 
 from ...io import common

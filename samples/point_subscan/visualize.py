@@ -1,4 +1,4 @@
-"""COntains methods for visualizing our experiment."""
+"""Contains methods for visualizing our experiment."""
 
 import logging
 from dataclasses import dataclass
