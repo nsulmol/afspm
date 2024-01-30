@@ -93,18 +93,26 @@ def set_up_logging(log_file: str, log_to_stdout: bool, log_level: str):
 
     log_level = LOG_LEVEL_STR_TO_VAL[log_level.upper()]
     root.setLevel(log_level)
-    formatter = ColoredFormatter(
+    formatter = logging.Formatter(
+        '%(asctime)s | %(name)s | '
+        '%(levelname)s:%(lineno)s | '
+        '%(message)s')
+
+    color_formatter = ColoredFormatter(
         '%(asctime)s | %(name)s | '
         '%(log_color)s%(levelname)s%(reset)s:%(lineno)s | '
         '%(log_color)s%(message)s%(reset)s')
 
     handlers = []
     if log_file:
-        handlers.append(logging.FileHandler(log_file))
+        handler = logging.FileHandler(log_file)
+        handler.setFormatter(formatter)
+        handlers.append(handler)
     if log_to_stdout:
-        handlers.append(logging.StreamHandler(sys.stdout))
+        handler = logging.StreamHandler(sys.stderr)
+        handler.setFormatter(color_formatter)
+        handlers.append(handler)
 
     for handler in handlers:
         handler.setLevel(log_level)
-        handler.setFormatter(formatter)
         root.addHandler(handler)
