@@ -10,7 +10,7 @@ from afspm.components.component import AfspmComponentBase
 from afspm.components.monitor import AfspmComponentsMonitor, SPAWN_DELAY_S
 
 # log_cli_level *is* used, but it's a fixture. Your editor may not see this.
-from tests.log import log_cli_level, get_logging_args
+from tests.log import log_cli_level, setup_and_get_logging_args
 
 
 logger = logging.getLogger(__name__)
@@ -108,7 +108,7 @@ def test_basic_component(ctx, kwargs, loop_sleep_s,
     kwargs['class'] = 'afspm.components.component.AfspmComponent'
     components_params_dict = {comp_name: kwargs}
 
-    log_init_method, log_init_args = get_logging_args(log_cli_level)
+    log_init_method, log_init_args = setup_and_get_logging_args(log_cli_level)
     monitor = AfspmComponentsMonitor(components_params_dict,
                                      poll_timeout_ms,
                                      loop_sleep_s,
@@ -141,7 +141,7 @@ def test_two_basic_components(ctx, kwargs, loop_sleep_s,
     components_params_dict = {comp_name: kwargs,
                               comp_name2: kwargs2}
 
-    log_init_method, log_init_args = get_logging_args(log_cli_level)
+    log_init_method, log_init_args = setup_and_get_logging_args(log_cli_level)
     monitor = AfspmComponentsMonitor(components_params_dict,
                                      poll_timeout_ms,
                                      loop_sleep_s,
@@ -174,7 +174,7 @@ def test_crashing_component(ctx, kwargs, loop_sleep_s, beat_period_s,
                        + 'CrashingComponent')
     components_params_dict = {comp_name: kwargs}
 
-    log_init_method, log_init_args = get_logging_args(log_cli_level)
+    log_init_method, log_init_args = setup_and_get_logging_args(log_cli_level)
     monitor = AfspmComponentsMonitor(components_params_dict,
                                      poll_timeout_ms,
                                      loop_sleep_s,
@@ -204,7 +204,7 @@ def test_exiting_component(ctx, kwargs, loop_sleep_s, beat_period_s,
                        + 'ExitingComponent')
     components_params_dict = {comp_name: kwargs}
 
-    log_init_method, log_init_args = get_logging_args(
+    log_init_method, log_init_args = setup_and_get_logging_args(
         log_cli_level)
     monitor = AfspmComponentsMonitor(components_params_dict,
                                      poll_timeout_ms,
