@@ -3,6 +3,7 @@
 import logging
 from colorlog import ColoredFormatter
 import sys
+import zmq
 from types import MappingProxyType  # Immutable dict
 
 
@@ -76,7 +77,8 @@ def addLoggingLevel(levelName, levelNum, methodName=None):
 
 
 def set_up_logging(log_file: str = None, log_to_stdout: bool = True,
-                   log_level: str | int = logging.INFO):
+                   log_level: str | int = logging.INFO,
+                   log_url: str = None, ctx: zmq.Context = None):
     """Set up logging logic.
 
     Args:
@@ -84,6 +86,9 @@ def set_up_logging(log_file: str = None, log_to_stdout: bool = True,
         log_to_std_out: whether or not we print to std out as well. Default is
             True.
         log_level: the log level to use, as a string or int. Default is INFO.
+        log_url: if provided, a PUBHandler is used to route logs to the
+            provided zmq url.
+        ctx: context linked to zmq url, for creating the socket.
     """
     root = logging.getLogger(LOGGER_ROOT)
 
@@ -92,6 +97,7 @@ def set_up_logging(log_file: str = None, log_to_stdout: bool = True,
 
     if isinstance(log_level, str):
         log_level = LOG_LEVEL_STR_TO_INT[log_level.upper()]
+
     root.setLevel(log_level)
     formatter = logging.Formatter(
         '%(asctime)s | %(name)s | '
@@ -112,7 +118,12 @@ def set_up_logging(log_file: str = None, log_to_stdout: bool = True,
         handler = logging.StreamHandler(sys.stderr)
         handler.setFormatter(color_formatter)
         handlers.append(handler)
-
+    if log_url and ctx:
+        pub = zmq.socket(zmq.PUB, ctx)
+        pub.connect(log_url)
+        handler = zmq.log.handlers.PUBHandler(pub)
+        handler.setFormatter(formatter)
+        handlers.append(handler)
     for handler in handlers:
         handler.setLevel(log_level)
         root.addHandler(handler)
