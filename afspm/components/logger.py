@@ -34,6 +34,11 @@ class AfspmLogger(AfspmComponentBase):
     - The logger does not currently *filter* different log levels. It is
     assumed that each device has filtered their log levels on their end, on
     startup.
+    - If you want to listen in to an AfspmLogger's PUB socket without adding a
+    new component, due it anywhere via:
+        python -m zmq.log $ZMQ_URL
+    where $ZMQ_URL is the pub_url  of your logger. This requires zmq to be
+    in your python installation.
 
     Attributes:
         ctx: ZMQ context, so we can force-close everything when ending.
