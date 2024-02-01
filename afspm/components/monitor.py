@@ -99,6 +99,11 @@ class AfspmComponentsMonitor:
             missed_beats_before_dead: how many missed beats we will allow
                 before we consider the Heartbeater dead.
             ctx: the zmq.Context instance.
+            log_init_method: Callable to be run whenever a new AfspmComponent
+                is constructed in its own Process (to set up log parameters
+                properly). This is necessary since we use 'spawn' mode of
+                Process creation.
+            log_init_args: arguments to pass to log_init_method.
         """
         logger.debug("Initializing components monitor.")
         if not ctx:
