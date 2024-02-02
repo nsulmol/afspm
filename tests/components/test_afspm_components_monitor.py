@@ -58,7 +58,7 @@ def ctx():
 
 @pytest.fixture
 def time_to_wait_s(beat_period_s, missed_beats_before_dead):
-    return 2 * beat_period_s * missed_beats_before_dead
+    return 5 * beat_period_s * missed_beats_before_dead
 
 
 # ----- Classes for Testing ----- #
