@@ -2,9 +2,9 @@
 
 # Package Structure
 The afspm package itself is divided as follows:
-- ```components```: contains the pre-defined/pre-written AfspmComponents. These are the components that will run in your experiment, the top-level logic.
-- ```io```: contains the communications particulars, for sending data between components. Unless you are particularly curious about the zmq internals, you only need to worry yourself with the data structures defines in io/protos.
-- ```utils```: general use utilities methods. Note that parser.py exists here, which is useful to understand in principle (but not worth delving into unless you are working on it).
+- ```components```: contains the pre-existing AfspmComponents. These are the components that will run in your experiment, the top-level logic.
+- ```io```: contains the communications particulars, for sending data between components. Unless you are particularly curious about the zmq internals, you only need to worry yourself with the data structures defines in the protos subdirectory.
+- ```utils```: general utilities methods. Note that parser.py exists here, which is useful to understand at a high-level (but not worth delving into unless you are working on it).
 
 We expand a bit upon the purpose of each (and their subdirectories) below.
 
@@ -15,11 +15,7 @@ The main 'base' components are:
 - ```AfspmController```: the 'mediator' class, to determine who has control of the SPM at an instance in time.
 - ```DeviceController```: the base device controller class, for communicating directly with the SPM.
 
-You will note that SPM-specific controllers are defined in subdirectories within components/device/controllers.
-
-Also worth noting: the afspm subdirectory contains AfspmController and AfspmControlUI, a component created to make it easier to manually change stuff with the AfspmController.
-
-All other components in here are of value in particular cases.
+SPM-specific controllers are defined in subdirectories within components/device/controllers. The other components in here may be of use for particular experiments.
 
 ## I/O
 
@@ -38,7 +34,7 @@ In the top-level readme, you will see that these protos must be *compiled* into 
 Of note, the main protobuffer data structures are found in:
 - ```control.proto```: this defines control requests/responses, control modes, experiment problems, and the structures by which these are all sent (e.g. the ControlState). These protos are sent/received via the 'control' i/o path.
 - ```geometry.proto```: these are base structures for dealing with geometric data, such as points and rectangles associated with scans. They are used by other protos.
-- ```scan.proto```: these are the main messages/structures sent out by the DeviceController. The 2d scans are defined here, as is the scan state, and parameters associated with a given scan.
+- ```scan.proto```: these are the main messages/structures sent out by the DeviceController (i.e., sent out via the 'pubsub' i/o path). The 2d scans are defined here, as is the scan state, and parameters associated with a given scan.
 - ```analysis.proto```: these are some pre-defined structures for sending analysis results between components.
 
 ## Utils
@@ -57,4 +53,5 @@ This file contains the main logic by which we 'spawn' components. All the compon
 
 
 # Tests and Samples
+
 In addition to the main package, a number of tests have been defined, in the tests subdirectory. Additionally, a number of sample experiments have been defined in the samples directory. These should serve as guidance/pointers to implementing your own experiments. Note that some/most of these samples use an 'ImageController', which allows faking scans over a provided image. This is useful for testing/working through the logic of your experiment.
