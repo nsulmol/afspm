@@ -1,5 +1,5 @@
 # Code Overview
-    
+
 # Package Structure
 The afspm package itself is divided as follows:
 - ```components```: contains the pre-defined/pre-written AfspmComponents. These are the components that will run in your experiment, the top-level logic.
