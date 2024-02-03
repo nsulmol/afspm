@@ -18,7 +18,7 @@ There is a base DeviceController, which all SPM-specific controller can inherit 
 1. Implementing the abstract ```on_XXX()``` and ```poll_XXX()``` methods.
 2. Implement other parameter set/get support by adding to ```self.param_method_map```.
 3. Support different operating modes (NOT YET AVAILABLE).
-4. Support 'actions' (e.g. approaching the tip).
+4. Support 'actions' (e.g. approaching the tip). (NOT YET AVAILABLE).
 
 To have a functional device controller for most experiments, you only need to implement (1).
 
@@ -32,7 +32,7 @@ These methods are 'responses' to specific requests. For example, ```on_start_sca
 
 Note that some of these methods are not *strictly* necessary. For example, ```on_set_zctrl_params()``` can return ```REP_CMD_NOT_SUPPORTED``` if it is not. Check the documentation in afspm/components/device/controller.py to see if a particular method *must* be supported or not.
 
-### Impelementing ```poll_XXX()``` Methods
+### Implementing ```poll_XXX()``` Methods
 
 These methods are called at a regular cadence by the base DeviceController class, in order to determine whether somethinig has changed. A child class *does not* need to hold state or check if something has 'changed'; it merely needs to return what is requested. The rest will be handled by the base controller.
 
@@ -57,7 +57,7 @@ We should note that there is 1 parameter that we *do* suggest implementing, for 
 
 ## Operating Modes and Actions (NOT YET AVAILABLE)
 
-Aside from setting scan parameters and scanning, one *may* feel the need to change the configuration of their SPM *during* an experiment. As described in design_considerations.md, afspm primarily assumes that the user has performed the following *before* starting their afspm experiment:
+Aside from setting scan parameters and scanning, one *may* feel the need to change the configuration of their SPM *during* an experiment. As described in design_philosophy.md, afspm primarily assumes that the user has performed the following *before* starting their afspm experiment:
 1. Prepared their sample, including any process of setting up vacuum or temperature conditions.
 2. Configured their scanning and spectroscopic modes. Thus, we assume a user will not change the 'mode' they are scanning (e.g. AM-AFM), nor the type of spectroscopic scans they are making (e.g. i-V curves).
 3. Approached the sample to the surface.
