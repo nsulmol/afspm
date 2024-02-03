@@ -38,6 +38,8 @@ These methods are called at a regular cadence by the base DeviceController class
 
 For example, ```poll_scans()``` should return a list of the latest scans received. Note that by 'latest scans', we really mean the latest single- or multi-channel scan, where a Scan2d is a single channel of a scan. 
 
+Note that ```poll_scans()```implies detecting the latest scan and converting it into a list of Scan2d structures. Thus, each SPM controller will need to be able to 'read' its scans and convert them to this SPM-agnostic structure. We expect developers to use pre-existing readers, and adding them as 'optional' packages in the pyproject.toml (within a group defined by the SPM name, e.g. 'gxsm' for a gxsm reader).
+
 These methods are called 'polling' methods, because the base controller regularly 'polls' for them. This is the simplest, most naive method of checking state. We purposefully chose this, to try to make the job of implementing a new DeviceController easier.
 
 These methods must return what was requested, but can throw a ParameterError on failure.
