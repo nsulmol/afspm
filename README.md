@@ -63,8 +63,7 @@ Now, there is one aspect that could be construed as either a pro or con: *protob
 Download the protobuf compiler. The easiest way is to download the latest precompiled binaries from their releases: https://github.com/protocolbuffers/protobuf/releases.
 
 Once downloaded, you will need to copy the executable and included well-known types to appropriate locations (so they are automatically detected):
-- Copy/link/move the files in ./bin to /usr/local/bin.
-- Copy/link/move the files in ./include to /usr/local/include.
+- Copy/link/move the files in ./bin to /usr/local/bin (or add this directory to your PATH, if on Windows).
 
 #### Compile the protobuf interfaces to your desired language
 We will assume you are dealing in Python by default, since this whole project is Python-based. However, if you need to implement a particular component (e.g. DeviceController) in a different language, modify the below instructions for your required language.
