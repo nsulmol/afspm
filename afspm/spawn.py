@@ -1,35 +1,25 @@
 """Top-level module, to spawn afspm components for an experiment."""
 
 import logging
-import sys
-from types import MappingProxyType  # Immutable dict
 
 import tomli
 import fire
+import zmq
 
 # TODO: Figure out why this can't be relative?
 from afspm.utils.parser import expand_variables_in_dict
 from afspm.components.monitor import AfspmComponentsMonitor
+from afspm.components.logger import get_url_for_logging
 from afspm.utils.parser import construct_and_run_component
+from afspm.utils.log import set_up_logging
 
 
 logger = logging.getLogger(__name__)
 
 
-LOGGER_ROOT = 'afspm'
 IS_COMPONENT_KEY = 'component'
 MONITOR_KEY = 'afspm_components_monitor'
-TRACE_LOG_LEVEL = logging.DEBUG - 5
-
-LOG_LEVEL_STR_TO_VAL = MappingProxyType({
-    'NOTSET': logging.NOTSET,
-    'TRACE': TRACE_LOG_LEVEL,
-    'DEBUG': logging.DEBUG,
-    'INFO': logging.INFO,
-    'WARNING': logging.WARNING,
-    'ERROR': logging.ERROR,
-    'CRITICAL': logging.CRITICAL
-})
+LOGGER_KEY = 'afspm_logger'
 
 
 def spawn_components(config_file: str,
@@ -71,12 +61,12 @@ def spawn_components(config_file: str,
     All spawned components are monitored via a single AfspmComponentsMonitor
     instance, which restarts any crashed/frozen components.
 
-    There is one 'special case' to the above, where the dict key is the
-    class name rather than the instance name: afspm_components_monitor
-    (note switch from CamelCase to snake_case).
+    There are two 'special cases', where we expect a specific key:
+    1. 'afspm_components_monitor' for the AfspmComponentsMonitor.
+    2. 'afspm_logger' for the AfspmLogger, if used.
 
-    This is because the monitor is what spawns the other components. For this
-    exception, we expect the following in the TOML:
+    1. There is only one monitor per PC, which spawns the other components. For
+    this exception, we expect the following in the TOML:
         [afspm_components_monitor]
         loop_sleep_s = ...
         missed_beats_before_dead = ...
@@ -84,13 +74,18 @@ def spawn_components(config_file: str,
     Once spawned, the components monitor's run method is called. This is
     a blocking call.
 
+    2. If the experiment is being split across multiple PCs, AfspmLogger should
+    be used to receive all logs (and store in a single place). Without it,
+    each PC will have its own local log, only consisting of the local spawned
+    components.
+
     Notes:
     - $COMPONENT_CLASS$ must be: the module_path + class name:
     'path.to.module.class' (e.g.
     'afspm.components.device.controller.DeviceController').
     - We  expect you to have a *single* experiment config file that contains
     all the components you want to run in your experiment. You may instantiate
-    these components on multiple different devices (using different
+    these components on multiple different PCs (using different
     components_to_spawn for each device), but there should be one config.
 
     Args:
@@ -108,23 +103,43 @@ def spawn_components(config_file: str,
             True.
         log_level: the log level to use. Default is INFO.
     """
-    _set_up_logging(log_file, log_to_stdout, log_level)
+    log_init_method = set_up_logging
+    log_args = (log_file, log_to_stdout, log_level)
+    log_init_method(*log_args)
 
     monitor = None
+    ctx = None
+    config_dict = None
     with open(config_file, 'rb') as file:
         config_dict = tomli.load(file)
 
-        expanded_dict = expand_variables_in_dict(config_dict)
-        filtered_dict = _filter_requested_components(expanded_dict,
-                                                     components_to_spawn,
-                                                     components_not_to_spawn)
+    if config_dict is None:
+        logger.error("Config file not found or loading failed, exiting.")
+        return
 
-        if MONITOR_KEY in expanded_dict:
-            monitor = AfspmComponentsMonitor(filtered_dict,
-                                             **expanded_dict[MONITOR_KEY])
-        else:
-            monitor = AfspmComponentsMonitor(filtered_dict)
+    expanded_dict = expand_variables_in_dict(config_dict)
+    filtered_dict = _filter_requested_components(expanded_dict,
+                                                 components_to_spawn,
+                                                 components_not_to_spawn)
 
+    # Check for universal logger. If there, get url to publish to,
+    # for logging method
+    if LOGGER_KEY in expanded_dict:
+        ctx = zmq.Context.instance()
+        log_args = log_args + (get_url_for_logging(expanded_dict[LOGGER_KEY]),
+                               ctx)
+
+    if MONITOR_KEY in expanded_dict:
+        monitor = AfspmComponentsMonitor(filtered_dict,
+                                         **expanded_dict[MONITOR_KEY],
+                                         log_init_method=log_init_method,
+                                         log_init_args=log_args,
+                                         ctx=ctx)
+    else:
+        monitor = AfspmComponentsMonitor(filtered_dict,
+                                         log_init_method=log_init_method,
+                                         log_init_args=log_args,
+                                         ctx=ctx)
     if monitor:
         monitor.run()
 
@@ -155,7 +170,7 @@ def spawn_monitorless_component(config_file: str,
             True.
         log_level: the log level to use. Default is INFO.
     """
-    _set_up_logging(log_file, log_to_stdout, log_level)
+    set_up_logging(log_file, log_to_stdout, log_level)
 
     with open(config_file, 'rb') as file:
         config_dict = tomli.load(file)
@@ -175,38 +190,6 @@ def spawn_monitorless_component(config_file: str,
 
         logger.info("Creating process for component %s", component_to_spawn)
         construct_and_run_component(filtered_dict[keys[0]])
-
-
-def _set_up_logging(log_file: str, log_to_stdout: bool, log_level: str):
-    """Set up logging logic.
-
-    Args:
-        log_file: a file path to save the process log. Default is 'log.txt'.
-            To not log to file, set to None.
-        log_to_std_out: whether or not we print to std out as well. Default is
-            True.
-        log_level: the log level to use. Default is INFO.
-    """
-    root = logging.getLogger(LOGGER_ROOT)
-
-    if root.hasHandlers():  # Delete existing handlers before adding ours
-        root.handlers.clear()
-
-    log_level = LOG_LEVEL_STR_TO_VAL[log_level.upper()]
-    root.setLevel(log_level)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - '
-                                  '%(levelname)s:%(lineno)s - %(message)s')
-
-    handlers = []
-    if log_file:
-        handlers.append(logging.FileHandler(log_file))
-    if log_to_stdout:
-        handlers.append(logging.StreamHandler(sys.stdout))
-
-    for handler in handlers:
-        handler.setLevel(log_level)
-        handler.setFormatter(formatter)
-        root.addHandler(handler)
 
 
 def _filter_requested_components(config_dict: dict,

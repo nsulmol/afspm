@@ -10,7 +10,6 @@ from types import MappingProxyType
 import zmq
 from google.protobuf.message import Message
 
-from .params import ParameterError
 from .. import component as afspmc
 
 from ...io import common
@@ -235,7 +234,10 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         """Obtain latest performed scans.
 
         We will compare the prior scans (or first of each) to the latest to
-        determine if the scan succeeded (i.e. they are different).
+        determine if the scan succeeded (i.e. they are different). Note that
+        each channel is a different scan! Thus, when we say 'latest scans',
+        we really mean the latest single- or multi-channel scan, provided as
+        a list of Scan2ds (with each Scan2d being a channel of the scan).
 
         Note that we will first consider the timestamp attribute when
         comparing scans. If this attribute is not passed, we will do
