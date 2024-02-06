@@ -72,7 +72,7 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
     For (1) and (2), we have introduced the REQ_PARAM request. The idea is to
     map settings to a common 'dictionary', with IDs defined in params.py. To
     set/get a particular parameter, the controller calls self.param_method_map
-    (see ParamMethod below for more info). If a parameter ID is not in these
+    (see ParamMethod at end of file). If a parameter ID is not in these
     maps, it is not supported.
 
     If setting a param is not immediate (i.e. takes time), you can set
@@ -122,13 +122,6 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
     # Indicates commands we will allow to be sent while not free
     ALLOWED_COMMANDS_WHILE_NOT_FREE = [control_pb2.ControlRequest.REQ_STOP_SCAN]
 
-    """Description of method for DeviceController.param_method_map).
-
-    This method takes in an optional set_value (if setting), and returns a
-    (ControlResponse, get_value) of the operation.
-    """
-    ParamMethod = Callable[[str | None],
-                           tuple[control_pb2.ControlResponse, str]]
 
     def __init__(self, name: str, publisher: pub.Publisher,
                  control_server: ctrl_srvr.ControlServer,
@@ -274,7 +267,7 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
 
             both_have_scans = len(self.scans) > 0 and len(old_scans) > 0
             only_new_has_scans = (len(self.scans) > 0 and
-                                    len(old_scans) == 0)
+                                  len(old_scans) == 0)
             timestamps_different = (
                 both_have_scans and
                 self.scans[0].HasField(self.TIMESTAMP_ATTRIB) and
@@ -373,9 +366,10 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
 
         if param.HasField(self.PARAM_VALUE_ATTRIB):
             self.set_param_map[param.parameter] = param.value  # Store set val
-            rep, new_val = self.param_method_map[param.parameter](param.value)
+            rep, new_val = self.param_method_map[param.parameter](self,
+                                                                  param.value)
         else:
-            rep, new_val = self.param_method_map[param.parameter]()
+            rep, new_val = self.param_method_map[param.parameter](self,)
 
         if new_val:
             param.value = new_val
@@ -395,3 +389,12 @@ def get_file_modification_datetime(filename: str) -> datetime.datetime:
     """
     return datetime.datetime.fromtimestamp(os.path.getmtime(filename),
                                            tz=datetime.timezone.utc)
+
+
+# Description of method for DeviceController.param_method_map).
+#
+# This method takes in the controller and an optional set_value (if setting);
+# and returns a (ControlResponse, get_value) of the operation. The controller
+# allows using internal variables that may be needed/desired.
+ParamMethod = Callable[[DeviceController, str | None],
+                       tuple[control_pb2.ControlResponse, str]]

@@ -199,13 +199,14 @@ def assert_and_return_message(sub: Subscriber):
 
 
 # ----- test_run_scan specific methods ----- #
-def get_config_scan_time(config_dict: dict,
-                         client: ControlClient) -> Optional[tuple[float, float]]:
-    """Determines if we are initing scan time (for a faster scan).
+def get_config_scan_speed(config_dict: dict,
+                          client: ControlClient
+                          ) -> Optional[tuple[float, float]]:
+    """Determines if we are initing scan speed (for a faster scan).
 
-    Checks if a desired scan time was provided via the config, and the client
-    supports setting scan time. If so, we return the desired scan time and
-    the current/init scan time the device controller has set.
+    Checks if a desired scan speed was provided via the config, and the client
+    supports setting scan speed. If so, we return the desired speed and
+    the current/init speed the device controller has set.
 
     Args:
         config_dict: configuration dictionary for our tests.
@@ -214,14 +215,14 @@ def get_config_scan_time(config_dict: dict,
     Returns:
         (float, float) tuple, containing (desired_val, init_val).
     """
-    if params.DeviceParameter.SCAN_TIME_S in config_dict:
-        desired_param = config_dict[params.DeviceParameter.SCAN_TIME_S]
-        param_msg = control_pb2.ParameterMsg(
-            parameter=params.DeviceParameter.SCAN_TIME_S)
+    speed_param = params.DeviceParameter.SCAN_SPEED_NM_S
+    if speed_param in config_dict:
+        desired_param = config_dict[speed_param]
+        param_msg = control_pb2.ParameterMsg(parameter=speed_param)
         rep, init_scan_msg = client.request_parameter(param_msg)
         if rep == control_pb2.ControlResponse.REP_SUCCESS:
             return desired_param, float(init_scan_msg.value)
-        logger.info("Controller failed setting/getting scan time, "
+        logger.info("Controller failed setting/getting scan speed, "
                     "returned response: %s",
                     common.get_enum_str(control_pb2.ControlResponse, rep))
     return None
@@ -241,13 +242,13 @@ def get_config_data_shape(config_dict: dict) -> Optional[list[int, int]]:
     return None
 
 
-def set_scan_time(client: ControlClient, scan_time_s: float):
+def set_scan_speed(client: ControlClient, scan_speed_nm_s: float):
     param_msg = control_pb2.ParameterMsg(
-        parameter=params.DeviceParameter.SCAN_TIME_S,
-        value=str(scan_time_s))
+        parameter=params.DeviceParameter.SCAN_SPEED_NM_S,
+        value=str(scan_speed_nm_s))
 
-    logger.info("Setting scan time to desired to: %s",
-                scan_time_s)
+    logger.info("Setting scan speed to desired: %s",
+                scan_speed_nm_s)
     rep, __ = client.request_parameter(param_msg)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
@@ -367,11 +368,11 @@ def test_run_scan(client, default_control_state,
 
     logger.info("First, check if we provided specific scan parameters "
                 "(so the scan is not super long)")
-    scan_time_tuple = get_config_scan_time(config_dict, client)
-    orig_scan_time_s = None
-    if scan_time_tuple:
-        orig_scan_time_s = scan_time_tuple[1]
-        set_scan_time(client, scan_time_tuple[0])
+    scan_speed_tuple = get_config_scan_speed(config_dict, client)
+    orig_scan_speed = None
+    if scan_speed_tuple:
+        orig_scan_speed = scan_speed_tuple[1]
+        set_scan_speed(client, scan_speed_tuple[0])
 
     desired_phys_size_nm = get_config_phys_size_nm(config_dict)
     desired_data_shape = get_config_data_shape(config_dict)
@@ -408,10 +409,10 @@ def test_run_scan(client, default_control_state,
     scan_state_msg.scan_state = scan_pb2.ScanState.SS_FREE
     assert_sub_received_proto(sub_scan_state, scan_state_msg)
 
-    if orig_scan_time_s or orig_scan_params:
-        logger.info("Reset our scan settings to what they were before this test.")
-        if orig_scan_time_s:
-            set_scan_time(client, orig_scan_time_s)
+    if orig_scan_speed or orig_scan_params:
+        logger.info("Reset scan settings to what they were before the test.")
+        if orig_scan_speed:
+            set_scan_speed(client, orig_scan_speed)
         if orig_scan_params:
             set_scan_params(client, orig_scan_params)
 

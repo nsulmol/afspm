@@ -6,6 +6,7 @@ from typing import Optional, Any
 
 from pint import UndefinedUnitError
 
+from afspm.components.device.controller import DeviceController
 from afspm.components.device import params
 from afspm.utils import units
 
@@ -68,39 +69,6 @@ class GxsmChannelIds(enum.Enum):
     DDIDV = enum.auto()
     I0_AVG = enum.auto()
     COUNTER = enum.auto()
-
-
-def handle_get_set_scan_time(val: Optional[str] = None
-                             ) -> (control_pb2.ControlResponse, str):
-    """Get/set scantime."""
-    if val:
-        logger.debug("Scantime to set: %s", val)
-        val = scan_time_to_scan_speed(val)
-        logger.debug("Setting Scan speed: %s", val)
-    res = handle_get_set(GxsmParameter.SCAN_SPEED_UNITS_S, val)
-    logger.debug("Gotten scan speed: %s", res[1])
-    val = scan_speed_to_scan_time(res[1])
-    logger.debug("Gotten scantime: %s", val)
-    return res[0], val
-
-
-def scan_time_to_scan_speed(val: str) -> str:
-    """Convert from s / scanline to units / s.
-
-    Receive and return in str; we do the conversion in float within.
-    """
-    # TODO: Does this support rotations??
-    scanline = gxsm.get(GxsmParameter.SZ_X)
-    return str(pow(float(val) / scanline, -1))
-
-
-def scan_speed_to_scan_time(val: str) -> str:
-    """Convert from units / s to s / scanline.
-
-    Receive and return in str; we do the conversion in float within.
-    Same as prior, copying for ease.
-    """
-    return scan_time_to_scan_speed(val)
 
 
 def set_param(attr: str, val: Any, curr_unit: str = None,
@@ -209,6 +177,13 @@ def handle_get_set(attr: str, val: Optional[Any] = None,
             gxsm.get(attr))
 
 
+def get_set_scan_speed(ctrlr: DeviceController, val: Optional[Any] = None):
+    """Get/set scan speed."""
+    return handle_get_set(GxsmParameter.SCAN_SPEED_UNITS_S, val,
+                          curr_units='nm',
+                          gxsm_units=ctrlr.gxsm_physical_units)
+
+
 PARAM_METHOD_MAP = {
-    params.DeviceParameter.SCAN_TIME_S: handle_get_set_scan_time
+    params.DeviceParameter.SCAN_SPEED_NM_S: get_set_scan_speed
 }

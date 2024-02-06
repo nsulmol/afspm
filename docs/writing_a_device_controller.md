@@ -55,7 +55,7 @@ The above methods define a basic controller. However, an experiment may desire t
 
 The 'design' workaround to setting other parameters is to encapsulate parameters setting into 'Operating Modes' (discussed later). Efforts should be made to use this approach instead, where possible.
 
-We should note that there is 1 parameter that we *do* suggest implementing, for testing purposes: scan time. The test_controller.py tests will optionally set the physical scan size, data points, and scan time in order to speed up the tests.
+We should note that there is 1 parameter that we *do* suggest implementing, for testing purposes: scan speed. The test_controller.py tests will optionally set the physical scan size, data points, and scan speed in order to speed up the tests.
 
 ## Operating Modes and Actions (NOT YET AVAILABLE)
 
