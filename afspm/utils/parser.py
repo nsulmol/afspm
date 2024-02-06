@@ -402,6 +402,11 @@ def _import_from_string(obj_path: str) -> Any:
                     final_obj = getattr(final_obj, top_obj)
                 break
         except ModuleNotFoundError as exc:
+            logger.trace("Received ModuleNotFoundError. Assuming due to the " +
+                         "requested module not existing. However, it could " +
+                         "be an import error *within* the requested module. " +
+                         "We will print the exception in case.")
+            logger.trace(exc)
             caught_exc = exc
             continue
 
