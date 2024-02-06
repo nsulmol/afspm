@@ -202,7 +202,7 @@ def _filter_requested_components(config_dict: dict,
     confirms each requested component is an 'actual' AfspmComponent via a hack:
     it expects such a dict to contain a key:val 'component': True.
 
-    If the no list of components are provided, we iterate through all keys in
+    If no list of components is provided, we iterate through all keys in
     the config dict and accept all key:vals that contain a 'component': True
     key:val.
 
