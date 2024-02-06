@@ -21,7 +21,7 @@ Note: for more information on the overall design (and justification), look in th
 
 ## Requirements
 
-afspm replies on the following libraries:
+afspm relies on the following libraries:
 - numpy, for data manipulation.
 - pyzmq, as the abstraction layer allowing different communication protocols.
 - protobuf, for encoding/decoding the data we send over our protocol.
