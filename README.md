@@ -60,10 +60,19 @@ We use Google protobuffers to serialize/deserialize data between the various sys
 Now, there is one aspect that could be construed as either a pro or con: *protobuf messages are not human readable*. While human readability is, in principle, a huge plus, it tends to go hand-in-hand with a lack of type safety/easy schema violations. What we mean by this: a user can easily unintentionally send a broken message when they are able to create it with a simple text editor. Thus, we will *accept* this 'con' given our perceived larger 'pro'.
 
 #### Set up Google Protobuf Compiler
-Download the protobuf compiler. The easiest way is to download the latest precompiled binaries from their releases: https://github.com/protocolbuffers/protobuf/releases.
+Download the protobuf compiler. The easiest way is to download the latest precompiled binaries from their releases: https://github.com/protocolbuffers/protobuf/releases. Note that you will need to grab the *appropriate* package for your operating system. E.g., ```protoc-25.2-win64.zip```for a 64-bit Windows environment, or ```protoc-25.2-linux-x86_64.zip```for a 64-bit x86-based Linux environment (where 25.2 was the latest stable build in this case).
 
-Once downloaded, you will need to copy the executable and included well-known types to appropriate locations (so they are automatically detected):
-- Copy/link/move the files in ./bin to /usr/local/bin (or add this directory to your PATH, if on Windows).
+Once downloaded, you will need to copy the executable and included well-known types to appropriate locations (so they are automatically detected).
+
+On Linux/OS X:
+1. Copy/move the files in ./bin to /usr/local/bin.
+2. Copy/move the files in ./include to /usr/local/include.
+
+On Windows (where ```$DIR``` is your chosen directory):
+1. Copy/move the ./bin folder to ```$DIR```and add ```$DIR/bin```to your ```PATH```.
+2. Copy/move the ./include folder to the ```$DIR``` directory. 
+
+In doing (2), the protoc executable will be able to find the well-known types (as it will be in ```../include```, relative to the executable). 
 
 #### Compile the protobuf interfaces to your desired language
 We will assume you are dealing in Python by default, since this whole project is Python-based. However, if you need to implement a particular component (e.g. DeviceController) in a different language, modify the below instructions for your required language.
