@@ -68,4 +68,5 @@ message ControlState {
 message ParameterMsg {
     optional string parameter = 1;
     optional string value = 2;  // If not provided, we treat as a get.
+    optional string units = 3;  // Units associated to value.
 }

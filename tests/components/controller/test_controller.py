@@ -34,6 +34,7 @@ from afspm.io.control.client import ControlClient
 
 from afspm.components.device import params
 from afspm.utils.log import LOGGER_ROOT
+from afspm.utils import units
 
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
@@ -45,6 +46,7 @@ logger = logging.getLogger(LOGGER_ROOT + '.samples.testing.test_controller.' +
 
 
 # Constants for config
+SCAN_SPEED_KEY = 'scan-speed-nm-s'
 PHYS_SIZE_KEY = 'phys-size-nm'
 DATA_SHAPE_KEY = 'data-shape'
 
@@ -215,13 +217,15 @@ def get_config_scan_speed(config_dict: dict,
     Returns:
         (float, float) tuple, containing (desired_val, init_val).
     """
-    speed_param = params.DeviceParameter.SCAN_SPEED_NM_S
-    if speed_param in config_dict:
-        desired_param = config_dict[speed_param]
-        param_msg = control_pb2.ParameterMsg(parameter=speed_param)
+    if SCAN_SPEED_KEY in config_dict:
+        desired_param = config_dict[SCAN_SPEED_KEY]
+        param_msg = control_pb2.ParameterMsg(
+            parameter=params.DeviceParameter.SCAN_SPEED)
         rep, init_scan_msg = client.request_parameter(param_msg)
         if rep == control_pb2.ControlResponse.REP_SUCCESS:
-            return desired_param, float(init_scan_msg.value)
+            init_val_nm = units.convert(float(init_scan_msg.value),
+                                     init_scan_msg.units, 'nm')
+            return desired_param, init_val_nm
         logger.info("Controller failed setting/getting scan speed, "
                     "returned response: %s",
                     common.get_enum_str(control_pb2.ControlResponse, rep))
@@ -244,10 +248,10 @@ def get_config_data_shape(config_dict: dict) -> Optional[list[int, int]]:
 
 def set_scan_speed(client: ControlClient, scan_speed_nm_s: float):
     param_msg = control_pb2.ParameterMsg(
-        parameter=params.DeviceParameter.SCAN_SPEED_NM_S,
-        value=str(scan_speed_nm_s))
+        parameter=params.DeviceParameter.SCAN_SPEED,
+        value=str(scan_speed_nm_s), units='nm/s')
 
-    logger.info("Setting scan speed to desired: %s",
+    logger.info("Setting scan speed to desired: %s nm/s",
                 scan_speed_nm_s)
     rep, __ = client.request_parameter(param_msg)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS

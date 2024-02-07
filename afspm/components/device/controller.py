@@ -108,12 +108,6 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             set/get of that parameter. The method should accept an optional
             str input, corresponding to the 'set' value. If none is provided,
             only a 'get' is requested. We expect a (REP, str) as return val.
-        set_param_map: a mapping from param id to the last value that was set.
-            This is useful if you have to convert from DeviceController format
-            to some internal format, and change the parameter based on other
-            settings being set. E.g., in gxsm, scantime is stored as scan speed
-            (in units/s); thus, whenever the physical scan size is changed, we
-            need to update the scan speed.
     """
 
     TIMESTAMP_ATTRIB = 'timestamp'
@@ -156,7 +150,6 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         self.zctrl_params = feedback_pb2.ZCtrlParameters()
 
         self.param_method_map = {}
-        self.set_param_map = {}
 
         # AfspmComponent constructor: no control_client provided, as that
         # logic is handled by the control_server.
@@ -365,14 +358,14 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                     param)
 
         if param.HasField(self.PARAM_VALUE_ATTRIB):
-            self.set_param_map[param.parameter] = param.value  # Store set val
-            rep, new_val = self.param_method_map[param.parameter](self,
-                                                                  param.value)
+            rep, val, units = self.param_method_map[param.parameter](
+                self, param.value, param.units)
         else:
-            rep, new_val = self.param_method_map[param.parameter](self)
+            rep, val, units = self.param_method_map[param.parameter](self)
 
-        if new_val:
-            param.value = new_val
+        if val:
+            param.value = val
+            param.units = units
         return (rep, param)
 
     def run_per_loop(self):
@@ -393,11 +386,17 @@ def get_file_modification_datetime(filename: str) -> datetime.datetime:
 
 # Description of method for DeviceController.param_method_map).
 #
-# This method takes in the controller and an optional set_value (if setting);
-# and returns a (ControlResponse, get_value) of the operation. The controller
-# allows using internal variables that may be needed/desired.
+# This method takes in the controller, an optional set_value (if setting), and
+# an optional units str (required if are set_value is provided).
+# It returns (ControlResponse, get_value, units) of the operation. Passing the
+# controller allows using internal variables that may be needed/desired.
 #
-# NOTE: The input and output params are str! Your method is responsible for
-# converting it to and from its appropriate data type.
-ParamMethod = Callable[[DeviceController, str | None],
-                       tuple[control_pb2.ControlResponse, str]]
+# Your ParamMethod is responsible for converting the received value to your
+# internal reference units, if not the same (see utils/units.py). In the same
+# fashion, the component that made this request is responsible for converting
+# the *received* value into *its own* reference units. See
+# docs/design_philosphy.md for more info.
+#
+# NOTE: The input and output params are str!
+ParamMethod = Callable[[DeviceController, str | None, str | None],
+                       tuple[control_pb2.ControlResponse, str, str]]

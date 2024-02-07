@@ -176,23 +176,28 @@ def handle_get_set(attr: str, val: Optional[str] = None,
         gxsm_units: units gxsm expects for this value. optional.
 
     Returns:
-        Tuple containing the control response and the value gotten (as a str).
+        Tuple (response, val, units), i.e. containing the control response,
+        the value gotten (as a str), and the units of said value (as a str).
     """
     if val:
-        if not set_param(attr, val, curr_units, gxsm_units):
+        if not curr_units or not set_param(attr, val, curr_units, gxsm_units):
+            logger.error("Unable to set val: %s with units: %s",
+                         val, curr_units)
             return (control_pb2.ControlResponse.REP_PARAM_ERROR, None)
     return (control_pb2.ControlResponse.REP_SUCCESS,
-            str(get_param(attr)))
+            str(get_param(attr)), gxsm_units)
 
 
-def get_set_scan_speed(ctrlr: DeviceController, val: Optional[str] = None
+def get_set_scan_speed(ctrlr: DeviceController, val: Optional[str] = None,
+                       units: Optional[str] = None
                        ) -> (control_pb2.ControlResponse, str):
     """Get/set scan speed."""
-    return handle_get_set(GxsmParameter.SCAN_SPEED_UNITS_S, val,
-                          curr_units='nm',
-                          gxsm_units=ctrlr.gxsm_physical_units)
+    gxsm_scan_speed_units = ctrlr.gxsm_physical_units + '/s'
+    return handle_get_set(
+        GxsmParameter.SCAN_SPEED_UNITS_S, val, curr_units=units,
+        gxsm_units=gxsm_scan_speed_units)
 
 
 PARAM_METHOD_MAP = {
-    params.DeviceParameter.SCAN_SPEED_NM_S: get_set_scan_speed
+    params.DeviceParameter.SCAN_SPEED: get_set_scan_speed
 }
