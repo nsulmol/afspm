@@ -2,11 +2,11 @@
 
 In order to run it, you must:
 1. Start up the afspmcon, via a call like the following:
-    spawn config.toml --components_to_spawn ['afspmcon']
+    poetry run spawn config.toml --components_to_spawn ['afspmcon']
 2. Start up the device controller you wish to test. This startup will be
 implementation-specific (look at the readme for your controller).
 3. Run these tests:
-    pytest $PATH_TO_TEST/test_controller.py --config_path $CONFIG_FILE_PATH
+    poetry run pytest $PATH_TO_TEST/test_controller.py --config_path $CONFIG_FILE_PATH
 Note the default config path is './config.toml'.
 
 Your config file contains the parameters for our tests. See sample_config.toml
@@ -14,7 +14,7 @@ for guidance.
 
 Ideally, you should set your controller's scan parameters to scan quickly
 before running these tests. For example, increase your scan speed and
-decrease your ROI size to pass the test more quickly.
+decrease your ROI size to pass the test more quickly. This can be accomplished by including SCAN_SPEED_KEY, PHYS_SIZE_KEY, and DATA_SHAPE_KEY keys in your config, with appropriate values. See these variables below, or look at sample_config.toml.
 """
 
 from typing import Optional
@@ -224,7 +224,7 @@ def get_config_scan_speed(config_dict: dict,
         rep, init_scan_msg = client.request_parameter(param_msg)
         if rep == control_pb2.ControlResponse.REP_SUCCESS:
             init_val_nm = units.convert(float(init_scan_msg.value),
-                                     init_scan_msg.units, 'nm')
+                                     init_scan_msg.units, 'nm/s')
             return desired_param, init_val_nm
         logger.info("Controller failed setting/getting scan speed, "
                     "returned response: %s",
