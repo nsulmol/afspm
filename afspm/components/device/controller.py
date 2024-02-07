@@ -59,26 +59,23 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
     parameters for a scan to run.
 
     However, it may also be necessary to:
-    1. Switch operating modes between scans (e.g. dynamic AM-AFM mode, static
-    mode with constant height).
-    2. Set different parameters between scans (e.g. scan speed, feedback
+    1. Set different parameters between scans (e.g. scan speed, feedback
     PI/PID system parameters).
+    2. Switch operating modes between scans (e.g. dynamic AM-AFM mode, static
+    mode with constant height).
     3. Explicitly approach/retract the tip, and use a coarse motor to move
     the scan region further around the surface.
     4. Perform tip conditioning, by moving the tip and performing one of a set
     of operations with the surface.
     5. Perform a 3D form of scanning (e.g. spectroscopy).
 
-    For (1) and (2), we have introduced the REQ_PARAM request. The idea is to
+    For (1), we have introduced the REQ_PARAM request. The idea is to
     map settings to a common 'dictionary', with IDs defined in params.py. To
     set/get a particular parameter, the controller calls self.param_method_map
     (see ParamMethod at end of file). If a parameter ID is not in these
     maps, it is not supported.
 
-    If setting a param is not immediate (i.e. takes time), you can set
-    self.scan_state to SS_BUSY_PARAM *within* the method. If doing so, you will
-    need to set it to SS_FREE once ready.
-
+    (2) will be introduced in the future, via a new REQ_OP_MODE call.
     Setting/getting an operating mode is the same as setting any other
     parameter! We make no special checks; it is assumed that an operating mode
     corresponds to (a) a feedback/z-controller configuration, and (b) a
@@ -86,6 +83,10 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
     phase). Thus, we expect setting a given operating mode ID on two different
     device controllers to result in the same output channels per scan. Again,
     NO SPECIAL CHECKS ARE DONE: caveat emptor.
+
+    If setting a param is not immediate (i.e. takes time), you can set
+    self.scan_state to SS_BUSY_PARAM *within* the method. If doing so, you will
+    need to set it to SS_FREE once ready.
 
     For (3)-(5): these *ARE NOT YET SUPPORTED*. We plan to introduce some
     mechanism to run actions (REQ_RUN_ACTION), to support some or all

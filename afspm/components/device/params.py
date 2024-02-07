@@ -21,8 +21,6 @@ from enum import Enum
 class DeviceParameter(str, Enum):
     """Holds parameters that can be set."""
 
-    OPERATING_MODE = 'operating-mode'
-
     # Note: Rest of Z Control Feedback is in feedback_pb2 message.
     ZCTRL_FB_SETPOINT = 'zctrl-fb-setpoint'
     ZCTRL_FB_ERRORGAIN = 'zctrl-fb-errorgain'
@@ -45,9 +43,6 @@ class DeviceParameter(str, Enum):
 
 
 DESCRIPTIONS = {
-    DeviceParameter.OPERATING_MODE:
-    "The current system operating mode (e.g. FM-AFM). str expected.",
-
     # Note: Rest of Z Control Feedback is in feedback_pb2 message.
     DeviceParameter.ZCTRL_FB_SETPOINT:
     "Set point of z-controller feedback.",
