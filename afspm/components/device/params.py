@@ -54,7 +54,7 @@ DESCRIPTIONS = {
     "Bias voltage applied to the tip. Unit is V.",
     DeviceParameter.TIP_VIBRATING_AMPL:
     "Free amplitude of the cantilever. Units in V.",
-    "tip-vibrating-freq": "Free frequency of the cantilever. Units in Hz.",
+    DeviceParameter.TIP_VIBRATING_FREQ: "Free frequency of the cantilever. Units in Hz.",
 
     # Amplitude Feedback
     DeviceParameter.AMPL_FB_ENABLED:
