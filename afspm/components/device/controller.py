@@ -369,7 +369,7 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             rep, new_val = self.param_method_map[param.parameter](self,
                                                                   param.value)
         else:
-            rep, new_val = self.param_method_map[param.parameter](self,)
+            rep, new_val = self.param_method_map[param.parameter](self)
 
         if new_val:
             param.value = new_val
@@ -396,5 +396,8 @@ def get_file_modification_datetime(filename: str) -> datetime.datetime:
 # This method takes in the controller and an optional set_value (if setting);
 # and returns a (ControlResponse, get_value) of the operation. The controller
 # allows using internal variables that may be needed/desired.
+#
+# NOTE: The input and output params are str! Your method is responsible for
+# converting it to and from its appropriate data type.
 ParamMethod = Callable[[DeviceController, str | None],
                        tuple[control_pb2.ControlResponse, str]]
