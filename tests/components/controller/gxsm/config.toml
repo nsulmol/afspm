@@ -13,7 +13,7 @@ scan_wait_ms = 180000
 # --- (Optional) Scan Settings --- #
 # Parameters we try to set to, for a faster scan.
 # Uncomment if desired
-#scan-time-s = 1.0
+#scan-speed-nm-s = 216  # 36 x 6
 #phys-size-nm = [36.0, 36.0]
 #data-shape = [10, 10]
 

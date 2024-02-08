@@ -95,14 +95,6 @@ class GxsmController(DeviceController):
                       self.gxsm_physical_units,
                       None, None]
 
-        # If scan time has been set previously, need to reset on scan params
-        # changing (since gxsm stores as scan speed).
-        if DeviceParameter.SCAN_TIME_S in self.set_param_map:
-            res, __ = handle_get_set_scan_time(
-                self.set_param_map[DeviceParameter.SCAN_TIME_S])
-            if res != control_pb2.ControlResponse.REP_SUCCESS:
-                return control_pb2.ControlResponse.REP_PARAM_ERROR
-
         # Note: when setting scan params, data units don't matter! These
         # are only important in explicit scans. When setting scan params,
         # we only care about the data shape, which is pixel-units.

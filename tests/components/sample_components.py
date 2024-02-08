@@ -77,7 +77,8 @@ class SampleDeviceController(DeviceController):
     def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
         return feedback_pb2.ZCtrlParameters()
 
-    def handle_operating_mode(self, set_value: str = None
+    def handle_operating_mode(self, ctrlr: DeviceController,
+                              set_value: str = None
                               ) -> (control_pb2.ControlResponse, str):
         """Get/set operating mode.
 
@@ -92,8 +93,7 @@ class SampleDeviceController(DeviceController):
             self.operating_mode = set_value
         return (control_pb2.ControlResponse.REP_SUCCESS, self.operating_mode)
 
-
-    def fail_on_vib_ampl(self, set_value: str = None
+    def fail_on_vib_ampl(self, ctrlr: DeviceController, set_value: str = None
                          ) -> (control_pb2.ControlResponse, str):
         """Get/set with failure case.
 
