@@ -10,7 +10,6 @@ from types import MappingProxyType
 import zmq
 from google.protobuf.message import Message
 
-from .params import ParameterError
 from .. import component as afspmc
 
 from ...io import common
@@ -60,26 +59,23 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
     parameters for a scan to run.
 
     However, it may also be necessary to:
-    1. Switch operating modes between scans (e.g. dynamic AM-AFM mode, static
-    mode with constant height).
-    2. Set different parameters between scans (e.g. scan speed, feedback
+    1. Set different parameters between scans (e.g. scan speed, feedback
     PI/PID system parameters).
+    2. Switch operating modes between scans (e.g. dynamic AM-AFM mode, static
+    mode with constant height).
     3. Explicitly approach/retract the tip, and use a coarse motor to move
     the scan region further around the surface.
     4. Perform tip conditioning, by moving the tip and performing one of a set
     of operations with the surface.
     5. Perform a 3D form of scanning (e.g. spectroscopy).
 
-    For (1) and (2), we have introduced the REQ_PARAM request. The idea is to
+    For (1), we have introduced the REQ_PARAM request. The idea is to
     map settings to a common 'dictionary', with IDs defined in params.py. To
     set/get a particular parameter, the controller calls self.param_method_map
-    (see ParamMethod below for more info). If a parameter ID is not in these
+    (see ParamMethod at end of file). If a parameter ID is not in these
     maps, it is not supported.
 
-    If setting a param is not immediate (i.e. takes time), you can set
-    self.scan_state to SS_BUSY_PARAM *within* the method. If doing so, you will
-    need to set it to SS_FREE once ready.
-
+    (2) will be introduced in the future, via a new REQ_OP_MODE call.
     Setting/getting an operating mode is the same as setting any other
     parameter! We make no special checks; it is assumed that an operating mode
     corresponds to (a) a feedback/z-controller configuration, and (b) a
@@ -87,6 +83,10 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
     phase). Thus, we expect setting a given operating mode ID on two different
     device controllers to result in the same output channels per scan. Again,
     NO SPECIAL CHECKS ARE DONE: caveat emptor.
+
+    If setting a param is not immediate (i.e. takes time), you can set
+    self.scan_state to SS_BUSY_PARAM *within* the method. If doing so, you will
+    need to set it to SS_FREE once ready.
 
     For (3)-(5): these *ARE NOT YET SUPPORTED*. We plan to introduce some
     mechanism to run actions (REQ_RUN_ACTION), to support some or all
@@ -109,26 +109,14 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             set/get of that parameter. The method should accept an optional
             str input, corresponding to the 'set' value. If none is provided,
             only a 'get' is requested. We expect a (REP, str) as return val.
-        set_param_map: a mapping from param id to the last value that was set.
-            This is useful if you have to convert from DeviceController format
-            to some internal format, and change the parameter based on other
-            settings being set. E.g., in gxsm, scantime is stored as scan speed
-            (in units/s); thus, whenever the physical scan size is changed, we
-            need to update the scan speed.
     """
+
     TIMESTAMP_ATTRIB = 'timestamp'
     PARAM_VALUE_ATTRIB = 'value'
 
     # Indicates commands we will allow to be sent while not free
     ALLOWED_COMMANDS_WHILE_NOT_FREE = [control_pb2.ControlRequest.REQ_STOP_SCAN]
 
-    """Description of method for DeviceController.param_method_map).
-
-    This method takes in an optional set_value (if setting), and returns a
-    (ControlResponse, get_value) of the operation.
-    """
-    ParamMethod = Callable[[str | None],
-                           tuple[control_pb2.ControlResponse, str]]
 
     def __init__(self, name: str, publisher: pub.Publisher,
                  control_server: ctrl_srvr.ControlServer,
@@ -163,7 +151,6 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         self.zctrl_params = feedback_pb2.ZCtrlParameters()
 
         self.param_method_map = {}
-        self.set_param_map = {}
 
         # AfspmComponent constructor: no control_client provided, as that
         # logic is handled by the control_server.
@@ -183,7 +170,6 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                 self.on_set_zctrl_params,
             control_pb2.ControlRequest.REQ_PARAM: self._handle_param_request,
         })
-
 
     @abstractmethod
     def on_start_scan(self) -> control_pb2.ControlResponse:
@@ -235,7 +221,10 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         """Obtain latest performed scans.
 
         We will compare the prior scans (or first of each) to the latest to
-        determine if the scan succeeded (i.e. they are different).
+        determine if the scan succeeded (i.e. they are different). Note that
+        each channel is a different scan! Thus, when we say 'latest scans',
+        we really mean the latest single- or multi-channel scan, provided as
+        a list of Scan2ds (with each Scan2d being a channel of the scan).
 
         Note that we will first consider the timestamp attribute when
         comparing scans. If this attribute is not passed, we will do
@@ -250,7 +239,7 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         """
 
     def _handle_polling_device(self):
-        """Polls aspects of device, and publishes changes (including scans).
+        """Poll aspects of device, and publishes changes (including scans).
 
         Note: we expect scan state to be sent *last*, so that any client has
         the ability to validate the expected changes have taken effect. Put
@@ -272,7 +261,7 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
 
             both_have_scans = len(self.scans) > 0 and len(old_scans) > 0
             only_new_has_scans = (len(self.scans) > 0 and
-                                    len(old_scans) == 0)
+                                  len(old_scans) == 0)
             timestamps_different = (
                 both_have_scans and
                 self.scans[0].HasField(self.TIMESTAMP_ATTRIB) and
@@ -313,7 +302,7 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             self.publisher.send_msg(scan_state_msg)
 
     def _handle_incoming_requests(self):
-        """Polls control_server for requests and responds to them."""
+        """Poll control_server for requests and responds to them."""
         req, proto = self.control_server.poll()
         if req:  # Ensure we received something
             # Refuse most requests while moving/scanning (not free)
@@ -370,13 +359,14 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                     param)
 
         if param.HasField(self.PARAM_VALUE_ATTRIB):
-            self.set_param_map[param.parameter] = param.value  # Store set val
-            rep, new_val = self.param_method_map[param.parameter](param.value)
+            rep, val, units = self.param_method_map[param.parameter](
+                self, param.value, param.units)
         else:
-            rep, new_val = self.param_method_map[param.parameter]()
+            rep, val, units = self.param_method_map[param.parameter](self)
 
-        if new_val:
-            param.value = new_val
+        if val:
+            param.value = val
+            param.units = units
         return (rep, param)
 
     def run_per_loop(self):
@@ -393,3 +383,21 @@ def get_file_modification_datetime(filename: str) -> datetime.datetime:
     """
     return datetime.datetime.fromtimestamp(os.path.getmtime(filename),
                                            tz=datetime.timezone.utc)
+
+
+# Description of method for DeviceController.param_method_map).
+#
+# This method takes in the controller, an optional set_value (if setting), and
+# an optional units str (required if are set_value is provided).
+# It returns (ControlResponse, get_value, units) of the operation. Passing the
+# controller allows using internal variables that may be needed/desired.
+#
+# Your ParamMethod is responsible for converting the received value to your
+# internal reference units, if not the same (see utils/units.py). In the same
+# fashion, the component that made this request is responsible for converting
+# the *received* value into *its own* reference units. See
+# docs/design_philosphy.md for more info.
+#
+# NOTE: The input and output params are str!
+ParamMethod = Callable[[DeviceController, str | None, str | None],
+                       tuple[control_pb2.ControlResponse, str, str]]

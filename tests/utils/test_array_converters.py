@@ -9,7 +9,7 @@ import pytest
 
 
 TEST_IMG_PATH = (str(Path(__file__).parent.parent.resolve()) + sep + "data" +
-                     sep + "sample.png")
+                 sep + "sample.png")
 
 
 class TestConverters:

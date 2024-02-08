@@ -1,4 +1,4 @@
-""" ROI Analysis methods."""
+"""ROI Analysis methods."""
 
 import logging
 from dataclasses import dataclass
@@ -6,7 +6,7 @@ import numpy as np
 
 from google.protobuf.message import Message
 
-from afspm.spawn import LOGGER_ROOT
+from afspm.utils.log import LOGGER_ROOT
 from afspm.components.component import AfspmComponent
 
 from afspm.io.protos.generated import scan_pb2

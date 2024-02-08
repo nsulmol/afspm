@@ -6,7 +6,6 @@ import threading
 import pytest
 import zmq
 
-from afspm.io.control import commands as cmd
 from afspm.io.control import client as ctrl_client
 from afspm.io.control import server as ctrl_srvr
 from afspm.io.control import router as ctrl_rtr
@@ -167,6 +166,7 @@ class TestServerWithClient:
     @pytest.fixture
     def srv_client(self, server_url, ctx):
         return ctrl_client.ControlClient(server_url, ctx)
+
     @pytest.fixture
     def srv_client_server_methods(self, srv_client):
         return [(srv_client.start_scan, None),
@@ -174,6 +174,7 @@ class TestServerWithClient:
                 (srv_client.set_scan_params, scan_pb2.ScanParameters2d()),
                 (srv_client.set_zctrl_params, feedback_pb2.ZCtrlParameters()),
                 (srv_client.request_parameter, control_pb2.ParameterMsg())]
+
     @pytest.fixture
     def srv_client_router_methods(self, srv_client, problem):
         return [(srv_client.request_control, control_pb2.ControlMode.CM_AUTOMATED),
@@ -208,12 +209,14 @@ class TestRouterServerClient:
     @pytest.fixture
     def rtr_client(self, router_url, ctx):
         return ctrl_client.ControlClient(router_url, ctx)
+
     @pytest.fixture
     def rtr_client_server_methods(self, rtr_client):
         return [(rtr_client.start_scan, None),
                 (rtr_client.stop_scan, None),
                 (rtr_client.set_scan_params, scan_pb2.ScanParameters2d()),
                 (rtr_client.set_zctrl_params, feedback_pb2.ZCtrlParameters())]
+
     @pytest.fixture
     def srv_client_router_methods(self, rtr_client, problem):
         return [(rtr_client.request_control, control_pb2.ControlMode.CM_AUTOMATED),
@@ -231,7 +234,6 @@ class TestRouterServerClient:
 
         comm_pub.send_multipart([CommEnvelope.KILL.value.encode(),
                                  b''])
-
 
     def test_requests_with_control(self, ctx, server_url, router_url,
                                    comm_url, comm_pub, timeout_ms,
@@ -257,7 +259,6 @@ class TestRouterServerClient:
 
         comm_pub.send_multipart([CommEnvelope.KILL.value.encode(),
                                  b''])
-
 
     def test_control_after_problem(self, ctx, server_url, router_url,
                                    comm_url, comm_pub, timeout_ms,

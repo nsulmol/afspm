@@ -2,7 +2,6 @@
 
 import threading
 from enum import Enum
-import time
 import pytest
 import zmq
 
@@ -51,9 +50,11 @@ def hb_listener_timeout_ms(beat_period_s, comm_timeout_ms):
 def missed_beats_before_dead():
     return 2
 
+
 @pytest.fixture
 def hb_count_flushing():
     return 3
+
 
 @pytest.fixture
 def hb_count_non_flushing():
@@ -122,6 +123,7 @@ def heartbeat_routine(ctx, hb_url, beat_period_s, comm_url,
                 heartbeat.handle_closing()
             if comm_msg in [CommMessage.CRASH, CommMessage.END]:
                 break
+
 
 def check_hb_n_times(hb_listener: HeartbeatListener, hb_count: int,
                      assert_check: bool):

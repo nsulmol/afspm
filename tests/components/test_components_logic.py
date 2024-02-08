@@ -8,25 +8,17 @@ import pytest
 import zmq
 
 from google.protobuf.message import Message
-from google.protobuf.timestamp_pb2 import Timestamp
 
-from afspm.components.device.controller import DeviceController
 from afspm.components.device.params import DeviceParameter
 from afspm.components.afspm.controller import AfspmController
 from afspm.components.component import AfspmComponentBase
 
-
 from afspm.io import common
 from afspm.io.pubsub.subscriber import Subscriber
-from afspm.io.pubsub.publisher import Publisher
-from afspm.io.pubsub.cache import PubSubCache
 from afspm.io.pubsub.logic import cache_logic as cl
 from afspm.io.pubsub.logic import pbc_logic as pbc
 
-
-from afspm.io.control.server import ControlServer
-from afspm.io.control.router import ControlRouter
-from afspm.io.control.client import ControlClient, AdminControlClient
+from afspm.io.control.client import AdminControlClient
 
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
@@ -75,6 +67,7 @@ def default_control_state():
 @pytest.fixture(scope="module")
 def wait_count():
     return 3
+
 
 @pytest.fixture(scope="module")
 def wait_ms():
@@ -440,7 +433,7 @@ def test_set_control_mode(thread_device_controller, thread_afspm_controller,
 
 def test_set_get_params(thread_device_controller, thread_afspm_controller,
                         afspm_component, wait_count, default_control_state,
-                        component_name,):
+                        component_name):
     """Confirm we can get/set supported params, and fail on unsupported."""
     startup_and_req_ctrl(afspm_component, default_control_state,
                          component_name, wait_count)
@@ -453,23 +446,24 @@ def test_set_get_params(thread_device_controller, thread_afspm_controller,
 
     # Supported param succeeds.
     param_msg = control_pb2.ParameterMsg(
-        parameter=DeviceParameter.OPERATING_MODE)
-    rep, obj = afspm_component.control_client.request_parameter(param_msg)
+        parameter=DeviceParameter.SCAN_SPEED)
+    rep, param_msg = afspm_component.control_client.request_parameter(param_msg)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
-    assert obj.value == "AM-AFM"
+    assert param_msg.value == str(500)  # from sample_components.py::SampleDeviceController
 
-    param_msg.value = "FM-AFM"
-    rep, obj = afspm_component.control_client.request_parameter(param_msg)
+    new_val = str(750.0)
+    param_msg.value = new_val
+    rep, param_msg = afspm_component.control_client.request_parameter(param_msg)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
-    assert obj.value == "FM-AFM"
+    assert param_msg.value == new_val
 
     # Setting failure is passed onto client. This one gets properly, but
     # fails on a set.
     param_msg = control_pb2.ParameterMsg(
         parameter=DeviceParameter.TIP_VIBRATING_AMPL)
-    rep, obj = afspm_component.control_client.request_parameter(param_msg)
+    rep, param_msg = afspm_component.control_client.request_parameter(param_msg)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
     param_msg.value = "33"
-    rep, obj = afspm_component.control_client.request_parameter(param_msg)
+    rep, param_msg = afspm_component.control_client.request_parameter(param_msg)
     assert rep == control_pb2.ControlResponse.REP_PARAM_ERROR

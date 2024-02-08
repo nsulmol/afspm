@@ -1,12 +1,11 @@
 """Experimenter that alternates between large and small scans."""
 
 import logging
-from typing import Callable
 import numpy as np
 
 from google.protobuf.message import Message
 
-from afspm.spawn import LOGGER_ROOT
+from afspm.utils.log import LOGGER_ROOT
 from afspm.components.component import AfspmComponent
 from afspm.components.scan_handler import ScanHandler
 from afspm.io import common

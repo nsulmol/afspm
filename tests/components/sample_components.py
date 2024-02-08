@@ -2,6 +2,9 @@
 
 import time
 import logging
+from typing import Optional
+
+from afspm.utils.units import convert
 
 from afspm.components.device.controller import DeviceController
 from afspm.components.device.params import DeviceParameter
@@ -28,7 +31,11 @@ logger = logging.getLogger(__name__)
 class SampleDeviceController(DeviceController):
 
     def __init__(self, scan_time_s, move_time_s, **kwargs):
-        self.operating_mode = 'AM-AFM'
+        self.scan_speed = 500
+        self.ss_units = 'nm/s'
+
+        self.vib_ampl_units = '%'
+
         self.start_ts = None
         self.dev_scan_state = scan_pb2.ScanState.SS_FREE
         self.dev_scan_params = scan_pb2.ScanParameters2d()
@@ -39,8 +46,8 @@ class SampleDeviceController(DeviceController):
         kwargs['name'] = 'dev_con'
         super().__init__(**kwargs)
 
-        self.param_method_map = {DeviceParameter.OPERATING_MODE:
-                                 self.handle_operating_mode,
+        self.param_method_map = {DeviceParameter.SCAN_SPEED:
+                                 self.handle_scan_speed,
                                  DeviceParameter.TIP_VIBRATING_AMPL:
                                  self.fail_on_vib_ampl}
 
@@ -77,23 +84,31 @@ class SampleDeviceController(DeviceController):
     def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
         return feedback_pb2.ZCtrlParameters()
 
-    def handle_operating_mode(self, set_value: str = None
-                              ) -> (control_pb2.ControlResponse, str):
-        """Get/set operating mode.
+    def handle_scan_speed(self, ctrlr: DeviceController,
+                          val: Optional[str] = None,
+                          units: Optional[str] = None,
+                          ) -> (control_pb2.ControlResponse, str, str):
+        """Get/set scan speed.
 
         Arguments:
-            set_value: if not None, the value we should set
-                our operating mode to (as a str).
+            ctrl: a reference to the DeviceController.
+            val: if not None, the value we should set.
+            units: if not None, the units of the provided value.
         Returns:
             - success/failure of operation
-            - the value of operating mode at the end of the method.
+            - the value at end of the method.
+            - the units of value.
         """
-        if set_value:
-            self.operating_mode = set_value
-        return (control_pb2.ControlResponse.REP_SUCCESS, self.operating_mode)
+        if val:
+            if not units:
+                return (control_pb2.ControlResponse.REP_PARAM_ERROR, None, None)
+            self.scan_speed = convert(float(val), units, self.ss_units)
+        return (control_pb2.ControlResponse.REP_SUCCESS, str(self.scan_speed),
+                self.ss_units)
 
-
-    def fail_on_vib_ampl(self, set_value: str = None
+    def fail_on_vib_ampl(self, ctrlr: DeviceController,
+                         val: Optional[str] = None,
+                         units: Optional[str] = None
                          ) -> (control_pb2.ControlResponse, str):
         """Get/set with failure case.
 
@@ -101,17 +116,21 @@ class SampleDeviceController(DeviceController):
         We simply want to ensure the failure is passed on.
 
         Arguments:
-            set_value: if not None, the value we should set our operating
-                mode to (as a str).
+            ctrlr: a reference to the DeviceController
+            val: if not None, the value we should set.
+            units: if not None, the units of the provided value.
+
         Returns:
             - success/failure of operation
-            - the value of operating mode at the end of the method. On failure,
-            return set_value.
+            - the value of at end of the method.
+            - the units of the value.
         """
-        if set_value:
-            return (control_pb2.ControlResponse.REP_PARAM_ERROR, set_value)
+        if val:
+            return (control_pb2.ControlResponse.REP_PARAM_ERROR, None,
+                    self.vib_ampl_units)
         else:
-            return (control_pb2.ControlResponse.REP_SUCCESS, "25")
+            return (control_pb2.ControlResponse.REP_SUCCESS, "25",
+                    self.vib_ampl_units)
 
     def run_per_loop(self):
         if self.start_ts:

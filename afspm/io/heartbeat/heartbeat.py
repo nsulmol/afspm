@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 class HBMessage(Enum):
     """Different messages we can send over our heartbeat socket."""
+
     HEARTBEAT = 0
     KILL = 1
 
@@ -34,6 +35,7 @@ class Heartbeater:
         _last_beat_ts: a timestamp of the last time we sent a
             heartbeat.
     """
+
     def __init__(self, url: str,
                  beat_period_s: int = common.HEARTBEAT_PERIOD_S,
                  ctx: zmq.Context = None, **kwargs):
@@ -96,6 +98,7 @@ class HeartbeatListener:
         _last_beat_ts: the timestamp of the last beat.
         _poll_timeout_ms: the poll timeout, in milliseconds.
     """
+
     def __init__(self, url: str, beat_period_s: int = common.HEARTBEAT_PERIOD_S,
                  missed_beats_before_dead: int = common.BEATS_BEFORE_DEAD,
                  poll_timeout_ms: int = common.POLL_TIMEOUT_MS,
@@ -129,7 +132,7 @@ class HeartbeatListener:
         common.sleep_on_socket_startup()
 
     def check_is_alive(self) -> bool:
-        """Checks if the Hearbeater is alive.
+        """Check if the Hearbeater is alive.
 
         If self.time_before_dead_ms has already been met, we do not even poll.
         If not, we poll and check for a heartbeat or KILL signal.

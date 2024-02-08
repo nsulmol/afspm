@@ -39,13 +39,14 @@ class AfspmComponentBase:
     override to add logic to-be-run per loop.
 
     On startup, an AfspmComponent will open a Heartbeater node with url
-    "ipc://$NAME$", where $NAME$ is the component name, assumed to be a uuid
-    for the duration of the experiment
+    "ipc://$TMP$/$NAME$", where $NAME$ is the component name (assumed to be a
+    uuid for the duration of the experiment) and $TMP$ is a temporary directory
+    defined by the OS.
 
     Attributes:
         ctx: ZMQ context, kept so we can force-close everything when ending.
         name: the chosen component 'name'.
-        heartbeater: Heatbeater instance, to send heartbeats to any monitoring
+        heartbeater: Heartbeater instance, to send heartbeats to any monitoring
             listener.
         loop_sleep_s: how long the component sleeps between loops in its main
             loop.
@@ -56,6 +57,7 @@ class AfspmComponentBase:
         stay_alive: boolean indicating whether we should continue looping in
             run(). In other words, if False, run() ends.
     """
+
     def __init__(self, name: str,
                  subscriber: sub.Subscriber = None,
                  control_client: ctrl_client.ControlClient = None,
@@ -94,7 +96,7 @@ class AfspmComponentBase:
             self.control_client.set_uuid(self.name)
 
     def run(self):
-        """Main loop."""
+        """Loop."""
         logger.info("Starting main loop for component %s", self.name)
 
         try:
@@ -129,7 +131,7 @@ class AfspmComponentBase:
                     self.on_message_received(msg[0], msg[1])
 
     def run_per_loop(self):
-        """Method that is run on every iteration of the main loop.
+        """Run on every iteration of the main loop.
 
         If you would like to implement any *general* logic to perform every
         loop, override this method. (Avoid modifying run(), as this handles
@@ -180,6 +182,7 @@ class AfspmComponent(AfspmComponentBase):
         methods_kwargs: any additional arguments to be fed to
             message_received_method and per_loop_method.
     """
+
     def __init__(self, publisher: pub.Publisher = None,
                  message_received_method: Callable = None,
                  per_loop_method: Callable = None,
@@ -195,7 +198,7 @@ class AfspmComponent(AfspmComponentBase):
         super().__init__(**kwargs)
 
     def run_per_loop(self):
-        """Override to run per_loop_method"""
+        """Override run per_loop_method."""
         if self.per_loop_method:
             self.per_loop_method(self, **self.methods_kwargs)
 

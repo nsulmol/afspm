@@ -3,9 +3,7 @@ import logging
 import numpy as np
 from dataclasses import dataclass
 
-from google.protobuf.message import Message
-
-from afspm.spawn import LOGGER_ROOT
+from afspm.utils.log import LOGGER_ROOT
 from afspm.components.component import AfspmComponent
 
 from afspm.io import common

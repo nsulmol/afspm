@@ -2,19 +2,14 @@
 
 import os.path
 import logging
-from typing import Any
-import zmq
-from google.protobuf.message import Message
 
 from afspm.components.device.controller import (DeviceController,
                                                 get_file_modification_datetime)
 from afspm.components.device.controllers.gxsm.params import (
     PARAM_METHOD_MAP, get_param_list, set_param_list, GxsmParameter,
-    get_param, set_param, handle_get_set_scan_time)
+    get_param)
 from afspm.components.device.params import DeviceParameter, ParameterError
 
-
-from afspm.utils import units
 from afspm.utils import array_converters as conv
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
@@ -100,14 +95,6 @@ class GxsmController(DeviceController):
                       self.gxsm_physical_units,
                       None, None]
 
-        # If scan time has been set previously, need to reset on scan params
-        # changing (since gxsm stores as scan speed).
-        if DeviceParameter.SCAN_TIME_S in self.set_param_map:
-            res, __ = handle_get_set_scan_time(
-                self.set_param_map[DeviceParameter.SCAN_TIME_S])
-            if res != control_pb2.ControlResponse.REP_SUCCESS:
-                return control_pb2.ControlResponse.REP_PARAM_ERROR
-
         # Note: when setting scan params, data units don't matter! These
         # are only important in explicit scans. When setting scan params,
         # we only care about the data shape, which is pixel-units.
@@ -128,7 +115,7 @@ class GxsmController(DeviceController):
         return control_pb2.ControlResponse.REP_PARAM_ERROR
 
     def poll_scan_state(self) -> scan_pb2.ScanState:
-        """Returns current scan state in accordance with system model."""
+        """Return current scan state in accordance with system model."""
         # Note: updating self.scan_state is handled by the calling method
         # in DeviceController.
         state = self._get_current_scan_state()
@@ -222,7 +209,6 @@ class GxsmController(DeviceController):
         zctrl_params.proportionalGain = vals[0]
         zctrl_params.integralGain = vals[1]
         return zctrl_params
-
 
     @staticmethod
     def _get_current_scan_state() -> scan_pb2.ScanState:

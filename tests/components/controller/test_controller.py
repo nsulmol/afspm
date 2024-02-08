@@ -2,11 +2,11 @@
 
 In order to run it, you must:
 1. Start up the afspmcon, via a call like the following:
-    spawn config.toml --components_to_spawn ['afspmcon']
+    poetry run spawn config.toml --components_to_spawn ['afspmcon']
 2. Start up the device controller you wish to test. This startup will be
 implementation-specific (look at the readme for your controller).
 3. Run these tests:
-    pytest $PATH_TO_TEST/test_controller.py --config_path $CONFIG_FILE_PATH
+    poetry run pytest $PATH_TO_TEST/test_controller.py --config_path $CONFIG_FILE_PATH
 Note the default config path is './config.toml'.
 
 Your config file contains the parameters for our tests. See sample_config.toml
@@ -14,7 +14,7 @@ for guidance.
 
 Ideally, you should set your controller's scan parameters to scan quickly
 before running these tests. For example, increase your scan speed and
-decrease your ROI size to pass the test more quickly.
+decrease your ROI size to pass the test more quickly. This can be accomplished by including SCAN_SPEED_KEY, PHYS_SIZE_KEY, and DATA_SHAPE_KEY keys in your config, with appropriate values. See these variables below, or look at sample_config.toml.
 """
 
 from typing import Optional
@@ -30,21 +30,23 @@ from google.protobuf.message import Message
 from afspm.io import common
 from afspm.io.pubsub.subscriber import Subscriber
 from afspm.io.pubsub.logic import cache_logic as cl
-from afspm.io.control.client import ControlClient, AdminControlClient
+from afspm.io.control.client import ControlClient
 
-from afspm.components.component import AfspmComponent
-from afspm.components.afspm.controller import AfspmController
 from afspm.components.device import params
+from afspm.utils.log import LOGGER_ROOT
+from afspm.utils import units
 
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
 from afspm.io.protos.generated import feedback_pb2
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(LOGGER_ROOT + '.samples.testing.test_controller.' +
+                           __name__)
 
 
 # Constants for config
+SCAN_SPEED_KEY = 'scan-speed-nm-s'
 PHYS_SIZE_KEY = 'phys-size-nm'
 DATA_SHAPE_KEY = 'data-shape'
 
@@ -86,6 +88,7 @@ def psc_url(config_dict):
 def router_url(config_dict):
     return config_dict['router_url']
 
+
 @pytest.fixture(scope="module")
 def control_mode():
     return control_pb2.ControlMode.CM_AUTOMATED
@@ -113,6 +116,7 @@ def topics_scan_params():
 @pytest.fixture(scope="module")
 def topics_scan_state():
     return [cl.CacheLogic.get_envelope_for_proto(scan_pb2.ScanStateMsg())]
+
 
 @pytest.fixture(scope="module")
 def topics_zctrl():
@@ -175,6 +179,7 @@ def stop_client(client: ControlClient):
     del client  # Explicitly kill to avoid zmq weirdness.
     time.sleep(1)
 
+
 def startup_grab_control(client: ControlClient,
                          control_mode: control_pb2.ControlMode.CM_AUTOMATED):
     """Request and get control of the device controller."""
@@ -196,13 +201,14 @@ def assert_and_return_message(sub: Subscriber):
 
 
 # ----- test_run_scan specific methods ----- #
-def get_config_scan_time(config_dict: dict,
-                         client: ControlClient) -> Optional[tuple[float, float]]:
-    """Determines if we are initing scan time (for a faster scan).
+def get_config_scan_speed(config_dict: dict,
+                          client: ControlClient
+                          ) -> Optional[tuple[float, float]]:
+    """Determines if we are initing scan speed (for a faster scan).
 
-    Checks if a desired scan time was provided via the config, and the client
-    supports setting scan time. If so, we return the desired scan time and
-    the current/init scan time the device controller has set.
+    Checks if a desired scan speed was provided via the config, and the client
+    supports setting scan speed. If so, we return the desired speed and
+    the current/init speed the device controller has set.
 
     Args:
         config_dict: configuration dictionary for our tests.
@@ -211,14 +217,16 @@ def get_config_scan_time(config_dict: dict,
     Returns:
         (float, float) tuple, containing (desired_val, init_val).
     """
-    if params.DeviceParameter.SCAN_TIME_S in config_dict:
-        desired_param = config_dict[params.DeviceParameter.SCAN_TIME_S]
+    if SCAN_SPEED_KEY in config_dict:
+        desired_param = config_dict[SCAN_SPEED_KEY]
         param_msg = control_pb2.ParameterMsg(
-            parameter=params.DeviceParameter.SCAN_TIME_S)
+            parameter=params.DeviceParameter.SCAN_SPEED)
         rep, init_scan_msg = client.request_parameter(param_msg)
         if rep == control_pb2.ControlResponse.REP_SUCCESS:
-            return desired_param, float(init_scan_msg.value)
-        logger.info("Controller failed setting/getting scan time, "
+            init_val_nm = units.convert(float(init_scan_msg.value),
+                                     init_scan_msg.units, 'nm/s')
+            return desired_param, init_val_nm
+        logger.info("Controller failed setting/getting scan speed, "
                     "returned response: %s",
                     common.get_enum_str(control_pb2.ControlResponse, rep))
     return None
@@ -238,13 +246,13 @@ def get_config_data_shape(config_dict: dict) -> Optional[list[int, int]]:
     return None
 
 
-def set_scan_time(client: ControlClient, scan_time_s: float):
+def set_scan_speed(client: ControlClient, scan_speed_nm_s: float):
     param_msg = control_pb2.ParameterMsg(
-        parameter=params.DeviceParameter.SCAN_TIME_S,
-        value=str(scan_time_s))
+        parameter=params.DeviceParameter.SCAN_SPEED,
+        value=str(scan_speed_nm_s), units='nm/s')
 
-    logger.info("Setting scan time to desired to: %s",
-                scan_time_s)
+    logger.info("Setting scan speed to desired: %s nm/s",
+                scan_speed_nm_s)
     rep, __ = client.request_parameter(param_msg)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
@@ -364,11 +372,11 @@ def test_run_scan(client, default_control_state,
 
     logger.info("First, check if we provided specific scan parameters "
                 "(so the scan is not super long)")
-    scan_time_tuple = get_config_scan_time(config_dict, client)
-    orig_scan_time_s = None
-    if scan_time_tuple:
-        orig_scan_time_s = scan_time_tuple[1]
-        set_scan_time(client, scan_time_tuple[0])
+    scan_speed_tuple = get_config_scan_speed(config_dict, client)
+    orig_scan_speed = None
+    if scan_speed_tuple:
+        orig_scan_speed = scan_speed_tuple[1]
+        set_scan_speed(client, scan_speed_tuple[0])
 
     desired_phys_size_nm = get_config_phys_size_nm(config_dict)
     desired_data_shape = get_config_data_shape(config_dict)
@@ -405,10 +413,10 @@ def test_run_scan(client, default_control_state,
     scan_state_msg.scan_state = scan_pb2.ScanState.SS_FREE
     assert_sub_received_proto(sub_scan_state, scan_state_msg)
 
-    if orig_scan_time_s or orig_scan_params:
-        logger.info("Reset our scan settings to what they were before this test.")
-        if orig_scan_time_s:
-            set_scan_time(client, orig_scan_time_s)
+    if orig_scan_speed or orig_scan_params:
+        logger.info("Reset scan settings to what they were before the test.")
+        if orig_scan_speed:
+            set_scan_speed(client, orig_scan_speed)
         if orig_scan_params:
             set_scan_params(client, orig_scan_params)
 

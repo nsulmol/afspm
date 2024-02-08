@@ -26,7 +26,7 @@ class ProtoBasedCacheLogic(CacheLogic):
 
     def __init__(self, proto_with_history_list: list[(Message, int)] =
                  DEFAULT_PROTO_WITH_HIST_SEQ):
-
+        """Init our Proto-Based cache logic."""
         self.envelope_to_history_map = {}
         self.envelope_to_proto_map = {}
 
@@ -42,6 +42,7 @@ class ProtoBasedCacheLogic(CacheLogic):
                 proto)
 
     def extract_proto(self, msg: list[bytes]) -> Message:
+        """Overload parent."""
         envelope, contents = msg
         envelope = envelope.decode()
         if envelope not in self.envelope_to_proto_map:
@@ -62,8 +63,8 @@ class ProtoBasedCacheLogic(CacheLogic):
         proto.ParseFromString(contents)
         return proto
 
-    def update_cache(self, proto: Message, cache: dict[str, Iterable]
-                     ):
+    def update_cache(self, proto: Message, cache: dict[str, Iterable]):
+        """Overload parent."""
         envelope = self.get_envelope_for_proto(proto)
         if envelope not in cache:
             cache[envelope] = deque(maxlen=self.envelope_to_history_map[
@@ -82,6 +83,7 @@ class PBCScanLogic(ProtoBasedCacheLogic):
     Attributes:
         scan_id: holds string uuid for Scan2d, for help parsing.
     """
+
     scan_id = ProtoBasedCacheLogic.get_envelope_for_proto(
         scan_pb2.Scan2d())
     divider = '_'
@@ -89,7 +91,6 @@ class PBCScanLogic(ProtoBasedCacheLogic):
     def __init__(self, proto_with_history_list: list[(Message, int)] =
                  DEFAULT_PROTO_WITH_HIST_SEQ,
                  default_scan_history: int = 1, **kwargs):
-
         """Override to force default Scan2d history and protos."""
         super().__init__(proto_with_history_list, **kwargs)
 
@@ -104,7 +105,7 @@ class PBCScanLogic(ProtoBasedCacheLogic):
     @staticmethod
     def get_envelope_for_proto(proto: Message,
                                force_parent: bool = False) -> str:
-        """ Overrides standard mechanism for cache_case.
+        """Override standard mechanism for cache_case.
 
         Args:
             proto: protobuf message.
@@ -139,7 +140,7 @@ class PBCScanLogic(ProtoBasedCacheLogic):
 def create_roi_proto_hist_list(sizes_with_hist_list:
                                list[tuple[tuple[float, float], int]]
                                ) -> list[(Message, int)]:
-    """Helper to create a proto-with-hist list for special ROIs.
+    """Create a proto-with-hist list for special ROIs.
 
     Args:
         sizes_with_hist_list: list of (size, cache_length), where size is
@@ -148,7 +149,6 @@ def create_roi_proto_hist_list(sizes_with_hist_list:
     Returns:
         A proto-history list, for instantiation of a PBCWithROi cache logic.
     """
-
     proto_with_hist_list = list(DEFAULT_PROTO_WITH_HIST_SEQ)
     for (size, hist) in sizes_with_hist_list:
         scan_params = common.create_scan_params_2d(size=[size[0], size[1]])
@@ -158,7 +158,7 @@ def create_roi_proto_hist_list(sizes_with_hist_list:
 
 
 def create_roi_scan_envelope(size: tuple[float, float]) -> str:
-    """Helper to create envelope for Scan2d of specific size."""
+    """Create envelope for Scan2d of specific size."""
     scan_params = common.create_scan_params_2d(size=[size[0], size[1]])
     scan_2d = scan_pb2.Scan2d(params=scan_params)
     return PBCScanLogic.get_envelope_for_proto(scan_2d)

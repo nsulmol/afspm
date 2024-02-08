@@ -19,15 +19,13 @@ from google.protobuf.message import Message
 
 from .component import AfspmComponent
 from .scan_handler import ScanningComponent
-from ..io import common
 
-from ..io.protos.generated import geometry_pb2
 from ..io.protos.generated import scan_pb2
 from ..io.protos.generated import control_pb2
 from ..io.protos.generated import feedback_pb2
 
-from ..io.control.client import ControlClient, send_req_handle_ctrl
 
+from ..io.control.client import send_req_handle_ctrl
 from ..utils import array_converters as ac
 
 
@@ -43,10 +41,11 @@ _THRESHOLD_FACTOR = 0.02  # 2%
 @dataclass
 class AnalysisConfig:
     """Configuration parameters for feedback analysis."""
+
     over_slope_factor: float = _SLOPE_FACTOR  # k1 in paper
     over_offset_factor: float = _OFFSET_FACTOR  # k2 in paper
     under_slope_factor: float = 1 / _SLOPE_FACTOR  # k1 equiv. for under
-    under_offset_factor: float = 1 / _OFFSET_FACTOR # k2 equiv. for under
+    under_offset_factor: float = 1 / _OFFSET_FACTOR  # k2 equiv. for under
 
     over_threshold: float = _THRESHOLD_FACTOR
     under_threshold: float = _THRESHOLD_FACTOR
@@ -73,7 +72,6 @@ def analyze_feedback_on_scan(scan: scan_pb2.Scan2d,
     Returns:
         A FeedbackAnalysis message, containing the over/under proportions.
     """
-
     # First, sum scanlines to get one total scanline
     xarr = ac.convert_scan_pb2_to_xarray(scan)
     over_proportion, under_proportion = analyze_feedback_on_arr(xarr, config)
@@ -144,7 +142,7 @@ def analyze_feedback_on_arr(arr: np.ndarray,
 
 def convert_freq_domain(arr: np.ndarray,
                         use_hanning_window: bool) -> (np.ndarray, np.ndarray):
-    """Converts data from spatial domain to frequency domain.
+    """Convert data from spatial domain to frequency domain.
 
     Given a numpy array, converts to frequency domain by (a) passing
     a Hann window over the data, and (b) running the FFT on it.
@@ -227,6 +225,7 @@ class FeedbackAnalyzer(AfspmComponent):
         _zctrl_params: store ZCtrlParams, as we only want to run our
             analysis if the feedback is actually on.
     """
+
     def __init__(self, config: AnalysisConfig, **kwargs):
         self.config = config
         self._zctrl_params = None
@@ -262,6 +261,7 @@ _STABILITY_MARGIN = 0.7  # 70% over value where ringing occurs
 
 class CorrectionState(Enum):
     """State of FeedbackCorrector."""
+
     NOT_RUNNING = auto()
     INIT = auto()
     CORRECT_I_STD = auto()
@@ -296,6 +296,7 @@ _INTEGRAL_STATES = [CorrectionState.CORRECT_I_STD,
 @dataclass
 class CorrectionConfig:
     """Configuration parameters for feedback correction."""
+
     pi_inits: (float, float) = None  # If None, will not set on start
     pi_updates_std: (float, float) = (_STANDARD_PI_UPDATE_FACTOR,
                                       _STANDARD_PI_UPDATE_FACTOR)

@@ -10,7 +10,7 @@ All other methods are used within these and thus private.
 import copy
 import logging
 from importlib import import_module
-from typing import Any
+from typing import Any, Callable
 
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ CLASS_KEY = 'class'
 
 
 def expand_variables_in_dict(config_dict: dict) -> dict:
-    """Replaces any 'variable' values in a dict with their values.
+    """Replace any 'variable' values in a dict with their values.
 
     Given a dictionary of key:val pairs where some values correspond to other
     keys, this method will replace all variables with their value (in effect
@@ -90,7 +90,7 @@ def _expand_variables_recursively(config_dict: dict, sub_dict: dict) -> dict:
             elif (isinstance(sub_dict[key], str) and
                   sub_dict[key] in config_dict):  # Expand variable
                 logger.debug("Expanding %s into %s.", sub_dict[key],
-                            config_dict[sub_dict[key]])
+                             config_dict[sub_dict[key]])
                 sub_dict[key] = config_dict[sub_dict[key]]
             else:  # Copy value over (this is not a variable)
                 logger.trace("Keeping %s for key %s", sub_dict[key], key)
@@ -121,14 +121,16 @@ def _expand_variables_list_recursively(config_dict: dict, in_list: list
         elif (isinstance(in_list[idx], str) and
               in_list[idx] in config_dict):  # Expand variable
             logger.debug("Expanding %s into %s.", in_list[idx],
-                        config_dict[in_list[idx]])
+                         config_dict[in_list[idx]])
             in_list[idx] = config_dict[in_list[idx]]
 
     return in_list
 
 
-def construct_and_run_component(params_dict: dict):
-    """Method to build and run an AfspmComponent, for use with multiprocess.
+def construct_and_run_component(params_dict: dict,
+                                log_init_method: Callable = None,
+                                log_init_args: tuple = None):
+    """Build and run an AfspmComponent, for use with multiprocess.
 
     This method functions as the process method fed to each mp.Process
     constructor, to start up a component and run it.
@@ -170,10 +172,18 @@ def construct_and_run_component(params_dict: dict):
     With this done, we can instantiate our actual AfspmComponent instance using
     a kwargs dict consisting of the other values in this params_dict.
 
+    Note: we also receive an optional log_init_method (and input args), to
+    initialize the logger of this new component.
+
     Args:
         params_dict: dictionary of parameters to feed the
             AfspmComponent's constructor.
+        log_init_method: optional method to run, to set up logging parameters.
+        log_init_args: optional arguments to pass to log_init_method.
     """
+    if log_init_method is not None and log_init_args is not None:
+        log_init_method(*log_init_args)
+
     try:
         component = _construct_component(params_dict)
         component.run()
@@ -181,8 +191,8 @@ def construct_and_run_component(params_dict: dict):
         logger.exception(error)
 
 
-def _construct_component(params_dict: dict) -> Any:  # Fix typing here!!!
-    """Method to build a component from a dict of parameters.
+def _construct_component(params_dict: dict) -> Any:
+    """Build a component from a dict of parameters.
 
     See construct_and_run_component() for full documentation.
     """
@@ -261,7 +271,7 @@ def _evaluate_values_list_recursively(values_list: list) -> list:
 
 
 def _instantiate_classes_recursively(params_dict: dict) -> Any | dict:
-    """Recursively instantiate classes within a provided dict.
+    """Instantiate classes recursively within a provided dict.
 
     This method will recursively search through a dictionary, finding
     dictionaries containing a 'class' key and instantiating them using that
@@ -276,7 +286,6 @@ def _instantiate_classes_recursively(params_dict: dict) -> Any | dict:
         - The input dictionary, with all values handled, or
         - An instantiated class.
     """
-
     final_dict = {}
     for key in params_dict:
         if isinstance(params_dict[key], dict):  # Go deeper in 'tree'
@@ -388,7 +397,6 @@ def _import_from_string(obj_path: str) -> Any:
     Returns:
         The imported object.
     """
-
     top_mod_path, _, top_obj = obj_path.rpartition('.')
     sub_mod_path, _, sub_obj = top_mod_path.rpartition('.')
 
@@ -404,6 +412,11 @@ def _import_from_string(obj_path: str) -> Any:
                     final_obj = getattr(final_obj, top_obj)
                 break
         except ModuleNotFoundError as exc:
+            logger.trace("Received ModuleNotFoundError. Assuming due to the " +
+                         "requested module not existing. However, it could " +
+                         "be an import error *within* the requested module. " +
+                         "We will print the exception in case.")
+            logger.trace(exc)
             caught_exc = exc
             continue
 

@@ -29,6 +29,7 @@ class ControlServer:
 
     def __init__(self, url: str, ctx: zmq.Context = None,
                  poll_timeout_ms: int = common.POLL_TIMEOUT_MS):
+        """Initialize controlserver."""
         self._poll_timeout_ms = poll_timeout_ms
         if not ctx:
             ctx = zmq.Context.instance()
@@ -75,10 +76,11 @@ class ControlServer:
         This method is expected to be called right after receiving a req.
 
         Args:
-            rep: control_pb2.ControlResponse we wish to send as response to the prior
-                req received.
-            obj: (optional) object to return with the reply. In all but a few cases,
-                this will be None as there is nothing to add to our response.
+            rep: control_pb2.ControlResponse we wish to send as response to the
+                prior req received.
+            obj: (optional) object to return with the reply. In all but a few
+                cases,this will be None as there is nothing to add to our
+                response.
         """
         logger.debug("Sending reply: %s, %s",
                      common.get_enum_str(control_pb2.ControlResponse, rep),

@@ -1,23 +1,15 @@
 """Test feedback logic."""
 
-import time
 import copy
 import pytest
 import logging
 import numpy as np
 from pathlib import Path
 from os import sep
-import threading
-import zmq
 
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
 from afspm.io.protos.generated import feedback_pb2
-
-from afspm.io.control.client import ControlClient
-from afspm.io.control.server import ControlServer
-from afspm.io.pubsub.publisher import Publisher
-from afspm.io.pubsub.subscriber import Subscriber
 
 from afspm.io import common
 from afspm.components import feedback
@@ -28,7 +20,8 @@ logger = logging.getLogger(__name__)
 
 
 TEST_IMG_PATH = (str(Path(__file__).parent.parent.resolve()) + sep + "data" +
-                     sep + "sample.png")
+                 sep + "sample.png")
+
 
 # ---------- Test Feedback Analysis --------- #
 @pytest.fixture
@@ -95,6 +88,7 @@ def cs_no_problem():
     return control_pb2.ControlState(
         control_mode=control_pb2.ControlMode.CM_AUTOMATED)
 
+
 @pytest.fixture
 def cs_with_problem():
     cs = control_pb2.ControlState(
@@ -140,6 +134,7 @@ def feedback_corrector():
                                       subscriber=None,
                                       control_client=FakeClient(),
                                       name='corrector')
+
 
 def step_in_corrector(corrector: feedback.FeedbackCorrector,
                       init_state: feedback.CorrectionState,
@@ -210,8 +205,8 @@ def test_zctrl_init(cs_with_problem, feedback_corrector,
                     scan_params):
     logger.info("Ensure ZCtrl init state functions as expected.")
     step_in_corrector(feedback_corrector, feedback.CorrectionState.NOT_RUNNING,
-                   scan_params, cs_with_problem,
-                   zctrl_params, fb_analysis_under)
+                      scan_params, cs_with_problem,
+                      zctrl_params, fb_analysis_under)
     assert (feedback_corrector._correction_state ==
             feedback.CorrectionState.INIT)
 
@@ -256,8 +251,8 @@ def test_zctrl_params_over_states(cs_with_problem, feedback_corrector,
         for fb_analysis, factor, expected_state in zip(fb_analyses, factors,
                                                        expected_states):
             step_in_corrector(feedback_corrector, state,
-                           scan_params, cs_with_problem,
-                           zctrl_params, fb_analysis)
+                              scan_params, cs_with_problem,
+                              zctrl_params, fb_analysis)
 
             assert feedback_corrector._correction_state == expected_state
             expected_pi_vals = copy.deepcopy(init_pi_vals)
@@ -275,8 +270,8 @@ def test_scan_params_over_states(cs_with_problem, feedback_corrector,
     # Init zctrl params: needed to run.
     feedback_corrector._zctrl_params = zctrl_params
 
-    logger.info("We expect scan params to always be the same without"
-                 "num_scan_lines or points_per_line")
+    logger.info("We expect scan params to always be the same without "
+                "num_scan_lines or points_per_line.")
     for state in list(feedback.CorrectionState):
         logger.info("Testing scan state %s", state)
         # Not sending zctrl_params or feedback analysis to not update state

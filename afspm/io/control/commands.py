@@ -1,6 +1,5 @@
 """Holds command ids and responses."""
 import logging
-from enum import Enum
 from types import MappingProxyType  # Immutable dict
 
 from google.protobuf.message import Message
@@ -38,7 +37,7 @@ REQ_TO_RETURN_OBJ_MAP = MappingProxyType({
 
 def parse_request(msg: list[list[bytes]]) -> (control_pb2.ControlRequest,
                                               Message | int):
-    """Helper to extract the request (and optional proto/enum) from a message.
+    """Extract the request (and optional proto/enum) from a message.
 
     Args:
         msg: the bytes list corresponding to the message received.
@@ -59,7 +58,7 @@ def parse_request(msg: list[list[bytes]]) -> (control_pb2.ControlRequest,
 
 def serialize_request(req: control_pb2.ControlRequest,
                       obj: Message | int = None) -> list[list[bytes]]:
-    """Helper to convert a request and its additional object to bytes.
+    """Convert a request and its additional object to bytes.
 
     Args:
         req: desired control request
@@ -68,7 +67,6 @@ def serialize_request(req: control_pb2.ControlRequest,
     Returns;
         a bytes array of the object after conversion.
     """
-
     msg = []
     msg.append(req.to_bytes(1, 'big'))
     if isinstance(obj, Message):
@@ -81,7 +79,7 @@ def serialize_request(req: control_pb2.ControlRequest,
 def parse_response(req: control_pb2.ControlRequest,
                    msg: list[list[bytes]]) -> (control_pb2.ControlResponse,
                                                Message | int | None):
-    """Helper to convert a response from bytes to our enum (and optional proto).
+    """Convert a response from bytes to our enum (and optional proto).
 
     Args:
         req: request associated to this response.
@@ -103,7 +101,7 @@ def parse_response(req: control_pb2.ControlRequest,
 
 def serialize_response(rep: control_pb2.ControlResponse,
                        obj: Message | int = None) -> list[list[bytes]]:
-    """Helper to convert a response  and optional object to bytes.
+    """Convert a response  and optional object to bytes.
 
     Args:
         rep: control response to convert.

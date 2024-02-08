@@ -1,4 +1,4 @@
-"""Simple method using pint to convert"""
+"""Simple method using pint to convert units."""
 
 import logging
 from typing import Optional, Any
@@ -16,44 +16,45 @@ ureg = pint.UnitRegistry()
 Q_ = ureg.Quantity
 
 
-def convert(val: Any, curr_unit: Optional[str] = None,
+def convert(val: Any, unit: Optional[str] = None,
             desired_unit: Optional[str] = None) -> Any | None:
-    """Uses pint to convert a value from one unit to another.
+    """Convert a value from one unit to another using pint.
+
+    If either unit/desired_unit is None or the same, we simply return the
+    original value.
 
     Args:
         val: input value, of a type that pint supports.
-        curr_unit: str representation of your current unit. If None, we do not
-            convert (i.e. just keep the original).
-        desired_unit: str representation of your desired unit. If None,
-            we do not convert (i.e. just keep the original).
+        unit: str representation of your current unit.
+        desired_unit: str representation of your desired unit.
 
     Returns:
         val converted into desired unit. None if there is an UndefinedUnitError
             or DimensionalityError.
     """
+    if not unit or not desired_unit or unit == desired_unit:
+        return val
 
-    if curr_unit and desired_unit and curr_unit != desired_unit:
-        try:
-            logger.trace("Converting %s from %s to %s", val, curr_unit,
-                         desired_unit)
-            quantity = val * ureg(curr_unit)
-            magnitude = quantity.to(desired_unit).magnitude
-            logger.trace("After conversion, magnitude is %s", magnitude)
-            return magnitude
-        except (pint.UndefinedUnitError, pint.DimensionalityError) as err:
-            logger.error("Unable to convert %s from %s to %s, due to %s",
-                         val, curr_unit, desired_unit,
-                         ("undefined unit error."
-                          if err is pint.UndefinedUnitError else
-                          "dimensionality error."))
-            return None
-    return val
+    try:
+        logger.trace("Converting %s from %s to %s", val, unit, desired_unit)
+        # Enforce float in conversion always. A str would break this...
+        quantity = float(val) * ureg(unit)
+        magnitude = quantity.to(desired_unit).magnitude
+        logger.trace("After conversion, magnitude is %s", magnitude)
+        return magnitude
+    except (pint.UndefinedUnitError, pint.DimensionalityError) as err:
+        logger.error("Unable to convert %s from %s to %s, due to %s",
+                     val, unit, desired_unit,
+                     ("undefined unit error."
+                      if err is pint.UndefinedUnitError else
+                      "dimensionality error."))
+        return None
 
 
 def convert_list(vals: list[Any], units: tuple[str | None],
                  desired_units: tuple[str | None]
                  ) -> list[Any] | None:
-    """Uses pint to convert a list of values to desired units.
+    """Convert a list of values to desired units using pint.
 
     Args:
         vals: list of values, of a type that pint supports.

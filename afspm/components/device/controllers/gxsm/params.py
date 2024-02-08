@@ -1,9 +1,16 @@
-"""Holds gxsm controller parameters (and other extra logic)."""
+"""Holds gxsm controller parameters (and other extra logic).
+
+NOTE: gxsm.set() expects a str value, and gxsm.get() returns a float value.
+This can be confusing!
+"""
 
 import enum
 import logging
 from typing import Optional, Any
 
+from pint import UndefinedUnitError
+
+from afspm.components.device.controller import DeviceController
 from afspm.components.device import params
 from afspm.utils import units
 
@@ -18,6 +25,7 @@ logger = logging.getLogger(__name__)
 # ----- Gxsm Params ----- #
 class GxsmParameter(str, enum.Enum):
     """Gxsm internal parameters."""
+
     TL_X = 'OffsetX'
     TL_Y = 'OffsetY'
     SZ_X = 'RangeX'
@@ -47,7 +55,7 @@ class GxsmChannelIds(enum.Enum):
     OFF = -4
     ACTIVE = enum.auto()
     ON = enum.auto()
-    MATH =  enum.auto()
+    MATH = enum.auto()
     X = enum.auto()
     TOPO = enum.auto()
     MIX1 = enum.auto()
@@ -65,39 +73,6 @@ class GxsmChannelIds(enum.Enum):
     DDIDV = enum.auto()
     I0_AVG = enum.auto()
     COUNTER = enum.auto()
-
-
-def handle_get_set_scan_time(val: Optional[str] = None
-                             ) -> (control_pb2.ControlResponse, str):
-    """Get/set scantime."""
-    if val:
-        logger.debug("Scantime to set: %s", val)
-        val = scan_time_to_scan_speed(val)
-        logger.debug("Setting Scan speed: %s", val)
-    res = handle_get_set(GxsmParameter.SCAN_SPEED_UNITS_S, val)
-    logger.debug("Gotten scan speed: %s", res[1])
-    val = scan_speed_to_scan_time(res[1])
-    logger.debug("Gotten scantime: %s", val)
-    return res[0], val
-
-
-def scan_time_to_scan_speed(val: str) -> str:
-    """Converts from s / scanline to units / s.
-
-    Receive and return in str; we do the conversion in float within.
-    """
-    # TODO: Does this support rotations??
-    scanline = gxsm.get(GxsmParameter.SZ_X)
-    return str(pow(float(val) / scanline, -1))
-
-
-def scan_speed_to_scan_time(val: str) -> str:
-    """Converts from units / s to s / scanline.
-
-    Receive and return in str; we do the conversion in float within.
-    Same as prior, copying for ease.
-    """
-    return scan_time_to_scan_speed(val)
 
 
 def set_param(attr: str, val: Any, curr_unit: str = None,
@@ -140,7 +115,7 @@ def set_param_list(attrs: list[str], vals: list[Any],
     return True
 
 
-def get_param(attr: str) -> str | None:
+def get_param(attr: str) -> float | None:
     """Get gxsm parameter.
 
     Gets the current value for the provided parameter. On error, returns
@@ -150,13 +125,13 @@ def get_param(attr: str) -> str | None:
         attr: name of the attribute, in gxsm terminology.
 
     Returns:
-        Current value (in str), or None if could not be obtained.
+        Current value (as float), or None if could not be obtained.
     """
     ret = gxsm.get(attr)
     return ret if ret != GET_FAILURE else None
 
 
-def get_param_list(attrs: list[str]) -> list[str] | None:
+def get_param_list(attrs: list[str]) -> list[float] | None:
     """Get list of gxsm attributes.
 
     Args:
@@ -174,9 +149,10 @@ def get_param_list(attrs: list[str]) -> list[str] | None:
     return vals
 
 
-def handle_get_set(attr: str, val: Optional[Any] = None,
+def handle_get_set(attr: str, val: Optional[str] = None,
                    curr_units: str = None,
-                   gxsm_units: str = None):
+                   gxsm_units: str = None
+                   ) -> (control_pb2.ControlResponse, str):
     """Get (and optionally, set) a gxsm attribute.
 
     If curr_units and gxsm_units are provided, units.convert is used to try
@@ -184,17 +160,33 @@ def handle_get_set(attr: str, val: Optional[Any] = None,
 
     Args:
         attr: name of the attribute, in gxsm terminology.
-        val: optional value to set it to.
+        val: optional value to set it to, as a str.
         curr_units: units of provided value. optional.
         gxsm_units: units gxsm expects for this value. optional.
+
+    Returns:
+        Tuple (response, val, units), i.e. containing the control response,
+        the value gotten (as a str), and the units of said value (as a str).
     """
     if val:
-        if not set_param(attr, val, curr_units, gxsm_units):
-            return control_pb2.ControlResponse.REP_PARAM_ERROR
+        if not curr_units or not set_param(attr, val, curr_units, gxsm_units):
+            logger.error("Unable to set val: %s with units: %s",
+                         val, curr_units)
+            return (control_pb2.ControlResponse.REP_PARAM_ERROR, None)
     return (control_pb2.ControlResponse.REP_SUCCESS,
-            gxsm.get(attr))
+            str(get_param(attr)), gxsm_units)
+
+
+def get_set_scan_speed(ctrlr: DeviceController, val: Optional[str] = None,
+                       units: Optional[str] = None
+                       ) -> (control_pb2.ControlResponse, str):
+    """Get/set scan speed."""
+    gxsm_scan_speed_units = ctrlr.gxsm_physical_units + '/s'
+    return handle_get_set(
+        GxsmParameter.SCAN_SPEED_UNITS_S, val, curr_units=units,
+        gxsm_units=gxsm_scan_speed_units)
 
 
 PARAM_METHOD_MAP = {
-    params.DeviceParameter.SCAN_TIME_S: handle_get_set_scan_time
+    params.DeviceParameter.SCAN_SPEED: get_set_scan_speed
 }
