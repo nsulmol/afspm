@@ -7,7 +7,7 @@ from afspm.components.device.controller import (DeviceController,
                                                 get_file_modification_datetime)
 from afspm.components.device.controllers.gxsm.params import (
     PARAM_METHOD_MAP, get_param_list, set_param_list, GxsmParameter,
-    get_param, handle_get_set_scan_time)
+    get_param)
 from afspm.components.device.params import DeviceParameter, ParameterError
 
 from afspm.utils import array_converters as conv

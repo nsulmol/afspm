@@ -2,11 +2,11 @@
 
 In order to run it, you must:
 1. Start up the afspmcon, via a call like the following:
-    spawn config.toml --components_to_spawn ['afspmcon']
+    poetry run spawn config.toml --components_to_spawn ['afspmcon']
 2. Start up the device controller you wish to test. This startup will be
 implementation-specific (look at the readme for your controller).
 3. Run these tests:
-    pytest $PATH_TO_TEST/test_controller.py --config_path $CONFIG_FILE_PATH
+    poetry run pytest $PATH_TO_TEST/test_controller.py --config_path $CONFIG_FILE_PATH
 Note the default config path is './config.toml'.
 
 Your config file contains the parameters for our tests. See sample_config.toml
@@ -14,7 +14,7 @@ for guidance.
 
 Ideally, you should set your controller's scan parameters to scan quickly
 before running these tests. For example, increase your scan speed and
-decrease your ROI size to pass the test more quickly.
+decrease your ROI size to pass the test more quickly. This can be accomplished by including SCAN_SPEED_KEY, PHYS_SIZE_KEY, and DATA_SHAPE_KEY keys in your config, with appropriate values. See these variables below, or look at sample_config.toml.
 """
 
 from typing import Optional
@@ -34,6 +34,7 @@ from afspm.io.control.client import ControlClient
 
 from afspm.components.device import params
 from afspm.utils.log import LOGGER_ROOT
+from afspm.utils import units
 
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
@@ -45,6 +46,7 @@ logger = logging.getLogger(LOGGER_ROOT + '.samples.testing.test_controller.' +
 
 
 # Constants for config
+SCAN_SPEED_KEY = 'scan-speed-nm-s'
 PHYS_SIZE_KEY = 'phys-size-nm'
 DATA_SHAPE_KEY = 'data-shape'
 
@@ -215,13 +217,15 @@ def get_config_scan_speed(config_dict: dict,
     Returns:
         (float, float) tuple, containing (desired_val, init_val).
     """
-    speed_param = params.DeviceParameter.SCAN_SPEED_NM_S
-    if speed_param in config_dict:
-        desired_param = config_dict[speed_param]
-        param_msg = control_pb2.ParameterMsg(parameter=speed_param)
+    if SCAN_SPEED_KEY in config_dict:
+        desired_param = config_dict[SCAN_SPEED_KEY]
+        param_msg = control_pb2.ParameterMsg(
+            parameter=params.DeviceParameter.SCAN_SPEED)
         rep, init_scan_msg = client.request_parameter(param_msg)
         if rep == control_pb2.ControlResponse.REP_SUCCESS:
-            return desired_param, float(init_scan_msg.value)
+            init_val_nm = units.convert(float(init_scan_msg.value),
+                                     init_scan_msg.units, 'nm/s')
+            return desired_param, init_val_nm
         logger.info("Controller failed setting/getting scan speed, "
                     "returned response: %s",
                     common.get_enum_str(control_pb2.ControlResponse, rep))
@@ -244,10 +248,10 @@ def get_config_data_shape(config_dict: dict) -> Optional[list[int, int]]:
 
 def set_scan_speed(client: ControlClient, scan_speed_nm_s: float):
     param_msg = control_pb2.ParameterMsg(
-        parameter=params.DeviceParameter.SCAN_SPEED_NM_S,
-        value=str(scan_speed_nm_s))
+        parameter=params.DeviceParameter.SCAN_SPEED,
+        value=str(scan_speed_nm_s), units='nm/s')
 
-    logger.info("Setting scan speed to desired: %s",
+    logger.info("Setting scan speed to desired: %s nm/s",
                 scan_speed_nm_s)
     rep, __ = client.request_parameter(param_msg)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS

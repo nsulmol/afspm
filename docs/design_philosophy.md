@@ -11,3 +11,9 @@ Why do we do this? The smaller percentage of people who need these features can 
 As an example: a research lab may create a child class of GxsmController, XYZLabGxsmController, which implements special operating modes and parameters it needs. This allows two options:
 - If the researcher implements this extra functionality in a 'general' way, such that it makes sense to pull it into afspm, we can do so.
 - If the researcher chooses to hack something up that works for their experiment (but is not 'general'), they can do so while still taking advantage of afspm.
+
+## On Units and Unit Conversions
+
+Different device controllers use different units for their equivalent attributes. This can be fairly confusing, and may introduce issues. Rather than standardize units everywhere, we impose a policy: all data is sent with units, and it is the *receiver's* responsibility to convert the data to the units they desire.
+
+To make this easier, we take advantage of a handy python package called pint. In utils/units.py, there are some conversion methods to help using this. Essentially, units are defined as a str, with most units you would deal with existing in the pint registry. If, for some reason, your SPM has an unusual unit and unit conversion, you should modify the registry in units.ureg (on startup).
