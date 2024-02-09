@@ -111,7 +111,7 @@ def get_param_list(client: XopClient, attrs: list[str],
     vals = []
     for attr in attrs:
         val = get_param(client, attr)
-        if not val:
+        if val is None:
             return None
         vals.append(val)
     return tuple(vals)
