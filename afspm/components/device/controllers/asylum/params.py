@@ -70,10 +70,15 @@ class AsylumParameter(str, enum.Enum):
 # Holds which parameters are strings instead of variables
 STR_PARAM_TUPLE = [AsylumParameter.IMG_PATH, AsylumParameter.FORCE_PATH]
 
-# Special case: if SCAN_X_RATIO/SCAN_Y_RATIO are not set (or unity), they may
-# be set to the string 'nan'. We have to check for this and switch to 1.0 if
-# so.
+# Lookup return indicating a variable lookup failure.
 NAN_STR = 'nan'
+
+
+def _is_variable_lookup_failure(val: float | str | None) -> bool:
+    """Check if returned val indicates a variable lookup failure."""
+    if isinstance(val, str) and val == NAN_STR:
+        return True
+    return False
 
 
 def get_param(client: XopClient, attr: str) -> float | str | None:
@@ -93,10 +98,7 @@ def get_param(client: XopClient, attr: str) -> float | str | None:
                   else AsylumMethod.GET_VALUE)
 
     received, val = client.send_request(get_method, (attr,))
-    if received:
-        # Unpleasant hack to turn 'nan' to 1.0 (look up NAN_STR).
-        if isinstance(val, str) and val == NAN_STR:
-            val = 1.0
+    if received and not _is_variable_lookup_failure(val):
         return val
     else:
         return None
