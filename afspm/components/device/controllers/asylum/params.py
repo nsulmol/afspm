@@ -68,7 +68,7 @@ class AsylumParameter(str, enum.Enum):
 
 
 # Holds which parameters are strings instead of variables
-STR_PARAM_LIST = [AsylumParameter.IMG_PATH, AsylumParameter.FORCE_PATH]
+STR_PARAM_TUPLE = [AsylumParameter.IMG_PATH, AsylumParameter.FORCE_PATH]
 
 
 def get_param(client: XopClient, attr: str) -> float | str | None:
@@ -84,10 +84,10 @@ def get_param(client: XopClient, attr: str) -> float | str | None:
     Returns:
         Current value (float or str), or None if could not be obtained.
     """
-    get_method = (AsylumMethod.GET_STRING if attr in STR_PARAM_LIST
+    get_method = (AsylumMethod.GET_STRING if attr in STR_PARAM_TUPLE
                   else AsylumMethod.GET_VALUE)
 
-    received, val = client.send_request(get_method, (attr))
+    received, val = client.send_request(get_method, (attr,))
     if received:
         return val
     else:
@@ -144,7 +144,7 @@ def set_param(client: XopClient, attr: str, val: str | float,
         except units.ConversionError:
             return False
 
-    set_method = (AsylumMethod.SET_STRING if attr in STR_PARAM_LIST
+    set_method = (AsylumMethod.SET_STRING if attr in STR_PARAM_TUPLE
                   else AsylumMethod.SET_VALUE)
 
     received, __ = client.send_request(set_method, (attr, val))
@@ -181,7 +181,7 @@ def set_param_list(client: XopClient, attrs: list[str],
 
     all_received = True
     for val, attr in zip(converted_vals, attrs):
-        set_method = (AsylumMethod.SET_STRING if attr in STR_PARAM_LIST
+        set_method = (AsylumMethod.SET_STRING if attr in STR_PARAM_TUPLE
                       else AsylumMethod.SET_VALUE)
         received, __ = client.send_request(set_method, (attr, val))
         all_received = all_received and received

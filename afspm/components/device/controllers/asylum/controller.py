@@ -36,14 +36,14 @@ class AsylumController(DeviceController):
         xop_client: XOPClient for communicating with Asylum Research exe.
     """
 
-    SCAN_PARAMS = [params.AsylumParameter.TL_X, params.AsylumParameter.TL_Y,
+    SCAN_PARAMS = (params.AsylumParameter.TL_X, params.AsylumParameter.TL_Y,
                    params.AsylumParameter.SCAN_SIZE,
                    params.AsylumParameter.SCAN_X_RATIO,
                    params.AsylumParameter.SCAN_Y_RATIO,
-                   params.AsylumParameter.RES_X, params.AsylumParameter.RES_Y]
+                   params.AsylumParameter.RES_X, params.AsylumParameter.RES_Y)
 
-    ZCTLR_PARAMS = [params.AsylumParameter.CP,
-                    params.AsylumParameter.CI]
+    ZCTLR_PARAMS = (params.AsylumParameter.CP,
+                    params.AsylumParameter.CI)
 
     IMG_EXT = ".ibw"
 
@@ -73,7 +73,7 @@ class AsylumController(DeviceController):
         self._old_save_state = params.get_param(
             self._client, params.AsylumParameter.SAVE_IMAGE)
         params.set_param(self._client, params.AsylumParameter.SAVE_IMAGE,
-                         (params.AsylumBool.TRUE))
+                         int(params.AsylumBool.TRUE))
 
     def on_start_scan(self):
         success, __ = self._client.send_request(
@@ -96,14 +96,14 @@ class AsylumController(DeviceController):
         scan_x_ratio = scan_params.spatial.roi.size.x / scan_size
 
         attrs = self.SCAN_PARAMS
-        vals = [scan_params.spatial.roi.top_left.x,
+        vals = (scan_params.spatial.roi.top_left.x,
                 scan_params.spatial.roi.top_left.y,
                 scan_size, scan_x_ratio, scan_y_ratio,
-                scan_params.data.shape.x, scan_params.data.shape.y]
-        attr_units = [scan_params.spatial.units, scan_params.spatial.units,
-                      scan_params.spatial.units, None, None, None, None]
+                scan_params.data.shape.x, scan_params.data.shape.y)
+        attr_units = (scan_params.spatial.units, scan_params.spatial.units,
+                      scan_params.spatial.units, None, None, None, None)
         # None means default of PHYS_UNITS
-        asylum_units = [None, None, None, None, None, None, None]
+        asylum_units = (None, None, None, None, None, None, None)
 
         if params.set_param_list(self._client, attrs, vals, attr_units,
                                  asylum_units):
@@ -112,9 +112,9 @@ class AsylumController(DeviceController):
 
     def on_set_zctrl_params(self, zctrl_params: feedback_pb2.ZCtrlParameters
                             ) -> control_pb2.ControlResponse:
-        desired_units = [None, None]
+        desired_units = (None, None)
         attrs = self.ZCTRL_PARAMS
-        vals = [zctrl_params.proportionalGain, zctrl_params.integralGain]
+        vals = (zctrl_params.proportionalGain, zctrl_params.integralGain)
         if params.set_param_list(self._client, attrs, vals, desired_units,
                                  desired_units):
             return control_pb2.ControlResponse.REP_SUCCESS
@@ -127,7 +127,7 @@ class AsylumController(DeviceController):
         logger.warning("This method is likely not fully functional, finish!")
         scan_status = params.get_param(self._client,
                                        params.AsylumParameter.SCAN_STATUS)
-        if scan_status == params.AsylumBool.TRUE:
+        if scan_status == int(params.AsylumBool.TRUE):
             return scan_pb2.ScanState.SS_SCANNING
         else:
             return scan_pb2.ScanState.SS_FREE
