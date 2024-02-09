@@ -80,8 +80,4 @@ class XopClient:
                 err_code, rep_msg_id, ret_val = xop.parse_response_string(
                     msg.decode())
                 msg_received = req_msg_id == rep_msg_id
-
-        if msg_received and err_code != 0:
-            logger.error("Error code %s for message id %s.", err_code,
-                         rep_msg_id)
         return msg_received, ret_val

@@ -33,6 +33,7 @@ CALL_NAME_KEY = 'name'
 CALL_PARAMS_KEY = 'params'
 
 ERROR_KEY = 'errorCode'
+MSG_KEY = 'message'
 VAL_KEY = 'value'
 TYPE_KEY = 'type'
 RES_KEY = 'result'
@@ -147,8 +148,13 @@ def parse_response_string(response: str) -> (int, int, Optional[float | str]):
     error = structure[ERROR_KEY][VAL_KEY]
     message_id = structure[MSG_ID_KEY]
 
+    if error != 0:
+        error_msg = structure[ERROR_KEY][MSG_KEY]
+        logger.error("Error %s for message id %s: %s",
+                     error, message_id, error_msg)
+
     if RES_KEY not in structure:
-        return error, message_id, None
+        return error, error_msg, message_id, None
 
     res_type = IgorType(structure[RES_KEY][TYPE_KEY])
     if res_type == IgorType.WAVE:
