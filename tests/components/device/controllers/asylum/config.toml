@@ -1,0 +1,61 @@
+# ===========================================
+#  Sample config.toml for test_controller.py.
+# ===========================================
+
+# ----- General variables ----- #
+# --- URLs --- #
+pub_url = 'tcp://127.0.0.1:7776'
+server_url = 'tcp://127.0.0.1:7777'
+psc_url = 'tcp://127.0.0.1:7778'
+router_url = 'tcp://127.0.0.1:7779'
+xop_url = 'tcp://127.0.0.1:5555'  # To be used on zmq-xop server startup in Igor
+
+# --- Timing --- #
+# Note: could make these shorter if using a short scan time.
+timeout_ms = 5000
+scan_wait_ms = 180000
+
+# --- (Optional) Scan Settings --- #
+# Parameters we try to set to, for a faster scan.
+# Uncomment if desired
+#scan-time-s = 1.0
+#phys-size-nm = [36.0, 36.0]
+#data-shape = [10, 10]
+
+
+# ----- PubSub ----- #
+[pub]
+class = 'afspm.io.pubsub.publisher.Publisher'
+url = 'pub_url'
+
+[psc]
+class = 'afspm.io.pubsub.cache.PubSubCache'
+url = 'psc_url'
+sub_url = 'pub_url'
+
+# ----- Control Logic ----- #
+[server]
+class = 'afspm.io.control.server.ControlServer'
+url = 'server_url'
+
+[router]
+class = 'afspm.io.control.router.ControlRouter'
+server_url = 'server_url'
+router_url = 'router_url'
+
+[xopclient]
+url = 'xop_url'
+
+# ----- Components ----- #
+[devcon]
+component = true
+class = 'afspm.components.device.controllers.asylum.controller.AsylumController'
+publisher = 'pub'
+control_server = 'server'
+xop_client = 'xopclient'
+
+[afspmcon]
+component = true
+class = 'afspm.components.afspm.controller.AfspmController'
+pubsubcache = 'psc'
+router = 'router'
