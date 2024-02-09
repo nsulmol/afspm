@@ -44,6 +44,7 @@ server_url = 'server_url'
 router_url = 'router_url'
 
 [xopclient]
+class = 'afspm.components.device.controllers.asylum.client.XopClient'
 url = 'xop_url'
 
 # ----- Components ----- #
