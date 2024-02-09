@@ -10,7 +10,9 @@ Follow the instructions at https://github.com/AllenInstitute/ZeroMQ-XOP to insta
 
 Once installed, the Asylum controller can be interfaced with afspm via the following steps:
 1. Start up the Asylum Research executable, AR.exe. This is based off of Igor Pro.
-2. To communicate with afspm, we must start up a ZeroMQ client for the Asylum controller. This is achieved via the following calls:
+2. Select your scan mode (e.g. Air Topography), to set up your controller.
+3. Ensure the Igor Command Window is open (either via Ctrl+J or selecting Windows->Command Window in the menu).
+4. To communicate with afspm, we must start up a ZeroMQ client for the Asylum controller. This is achieved via the following calls (in the command window):
 ```
 zeromq_stop() // Stop any existing ZeroMQ operations
 zeromq_server_bind("tcp://127.0.0.1:5555") // Create a ZeroMQ server and begin listening
