@@ -2,6 +2,7 @@
 
 import os.path
 import logging
+from typing import Any
 
 from afspm.components.device.controller import (DeviceController,
                                                 get_file_modification_datetime)
@@ -128,10 +129,7 @@ class GxsmController(DeviceController):
         vals = get_param_list([GxsmParameter.TL_X, GxsmParameter.TL_Y,
                                GxsmParameter.SZ_X, GxsmParameter.SZ_Y,
                                GxsmParameter.RES_X, GxsmParameter.RES_Y])
-        if vals is None:
-            msg = "Polling for scan params failed!"
-            logger.error(msg)
-            raise ParameterError(msg)
+        _handle_params_error(vals, "Polling for scan params failed!")
 
         scan_params = scan_pb2.ScanParameters2d()
         scan_params.spatial.roi.top_left.x = vals[0]
@@ -199,10 +197,7 @@ class GxsmController(DeviceController):
     def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
         """Poll the controller for the current Z-Control parameters."""
         vals = get_param_list([GxsmParameter.CP, GxsmParameter.CI])
-        if vals is None:
-            msg = "Polling for CP/CI failed!"
-            logger.error(msg)
-            raise ParameterError(msg)
+        _handle_params_error(vals, "Polling for CP/CI failed!")
 
         zctrl_params = feedback_pb2.ZCtrlParameters()
         zctrl_params.feedbackOn = self.is_zctrl_feedback_on
@@ -212,7 +207,7 @@ class GxsmController(DeviceController):
 
     @staticmethod
     def _get_current_scan_state() -> scan_pb2.ScanState:
-        """Returns the current scan state.
+        """Return the current scan state.
 
         This queries gxsm for its current scan state.
 
@@ -228,10 +223,8 @@ class GxsmController(DeviceController):
 
         # TODO: investigate motor logic further...
         val = get_param(GxsmParameter.MOTOR)
-        if val is None:
-            msg = "Failed querying gxsm for dsp-fbs-motor param."
-            logger.error(msg)
-            raise ParameterError(msg)
+        _handle_params_error(val,
+                             "Failed querying gxsm for dsp-fbs-motor param.")
 
         motor_running = (val < GxsmController.MOTOR_RUNNING_THRESH)
         if motor_running:
@@ -241,3 +234,10 @@ class GxsmController(DeviceController):
         if moving:
             return scan_pb2.ScanState.SS_MOVING
         return scan_pb2.ScanState.SS_FREE
+
+
+def _handle_params_error(vals: Any | None, msg: str):
+    """Raise error if vals is None, passing msg."""
+    if vals is None:
+        logger.error(msg)
+        raise ParameterError(msg)
