@@ -14,7 +14,10 @@ for guidance.
 
 Ideally, you should set your controller's scan parameters to scan quickly
 before running these tests. For example, increase your scan speed and
-decrease your ROI size to pass the test more quickly. This can be accomplished by including SCAN_SPEED_KEY, PHYS_SIZE_KEY, and DATA_SHAPE_KEY keys in your config, with appropriate values. See these variables below, or look at sample_config.toml.
+decrease your ROI size to pass the test more quickly. This can be accomplished
+by including SCAN_SPEED_KEY, PHYS_SIZE_KEY, and DATA_SHAPE_KEY keys in your
+config, with appropriate values. See these variables below, or look at
+sample_config.toml.
 """
 
 from typing import Optional
