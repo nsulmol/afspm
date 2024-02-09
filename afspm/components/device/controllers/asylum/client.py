@@ -41,7 +41,7 @@ class XopClient:
                      ) -> (bool, float | str):
         """Send asylum request.
 
-        Given a method name and list of parameters, send a request to call
+        Given a method name and tuple of parameters, send a request to call
         this method to asylum. The format of the call is:
             method_name(params[0], params[1], ...)
 
@@ -53,8 +53,8 @@ class XopClient:
             method_name: method name, as str.
             params: tuple of parameters to feed the method. Optional. Default
                 is None. This could consist of, for example:
-                - [attrib], for something like GetValue(attrib)
-                -[attrib, val], for something like SetValue(attrib, val)
+                - (attrib), for something like GetValue(attrib)
+                -(attrib, val), for something like SetValue(attrib, val)
 
         Returns:
             (msg_received, ret_val), where
@@ -63,6 +63,7 @@ class XopClient:
             ret_val: the returned value, if applicable.
         """
         req_msg_id, req = xop.create_call_string(method_name, params)
+        logger.trace('Call string to send: %s', req)
         self._client.send(req.encode())
         ts = time.time()
 
@@ -76,8 +77,9 @@ class XopClient:
         ret_val = None
         while not msg_received and time.time() - ts < self._timeout_ms:
             if self._client.poll(POLL_TIMEOUT_MS, zmq.POLLIN):
-                msg = self._client.recv(zmq.NOBLOCK)
+                msg = self._client.recv(zmq.NOBLOCK).decode()
+                logger.trace('Received response: %s', msg)
                 err_code, rep_msg_id, ret_val = xop.parse_response_string(
-                    msg.decode())
+                    msg)
                 msg_received = req_msg_id == rep_msg_id
         return msg_received, ret_val
