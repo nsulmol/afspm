@@ -2,7 +2,6 @@
 
 import logging
 import enum
-from pint import UndefinedUnitError
 
 from afspm.components.device.controllers.asylum.client import XopClient
 from afspm.utils import units
@@ -17,12 +16,14 @@ PHYS_UNITS = 'm'
 
 class AsylumBool(int, enum.Enum):
     """Defines true or false in asylum."""
+
     TRUE = 2
     FALSE = 0
 
 
 class AsylumMethod(str, enum.Enum):
     """Asylum method names."""
+
     SCAN = 'DoScanFunc'
     START_SCAN_PARAM = 'DoScan_0'
     STOP_SCAN_PARAM = 'StopScan_0'
@@ -37,6 +38,7 @@ class AsylumMethod(str, enum.Enum):
 # ----- Asylum Params ----- #
 class AsylumParameter(str, enum.Enum):
     """Asylum internal parameter names."""
+
     TL_X = 'XOffset'
     TL_Y = 'YOffset'
 
@@ -135,11 +137,11 @@ def set_param(attr: str, client: XopClient, val: str | float,
     Returns:
         True if the set succeeds.
     """
-
     # Convert value if needed
     if isinstance(val, float):
-        val = units.convert(val, curr_unit, desired_unit)
-        if not val:
+        try:
+            val = units.convert(val, curr_unit, desired_unit)
+        except units.ConversionError:
             return False
 
     set_method = (AsylumMethod.SET_STRING if attr in STR_PARAM_LIST
@@ -172,8 +174,9 @@ def set_param_list(attrs: list[str], client: XopClient,
     # Replace all desired units that are None with PHYS_UNITS.
     curr_units = [x if x is not None else PHYS_UNITS for x in curr_units]
 
-    converted_vals = units.convert_list(vals, curr_units, desired_units)
-    if not converted_vals:
+    try:
+        converted_vals = units.convert_list(vals, curr_units, desired_units)
+    except units.ConversionError:
         return False
 
     all_received = True
