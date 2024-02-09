@@ -5,7 +5,7 @@ import time
 import zmq
 from typing import Optional
 
-from afspm.io.common import POLL_TIMEOUT_MS
+from afspm.io.common import POLL_TIMEOUT_MS, REQUEST_TIMEOUT_MS
 from afspm.components.device.controllers.asylum import xop
 
 
@@ -22,11 +22,11 @@ class XopClient:
     Attributes:
         _url: address of server we are connecting to.
         _timeout_ms: how long to wait before concluding a sent request has not
-            been responded to.
+            been responded to. Defaults to REQUEST_TIMEOUT_MS.
         _client: zmq socket used to connect to server.
     """
 
-    def __init__(self, url: str, timeout_ms: int,
+    def __init__(self, url: str, timeout_ms: int = REQUEST_TIMEOUT_MS,
                  ctx: zmq.Context = None):
         if not ctx:
             ctx = zmq.Context.instance()
@@ -66,6 +66,10 @@ class XopClient:
         self._client.send(req)
         ts = time.time()
 
+        # Note: we use this ugly approach because the server may be responding
+        # to multiple requests (with different req_msg_ids). Thus, we may
+        # receive multiple messages that are not for us!
+        # Note: HIGHLY unlikely, but why not.
         msg_received = False
         err_code = None
         rep_msg_id = None
