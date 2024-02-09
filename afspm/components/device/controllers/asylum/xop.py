@@ -33,7 +33,7 @@ CALL_NAME_KEY = 'name'
 CALL_PARAMS_KEY = 'params'
 
 ERROR_KEY = 'errorCode'
-MSG_KEY = 'message'
+MSG_KEY = 'msg'
 VAL_KEY = 'value'
 TYPE_KEY = 'type'
 RES_KEY = 'result'
