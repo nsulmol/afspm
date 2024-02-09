@@ -43,8 +43,8 @@ class AsylumParameter(str, enum.Enum):
     TL_Y = 'YOffset'
 
     SCAN_SIZE = 'ScanSize'
-    SCAN_X_RATIO = 'Width'
-    SCAN_Y_RATIO = 'Height'
+    SCAN_X_RATIO = 'FastRatio'
+    SCAN_Y_RATIO = 'SlowRatio'
 
     RES_X = 'ScanPoints'
     RES_Y = 'ScanLines'
