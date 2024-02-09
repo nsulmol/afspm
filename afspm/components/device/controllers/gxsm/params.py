@@ -8,8 +8,6 @@ import enum
 import logging
 from typing import Optional, Any
 
-from pint import UndefinedUnitError
-
 from afspm.components.device.controller import DeviceController
 from afspm.components.device import params
 from afspm.utils import units
@@ -89,8 +87,9 @@ def set_param(attr: str, val: Any, curr_unit: str = None,
         gxsm_unit: unit gxsm expects for this value. optional.
 
     """
-    val = units.convert(val, curr_unit, gxsm_unit)
-    if not val:
+    try:
+        val = units.convert(val, curr_unit, gxsm_unit)
+    except units.ConversionError:
         return False
 
     gxsm.set(attr, str(val))
@@ -105,9 +104,9 @@ def set_param_list(attrs: list[str], vals: list[Any],
     Note: different from set_param in that we validate all conversions
     can be done *before* setting them.
     """
-
-    converted_vals = units.convert_list(vals, curr_units, gxsm_units)
-    if not converted_vals:
+    try:
+        converted_vals = units.convert_list(vals, curr_units, gxsm_units)
+    except units.ConversionError:
         return False
 
     for val, attr in zip(converted_vals, attrs):

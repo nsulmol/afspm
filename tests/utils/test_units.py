@@ -41,5 +41,5 @@ def test_convert(val_nm, units_nm, val_ang, units_ang):
 
 
 def test_break(val_nm, units_nm, units_fake):
-    with pytest.raises(pint.UndefinedUnitError):
+    with pytest.raises(units.ConversionError):
         units.convert(val_nm, units_nm, units_fake)

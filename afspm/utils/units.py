@@ -11,13 +11,23 @@ logger = logging.getLogger(__name__)
 
 # Note: pint's unit registry will exist *HERE*. If you need it, import it in
 # your module.
-#
 ureg = pint.UnitRegistry()
 Q_ = ureg.Quantity
 
 
+class ConversionError(Exception):
+    """Exception indicating an issue during a conversion.
+
+    This is mainly to encapsulate our conversion dependency/avoid imposing
+    it on methods that use this package. Now, they only have to check for
+    an exception defined here.
+    """
+
+    pass
+
+
 def convert(val: Any, unit: Optional[str] = None,
-            desired_unit: Optional[str] = None) -> Any | None:
+            desired_unit: Optional[str] = None) -> Any:
     """Convert a value from one unit to another using pint.
 
     If either unit/desired_unit is None or the same, we simply return the
@@ -29,8 +39,11 @@ def convert(val: Any, unit: Optional[str] = None,
         desired_unit: str representation of your desired unit.
 
     Returns:
-        val converted into desired unit. None if there is an UndefinedUnitError
-            or DimensionalityError.
+        val converted into desired unit.
+
+    Raises:
+        ConversionError if the conversion fails for some reason. Check the log,
+        we likely have elaborated further..
     """
     if not unit or not desired_unit or unit == desired_unit:
         return val
@@ -48,7 +61,7 @@ def convert(val: Any, unit: Optional[str] = None,
                      ("undefined unit error."
                       if err is pint.UndefinedUnitError else
                       "dimensionality error."))
-        return None
+        raise ConversionError
 
 
 def convert_list(vals: list[Any], units: tuple[str | None],
@@ -64,13 +77,14 @@ def convert_list(vals: list[Any], units: tuple[str | None],
             provided vals. If a particular index is None, we do not convert.
 
     Returns:
-        tuple of values, converted to desired units. If unable to convert one
-        (due to an exception), we return None.
+        tuple of values, converted to desired units.
+
+    Raises:
+        ConversionError if a conversion fails for some reason. Check the log,
+        we likely have elaborated further.
     """
     converted_vals = []
     for val, curr_unit, desired_unit in zip(vals, units, desired_units):
         res = convert(val, curr_unit, desired_unit)
-        if not res:
-            return None
         converted_vals.append(res)
     return tuple(converted_vals)
