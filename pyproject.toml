@@ -34,9 +34,12 @@ optional = true
 [tool.poetry.group.gxsm.dependencies]
 gxsmread = {path = "../gxsmread"}
 
+[tool.poetry.group.asylum]
+optional = true
+
 [tool.poetry.group.asylum.dependencies]
-scifireaders = {path = "../scifireaders"}
 igor2 = "^0.5.3"
+scifireaders = "^0.11.0"
 
 [tool.poetry.scripts]
 spawn = "afspm.spawn:cli_spawn"
