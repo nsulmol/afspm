@@ -42,7 +42,7 @@ class AsylumController(DeviceController):
                    params.AsylumParameter.SCAN_Y_RATIO,
                    params.AsylumParameter.RES_X, params.AsylumParameter.RES_Y)
 
-    ZCTLR_PARAMS = (params.AsylumParameter.CP,
+    ZCTRL_PARAMS = (params.AsylumParameter.CP,
                     params.AsylumParameter.CI)
 
     IMG_EXT = ".ibw"
