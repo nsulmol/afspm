@@ -63,7 +63,7 @@ class XopClient:
             ret_val: the returned value, if applicable.
         """
         req_msg_id, req = xop.create_call_string(method_name, params)
-        self._client.send(req)
+        self._client.send(req.encode())
         ts = time.time()
 
         # Note: we use this ugly approach because the server may be responding
