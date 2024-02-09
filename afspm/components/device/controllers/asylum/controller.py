@@ -64,13 +64,15 @@ class AsylumController(DeviceController):
 
     def __del__(self):
         # Reset save state!
-        params.set_param(params.AsylumParameter.SAVE_IMAGE,
-                         (self._old_save_state))
+        params.set_param(self._client,
+                         params.AsylumParameter.SAVE_IMAGE,
+                         self._old_save_state)
 
     def _setup_saving(self):
         """Ensure data is being saved while running and store prior state."""
-        old_state = params.get_param(params.AsylumParameter.SAVE_IMAGE)
-        params.set_param(params.AsylumParameter.SAVE_IMAGE,
+        self._old_save_state = params.get_param(
+            self._client, params.AsylumParameter.SAVE_IMAGE)
+        params.set_param(self._client, params.AsylumParameter.SAVE_IMAGE,
                          (params.AsylumBool.TRUE))
 
     def on_start_scan(self):
@@ -103,7 +105,8 @@ class AsylumController(DeviceController):
         # None means default of PHYS_UNITS
         asylum_units = [None, None, None, None, None, None, None]
 
-        if params.set_param_list(attrs, vals, attr_units, asylum_units):
+        if params.set_param_list(self._client, attrs, vals, attr_units,
+                                 asylum_units):
             return control_pb2.ControlResponse.REP_SUCCESS
         return control_pb2.ControlResponse.REP_PARAM_ERROR
 
@@ -112,7 +115,8 @@ class AsylumController(DeviceController):
         desired_units = [None, None]
         attrs = self.ZCTRL_PARAMS
         vals = [zctrl_params.proportionalGain, zctrl_params.integralGain]
-        if params.set_param_list(attrs, vals, desired_units, desired_units):
+        if params.set_param_list(self._client, attrs, vals, desired_units,
+                                 desired_units):
             return control_pb2.ControlResponse.REP_SUCCESS
         return control_pb2.ControlResponse.REP_PARAM_ERROR
 
@@ -121,14 +125,15 @@ class AsylumController(DeviceController):
         # TODO: Need to see if we can read moving vs. scanning vs. free vs.
         # motor running?
         logger.warning("This method is likely not fully functional, finish!")
-        scan_status = params.get_param(params.AsylumParameter.SCAN_STATUS)
+        scan_status = params.get_param(self._client,
+                                       params.AsylumParameter.SCAN_STATUS)
         if scan_status == params.AsylumBool.TRUE:
             return scan_pb2.ScanState.SS_SCANNING
         else:
             return scan_pb2.ScanState.SS_FREE
 
     def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
-        vals = params.get_param_list(self.SCAN_PARAMS)
+        vals = params.get_param_list(self._client, self.SCAN_PARAMS)
 
         if vals is None:
             msg = "Polling for scan params failed!"
@@ -155,7 +160,7 @@ class AsylumController(DeviceController):
         return scan_params
 
     def poll_scans(self) -> [scan_pb2.Scan2d]:
-        val = params.get_param(params.AsylumParameter.IMG_PATH)
+        val = params.get_param(self._client, params.AsylumParameter.IMG_PATH)
 
         if val is None:
             msg = "Requesting img path failed!"
@@ -193,7 +198,7 @@ class AsylumController(DeviceController):
         return self._old_scans
 
     def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
-        vals = params.get_param_list(self.ZCTRL_PARAMS)
+        vals = params.get_param_list(self._client, self.ZCTRL_PARAMS)
         if vals is None:
             msg = "Polling for CP/CI failed!"
             logger.error(msg)

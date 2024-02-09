@@ -71,15 +71,15 @@ class AsylumParameter(str, enum.Enum):
 STR_PARAM_LIST = [AsylumParameter.IMG_PATH, AsylumParameter.FORCE_PATH]
 
 
-def get_param(attr: str, client: XopClient) -> float | str | None:
+def get_param(client: XopClient, attr: str) -> float | str | None:
     """Get asylum parameter.
 
     Uses the client to get the current value of the provided parameter. On
     error, returns None.
 
     Args:
-        attr: name of the attribute, in asylum terminology.
         client: XopClient, used to communicate with asylum controller.
+        attr: name of the attribute, in asylum terminology.
 
     Returns:
         Current value (float or str), or None if could not be obtained.
@@ -94,13 +94,13 @@ def get_param(attr: str, client: XopClient) -> float | str | None:
         return None
 
 
-def get_param_list(attrs: list[str], client: XopClient
+def get_param_list(client: XopClient, attrs: list[str],
                    ) -> tuple[float | str] | None:
     """Get list of asylum parameters.
 
     Args:
-        attrs: list of attribute names, in asylum terminology.
         client: XopClient, used to communicate with asylum controller.
+        attrs: list of attribute names, in asylum terminology.
 
     Returns:
         Tuple of received values (float or str for each) or None if one or more
@@ -110,14 +110,14 @@ def get_param_list(attrs: list[str], client: XopClient
     """
     vals = []
     for attr in attrs:
-        val = get_param(attr, client)
+        val = get_param(client, attr)
         if not val:
             return None
         vals.append(val)
     return tuple(vals)
 
 
-def set_param(attr: str, client: XopClient, val: str | float,
+def set_param(client: XopClient, attr: str, val: str | float,
               curr_unit: str = None, desired_unit: str = PHYS_UNITS) -> bool:
     """Set asylum parameter.
 
@@ -126,13 +126,13 @@ def set_param(attr: str, client: XopClient, val: str | float,
     it if necessary.
 
     Args:
-        attr: name of the attribute, in asylum terminology.
         client: XopClient, used to communicate with the asylum controller.
+        attr: name of the attribute, in asylum terminology.
         val: value to set it to.
         curr_unit: units of provided value, as str. Default is None.
-        desired_unit: desired units of value, as str. Default is PHYS_UNITS, the
-            expected unit of asylum physical units. (We have this to allow
-            exceptional overrides).
+        desired_unit: desired units of value, as str. Default is PHYS_UNITS,
+            the expected unit of asylum physical units. (We have this to
+            allow exceptional overrides).
 
     Returns:
         True if the set succeeds.
@@ -151,7 +151,7 @@ def set_param(attr: str, client: XopClient, val: str | float,
     return received
 
 
-def set_param_list(attrs: list[str], client: XopClient,
+def set_param_list(client: XopClient, attrs: list[str],
                    vals: tuple[str | float], curr_units: tuple[str | None],
                    desired_units: tuple[str | None]) -> bool:
     """Convert a list of values to appropriate units and set them.
@@ -160,8 +160,8 @@ def set_param_list(attrs: list[str], client: XopClient,
     done *before* setting them.
 
     Args:
-        attrs: list of attributes to set.
         client: XopClient, used to communicate with the asylum controller.
+        attrs: list of attributes to set.
         vals: tuple of values to set to.
         curr_units: tuple of units the values are provided in. For a given one,
             if it is None we do not try to convert it.
