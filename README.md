@@ -78,13 +78,13 @@ In doing (2), the protoc executable will be able to find the well-known types (a
 We will assume you are dealing in Python by default, since this whole project is Python-based. However, if you need to implement a particular component (e.g. DeviceController) in a different language, modify the below instructions for your required language.
 
 ``` sh
-  cd /path/to/afspm/afspm/
-  protoc --proto_path=./io/protos/src --python_out=./io/protos/generated/ ./io/protos/src/*.proto
-  # Fix absolute to relative imports
-  # Linux/Mac OSX:
-  sed -i ./io/protos/generated/*_pb2.py -e 's/^import [^ ]*_pb2/from . \0/'
-  # Windows (PowerShell):
-  gci ./io/protos/generated/*_pb2.py -recurse | ForEach-Object { (Get-Content $_) | ForEach-Object { $_ -replace "^(import [^ ]*_pb2)", "from . `$0" } | Set-Content $_ }
+cd /path/to/afspm/afspm/
+protoc --proto_path=./io/protos/src --python_out=./io/protos/generated/ ./io/protos/src/*.proto
+# Fix absolute to relative imports
+# Linux/Mac OSX:
+sed -i ./io/protos/generated/*_pb2.py -e 's/^import [^ ]*_pb2/from . \0/'
+# Windows (PowerShell):
+gci ./io/protos/generated/*_pb2.py -recurse | ForEach-Object { (Get-Content $_) | ForEach-Object { $_ -replace "^(import [^ ]*_pb2)", "from . `$0" } | Set-Content $_ }
 ```
 
 ### Unit testing
