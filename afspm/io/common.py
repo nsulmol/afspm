@@ -14,7 +14,7 @@ ALL_ENVELOPE_LOG = "ALL"
 
 
 # --- Good defaults --- #
-REQUEST_TIMEOUT_MS = 250  # Linked to TCP delay
+REQUEST_TIMEOUT_MS = 500  # Linked to TCP delay
 POLL_TIMEOUT_MS = 25
 LOOP_SLEEP_S = 0.1  # 100 ms
 HEARTBEAT_PERIOD_S = 5
