@@ -44,14 +44,14 @@ router_url = 'router_url'
 
 
 # ----- Components ----- #
-[devcon]
-component = true
-class = 'afspm.components.device.controllers.gxsm.controller.GxsmController'
-publisher = 'pub'
-control_server = 'server'
-
 [afspmcon]
 component = true
 class = 'afspm.components.afspm.controller.AfspmController'
 pubsubcache = 'psc'
 router = 'router'
+
+[devcon]
+component = true
+class = 'afspm.components.device.controllers.gxsm.controller.GxsmController'
+publisher = 'pub'
+control_server = 'server'

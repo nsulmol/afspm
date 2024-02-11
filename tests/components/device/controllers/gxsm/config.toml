@@ -40,6 +40,12 @@ router_url = 'router_url'
 
 
 # ----- Components ----- #
+[afspmcon]
+component = true
+class = 'afspm.components.afspm.controller.AfspmController'
+pubsubcache = 'psc'
+router = 'router'
+
 [devcon]
 component = true
 class = 'afspm.components.device.controllers.gxsm.controller.GxsmController'
@@ -47,9 +53,3 @@ publisher = 'pub'
 control_server = 'server'
 # gxsm-specific
 read_use_physical_units = 'False'  # TODO: Test with!
-
-[afspmcon]
-component = true
-class = 'afspm.components.afspm.controller.AfspmController'
-pubsubcache = 'psc'
-router = 'router'

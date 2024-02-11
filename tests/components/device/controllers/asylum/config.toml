@@ -48,15 +48,15 @@ class = 'afspm.components.device.controllers.asylum.client.XopClient'
 url = 'xop_url'
 
 # ----- Components ----- #
+[afspmcon]
+component = true
+class = 'afspm.components.afspm.controller.AfspmController'
+pubsubcache = 'psc'
+router = 'router'
+
 [devcon]
 component = true
 class = 'afspm.components.device.controllers.asylum.controller.AsylumController'
 publisher = 'pub'
 control_server = 'server'
 xop_client = 'xopclient'
-
-[afspmcon]
-component = true
-class = 'afspm.components.afspm.controller.AfspmController'
-pubsubcache = 'psc'
-router = 'router'
