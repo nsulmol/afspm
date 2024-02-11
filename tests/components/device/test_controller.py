@@ -227,7 +227,7 @@ def get_config_scan_speed(config_dict: dict,
         rep, init_scan_msg = client.request_parameter(param_msg)
         if rep == control_pb2.ControlResponse.REP_SUCCESS:
             init_val_nm = units.convert(float(init_scan_msg.value),
-                                     init_scan_msg.units, 'nm/s')
+                                        init_scan_msg.units, 'nm/s')
             return desired_param, init_val_nm
         logger.info("Controller failed setting/getting scan speed, "
                     "returned response: %s",
