@@ -132,9 +132,6 @@ class AsylumController(DeviceController):
 
     def poll_scan_state(self) -> scan_pb2.ScanState:
         # Poll for current scan state and send out!
-        # TODO: Need to see if we can read moving vs. scanning vs. free vs.
-        # motor running?
-        logger.warning("This method is likely not fully functional, finish!")
         scan_status = params.get_param(self._client,
                                        params.AsylumParameter.SCAN_STATUS)
         _handle_params_error(scan_status, "Polling for scan state failed!")
