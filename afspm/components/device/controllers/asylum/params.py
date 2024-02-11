@@ -13,12 +13,7 @@ logger = logging.getLogger(__name__)
 # All physical  units over the API are stored in meters.
 PHYS_UNITS = 'm'
 
-
-class AsylumBool(int, enum.Enum):
-    """Defines true or false in asylum."""
-
-    TRUE = 2
-    FALSE = 0
+SAVE_ALL_IMAGES = 2  # Hard-coded value for SaveImage/SaveForce
 
 
 class AsylumMethod(str, enum.Enum):

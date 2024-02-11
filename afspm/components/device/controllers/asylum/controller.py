@@ -80,7 +80,7 @@ class AsylumController(DeviceController):
 
         if not params.set_param(self._client,
                                 params.AsylumParameter.SAVE_IMAGE,
-                                int(params.AsylumBool.TRUE)):
+                                params.SAVE_ALL_IMAGES):
             msg = "Unable to set SaveImage to TRUE on startup."
             logger.error(msg)
             raise ParameterError(msg)
@@ -139,7 +139,7 @@ class AsylumController(DeviceController):
                                        params.AsylumParameter.SCAN_STATUS)
         _handle_params_error(scan_status, "Polling for scan state failed!")
 
-        if scan_status == int(params.AsylumBool.TRUE):
+        if scan_status:  # If 0, not scanning
             return scan_pb2.ScanState.SS_SCANNING
         else:
             return scan_pb2.ScanState.SS_FREE
