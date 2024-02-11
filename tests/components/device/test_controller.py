@@ -52,6 +52,7 @@ logger = logging.getLogger(LOGGER_ROOT + '.samples.testing.test_controller.' +
 SCAN_SPEED_KEY = 'scan-speed-nm-s'
 PHYS_SIZE_KEY = 'phys-size-nm'
 DATA_SHAPE_KEY = 'data-shape'
+REQUEST_TIMEOUT_MS = 'request_timeout_ms'
 
 
 # -------------------- Fixtures -------------------- #
@@ -102,6 +103,13 @@ def default_control_state(control_mode):
     cs = control_pb2.ControlState()
     cs.control_mode = control_mode
     return cs
+
+
+@pytest.fixture
+def request_timeout_ms(config_dict):
+    if REQUEST_TIMEOUT_MS in config_dict:
+        return config_dict[REQUEST_TIMEOUT_MS]
+    return common.REQUEST_TIMEOUT_MS
 
 
 # Note: topics use 'base' CacheLogic, so we catch all messages of each
@@ -156,8 +164,9 @@ def sub_zctrl(ctx, topics_zctrl, timeout_ms, psc_url):
 
 
 @pytest.fixture
-def client(ctx, component_name, router_url):
-    return ControlClient(router_url, ctx, component_name)
+def client(ctx, component_name, router_url, request_timeout_ms):
+    return ControlClient(router_url, ctx, component_name,
+                         request_timeout_ms=2*request_timeout_ms)
 
 
 # -------------------- Helper Methods -------------------- #
