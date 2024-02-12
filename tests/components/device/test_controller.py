@@ -38,6 +38,7 @@ from afspm.io.control.client import ControlClient
 from afspm.components.device import params
 from afspm.utils.log import LOGGER_ROOT
 from afspm.utils import units
+from afspm.utils.protobuf import check_equal
 
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
@@ -52,7 +53,9 @@ logger = logging.getLogger(LOGGER_ROOT + '.samples.testing.test_controller.' +
 SCAN_SPEED_KEY = 'scan-speed-nm-s'
 PHYS_SIZE_KEY = 'phys-size-nm'
 DATA_SHAPE_KEY = 'data-shape'
-REQUEST_TIMEOUT_MS = 'request_timeout_ms'
+REQUEST_TIMEOUT_MS_KEY = 'request_timeout_ms'
+# The relative tolerance used to compare set/get params (when float).
+FLOAT_TOLERANCE_KEY = 'float-tolerance'
 
 
 # -------------------- Fixtures -------------------- #
@@ -105,11 +108,18 @@ def default_control_state(control_mode):
     return cs
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def request_timeout_ms(config_dict):
-    if REQUEST_TIMEOUT_MS in config_dict:
-        return config_dict[REQUEST_TIMEOUT_MS]
+    if REQUEST_TIMEOUT_MS_KEY in config_dict:
+        return config_dict[REQUEST_TIMEOUT_MS_KEY]
     return common.REQUEST_TIMEOUT_MS
+
+
+@pytest.fixture(scope="module")
+def float_tolerance(config_dict):
+    if FLOAT_TOLERANCE_KEY in config_dict:
+        return config_dict[FLOAT_TOLERANCE_KEY]
+    return 1e-09  # Standard from math.isclose()
 
 
 # Note: topics use 'base' CacheLogic, so we catch all messages of each
@@ -341,7 +351,8 @@ def test_cancel_scan(client, default_control_state,
 
 
 def test_scan_params(client, default_control_state,
-                     sub_scan_params, control_mode):
+                     sub_scan_params, control_mode,
+                     float_tolerance):
     logger.info("Validate we can set scan parameters.")
     startup_grab_control(client, control_mode)
 
@@ -364,13 +375,15 @@ def test_scan_params(client, default_control_state,
     logger.info("Next, validate that our subscriber receives these new "
                 "params.")
     last_params = assert_and_return_message(sub_scan_params)
-    assert last_params == modified_params
+
+    assert check_equal(last_params, modified_params, float_tolerance)
 
     logger.info("Now, return to our initial parameters.")
     rep = client.set_scan_params(initial_params)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
     last_params = assert_and_return_message(sub_scan_params)
-    assert last_params == initial_params
+
+    assert check_equal(last_params, initial_params, float_tolerance)
 
     end_test(client)
     stop_client(client)
@@ -438,7 +451,7 @@ def test_run_scan(client, default_control_state,
 
 def test_handle_zctrl(client, default_control_state,
                       sub_zctrl, timeout_ms,
-                      control_mode):
+                      control_mode, fault_tolerance):
     logger.info("Validate we recieve and can set ZCtrlParams.")
     startup_grab_control(client, control_mode)
 
@@ -456,13 +469,13 @@ def test_handle_zctrl(client, default_control_state,
     logger.info("Next, validate that our subscriber receives these new "
                 "params.")
     last_params = assert_and_return_message(sub_zctrl)
-    assert last_params == modified_params
+    assert check_equal(last_params, modified_params, fault_tolerance)
 
     logger.info("Now, return to our initial parameters.")
     rep = client.set_zctrl_params(initial_params)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
     last_params = assert_and_return_message(sub_zctrl)
-    assert last_params == initial_params
+    assert check_equal(last_params, initial_params, fault_tolerance)
 
     end_test(client)
     stop_client(client)

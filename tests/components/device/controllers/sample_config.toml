@@ -21,6 +21,9 @@ scan_wait_ms = 180000
 #phys-size-nm = [36.0, 36.0]
 #data-shape = [10, 10]
 
+# --- Miscellaneous --- #
+#float-tolerance = 1e-06
+
 
 # ----- PubSub ----- #
 [pub]

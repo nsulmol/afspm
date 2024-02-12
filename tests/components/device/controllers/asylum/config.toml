@@ -23,6 +23,9 @@ request_timeout_ms=5000  # Starting/stopping scans can take a while!
 #phys-size-nm = [36.0, 36.0]
 #data-shape = [10, 10]
 
+# --- Miscellaneous --- #
+#float-tolerance = 1e-06
+
 
 # ----- PubSub ----- #
 [pub]
