@@ -136,7 +136,7 @@ class AsylumController(DeviceController):
                                        params.AsylumParameter.SCAN_STATUS)
         _handle_params_error(scan_status, "Polling for scan state failed!")
 
-        if scan_status:  # If 0, not scanning
+        if scan_status > 0:  # If 0, not scanning
             return scan_pb2.ScanState.SS_SCANNING
         else:
             return scan_pb2.ScanState.SS_FREE
@@ -171,7 +171,7 @@ class AsylumController(DeviceController):
         img_path = convert_igor_path_to_python_path(val)
         images = sorted(glob.glob(img_path + os.sep + "*" + self.IMG_EXT),
                         key=os.path.getmtime)  # Sorted by access time
-        scan_path = images[0] if images else None
+        scan_path = images[-1] if images else None  # Get latest
 
         if (scan_path and not self._old_scan_path or
                 scan_path != self._old_scan_path):
@@ -188,9 +188,9 @@ class AsylumController(DeviceController):
 
             if datasets:
                 scans = []
+                ts = get_file_modification_datetime(scan_path)
                 for ds in datasets:
                     scan = conv.convert_sidpy_to_scan_pb2(ds)
-                    ts = get_file_modification_datetime(fname)
                     scan.timestamp.FromDatetime(ts)
                     scans.append(scan)
                 self._old_scans = scans
