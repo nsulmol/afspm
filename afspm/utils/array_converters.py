@@ -126,7 +126,7 @@ def convert_scan_pb2_to_sidpy(scan: scan_pb2.Scan2d) -> Dataset:
         dim.quantity = 'distance'
         dim.units = scan.params.spatial.units
 
-    dset._name = scan.channel
+    dset.quantity = scan.channel
     return dset
 
 
@@ -162,7 +162,7 @@ def convert_sidpy_to_scan_pb2(ds: Dataset) -> scan_pb2.Scan2d:
                                             data=data_aspects)
 
     scan = scan_pb2.Scan2d(params=scan_params,
-                           channel=ds.name,
+                           channel=ds.quantity,
                            values=ds.compute().ravel().tolist())
     return scan
 
