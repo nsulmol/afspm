@@ -272,7 +272,7 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                 old_scans[0].values)
 
             if (only_new_has_scans or (timestamps_different or
-                                        values_different)):
+                                       values_different)):
                 send_scan = True
 
             if send_scan:
