@@ -171,7 +171,7 @@ class AsylumController(DeviceController):
         img_path = convert_igor_path_to_python_path(val)
         images = sorted(glob.glob(img_path + os.sep + "*" + self.IMG_EXT),
                         key=os.path.getmtime)  # Sorted by access time
-        scan_path = images[0]
+        scan_path = images[0] if images else None
 
         if (scan_path and not self._old_scan_path or
                 scan_path != self._old_scan_path):
