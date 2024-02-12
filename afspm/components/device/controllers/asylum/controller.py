@@ -169,7 +169,7 @@ class AsylumController(DeviceController):
         _handle_params_error(val, "Requesting img path failed!")
 
         img_path = convert_igor_path_to_python_path(val)
-        images = sorted(glob.glob(img_path + os.sep + "*" + IMG_EXT),
+        images = sorted(glob.glob(img_path + os.sep + "*" + self.IMG_EXT),
                         key=os.path.getmtime)  # Sorted by access time
         scan_path = images[0]
 
