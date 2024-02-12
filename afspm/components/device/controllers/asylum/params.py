@@ -19,7 +19,7 @@ SAVE_ALL_IMAGES = 2  # Hard-coded value for SaveImage/SaveForce
 class AsylumMethod(str, enum.Enum):
     """Asylum method names."""
 
-    SCAN = 'DoScanFunc'
+    SCAN_FUNC = 'DoScanFunc'
     START_SCAN_PARAM = 'DoScan_0'
     STOP_SCAN_PARAM = 'StopScan_0'
 
