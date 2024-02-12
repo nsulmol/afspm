@@ -20,8 +20,8 @@ class AsylumMethod(str, enum.Enum):
     """Asylum method names."""
 
     SCAN_FUNC = 'DoScanFunc'
-    START_SCAN_PARAM = 'DoScan_0'
-    STOP_SCAN_PARAM = 'StopScan_0'
+    START_SCAN_PARAM = 'DoScan_0'  # Param for DoScanFunc
+    STOP_SCAN_PARAM = 'StopScan_0'  # Param for DoScanFunc
 
     GET_VALUE = 'GV'
     SET_VALUE = 'PV'

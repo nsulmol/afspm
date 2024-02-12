@@ -88,14 +88,14 @@ class AsylumController(DeviceController):
     def on_start_scan(self):
         success, __ = self._client.send_request(
             params.AsylumMethod.SCAN_FUNC,
-            (params.AsylumParameter.START_SCAN_PARAM))
+            (params.AsylumMethod.START_SCAN_PARAM))
         return (control_pb2.ControlResponse.REP_NO_RESPONSE if not success
                 else control_pb2.ControlResponse.REP_SUCCESS)
 
     def on_stop_scan(self):
         success, __ = self._client.send_request(
             params.AsylumMethod.SCAN_FUNC,
-            (params.AsylumParameter.STOP_SCAN_PARAM))
+            (params.AsylumMethod.STOP_SCAN_PARAM))
         return (control_pb2.ControlResponse.REP_NO_RESPONSE if not success
                 else control_pb2.ControlResponse.REP_SUCCESS)
 
