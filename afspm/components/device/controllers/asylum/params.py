@@ -2,6 +2,7 @@
 
 import logging
 import enum
+from types import MappingProxyType  # Immutable dict
 
 from afspm.components.device.controllers.asylum.client import XopClient
 from afspm.utils import units
@@ -30,40 +31,59 @@ class AsylumMethod(str, enum.Enum):
     SET_STRING = 'PS'
 
 
-# ----- Asylum Params ----- #
-class AsylumParameter(str, enum.Enum):
-    """Asylum internal parameter names."""
+class AsylumParam(enum.Enum):
+    """Asylum internal parameters.
 
-    TL_X = 'XOffset'
-    TL_Y = 'YOffset'
+    Stored as integers, because StrEnums will merge duplicates, and we are
+    dealing with a number of duplicate strings here. Thus, we use the below
+    param_map to map a parameter enum to its associated string.
+    """
 
-    SCAN_SIZE = 'ScanSize'
-    SCAN_X_RATIO = 'FastRatio'
-    SCAN_Y_RATIO = 'SlowRatio'
+    TL_X = enum.auto()
+    TL_Y = enum.auto()
 
-    RES_X = 'ScanPoints'
-    RES_Y = 'ScanLines'
+    SCAN_SIZE = enum.auto()
+    SCAN_X_RATIO = enum.auto()
+    SCAN_Y_RATIO = enum.auto()
 
-    SCAN_SPEED_UNITS_S = 'ScanSpeed'
+    RES_X = enum.auto()
+    RES_Y = enum.auto()
 
-    CP = 'ProportionalGain'
-    CI = 'IntegralGain'
+    SCAN_SPEED = enum.auto()
+
+    CP = enum.auto()
+    CI = enum.auto()
 
     # Don't forget these are in 'igor path' format, use xop methods
     # to convert back.
-    IMG_PATH = 'SaveImage'
-    FORCE_PATH = 'SaveForce'
+    IMG_PATH = enum.auto()
+    FORCE_PATH = enum.auto()
 
     # Note: diff with IMG_PATH is type: string vs. variable/bool
-    SAVE_IMAGE = 'SaveImage'
-    SAVE_FORCE = 'SaveForce'
+    SAVE_IMAGE = enum.auto()
+    SAVE_FORCE = enum.auto()
 
-    SCAN_STATUS = 'ScanStatus'
-    FORCE_STATUS = 'FMapStatus'
+    SCAN_STATUS = enum.auto()
+    FORCE_STATUS = enum.auto()
 
 
-# Holds which parameters are strings instead of variables
-STR_PARAM_TUPLE = [AsylumParameter.IMG_PATH, AsylumParameter.FORCE_PATH]
+# Creating a dict mapping equivalent to AsylumParameter, to map to necessary
+# str values. We need to get *compare* via this mapping, to ensure we
+# distinguish between duplicates (this is why we cannot use StrEnum).
+PARAM_STR_MAP = MappingProxyType(
+    AsylumParam.TL_X: 'XOffset', AsylumParam.TL_Y: 'YOffset',
+    AsylumParam.SCAN_SIZE: 'ScanSize', AsylumParam.SCAN_X_RATIO: 'FastRatio',
+    AsylumParam.SCAN_Y_RATIO: 'SlowRatio', AsylumParam.RES_X: 'ScanPoints',
+    AsylumParam.RES_Y: 'ScanLines', AsylumParam.SCAN_SPEED: 'ScanSpeed',
+    AsylumParam.CP: 'ProportionalGain', AsylumParam.CI: 'IntegralGain',
+    AsylumParam.IMG_PATH: 'SaveImage', AsylumParam.FORCE_PATH: 'SaveForce',
+    AsylumParam.SAVE_IMAGE: 'SaveImage', AsylumParam.SAVE_FORCE: 'SaveForce',
+    AsylumParam.SCAN_STATUS: 'ScanStatus', AsylumParam.FORCE_STATUS: 'FMapStatus'
+    })
+
+
+ # Holds which parameters are strings instead of variables
+PARAM_IS_STR_TUPLE = (AsylumParam.IMG_PATH, AsylumParam.FORCE_PATH)
 
 # Lookup return indicating a variable lookup failure.
 NAN_STR = 'nan'
@@ -76,7 +96,7 @@ def _is_variable_lookup_failure(val: float | str | None) -> bool:
     return False
 
 
-def get_param(client: XopClient, attr: str) -> float | str | None:
+def get_param(client: XopClient, param: AsylumParam) -> float | str | None:
     """Get asylum parameter.
 
     Uses the client to get the current value of the provided parameter. On
@@ -84,28 +104,31 @@ def get_param(client: XopClient, attr: str) -> float | str | None:
 
     Args:
         client: XopClient, used to communicate with asylum controller.
-        attr: name of the attribute, in asylum terminology.
+        param: AsylumParam to look up.
 
     Returns:
         Current value (float or str), or None if could not be obtained.
     """
-    get_method = (AsylumMethod.GET_STRING if attr in STR_PARAM_TUPLE
+
+    # Note: need to do a value comparison
+    get_method = (AsylumMethod.GET_STRING if param in PARAM_IS_STR_TUPLE
                   else AsylumMethod.GET_VALUE)
 
-    received, val = client.send_request(get_method, (attr,))
+    received, val = client.send_request(get_method,
+                                        (PARAM_STR_MAP[param],))
     if received and not _is_variable_lookup_failure(val):
         return val
     else:
         return None
 
 
-def get_param_list(client: XopClient, attrs: list[str],
+def get_param_list(client: XopClient, params: tuple[AsylumParam],
                    ) -> tuple[float | str] | None:
     """Get list of asylum parameters.
 
     Args:
         client: XopClient, used to communicate with asylum controller.
-        attrs: list of attribute names, in asylum terminology.
+        params: list of AsylumParams.
 
     Returns:
         Tuple of received values (float or str for each) or None if one or more
@@ -114,25 +137,25 @@ def get_param_list(client: XopClient, attrs: list[str],
         practice in Python, as developers expect lists to be of a single type.)
     """
     vals = []
-    for attr in attrs:
-        val = get_param(client, attr)
+    for param in params:
+        val = get_param(client, param)
         if val is None:
             return None
         vals.append(val)
     return tuple(vals)
 
 
-def set_param(client: XopClient, attr: str, val: str | float,
+def set_param(client: XopClient, param: AsylumParam, val: str | float,
               curr_unit: str = None, desired_unit: str = PHYS_UNITS) -> bool:
     """Set asylum parameter.
 
-    Given an attribute name and value, attempts to set the asylum controller
+    Given a parameter name and value, attempts to set the asylum controller
     with it. If the value is a float and a curr_unit are provided, we convert
     it if necessary.
 
     Args:
         client: XopClient, used to communicate with the asylum controller.
-        attr: name of the attribute, in asylum terminology.
+        param: AsylumParam to set.
         val: value to set it to.
         curr_unit: units of provided value, as str. Default is None.
         desired_unit: desired units of value, as str. Default is PHYS_UNITS,
@@ -149,14 +172,15 @@ def set_param(client: XopClient, attr: str, val: str | float,
         except units.ConversionError:
             return False
 
-    set_method = (AsylumMethod.SET_STRING if attr in STR_PARAM_TUPLE
+    set_method = (AsylumMethod.SET_STRING if param in PARAM_IS_STR_TUPLE
                   else AsylumMethod.SET_VALUE)
 
-    received, __ = client.send_request(set_method, (attr, val))
+    received, __ = client.send_request(set_method,
+                                       (PARAM_STR_MAP[param], val))
     return received
 
 
-def set_param_list(client: XopClient, attrs: list[str],
+def set_param_list(client: XopClient, params: tuple[AsylumParam],
                    vals: tuple[str | float], curr_units: tuple[str | None],
                    desired_units: tuple[str | None]) -> bool:
     """Convert a list of values to appropriate units and set them.
@@ -166,7 +190,7 @@ def set_param_list(client: XopClient, attrs: list[str],
 
     Args:
         client: XopClient, used to communicate with the asylum controller.
-        attrs: list of attributes to set.
+        params: list of params to set.
         vals: tuple of values to set to.
         curr_units: tuple of units the values are provided in. For a given one,
             if it is None we do not try to convert it.
@@ -185,10 +209,11 @@ def set_param_list(client: XopClient, attrs: list[str],
         return False
 
     all_received = True
-    for val, attr in zip(converted_vals, attrs):
-        set_method = (AsylumMethod.SET_STRING if attr in STR_PARAM_TUPLE
+    for val, param in zip(converted_vals, params):
+        set_method = (AsylumMethod.SET_STRING if param in PARAM_IS_STR_TUPLE
                       else AsylumMethod.SET_VALUE)
-        received, __ = client.send_request(set_method, (attr, val))
+        received, __ = client.send_request(set_method,
+                                           (PARAM_STR_MAP[param], val))
         all_received = all_received and received
 
     if not all_received:

@@ -37,14 +37,14 @@ class AsylumController(DeviceController):
         xop_client: XOPClient for communicating with Asylum Research exe.
     """
 
-    SCAN_PARAMS = (params.AsylumParameter.TL_X, params.AsylumParameter.TL_Y,
-                   params.AsylumParameter.SCAN_SIZE,
-                   params.AsylumParameter.SCAN_X_RATIO,
-                   params.AsylumParameter.SCAN_Y_RATIO,
-                   params.AsylumParameter.RES_X, params.AsylumParameter.RES_Y)
+    SCAN_PARAMS = (params.AsylumParam.TL_X, params.AsylumParam.TL_Y,
+                   params.AsylumParam.SCAN_SIZE,
+                   params.AsylumParam.SCAN_X_RATIO,
+                   params.AsylumParam.SCAN_Y_RATIO,
+                   params.AsylumParam.RES_X, params.AsylumParam.RES_Y)
 
-    ZCTRL_PARAMS = (params.AsylumParameter.CP,
-                    params.AsylumParameter.CI)
+    ZCTRL_PARAMS = (params.AsylumParam.CP,
+                    params.AsylumParam.CI)
 
     IMG_EXT = ".ibw"
 
@@ -66,7 +66,7 @@ class AsylumController(DeviceController):
     def __del__(self):
         # Reset save state!
         if not params.set_param(self._client,
-                                params.AsylumParameter.SAVE_IMAGE,
+                                params.AsylumParam.SAVE_IMAGE,
                                 self._old_save_state):
             msg = "Was unable to reset SaveImage state on closure!"
             logger.error(msg)
@@ -75,11 +75,11 @@ class AsylumController(DeviceController):
     def _setup_saving(self):
         """Ensure data is being saved while running and store prior state."""
         self._old_save_state = params.get_param(
-            self._client, params.AsylumParameter.SAVE_IMAGE)
+            self._client, params.AsylumParam.SAVE_IMAGE)
         _handle_params_error(self._old_save_state, "Unable to store SaveImage!")
 
         if not params.set_param(self._client,
-                                params.AsylumParameter.SAVE_IMAGE,
+                                params.AsylumParam.SAVE_IMAGE,
                                 params.SAVE_ALL_IMAGES):
             msg = "Unable to set SaveImage to TRUE on startup."
             logger.error(msg)
@@ -133,7 +133,7 @@ class AsylumController(DeviceController):
     def poll_scan_state(self) -> scan_pb2.ScanState:
         # Poll for current scan state and send out!
         scan_status = params.get_param(self._client,
-                                       params.AsylumParameter.SCAN_STATUS)
+                                       params.AsylumParam.SCAN_STATUS)
         _handle_params_error(scan_status, "Polling for scan state failed!")
 
         if scan_status > 0:  # If 0, not scanning
@@ -165,7 +165,7 @@ class AsylumController(DeviceController):
         return scan_params
 
     def poll_scans(self) -> [scan_pb2.Scan2d]:
-        val = params.get_param(self._client, params.AsylumParameter.IMG_PATH)
+        val = params.get_param(self._client, params.AsylumParam.IMG_PATH)
         _handle_params_error(val, "Requesting img path failed!")
 
         img_path = convert_igor_path_to_python_path(val)
