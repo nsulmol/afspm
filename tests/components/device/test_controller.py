@@ -50,12 +50,12 @@ logger = logging.getLogger(LOGGER_ROOT + '.samples.testing.test_controller.' +
 
 
 # Constants for config
-SCAN_SPEED_KEY = 'scan-speed-nm-s'
-PHYS_SIZE_KEY = 'phys-size-nm'
-DATA_SHAPE_KEY = 'data-shape'
+SCAN_SPEED_KEY = 'scan_speed_nm_s'
+PHYS_SIZE_KEY = 'phys_size_nm'
+DATA_SHAPE_KEY = 'data_shape'
 REQUEST_TIMEOUT_MS_KEY = 'request_timeout_ms'
 # The relative tolerance used to compare set/get params (when float).
-FLOAT_TOLERANCE_KEY = 'float-tolerance'
+FLOAT_TOLERANCE_KEY = 'float_tolerance'
 
 
 # -------------------- Fixtures -------------------- #

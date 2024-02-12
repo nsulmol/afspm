@@ -19,12 +19,12 @@ request_timeout_ms=5000  # Starting/stopping scans can take a while!
 # --- (Optional) Scan Settings --- #
 # Parameters we try to set to, for a faster scan.
 # Uncomment if desired
-#scan-time-s = 1.0
-#phys-size-nm = [36.0, 36.0]
-#data-shape = [10, 10]
+#scan_time_s = 1.0
+#phys_size_nm = [36.0, 36.0]
+#data_shape = [10, 10]
 
 # --- Miscellaneous --- #
-#float-tolerance = 1e-06
+#float_tolerance = 1e-06
 
 
 # ----- PubSub ----- #
