@@ -451,7 +451,7 @@ def test_run_scan(client, default_control_state,
 
 def test_handle_zctrl(client, default_control_state,
                       sub_zctrl, timeout_ms,
-                      control_mode, fault_tolerance):
+                      control_mode, float_tolerance):
     logger.info("Validate we recieve and can set ZCtrlParams.")
     startup_grab_control(client, control_mode)
 
@@ -469,13 +469,13 @@ def test_handle_zctrl(client, default_control_state,
     logger.info("Next, validate that our subscriber receives these new "
                 "params.")
     last_params = assert_and_return_message(sub_zctrl)
-    assert check_equal(last_params, modified_params, fault_tolerance)
+    assert check_equal(last_params, modified_params, float_tolerance)
 
     logger.info("Now, return to our initial parameters.")
     rep = client.set_zctrl_params(initial_params)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
     last_params = assert_and_return_message(sub_zctrl)
-    assert check_equal(last_params, initial_params, fault_tolerance)
+    assert check_equal(last_params, initial_params, float_tolerance)
 
     end_test(client)
     stop_client(client)

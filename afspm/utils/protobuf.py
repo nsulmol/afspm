@@ -26,7 +26,7 @@ def check_equal(msg1: Message, msg2: Message,
         val2 = getattr(msg2, field.name)
         is_float = isinstance(val1, float)
 
-        if is_float and not math.isclose(val1, val2, rel_tol):
+        if is_float and not math.isclose(val1, val2, rel_tol=rel_tol):
             return False
         if not is_float and val1 != val2:  # Value comparison
             return False
