@@ -184,22 +184,22 @@ class ControlRouter:
         """
         old_problems_set = copy.deepcopy(self._problems_set)
         if add_problem:
-            logger.debug("Adding problem %s",
-                         common.get_enum_str(control_pb2.ExperimentProblem,
-                                             exp_problem))
+            logger.warning("Adding problem %s",
+                           common.get_enum_str(control_pb2.ExperimentProblem,
+                                               exp_problem))
             self._problems_set.add(exp_problem)
         else:
-            logger.debug("Removing problem %s",
-                         common.get_enum_str(control_pb2.ExperimentProblem,
-                                             exp_problem))
+            logger.warning("Removing problem %s",
+                           common.get_enum_str(control_pb2.ExperimentProblem,
+                                               exp_problem))
             self._problems_set.remove(exp_problem)
 
         if not old_problems_set and self._problems_set:
-            logger.info("Entering problem mode")
+            logger.warning("Entering problem mode")
             self._control_mode = control_pb2.ControlMode.CM_PROBLEM
             self._client_in_control_id = None
         elif old_problems_set and not self._problems_set:
-            logger.info("Exiting problem mode, switching to automated.")
+            logger.warning("Exiting problem mode, switching to automated.")
             self._control_mode = control_pb2.ControlMode.CM_AUTOMATED
             self._client_in_control_id = None
 
