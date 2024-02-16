@@ -21,6 +21,7 @@ class TipStateData:
     scan_period_raise_problem: int
     scan_count: int = 0
     problem_resolved: bool = True
+    last_scan_ts = None
 
 
 def on_message_received(component: AfspmComponent, envelope: str,
@@ -28,9 +29,13 @@ def on_message_received(component: AfspmComponent, envelope: str,
     """Throw a tip problem every N scans (but wait until resolved)."""
     tip_problem = control_pb2.ExperimentProblem.EP_TIP_SHAPE_CHANGED
     if tip_state.problem_resolved:
-        if isinstance(proto, scan_pb2.ScanStateMsg):
+        if (isinstance(proto, scan_pb2.Scan2d)
+            and (tip_state.last_scan_ts is None
+                 or tip_state.last_scan_ts != proto.timestamp)):
             tip_state.scan_count += 1
+            tip_state.last_scan_ts = proto.timestamp
         if tip_state.scan_count > tip_state.scan_period_raise_problem:
+            logger.warning("Detected tip problem! Trying to report it.")
             rep = component.control_client.add_experiment_problem(tip_problem)
             if rep == control_pb2.ControlResponse.REP_SUCCESS:
                 tip_state.problem_resolved = False
