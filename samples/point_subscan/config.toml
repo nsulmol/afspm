@@ -154,6 +154,7 @@ control_client = 'admin_client'
 
 # --- Fake Tip Detector --- #
 [tip_state_data]
+class = 'tip_analysis.TipStateData'
 scan_period_raise_problem = 2
 
 [tip_detector]
