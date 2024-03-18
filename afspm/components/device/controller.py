@@ -254,7 +254,7 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             old_scans = copy.deepcopy(self.scans)
             self.scans = self.poll_scans()
 
-            # If scans are different, assume now and send out!
+            # If scans are different, assume new and send out!
             # Test timestamps if they exist. Otherwise, compare
             # data arrays.
             send_scan = False
