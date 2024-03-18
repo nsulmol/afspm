@@ -16,6 +16,9 @@ from ..utils import array_converters as ac
 logger = logging.getLogger(__name__)
 
 
+NONE_VAL = ''  # For providing None in TOML config.
+
+
 class CacheMeaning(Enum):
     """Holds cache meaning for visualization purposes."""
 
@@ -33,7 +36,6 @@ class VisualizationStyle(Enum):
     SURFACE = 5  # xarray.plot.surface()
 
 
-# TODO: Write unit test for this.
 class Visualizer(AfspmComponent):
     """Base visualizer, to display scans from cache.
 
@@ -115,18 +117,19 @@ class Visualizer(AfspmComponent):
             scan_phys_size_list: list of values, with keys in list_keys.
                 creates scan_phys_size_map.
             visualization_style_list: list of values, with keys in list_keys.
-                creates visualization_style_map. If False, uses default
-                (colormesh).
+                creates visualization_style_map. Default is empty arr, imposing
+                matplotlib default. If you want a single value in the arr to be
+                default, provide '' for it.
             visualization_colormap_list: list of values, with keys in list_keys.
-                creates visualization_colormap_map. If False, uses default
-                mapping (it's blue).
+                creates visualization_colormap_map. Default is empty arr,
+                imposing matplotlib default. If you want a single value in the
+                arr to be default, provide '' for it.
             visualize_undeclared_scans: see class attribute.
             scan_id: see class attribute.
         """
         # Validate lists match in size and populate map
         for vals_list in [cache_meaning_list, scan_phys_origin_list,
-                          scan_phys_size_list, visualization_style_list,
-                          visualization_colormap_list]:
+                          scan_phys_size_list]:
             assert len(list_keys) == len(vals_list)
 
         self.cache_meaning_map = {}
@@ -141,11 +144,15 @@ class Visualizer(AfspmComponent):
 
             # Special cases since viz stuff can be None (using matplotlib
             # defaults).
-            style = visualization_style_list[idx]
-            self.visualization_style_map[key] = style if style else None
-            colormap = visualization_colormap_list[idx]
-            self.visualization_colormap_map[key] = (colormap if colormap
-                                                    else None)
+            style = (visualization_style_list[idx] if
+                     len(visualization_style_list) > idx
+                     else None)
+            self.visualization_style_map[key] = (style if style != NONE_VAL
+                                                 else None)
+            colormap = (visualization_colormap_list[idx] if
+                        len(visualization_colormap_list) > idx else None)
+            self.visualization_colormap_map[key] = (colormap if colormap !=
+                                                    NONE_VAL else None)
 
         self.visualize_undeclared_scans = visualize_undeclared_scans
         self.scan_id = scan_id

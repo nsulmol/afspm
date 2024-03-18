@@ -155,8 +155,8 @@ def visualizer_params_dict(scan_size):
         'cache_meaning_list':  ['temporal'],
         'scan_phys_origin_list': [full_scan_origin],
         'scan_phys_size_list': [scan_size],
-        'visualization_style_list': [False],  # Default
-        'visualization_colormap_list': [False],  # Default
+        'visualization_style_list': [],  # Default
+        'visualization_colormap_list': [],  # Default
         'visualize_undeclared_scans': True,
         'scan_id': 'Scan2d',
         'loop_sleep_s': 0,
