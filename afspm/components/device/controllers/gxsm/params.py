@@ -154,7 +154,10 @@ def get_param_list(attrs: list[str]) -> list[float] | None:
         List of values,.
 
     Raises:
-        ParameterError if getting any of the parameters fails.
+        ParameterError if getting any of the parameters fails. We explicitly
+        do this rather than provide a 'None' (or something similar), as we
+        do not expect that the user will be able to continue without one of
+        the requested parameters.
     """
     return [get_param(attr) for attr in attrs]
 
