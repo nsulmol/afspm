@@ -193,7 +193,7 @@ class PubSubCache:
         """
         envelope_log = (common.ALL_ENVELOPE_LOG
                         if envelope == common.ALL_ENVELOPE else envelope)
-        logger.info("New subscription to %s.", envelope_log)
+        logger.info(f"New subscription to {envelope_log}")
 
         # If "ALL" subscribed, send all envelopes in our cache
         envelopes_to_send = (list(self.cache.keys())
@@ -201,8 +201,7 @@ class PubSubCache:
                              else [envelope])
         for env in envelopes_to_send:
             if env in self.cache:
-                logger.info("Subscription: cache for %s being sent out.",
-                            env)
+                logger.info(f"Subscription: cache for {env} being sent out.")
                 for proto in self.cache[env]:
                     self._backend.send_multipart([env.encode(),
                                                   proto.SerializeToString()])
@@ -217,7 +216,7 @@ class PubSubCache:
             proto, **self._get_envelope_kwargs)
         self._update_cache(proto, self.cache,
                            **self._update_cache_kwargs)
-        logger.debug("Sending message %s", envelope)
+        logger.debug(f"Sending message {envelope}")
         self._backend.send_multipart([envelope.encode(),
                                       proto.SerializeToString()])
 

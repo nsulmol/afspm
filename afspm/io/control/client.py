@@ -173,7 +173,7 @@ class ControlClient:
         Returns:
             The received RequestResponse.
         """
-        logger.debug("Sending set_scan_params with: %s", scan_params)
+        logger.debug(f"Sending set_scan_params with: {scan_params}")
         msg = cmd.serialize_request(
             control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS, scan_params)
         return self._try_send_req(msg)
@@ -288,7 +288,7 @@ class ControlClient:
             tuple of ControlResponse and a ParameterMsg response, corresponding
                 to a final get call on the parameter.
         """
-        logger.debug("Sending parameter request with: %s", param)
+        logger.debug(f"Sending parameter request with: {param}")
         msg = cmd.serialize_request(
             control_pb2.ControlRequest.REQ_PARAM, param)
         return self._try_send_req(msg, keep_obj=True)

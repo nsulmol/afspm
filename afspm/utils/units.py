@@ -49,18 +49,17 @@ def convert(val: Any, unit: Optional[str] = None,
         return val
 
     try:
-        logger.trace("Converting %s from %s to %s", val, unit, desired_unit)
+        logger.trace(f"Converting {val} from {unit} to {desired_unit}")
         # Enforce float in conversion always. A str would break this...
         quantity = float(val) * ureg(unit)
         magnitude = quantity.to(desired_unit).magnitude
-        logger.trace("After conversion, magnitude is %s", magnitude)
+        logger.trace(f"After conversion, magnitude is {magnitude}")
         return magnitude
     except (pint.UndefinedUnitError, pint.DimensionalityError) as err:
-        logger.error("Unable to convert %s from %s to %s, due to %s",
-                     val, unit, desired_unit,
-                     ("undefined unit error."
-                      if err is pint.UndefinedUnitError else
-                      "dimensionality error."))
+        reason = ("undefined unit error." if err is pint.UndefinedUnitError else
+                  "dimensionality error.")
+        logger.error(f"Unable to convert {val} from {unit} to {desired_unit}, "
+                     f"due to {reason}.")
         raise ConversionError
 
 

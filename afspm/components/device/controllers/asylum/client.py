@@ -63,7 +63,7 @@ class XopClient:
             ret_val: the returned value, if applicable.
         """
         req_msg_id, req = xop.create_call_string(method_name, params)
-        logger.trace('Call string to send: %s', req)
+        logger.trace(f'Call string to send: {req}')
         self._client.send(req.encode())
         ts = time.time()
 
@@ -78,7 +78,7 @@ class XopClient:
         while not msg_received and time.time() - ts < self._timeout_ms:
             if self._client.poll(POLL_TIMEOUT_MS, zmq.POLLIN):
                 msg = self._client.recv(zmq.NOBLOCK).decode()
-                logger.trace('Received response: %s', msg)
+                logger.trace(f'Received response: {msg}')
                 err_code, rep_msg_id, ret_val = xop.parse_response_string(
                     msg)
                 msg_received = req_msg_id == rep_msg_id

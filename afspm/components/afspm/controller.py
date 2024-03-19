@@ -79,7 +79,7 @@ class AfspmController(afspmc.AfspmComponentBase):
         new_control_state = self.router.get_control_state()
 
         if new_control_state != self.control_state:
-            logger.debug("Sending new control state: %s", new_control_state)
+            logger.debug(f"Sending new control state: {new_control_state}")
             self.pubsubcache.send_message(new_control_state)
         self.control_state = new_control_state
 

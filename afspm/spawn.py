@@ -181,14 +181,14 @@ def spawn_monitorless_component(config_file: str,
 
         keys = list(filtered_dict.keys())
         if len(keys) == 0:
-            logger.error("Component %s not found, exiting.", component_to_spawn)
+            logger.error(f"Component {component_to_spawn} not found, exiting.")
             return
         if len(keys) > 1:
-            logger.error("More than 1 component with name %s found, exiting.",
-                         component_to_spawn)
+            logger.error("More than 1 component with name "
+                         f"{component_to_spawn} found, exiting.")
             return
 
-        logger.info("Creating process for component %s", component_to_spawn)
+        logger.info(f"Creating process for component {component_to_spawn}")
         construct_and_run_component(filtered_dict[keys[0]])
 
 
@@ -244,9 +244,9 @@ def _filter_requested_components(config_dict: dict,
                 config_dict[key]['name'] = key
                 filtered_dict[key] = config_dict[key]
             elif components_to_spawn is not None:
-                msg = ("Requested component %s, but this is not a "
+                msg = (f"Requested component {key}, but this is not a "
                        "component (does not have 'component': True "
-                       "key:val pair)!" % key)
+                       "key:val pair)!")
                 logger.error(msg)
                 raise KeyError(msg)
     return filtered_dict

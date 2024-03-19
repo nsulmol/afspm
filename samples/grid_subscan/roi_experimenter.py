@@ -146,8 +146,7 @@ class ROIExperimenter(AfspmComponent):
             origin = self.rng.choice(self.sscan_origins, replace=False)
             size = self.sscan_phys_size
             res = self.sscan_res
-            logger.info("Performing subscan with origin: %s",
-                        origin)
+            logger.info(f"Performing subscan with origin: {origin}")
             self.scans_since_last_fscan += 1
 
         return common.create_scan_params_2d(origin.tolist(), size.tolist(),

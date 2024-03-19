@@ -167,9 +167,8 @@ class Visualizer(AfspmComponent):
                     CacheMeaning.REGIONS.name and
                     (key not in self.scan_phys_origin_map or
                      key not in self.scan_phys_size_map)):
-                msg = ("Scan data with key %s is of meaning REGIONS "
-                       "with no extents. Not currently supported!" %
-                       key)
+                msg = (f"Scan data with key {key} is of meaning REGIONS "
+                       "with no extents. Not currently supported!")
                 logger.error(msg)
                 raise KeyError(msg)
 
@@ -247,7 +246,7 @@ class Visualizer(AfspmComponent):
                 viz_method = scan_xarr.plot.surface
             else:
                 logger.error("Visualization requested with unsupported style "
-                             "%s. Not displaying", viz_style)
+                             f"{viz_style}. Not displaying")
                 continue
 
             viz_method(ax=axes, cmap=cmap)

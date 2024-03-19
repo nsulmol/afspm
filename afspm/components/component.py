@@ -79,7 +79,7 @@ class AfspmComponentBase:
                 UUID. Default is true.
             ctx: zmq context.
         """
-        logger.debug("Initializing component %s", name)
+        logger.debug(f"Initializing component {name}")
         if not ctx:
             ctx = zmq.Context.instance()
 
@@ -97,7 +97,7 @@ class AfspmComponentBase:
 
     def run(self):
         """Loop."""
-        logger.info("Starting main loop for component %s", self.name)
+        logger.info(f"Starting main loop for component {self.name}")
 
         try:
             while self.stay_alive:
@@ -106,7 +106,7 @@ class AfspmComponentBase:
                 self.run_per_loop()
                 time.sleep(self.loop_sleep_s)
         except (KeyboardInterrupt, SystemExit):
-            logger.warning("%s: Interrupt received. Stopping.", self.name)
+            logger.warning(f"{self.name}: Interrupt received. Stopping.")
 
         # Terminate (not so gracefully)
         self.ctx.destroy()
@@ -123,7 +123,7 @@ class AfspmComponentBase:
             # If the last value indicates shutdown was requested, stop
             # looping
             if self.subscriber.shutdown_was_requested:
-                logger.info("%s: Shutdown received. Stopping.", self.name)
+                logger.info(f"{self.name}: Shutdown received. Stopping.")
                 self.heartbeater.handle_closing()
                 self.stay_alive = False  # Shutdown self
             elif messages:
@@ -188,7 +188,7 @@ class AfspmComponent(AfspmComponentBase):
                  per_loop_method: Callable = None,
                  methods_kwargs: dict = None,
                  **kwargs):
-
+        """Init local variables."""
         self.publisher = publisher
         self.message_received_method = message_received_method
         self.methods_kwargs = (methods_kwargs if

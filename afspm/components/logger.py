@@ -118,6 +118,6 @@ def create_local_logger_dict() -> dict:
         'ipc://')[1]
 
     logger.warning("No logger was provided in config. Creating a default "
-                   "with: %s, using default extract_proto and update_cache.",
-                   params_dict)
+                   f"with: {params_dict}, using default extract_proto and "
+                   "update_cache.")
     return params_dict

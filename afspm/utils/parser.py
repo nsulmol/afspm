@@ -80,23 +80,23 @@ def _expand_variables_recursively(config_dict: dict, sub_dict: dict) -> dict:
     try:
         for key in sub_dict:
             if isinstance(sub_dict[key], dict):  # Go deeper in 'tree'
-                logger.trace("Going into dict for expansion, with key %s", key)
+                logger.trace(f"Going into dict for expansion, with key {key}")
                 sub_dict[key] = _expand_variables_recursively(
                     config_dict, sub_dict[key])
             elif isinstance(sub_dict[key], list):
-                logger.trace("Going into list for expansion, with key %s", key)
+                logger.trace(f"Going into list for expansion, with key {key}")
                 sub_dict[key] = _expand_variables_list_recursively(
                     config_dict, sub_dict[key])
             elif (isinstance(sub_dict[key], str) and
                   sub_dict[key] in config_dict):  # Expand variable
-                logger.debug("Expanding %s into %s.", sub_dict[key],
-                             config_dict[sub_dict[key]])
+                logger.debug(f"Expanding {sub_dict[key]} into "
+                             f"{config_dict[sub_dict[key]]}.")
                 sub_dict[key] = config_dict[sub_dict[key]]
             else:  # Copy value over (this is not a variable)
-                logger.trace("Keeping %s for key %s", sub_dict[key], key)
+                logger.trace(f"Keeping {sub_dict[key]} for key {key}.")
                 sub_dict[key] = sub_dict[key]
     except Exception as error:
-        logger.error("Exception for key:val = %s : %s", key, sub_dict[key])
+        logger.error(f"Exception for key:val = {key} : {sub_dict[key]}")
         logger.exception(error)
     return sub_dict
 
@@ -111,17 +111,17 @@ def _expand_variables_list_recursively(config_dict: dict, in_list: list
     """
     for idx in range(len(in_list)):
         if isinstance(in_list[idx], dict):  # Go deeper
-            logger.trace("Going into dict for expansion with index %s", idx)
+            logger.trace(f"Going into dict for expansion with index {idx}")
             in_list[idx] = _expand_variables_recursively(config_dict,
                                                          in_list[idx])
         elif isinstance(in_list[idx], list):  # Go deeper
-            logger.trace("Going into list for expansion with index %s", idx)
+            logger.trace(f"Going into list for expansion with index {idx}")
             in_list[idx] = _expand_variables_list_recursively(config_dict,
                                                               in_list[idx])
         elif (isinstance(in_list[idx], str) and
               in_list[idx] in config_dict):  # Expand variable
-            logger.debug("Expanding %s into %s.", in_list[idx],
-                         config_dict[in_list[idx]])
+            logger.debug(f"Expanding {in_list[idx]} into "
+                         f"{config_dict[in_list[idx]]}.")
             in_list[idx] = config_dict[in_list[idx]]
 
     return in_list
@@ -236,17 +236,17 @@ def _evaluate_values_recursively(params_dict: dict) -> dict:
     kwargs_dict = {}
     for key in params_dict:
         if isinstance(params_dict[key], dict):  # Go deeper in 'tree'
-            logger.trace("Going into dict for evaluation, with key %s", key)
+            logger.trace(f"Going into dict for evaluation, with key {key}")
             kwargs_dict[key] = _evaluate_values_recursively(params_dict[key])
         elif isinstance(params_dict[key], list):
-            logger.trace("Going into list for evaluation, with key %s", key)
+            logger.trace(f"Going into list for evaluation, with key {key}")
             kwargs_dict[key] = _evaluate_values_list_recursively(
                 params_dict[key])
         elif isinstance(params_dict[key], str):
-            logger.debug("Evaluating value %s", params_dict[key])
+            logger.debug(f"Evaluating value {params_dict[key]}")
             kwargs_dict[key] = _evaluate_value_str(params_dict[key])
         else:
-            logger.trace("Keeping key %s without evaluating", key)
+            logger.trace(f"Keeping key {key} without evaluating")
             kwargs_dict[key] = params_dict[key]
     return kwargs_dict
 
@@ -259,13 +259,13 @@ def _evaluate_values_list_recursively(values_list: list) -> list:
     """
     for idx, val in enumerate(values_list):
         if isinstance(val, list):  # Go deeper
-            logger.trace("Going into list for evaluation, with index %s", idx)
+            logger.trace(f"Going into list for evaluation, with index {idx}")
             values_list[idx] = _evaluate_values_list_recursively(val)
         elif isinstance(val, dict):  # Evaluate dict
-            logger.trace("Going into dict for evaluation, with index %s", idx)
+            logger.trace(f"Going into dict for evaluation, with index {idx}")
             values_list[idx] = _evaluate_values_recursively(val)
         elif isinstance(val, str):
-            logger.debug("Evaluating value %s", val)
+            logger.debug(f"Evaluating value {val}")
             values_list[idx] = _evaluate_value_str(val)
     return values_list
 
@@ -289,22 +289,22 @@ def _instantiate_classes_recursively(params_dict: dict) -> Any | dict:
     final_dict = {}
     for key in params_dict:
         if isinstance(params_dict[key], dict):  # Go deeper in 'tree'
-            logger.trace("Going into dict for instantation, with key %s", key)
+            logger.trace(f"Going into dict for instantation, with key {key}")
             final_dict[key] = _instantiate_classes_recursively(
                 params_dict[key])
         elif isinstance(params_dict[key], list):
-            logger.trace("Going into list for instantation, with key %s", key)
+            logger.trace(f"Going into list for instantation, with key {key}")
             final_dict[key] = _instantiate_classes_in_list_recursively(
                 params_dict[key])
         else:  # Copy over value
-            logger.trace("Copying over key %s without changing.", key)
+            logger.trace(f"Copying over key {key} without changing.")
             final_dict[key] = params_dict[key]
 
     if CLASS_KEY in final_dict:
         # This is a class level, instantiate a class and return it
         class_obj = final_dict[CLASS_KEY]
         del final_dict[CLASS_KEY]
-        logger.debug("Instantiating %s with kwargs: %s", class_obj, final_dict)
+        logger.debug(f"Instantiating {class_obj} with kwargs: {final_dict}")
         tmp = class_obj(**final_dict)
         return tmp
     return final_dict  # Go up a level
@@ -318,10 +318,10 @@ def _instantiate_classes_in_list_recursively(values_list: list) -> list:
     """
     for idx, val in enumerate(values_list):
         if isinstance(val, list):  # Go deeper
-            logger.trace("Going into list for instantation, with idx %s", idx)
+            logger.trace(f"Going into list for instantation, with idx {idx}")
             values_list[idx] = _instantiate_classes_in_list_recursively(val)
         elif isinstance(val, dict):  # Instantiate dict
-            logger.trace("Going into dict for instantation, with idx %s", idx)
+            logger.trace(f"Going into dict for instantation, with idx {idx}")
             values_list[idx] = _instantiate_classes_recursively(val)
     return values_list
 
@@ -366,10 +366,10 @@ def _evaluate_value_str(value: str) -> Any:
         if args:
             # If there were no arguments, args will be a list with one empty
             # string
-            logger.debug("Instantiating %s with args: %s", value, args)
+            logger.debug(f"Instantiating {value} with args: {args}")
             instantiated = imported(*args) if args != [''] else imported()
             return instantiated  # Return instantiation of what we imported
-        logger.debug("Imported class/method %s", imported)
+        logger.debug("Imported class/method {imported}")
         return imported  # Return imported class or method
     return value  # Return original string
 
@@ -412,9 +412,9 @@ def _import_from_string(obj_path: str) -> Any:
                     final_obj = getattr(final_obj, top_obj)
                 break
         except ModuleNotFoundError as exc:
-            logger.trace("Received ModuleNotFoundError. Assuming due to the " +
-                         "requested module not existing. However, it could " +
-                         "be an import error *within* the requested module. " +
+            logger.trace("Received ModuleNotFoundError. Assuming due to the "
+                         "requested module not existing. However, it could "
+                         "be an import error *within* the requested module. "
                          "We will print the exception in case.")
             logger.trace(exc)
             caught_exc = exc
@@ -423,7 +423,7 @@ def _import_from_string(obj_path: str) -> Any:
     if final_obj:
         return final_obj
     else:
-        logger.warning("Could not import %s, got exception %s. " +
-                       "Treating as direct string and continuing.",
-                       obj_path, caught_exc)
+        logger.warning(f"Could not import {obj_path}, got exception "
+                       f"{caught_exc}. Treating as direct string and "
+                       "continuing.")
         return obj_path

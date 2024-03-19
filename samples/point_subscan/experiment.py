@@ -87,8 +87,7 @@ def get_next_scan_params(component: AfspmComponent,
         size = size.tolist()
         res = exp_data.sub_scan_res
 
-        logger.info("Performing subscan with origin, size: %s, %s",
-                    origin, size)
+        logger.info(f"Performing subscan with origin, size: {origin}, {size}")
         exp_data.scans_since_last_full_scan += 1
     return common.create_scan_params_2d(origin, size,
                                         exp_data.phys_units,

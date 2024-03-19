@@ -75,8 +75,8 @@ def analyze_feedback_on_scan(scan: scan_pb2.Scan2d,
     # First, sum scanlines to get one total scanline
     xarr = ac.convert_scan_pb2_to_xarray(scan)
     over_proportion, under_proportion = analyze_feedback_on_arr(xarr, config)
-    logger.debug("Feedback Analysis: Over Proportion = %s, "
-                 "Under Proportion = %s", over_proportion, under_proportion)
+    logger.debug(f"Feedback Analysis: Over Proportion = {over_proportion}, "
+                 f"Under Proportion = {under_proportion}")
     return feedback_pb2.FeedbackAnalysis(
         proportionOverThreshold=over_proportion,
         proportionUnderThreshold=under_proportion)
@@ -132,7 +132,7 @@ def analyze_feedback_on_arr(arr: np.ndarray,
 
     if config.visualize_analysis:
         y_fit = np.polynomial.polynomial.polyval(x_inv_f, fit)
-        logger.debug("Polynomial fit to: %f / x + %f", fit[1], fit[0])
+        logger.debug(f"Polynomial fit to: {fit[1]} / x + {fit[0]}")
         visualize_analysis(x_f, y_f, y_fit, over_under_y[0], over_under_y[1],
                            config.viz_block_plot, config.viz_plot_log)
 
@@ -383,19 +383,19 @@ class FeedbackCorrector(ScanningComponent):
                             [CorrectionState.INIT,
                              CorrectionState.REVERT_SCAN_PARAMS])
         if self._correction_state in set_zctrl_states:
-            logger.info("Sending ZCtrl Params: %s", self._zctrl_params)
+            logger.info(f"Sending ZCtrl Params: {self._zctrl_params}")
             rep = send_req_handle_ctrl(self.control_client,
                                        self.control_client.set_zctrl_params,
                                        {'zctrl_params': self._zctrl_params},
                                        control_pb2.ControlMode.CM_PROBLEM)
             if rep == control_pb2.ControlResponse.REP_SUCCESS:
                 if self._correction_state == CorrectionState.REVERT_SCAN_PARAMS:
-                    logger.info("Sending original scan parameters: %s",
-                                self._orig_scan_params)
+                    logger.info("Sending original scan parameters: "
+                                f"{self._orig_scan_params}")
                     return self._orig_scan_params
                 params = self._get_desired_scan_params(self._orig_scan_params,
                                                        self._cconfig)
-                logger.info("Sending new scan params: %s", params)
+                logger.info(f"Sending new scan params: {params}")
                 return params
         elif self._correction_state == CorrectionState.REMOVE_PROBLEM:
             logger.info("Removing experiment problem.")
@@ -457,7 +457,7 @@ class FeedbackCorrector(ScanningComponent):
         # INIT; we just jump straight ahead (and set some parameters below).
         if self._correction_state in _SINGLE_STEP_STATES:
             self._correction_state = self._correction_state.next()
-        logger.info("In state %s", self._correction_state)
+        logger.info(f"In state {self._correction_state}")
 
         # Now, we are in our current state. Decide if we go to next and
         # what params to set.
@@ -489,4 +489,4 @@ class FeedbackCorrector(ScanningComponent):
                 params_to_set.proportionalGain *= update_factors[0]
 
         self._zctrl_params = params_to_set
-        logger.debug("Going to set params: %s", self._zctrl_params)
+        logger.debug(f"Going to set params: {self._zctrl_params}")

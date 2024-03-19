@@ -30,8 +30,8 @@ def analyze_full_scan(component: AfspmComponent, envelope: str,
     """For each 'full scan', output a random set of points of interest."""
     if isinstance(proto, scan_pb2.Scan2d):
         logger.debug("Scan received, analyzing...")
-        logger.debug("Randomizing %s points...",
-                     analysis_data.num_points_to_output)
+        logger.debug(f"Randomizing {analysis_data.num_points_to_output} points"
+                     "...")
         rand_vals = analysis_data.rng.random(
             (analysis_data.num_points_to_output, 2))
         rand_vals *= (analysis_data.fscan_phys_size[0],
@@ -46,5 +46,5 @@ def analyze_full_scan(component: AfspmComponent, envelope: str,
             points_list.spatials.append(pt_with_score)
 
         if component.publisher:
-            logger.info("Publishing points: %s", points_list)
+            logger.info(f"Publishing points: {points_list}")
             component.publisher.send_msg(points_list)

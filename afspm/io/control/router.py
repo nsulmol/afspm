@@ -163,11 +163,11 @@ class ControlRouter:
                 control to begin with (or no one was under control).
         """
         if self._client_in_control_id and self._client_in_control_id == client:
-            logger.info("Releasing control from %s", client)
+            logger.info(f"Releasing control from {client}")
             self._client_in_control_id = None
             return control_pb2.ControlResponse.REP_SUCCESS
 
-        logger.debug("%s tried to release control, but in control.", client)
+        logger.debug(f"{client} tried to release control, but in control.")
         return control_pb2.ControlResponse.REP_FAILURE
 
     def _handle_experiment_problem(self, add_problem: bool,
@@ -251,7 +251,7 @@ class ControlRouter:
         Returns:
             ControlResponse indicating success/failure.
         """
-        logger.info("Control mode changed to %s", control_mode)
+        logger.info(f"Control mode changed to {control_mode}")
         self._control_mode = control_mode
         self._client_in_control_id = None
         return control_pb2.ControlResponse.REP_SUCCESS

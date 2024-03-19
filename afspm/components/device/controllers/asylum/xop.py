@@ -150,8 +150,7 @@ def parse_response_string(response: str) -> (int, int, Optional[float | str]):
 
     if error != 0:
         error_msg = structure[ERROR_KEY][MSG_KEY]
-        logger.error("Error %s for message id %s: %s",
-                     error, message_id, error_msg)
+        logger.error(f"Error {error} for message id {message_id}: {error_msg}")
 
     if RES_KEY not in structure:
         return error, error_msg, message_id, None

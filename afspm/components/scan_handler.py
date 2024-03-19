@@ -10,7 +10,6 @@ from google.protobuf.message import Message
 from .component import AfspmComponent
 from ..io import common
 
-from ..io.protos.generated import geometry_pb2
 from ..io.protos.generated import scan_pb2
 from ..io.protos.generated import control_pb2
 

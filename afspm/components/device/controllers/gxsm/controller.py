@@ -168,8 +168,8 @@ class GxsmController(DeviceController):
                     fnames.append(fname)
                 channel_idx += 1
         except Exception as exc:
-            logger.trace("Exception with requesting channel %s: %s",
-                         channel_idx, str(exc))
+            logger.trace(f"Exception with requesting channel {channel_idx}: "
+                         f"{str(exc)}")
 
         # Avoid reloading scans if they are not new.
         if len(fnames) > 0:
@@ -184,8 +184,8 @@ class GxsmController(DeviceController):
                         self.read_simplify_metadata,
                         engine='scipy')
                 except Exception as exc:
-                    logger.error("Could not read scan fname %s, got error %s.",
-                                 fname, exc)
+                    logger.error(f"Could not read scan fname {fname}, "
+                                 f"got error {exc}.")
                     continue
                 scan = conv.convert_xarray_to_scan_pb2(
                     ds[list(ds.data_vars)[0]])  # Grabbing first data variable

@@ -163,7 +163,7 @@ class AfspmComponentsMonitor:
         """
         params_dict = copy.deepcopy(params_dict)
         params_dict['ctx'] = None
-        logger.info("Creating process for component %s", params_dict['name'])
+        logger.info(f"Creating process for component {params_dict['name']}")
 
         # Force 'spawning' to be consistent acros OSes.
         ctx = mp.get_context('spawn')
@@ -202,7 +202,7 @@ class AfspmComponentsMonitor:
         params_dict['url'] = get_heartbeat_url(params_dict['name'])
         params_dict['poll_timeout_ms'] = poll_timeout_ms
 
-        logger.info("Creating listener for component %s", params_dict['name'])
+        logger.info(f"Creating listener for component {params_dict['name']}")
         return HeartbeatListener(**params_dict)
 
     def _startup_processes_and_listeners(self) -> bool:
@@ -226,12 +226,11 @@ class AfspmComponentsMonitor:
                 is_alive = self.listeners[name].check_is_alive()
 
             if not self.listeners[name].received_first_beat:
-                logger.info("Component %s failed on start up, exiting.",
-                            name)
+                logger.info(f"Component {name} failed on start up, exiting.")
                 succeeded = False
                 break
-            logger.debug("Received heartbeat for component %s, continuing.",
-                         name)
+            logger.debug(f"Received heartbeat for component {name}, "
+                         "continuing.")
 
         if not succeeded:
             keys = list(self.listeners.keys())
@@ -268,12 +267,12 @@ class AfspmComponentsMonitor:
         for key in self.listeners:
             if not self.listeners[key].check_is_alive():
                 if self.listeners[key].received_kill_signal:
-                    logger.info("Component %s has finished. Closing.", key)
+                    logger.info(f"Component {key} has finished. Closing.")
 
                     procs_to_be_removed.append(key)
                 else:
-                    logger.error("Component %s has crashed/frozen. Restarting.",
-                                 key)
+                    logger.error(f"Component {key} has crashed/frozen. "
+                                 "Restarting.")
                     self._restart_process(key)
 
         # Delete any keys set up for deletion (removed after, to not ruin for

@@ -115,7 +115,7 @@ class AfspmControlUI(AfspmComponentBase):
         req_args = []
 
         if common.is_str_in_enums(control_pb2.ControlMode, event):
-            logger.info("Control Mode Selected: %s", event)
+            logger.info(f"Control Mode Selected: {event}")
             req_methods.append(self.control_client.set_control_mode)
             req_args.append(common.get_enum_val(control_pb2.ControlMode,
                                                 event))
@@ -139,13 +139,13 @@ class AfspmControlUI(AfspmComponentBase):
             for req, arg in zip(req_methods, req_args):
                 rep = req(arg) if arg is not None else req()
                 if rep != control_pb2.ControlResponse.REP_SUCCESS:
-                    msg = ("DeviceController refused request %s, returned %s"
-                           % (req.__name__, rep))
+                    msg = (f"DeviceController refused request {req.__name__}, "
+                           f"returned {rep}")
                     logger.warning(msg)
                     self.window[ERROR_LOG_KEY].update(value=msg)
 
     def on_message_received(self, envelope: str, proto: Message):
-        logger.debug("Message received, envelope: %s", envelope)
+        logger.debug(f"Message received, envelope: {envelope}")
         if isinstance(proto, control_pb2.ControlState):
             last_cs = copy.deepcopy(self.control_state)
             self.control_state = proto
@@ -159,7 +159,7 @@ class AfspmControlUI(AfspmComponentBase):
         elif isinstance(proto, scan_pb2.ScanStateMsg):
             last_state = copy.deepcopy(self.scan_state)
             self.scan_state = proto.scan_state
-            if(self.scan_state != last_state):
+            if self.scan_state != last_state:
                 self._handle_scan_state_changed()
 
     def _handle_mode_changed(self):

@@ -46,12 +46,12 @@ class ProtoBasedCacheLogic(CacheLogic):
         envelope, contents = msg
         envelope = envelope.decode()
         if envelope not in self.envelope_to_proto_map:
-            logger.trace("Envelope %s not in envelope_to_proto_map. Trying "
-                         "to find 'base' envelope that matches.", envelope)
+            logger.trace(f"Envelope {envelope} not in envelope_to_proto_map. "
+                         "Trying to find 'base' envelope that matches.")
             env_changed = False
             for key in list(self.envelope_to_proto_map.keys()):
                 if key in envelope:
-                    logger.trace("'Base' envelop %s found, using.", key)
+                    logger.trace(f"'Base' envelop {key} found, using.")
                     envelope = key
                     env_changed = True
 

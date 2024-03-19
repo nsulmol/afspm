@@ -200,7 +200,7 @@ class Subscriber(ABCSubscriber):
             return None
 
         proto = self._sub_extract_proto(msg, **self._extract_proto_kwargs)
-        logger.debug("Message received %s", envelope)
+        logger.debug(f"Message received {envelope}")
         self._update_cache(proto, self._cache,
                            **self._update_cache_kwargs)
         return [(envelope, proto)]
