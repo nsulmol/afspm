@@ -25,6 +25,12 @@ from ...io.protos.generated import feedback_pb2
 logger = logging.getLogger(__name__)
 
 
+class DeviceError(Exception):
+    """General DeviceController error."""
+
+    pass
+
+
 class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
     """Handles communicating with SPM device and handling requests.
 
@@ -196,14 +202,14 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
     def poll_scan_state(self) -> scan_pb2.ScanState:
         """Poll the controller for the current scan state.
 
-        Throw params.ParameterError on failure.
+        Throw DeviceError on failure.
         """
 
     @abstractmethod
     def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
         """Poll the controller for the current scan parameters.
 
-        Throw params.ParameterError on failure.
+        Throw DeviceError on failure..
         """
 
     @abstractmethod
@@ -213,7 +219,7 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         If not supported, return a new ZCtrlParameters instance:
             return feedback_pb2.ZCtrlParameters()
 
-        Throw params.ParameterError on failure.
+        Throw DeviceError on failure..
         """
 
     @abstractmethod
@@ -230,7 +236,7 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         comparing scans. If this attribute is not passed, we will do
         a data comparison.
 
-        Throw params.ParameterError on failure.
+        Throw DeviceError on failure..
 
         To read the creation time of a file using Python, use
             get_file_modification_datetime()

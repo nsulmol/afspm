@@ -42,8 +42,7 @@ Note that ```poll_scans()```implies detecting the latest scan and converting it 
 
 These methods are called 'polling' methods, because the base controller regularly 'polls' for them. This is the simplest, most naive method of checking state. We purposefully chose this, to try to make the job of implementing a new DeviceController easier.
 
-These methods must return what was requested, but can throw a ParameterError on failure.
-(NOTE: Re-review this logic, to make sure it makes sense for all poll methods!)
+These methods must return what was requested, but can throw a DeviceError on failure.
 
 ### Missing Support
 

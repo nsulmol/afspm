@@ -79,6 +79,7 @@ DESCRIPTIONS = {
     "Speed at which scanning occurs."
 }
 
+
 class ParameterError(Exception):
     """Controller failed at getting or setting a parameter."""
 

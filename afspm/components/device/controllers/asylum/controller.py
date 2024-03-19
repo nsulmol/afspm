@@ -5,8 +5,8 @@ import logging
 import glob
 
 from afspm.components.device.controller import (DeviceController,
-                                                get_file_modification_datetime)
-from afspm.components.device.params import ParameterError
+                                                get_file_modification_datetime,
+                                                DeviceError)
 
 from afspm.components.device.controllers.asylum.client import XopClient
 from afspm.components.device.controllers.asylum import params
@@ -71,7 +71,7 @@ class AsylumController(DeviceController):
                                 self._old_save_state):
             msg = "Was unable to reset SaveImage state on closure!"
             logger.error(msg)
-            raise ParameterError(msg)
+            raise DeviceError(msg)
 
     def _setup_saving(self):
         """Ensure data is being saved while running and store prior state."""
@@ -83,7 +83,7 @@ class AsylumController(DeviceController):
                                 params.SAVE_ALL_IMAGES):
             msg = "Unable to set SaveImage to TRUE on startup."
             logger.error(msg)
-            raise ParameterError(msg)
+            raise DeviceError(msg)
 
     def on_start_scan(self):
         """Override starting of scan."""
