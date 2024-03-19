@@ -39,32 +39,32 @@ class AsylumParam(enum.Enum):
     param_map to map a parameter enum to its associated string.
     """
 
-    TL_X = enum.auto()
-    TL_Y = enum.auto()
+    TL_X = enum.auto()  # x-coordinate top-left of scan region (offset).
+    TL_Y = enum.auto()  # y-coordinate top-left of scan region (offset).
 
-    SCAN_SIZE = enum.auto()
-    SCAN_X_RATIO = enum.auto()
-    SCAN_Y_RATIO = enum.auto()
+    SCAN_SIZE = enum.auto()  # major-axis size of scan region.
+    SCAN_X_RATIO = enum.auto()  # x-coordinate ratio of scan region.
+    SCAN_Y_RATIO = enum.auto()  # y-coordinate ratio of scan region.
 
-    RES_X = enum.auto()
-    RES_Y = enum.auto()
+    RES_X = enum.auto()  # x-coordinate size of scan array (data points).
+    RES_Y = enum.auto()  # y-coordinate size of scan array (data points).
 
-    SCAN_SPEED = enum.auto()
+    SCAN_SPEED = enum.auto()  # scanning speed in XX units/s.
 
-    CP = enum.auto()
-    CI = enum.auto()
+    CP = enum.auto()  # proportional gain of main feedback loop.
+    CI = enum.auto()  # integral gain of main feedback loop.
 
     # Don't forget these are in 'igor path' format, use xop methods
     # to convert back.
-    IMG_PATH = enum.auto()
-    FORCE_PATH = enum.auto()
+    IMG_PATH = enum.auto()  # path to saved scans.
+    FORCE_PATH = enum.auto()  # path to saved spectroscopic data.
 
     # Note: diff with IMG_PATH is type: string vs. variable/bool
-    SAVE_IMAGE = enum.auto()
-    SAVE_FORCE = enum.auto()
+    SAVE_IMAGE = enum.auto()  # whether or not to save images.
+    SAVE_FORCE = enum.auto()  # whether or not to save spectroscopic data.
 
-    SCAN_STATUS = enum.auto()
-    FORCE_STATUS = enum.auto()
+    SCAN_STATUS = enum.auto()  # scan status.
+    FORCE_STATUS = enum.auto()  # spectroscopic status.
 
 
 # Creating a dict mapping equivalent to AsylumParameter, to map to necessary
@@ -96,20 +96,21 @@ def _is_variable_lookup_failure(val: float | str | None) -> bool:
     return False
 
 
-def get_param(client: XopClient, param: AsylumParam) -> float | str | None:
+def get_param(client: XopClient, param: AsylumParam) -> float | str:
     """Get asylum parameter.
 
-    Uses the client to get the current value of the provided parameter. On
-    error, returns None.
+    Uses the client to get the current value of the provided parameter.
 
     Args:
         client: XopClient, used to communicate with asylum controller.
         param: AsylumParam to look up.
 
     Returns:
-        Current value (float or str), or None if could not be obtained.
-    """
+        Current value (float or str).
 
+    Raises:
+        ParameterError if getting the parameter fails.
+    """
     # Note: need to do a value comparison
     get_method = (AsylumMethod.GET_STRING if param in PARAM_IS_STR_TUPLE
                   else AsylumMethod.GET_VALUE)
@@ -118,12 +119,13 @@ def get_param(client: XopClient, param: AsylumParam) -> float | str | None:
                                         (PARAM_STR_MAP[param],))
     if received and not _is_variable_lookup_failure(val):
         return val
-    else:
-        return None
+    msg = f"Get param failed for {param}"
+    logger.error(msg)
+    raise params.ParameterError(msg)
 
 
 def get_param_list(client: XopClient, params: tuple[AsylumParam],
-                   ) -> tuple[float | str] | None:
+                   ) -> tuple[float | str]:
     """Get list of asylum parameters.
 
     Args:
@@ -131,18 +133,15 @@ def get_param_list(client: XopClient, params: tuple[AsylumParam],
         params: list of AsylumParams.
 
     Returns:
-        Tuple of received values (float or str for each) or None if one or more
-        could not be obtained. Note we return a tuple because the type may
-        change of the values. (This is not required, but appears to be a good
-        practice in Python, as developers expect lists to be of a single type.)
+        Tuple of received values (float or str for each). Note we return a
+        tuple because the type may change of the values. (This is not required,
+        but appears to be a good practice in Python, as developers expect
+        lists to be of a single type.)
+
+    Raises:
+        ParameterError if getting any of the parameters fails.
     """
-    vals = []
-    for param in params:
-        val = get_param(client, param)
-        if val is None:
-            return None
-        vals.append(val)
-    return tuple(vals)
+    return tuple([get_param(client, param) for param in params])
 
 
 def set_param(client: XopClient, param: AsylumParam, val: str | float,

@@ -24,16 +24,23 @@ logger = logging.getLogger(__name__)
 class GxsmParameter(str, enum.Enum):
     """Gxsm internal parameters."""
 
-    TL_X = 'OffsetX'
-    TL_Y = 'OffsetY'
-    SZ_X = 'RangeX'
-    SZ_Y = 'RangeY'
-    RES_X = 'PointsX'
-    RES_Y = 'PointsY'
-    SCAN_SPEED_UNITS_S = 'dsp-fbs-scan-speed-scan'
-    CP = 'dsp-fbs-cp'
-    CI = 'dsp-fbs-ci'
-    MOTOR = 'dsp-fbs-motor'
+    # Physical scan parameters
+    TL_X = 'OffsetX'  # x-coordinate top-left of scan region (offset).
+    TL_Y = 'OffsetY'  # y-coordinate top-left of scan region (offset).
+    SZ_X = 'RangeX'  # x-coordinate size of scan region.
+    SZ_Y = 'RangeY'  # y-coordinate size of scan region.
+
+    # Digital scan parameters
+    RES_X = 'PointsX'  # x-coordinate size of scan array (data points).
+    RES_Y = 'PointsY'  # y-coordinate size of scan array (data points).
+
+    # Feedback parameters
+    CP = 'dsp-fbs-cp'  # proportional gain of main feedback loop.
+    CI = 'dsp-fbs-ci'  # integral gain of main feedback loop.
+
+    # Other
+    SCAN_SPEED_UNITS_S = 'dsp-fbs-scan-speed-scan'  # scan speed in units/s
+    MOTOR = 'dsp-fbs-motor'  # coarse motor status.
 
 
 GET_FAILURE = '\x04'
@@ -114,20 +121,27 @@ def set_param_list(attrs: list[str], vals: list[Any],
     return True
 
 
-def get_param(attr: str) -> float | None:
+def get_param(attr: str) -> float:
     """Get gxsm parameter.
 
-    Gets the current value for the provided parameter. On error, returns
-    None.
+    Gets the current value for the provided parameter.
 
     Args:
         attr: name of the attribute, in gxsm terminology.
 
     Returns:
-        Current value (as float), or None if could not be obtained.
+        Current value (as float).
+
+    Raises:
+        ParameterError if getting the parameter fails.
     """
     ret = gxsm.get(attr)
-    return ret if ret != GET_FAILURE else None
+    if ret != GET_FAILURE:
+        return ret
+    else:
+        msg = f"Get param failed for {str}"
+        logger.error(msg)
+        raise params.ParameterError(msg)
 
 
 def get_param_list(attrs: list[str]) -> list[float] | None:
@@ -137,15 +151,12 @@ def get_param_list(attrs: list[str]) -> list[float] | None:
         attrs: list of attribute names, in gxsm terminology.
 
     Returns:
-        List of values, or None if one or more could not be obtained.
+        List of values,.
+
+    Raises:
+        ParameterError if getting any of the parameters fails.
     """
-    vals = []
-    for attr in attrs:
-        ret = get_param(attr)
-        if ret is None:
-            return None
-        vals.append(ret)
-    return vals
+    return [get_param(attr) for attr in attrs]
 
 
 def handle_get_set(attr: str, val: Optional[str] = None,

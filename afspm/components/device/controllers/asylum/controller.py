@@ -3,7 +3,6 @@
 import os
 import logging
 import glob
-from typing import Any
 
 from afspm.components.device.controller import (DeviceController,
                                                 get_file_modification_datetime)
@@ -49,6 +48,7 @@ class AsylumController(DeviceController):
     IMG_EXT = ".ibw"
 
     def __init__(self, xop_client: XopClient, **kwargs):
+        """Init things, ensuer we can hook into XOP Client."""
         if xop_client is None:
             msg = "No xop client provided, cannot continue!"
             logger.critical(msg)
@@ -64,6 +64,7 @@ class AsylumController(DeviceController):
         super().__init__(**kwargs)
 
     def __del__(self):
+        """Handle object destruction: reset what we changed on startup."""
         # Reset save state!
         if not params.set_param(self._client,
                                 params.AsylumParam.SAVE_IMAGE,
@@ -76,7 +77,6 @@ class AsylumController(DeviceController):
         """Ensure data is being saved while running and store prior state."""
         self._old_save_state = params.get_param(
             self._client, params.AsylumParam.SAVE_IMAGE)
-        _handle_params_error(self._old_save_state, "Unable to store SaveImage!")
 
         if not params.set_param(self._client,
                                 params.AsylumParam.SAVE_IMAGE,
@@ -86,6 +86,7 @@ class AsylumController(DeviceController):
             raise ParameterError(msg)
 
     def on_start_scan(self):
+        """Override starting of scan."""
         success, __ = self._client.send_request(
             params.AsylumMethod.SCAN_FUNC,
             (params.AsylumMethod.START_SCAN_PARAM,))
@@ -93,6 +94,7 @@ class AsylumController(DeviceController):
                 else control_pb2.ControlResponse.REP_SUCCESS)
 
     def on_stop_scan(self):
+        """Override stopping of scan."""
         success, __ = self._client.send_request(
             params.AsylumMethod.SCAN_FUNC,
             (params.AsylumMethod.STOP_SCAN_PARAM,))
@@ -101,6 +103,7 @@ class AsylumController(DeviceController):
 
     def on_set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
                            ) -> control_pb2.ControlResponse:
+        """Override setting of scan params."""
         scan_size = scan_params.spatial.roi.size.y
         scan_y_ratio = 1.0
         scan_x_ratio = scan_params.spatial.roi.size.x / scan_size
@@ -122,6 +125,7 @@ class AsylumController(DeviceController):
 
     def on_set_zctrl_params(self, zctrl_params: feedback_pb2.ZCtrlParameters
                             ) -> control_pb2.ControlResponse:
+        """Override setting zctrl."""
         desired_units = (None, None)
         attrs = self.ZCTRL_PARAMS
         vals = (zctrl_params.proportionalGain, zctrl_params.integralGain)
@@ -131,10 +135,9 @@ class AsylumController(DeviceController):
         return control_pb2.ControlResponse.REP_PARAM_ERROR
 
     def poll_scan_state(self) -> scan_pb2.ScanState:
-        # Poll for current scan state and send out!
+        """Override scan state polling."""
         scan_status = params.get_param(self._client,
                                        params.AsylumParam.SCAN_STATUS)
-        _handle_params_error(scan_status, "Polling for scan state failed!")
 
         if scan_status > 0:  # If 0, not scanning
             return scan_pb2.ScanState.SS_SCANNING
@@ -142,9 +145,8 @@ class AsylumController(DeviceController):
             return scan_pb2.ScanState.SS_FREE
 
     def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
+        """Override polling of scan params."""
         vals = params.get_param_list(self._client, self.SCAN_PARAMS)
-        _handle_params_error(vals, "Polling for scan params failed!")
-
         scan_params = scan_pb2.ScanParameters2d()
         scan_params.spatial.roi.top_left.x = vals[0]
         scan_params.spatial.roi.top_left.y = vals[1]
@@ -165,9 +167,8 @@ class AsylumController(DeviceController):
         return scan_params
 
     def poll_scans(self) -> [scan_pb2.Scan2d]:
+        """Override polling of scans."""
         val = params.get_param(self._client, params.AsylumParam.IMG_PATH)
-        _handle_params_error(val, "Requesting img path failed!")
-
         img_path = convert_igor_path_to_python_path(val)
         images = sorted(glob.glob(img_path + os.sep + "*" + self.IMG_EXT),
                         key=os.path.getmtime)  # Sorted by access time
@@ -178,12 +179,12 @@ class AsylumController(DeviceController):
             self._old_scan_path = scan_path
             datasets = None
             try:
-                logger.debug("Getting datasets from %s (each dataset is a "
-                             "channel)", scan_path)
+                logger.debug(f"Getting datasets from {scan_path} (each dataset"
+                             " is a channel).")
                 reader = sr.IgorIBWReader(scan_path)
                 datasets = reader.read(verbose=False)
             except Exception as exc:
-                logger.error("Failure loading scan at %s.", scan_path)
+                logger.error(f"Failure loading scan at {scan_path}: {exc}")
                 return self._old_scans
 
             if datasets:
@@ -199,18 +200,10 @@ class AsylumController(DeviceController):
         return self._old_scans
 
     def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
+        """Override polling of zctrl."""
         vals = params.get_param_list(self._client, self.ZCTRL_PARAMS)
-        _handle_params_error(vals, "Polling for CP/CI failed!")
-
         zctrl_params = feedback_pb2.ZCtrlParameters()
         zctrl_params.feedbackOn = False  # TODO: how to read this!?!?!
         zctrl_params.proportionalGain = vals[0]
         zctrl_params.integralGain = vals[1]
         return zctrl_params
-
-
-def _handle_params_error(vals: Any | None, msg: str):
-    """Raise error if vals is None, passing msg."""
-    if vals is None:
-        logger.error(msg)
-        raise ParameterError(msg)

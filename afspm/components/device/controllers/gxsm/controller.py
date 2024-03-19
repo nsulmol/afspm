@@ -2,14 +2,12 @@
 
 import os.path
 import logging
-from typing import Any
 
 from afspm.components.device.controller import (DeviceController,
                                                 get_file_modification_datetime)
 from afspm.components.device.controllers.gxsm.params import (
     PARAM_METHOD_MAP, get_param_list, set_param_list, GxsmParameter,
     get_param)
-from afspm.components.device.params import ParameterError
 
 from afspm.utils import array_converters as conv
 from afspm.io.protos.generated import scan_pb2
@@ -42,8 +40,6 @@ class GxsmController(DeviceController):
     MAX_NUM_CHANNELS = 6
     CHFNAME_ERROR_STR = 'EE: invalid channel'
 
-    # NOTE: I'm thinking each side is responsible for converting the data to the
-    # units they want
     def __init__(self,
                  read_channels_config_path: str = None,
                  read_use_physical_units: bool = True,
@@ -51,6 +47,7 @@ class GxsmController(DeviceController):
                  read_simplify_metadata: bool = True,
                  gxsm_physical_units: str = 'angstrom',
                  is_zctrl_feedback_on: bool = True, **kwargs):
+        """Initialize internal logic."""
         self.read_channels_config_path = read_channels_config_path
         self.read_use_physical_units = read_use_physical_units
         self.read_allow_convert_from_metadata = read_allow_convert_from_metadata
@@ -65,15 +62,18 @@ class GxsmController(DeviceController):
         self.param_method_map = PARAM_METHOD_MAP
 
     def on_start_scan(self):
+        """Override on starting scan."""
         gxsm.startscan()
         return control_pb2.ControlResponse.REP_SUCCESS
 
     def on_stop_scan(self):
+        """Override on stopping scan."""
         gxsm.stopscan()
         return control_pb2.ControlResponse.REP_SUCCESS
 
     def on_set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
                            ) -> control_pb2.ControlResponse:
+        """Override on setting scan params."""
         # We *must* set x-values before y-values, because gxsm will scale the
         # linked y when its x is set. Somewhat confusing, in my opinion.
         attrs = [GxsmParameter.TL_X, GxsmParameter.TL_Y,
@@ -121,15 +121,15 @@ class GxsmController(DeviceController):
         # in DeviceController.
         state = self._get_current_scan_state()
         if (self.scan_state == scan_pb2.ScanState.SS_SCANNING and
-                state  == scan_pb2.ScanState.SS_FREE):
+                state == scan_pb2.ScanState.SS_FREE):
             gxsm.autosave()  # Save the images we have recorded
         return state
 
     def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
+        """Override scan params polling."""
         vals = get_param_list([GxsmParameter.TL_X, GxsmParameter.TL_Y,
                                GxsmParameter.SZ_X, GxsmParameter.SZ_Y,
                                GxsmParameter.RES_X, GxsmParameter.RES_Y])
-        _handle_params_error(vals, "Polling for scan params failed!")
 
         scan_params = scan_pb2.ScanParameters2d()
         scan_params.spatial.roi.top_left.x = vals[0]
@@ -146,6 +146,7 @@ class GxsmController(DeviceController):
 
 
     def poll_scans(self) -> [scan_pb2.Scan2d]:
+        """Override scans polling."""
         channel_idx = 0
         fnames = []
         try:
@@ -197,7 +198,6 @@ class GxsmController(DeviceController):
     def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
         """Poll the controller for the current Z-Control parameters."""
         vals = get_param_list([GxsmParameter.CP, GxsmParameter.CI])
-        _handle_params_error(vals, "Polling for CP/CI failed!")
 
         zctrl_params = feedback_pb2.ZCtrlParameters()
         zctrl_params.feedbackOn = self.is_zctrl_feedback_on
@@ -222,11 +222,8 @@ class GxsmController(DeviceController):
         moving = s & 16 > GxsmController.STATE_RUNNING_THRESH
 
         # TODO: investigate motor logic further...
-        val = get_param(GxsmParameter.MOTOR)
-        _handle_params_error(val,
-                             "Failed querying gxsm for dsp-fbs-motor param.")
-
-        motor_running = (val < GxsmController.MOTOR_RUNNING_THRESH)
+        motor_running = (get_param(GxsmParameter.MOTOR) <
+                         GxsmController.MOTOR_RUNNING_THRESH)
         if motor_running:
             return scan_pb2.ScanState.SS_MOTOR_RUNNING
         if scanning:
@@ -234,10 +231,3 @@ class GxsmController(DeviceController):
         if moving:
             return scan_pb2.ScanState.SS_MOVING
         return scan_pb2.ScanState.SS_FREE
-
-
-def _handle_params_error(vals: Any | None, msg: str):
-    """Raise error if vals is None, passing msg."""
-    if vals is None:
-        logger.error(msg)
-        raise ParameterError(msg)
