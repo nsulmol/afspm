@@ -2,7 +2,6 @@
 
 import logging
 import zmq
-from google.protobuf.message import Message
 
 from .. import component as afspmc
 
@@ -37,6 +36,7 @@ class AfspmController(afspmc.AfspmComponentBase):
             and determine if a new message is to be sent out (via the
             publisher).
     """
+
     def __init__(self, name: str,
                  pubsubcache: pbc.PubSubCache,
                  router: ctrl_rtr.ControlRouter,
@@ -65,7 +65,7 @@ class AfspmController(afspmc.AfspmComponentBase):
                          loop_sleep_s=loop_sleep_s, beat_period_s=beat_period_s)
 
     def run_per_loop(self):  # TODO: Change this to be private everywhere!?
-        """Internal checks to be done per loop in run().
+        """Check internals to be done per loop in run().
 
         Here, we update the pubsubcache, router.
         """
