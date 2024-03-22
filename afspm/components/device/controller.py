@@ -268,17 +268,18 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             both_have_scans = len(self.scans) > 0 and len(old_scans) > 0
             only_new_has_scans = (len(self.scans) > 0 and
                                   len(old_scans) == 0)
-            timestamps_different = (
-                both_have_scans and
+            both_have_timestamps = both_have_scans and (
                 self.scans[0].HasField(self.TIMESTAMP_ATTRIB) and
-                old_scans[0].HasField(self.TIMESTAMP_ATTRIB) and
-                self.scans[0].timestamp != old_scans[0].timestamp)
-            values_different = (
-                both_have_scans and self.scans[0].values !=
-                old_scans[0].values)
+                old_scans[0].HasField(self.TIMESTAMP_ATTRIB))
 
-            if (only_new_has_scans or (timestamps_different or
-                                       values_different)):
+            # First, check if timestamps are different
+            scans_different = both_have_timestamps and (
+                self.scans[0].timestamp != old_scans[0].timestamp)
+            # Only compare scan data if not the case.
+            scans_different = scans_different or both_have_scans and (
+                self.scans[0].values != old_scans[0].values)
+
+            if only_new_has_scans or scans_different:
                 send_scan = True
 
             if send_scan:
