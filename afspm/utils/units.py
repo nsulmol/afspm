@@ -30,8 +30,8 @@ def convert(val: Any, unit: Optional[str] = None,
             desired_unit: Optional[str] = None) -> Any:
     """Convert a value from one unit to another using pint.
 
-    If either unit/desired_unit is None or the same, we simply return the
-    original value.
+    If either unit/desired_unit is None or both are the same, we simply return
+    the original value.
 
     Args:
         val: input value, of a type that pint supports.
