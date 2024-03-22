@@ -4,6 +4,7 @@ import logging
 import enum
 from types import MappingProxyType  # Immutable dict
 
+from afspm.components.device import params
 from afspm.components.device.controllers.asylum.client import XopClient
 from afspm.utils import units
 
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 # All physical  units over the API are stored in meters.
 PHYS_UNITS = 'm'
 
-SAVE_ALL_IMAGES = 2  # Hard-coded value for SaveImage/SaveForce
+ASYLUM_TRUE = 2  # Hard-coded value for SaveImage/SaveForce
 
 
 class AsylumMethod(str, enum.Enum):
@@ -66,6 +67,8 @@ class AsylumParam(enum.Enum):
     SCAN_STATUS = enum.auto()  # scan status.
     FORCE_STATUS = enum.auto()  # spectroscopic status.
 
+    LAST_SCAN = enum.auto()  # are we scanning one time or continuously?
+
 
 # Creating a dict mapping equivalent to AsylumParameter, to map to necessary
 # str values. We need to get *compare* via this mapping, to ensure we
@@ -78,7 +81,8 @@ PARAM_STR_MAP = MappingProxyType({
     AsylumParam.CP: 'ProportionalGain', AsylumParam.CI: 'IntegralGain',
     AsylumParam.IMG_PATH: 'SaveImage', AsylumParam.FORCE_PATH: 'SaveForce',
     AsylumParam.SAVE_IMAGE: 'SaveImage', AsylumParam.SAVE_FORCE: 'SaveForce',
-    AsylumParam.SCAN_STATUS: 'ScanStatus', AsylumParam.FORCE_STATUS: 'FMapStatus'
+    AsylumParam.SCAN_STATUS: 'ScanStatus', AsylumParam.FORCE_STATUS: 'FMapStatus',
+    AsylumParam.LAST_SCAN: 'LastScan'
     })
 
 

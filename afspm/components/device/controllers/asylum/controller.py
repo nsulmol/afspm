@@ -33,7 +33,13 @@ class AsylumController(DeviceController):
     https://github.com/AllenInstitute/ZeroMQ-XOP
 
     Attributes:
-        xop_client: XOPClient for communicating with Asylum Research exe.
+        _client: XOPClient for communicating with Asylum Research exe.
+        _old_scan_path: the prior scan filepath. We use this to avoid loading
+            the same scans multiple times.
+        _old_save_state: the prior state of whether or not we were saving
+            scans.
+        _old_last_scan: the prior state of whether or not we were scanning 1x
+            per request.
     """
 
     SCAN_PARAMS = (params.AsylumParam.TL_X, params.AsylumParam.TL_Y,
@@ -48,7 +54,7 @@ class AsylumController(DeviceController):
     IMG_EXT = ".ibw"
 
     def __init__(self, xop_client: XopClient, **kwargs):
-        """Init things, ensuer we can hook into XOP Client."""
+        """Init things, ensure we can hook into XOP Client."""
         if xop_client is None:
             msg = "No xop client provided, cannot continue!"
             logger.critical(msg)
@@ -59,29 +65,48 @@ class AsylumController(DeviceController):
         self._old_scans = []
 
         self._old_save_state = None
-        self._setup_saving()
+        self._old_last_scan = None
+        self._set_save_params(save_state=params.ASYLUM_TRUE,
+                              last_scan=params.ASYLUM_TRUE,
+                              store_old_vals=True)
 
         super().__init__(**kwargs)
 
     def __del__(self):
         """Handle object destruction: reset what we changed on startup."""
-        # Reset save state!
+        self._set_save_params(save_state=self._old_save_state,
+                              last_scan=self._old_last_scan,
+                              store_old_vals=False)
+
+    def _set_save_params(self, save_state: int, last_scan: int,
+                         store_old_vals: bool):
+        """Set the save state and save 'mode' of the controller.
+
+        Args:
+            save_state: whether or not to save images as we scan.
+            last_scan: whether or not we are scanning one image (2), or
+                running continuously (0).
+            store_old_vals: whether or not to store the old vals in
+                self.old_save_state and old_save_mode, respectively. useful
+                for resetting later.
+        """
+        if store_old_vals:
+            self._old_save_state = params.get_param(
+                self._client, params.AsylumParam.SAVE_IMAGE)
+            self._old_last_scan = params.get_param(
+                self._client, params.AsylumParam.LAST_SCAN)
+
         if not params.set_param(self._client,
                                 params.AsylumParam.SAVE_IMAGE,
-                                self._old_save_state):
-            msg = "Was unable to reset SaveImage state on closure!"
+                                save_state):
+            msg = f"Unable to set SaveImage to {save_state}."
             logger.error(msg)
             raise DeviceError(msg)
 
-    def _setup_saving(self):
-        """Ensure data is being saved while running and store prior state."""
-        self._old_save_state = params.get_param(
-            self._client, params.AsylumParam.SAVE_IMAGE)
-
         if not params.set_param(self._client,
-                                params.AsylumParam.SAVE_IMAGE,
-                                params.SAVE_ALL_IMAGES):
-            msg = "Unable to set SaveImage to TRUE on startup."
+                                params.AsylumParam.LAST_SCAN,
+                                last_scan):
+            msg = f"Unable to set LastScan to {last_scan}."
             logger.error(msg)
             raise DeviceError(msg)
 
