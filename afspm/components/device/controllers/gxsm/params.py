@@ -183,7 +183,7 @@ def handle_get_set(attr: str, val: Optional[str] = None,
         the value gotten (as a str), and the units of said value (as a str).
     """
     if val:
-        if not curr_units or not set_param(attr, val, curr_units, gxsm_units):
+        if not set_param(attr, val, curr_units, gxsm_units):
             logger.error(f"Unable to set val: {val} with units: {curr_units}")
             return (control_pb2.ControlResponse.REP_PARAM_ERROR, None)
     return (control_pb2.ControlResponse.REP_SUCCESS,
