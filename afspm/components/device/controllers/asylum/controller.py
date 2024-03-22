@@ -140,8 +140,8 @@ class AsylumController(DeviceController):
                 scan_params.data.shape.x, scan_params.data.shape.y)
         attr_units = (scan_params.spatial.units, scan_params.spatial.units,
                       scan_params.spatial.units, None, None, None, None)
-        # None means default of PHYS_UNITS
-        asylum_units = (None, None, None, None, None, None, None)
+        asylum_units = (params.PHYS_UNITS, params.PHYS_UNITS,
+                        params.PHYS_UNITS, None, None, None, None)
 
         if params.set_param_list(self._client, attrs, vals, attr_units,
                                  asylum_units):
@@ -151,7 +151,6 @@ class AsylumController(DeviceController):
     def on_set_zctrl_params(self, zctrl_params: feedback_pb2.ZCtrlParameters
                             ) -> control_pb2.ControlResponse:
         """Override setting zctrl."""
-        # None means default of PHYS_UNITS
         desired_units = (None, None)
         attrs = self.ZCTRL_PARAMS
         vals = (zctrl_params.proportionalGain, zctrl_params.integralGain)

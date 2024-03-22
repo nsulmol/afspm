@@ -156,7 +156,7 @@ def get_param_list(client: XopClient, params: tuple[AsylumParam],
 
 
 def set_param(client: XopClient, param: AsylumParam, val: str | float,
-              curr_unit: str = None, desired_unit: str = PHYS_UNITS) -> bool:
+              curr_unit: str = None, desired_unit: str = None) -> bool:
     """Set asylum parameter.
 
     Given a parameter name and value, attempts to set the asylum controller
@@ -168,9 +168,7 @@ def set_param(client: XopClient, param: AsylumParam, val: str | float,
         param: AsylumParam to set.
         val: value to set it to.
         curr_unit: units of provided value, as str. Default is None.
-        desired_unit: desired units of value, as str. Default is PHYS_UNITS,
-            the expected unit of asylum physical units. (We have this to
-            allow exceptional overrides).
+        desired_unit: desired units of value, as str.
 
     Returns:
         True if the set succeeds.
@@ -202,17 +200,12 @@ def set_param_list(client: XopClient, params: tuple[AsylumParam],
         client: XopClient, used to communicate with the asylum controller.
         params: list of params to set.
         vals: tuple of values to set to.
-        curr_units: tuple of units the values are provided in. For a given one,
-            if it is None we do not try to convert it.
-        desired_units: tuple of units the values should be in. For a given one,
-            if it is None we use PHYS_UNITS, the default asylum unit!
+        curr_units: tuple of units the values are provided in.
+        desired_units: tuple of units the values should be in.
 
     Returns:
         True if all can be set.
     """
-    # Replace all desired units that are None with PHYS_UNITS.
-    curr_units = [x if x is not None else PHYS_UNITS for x in curr_units]
-
     try:
         converted_vals = units.convert_list(vals, curr_units, desired_units)
     except units.ConversionError:
