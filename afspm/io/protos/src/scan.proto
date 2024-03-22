@@ -60,6 +60,7 @@ message Scan2d {
   optional ScanParameters2d params = 1;
   optional google.protobuf.Timestamp timestamp = 2;
   optional string channel = 3; // Channel to save
+  optional string filename = 5;
 
   repeated double values = 4; // Expect [y][x]
 }

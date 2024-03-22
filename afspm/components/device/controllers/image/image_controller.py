@@ -67,9 +67,8 @@ class ImageController(DeviceController):
         self.dev_scan_state = scan_pb2.ScanState.SS_FREE
         self.dev_scan_params = scan_pb2.ScanParameters2d()
         self.dev_scan = None
+        self.file_id = 0
         super().__init__(**kwargs)
-
-    # TODO: Move to array converters?
 
     def on_start_scan(self):
         self.start_ts = time.time()
@@ -125,6 +124,7 @@ class ImageController(DeviceController):
                     if update_scan:
                         self.update_scan()
                         self.dev_scan.timestamp.GetCurrentTime()
+                        self.dev_scan.filename = self._simulate_filename()
         super().run_per_loop()
 
     def update_scan(self):
@@ -149,3 +149,13 @@ class ImageController(DeviceController):
 
         img = self.dev_img.interp(x=da.x, y=da.y)
         self.dev_scan = ac.convert_xarray_to_scan_pb2(img)
+
+    def _simulate_filename(self) -> str:
+        """Simulate a fake filename, for testing.
+
+        We expecct filenames to be stored in Scan2d, so we can better log
+        metadata. Thus, we simulate a filename here.
+        """
+        fname = './' + str(self.file_id) + '.png'
+        self.file_id += 1
+        return fname

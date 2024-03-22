@@ -190,6 +190,7 @@ class GxsmController(DeviceController):
                 scan = conv.convert_xarray_to_scan_pb2(
                     ds[list(ds.data_vars)[0]])  # Grabbing first data variable
                 scan.timestamp.FromDatetime(ts)
+                scan.filename = fname
                 scans.append(scan)
             self.old_scans = scans
             return scans

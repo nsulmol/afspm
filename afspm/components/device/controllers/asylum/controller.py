@@ -193,6 +193,7 @@ class AsylumController(DeviceController):
                 for ds in datasets:
                     scan = conv.convert_sidpy_to_scan_pb2(ds)
                     scan.timestamp.FromDatetime(ts)
+                    scan.filename = scan_path
                     scans.append(scan)
                 self._old_scans = scans
                 return scans
