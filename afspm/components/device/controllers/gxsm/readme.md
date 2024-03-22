@@ -36,7 +36,7 @@ NOTE: Depending on your components, you may want to separately startup your Afsp
 
 ```bash
 cd /path/to/experiment/file
-poetry run spawn --component_to_spawn=['afspmcon']
+poetry run spawn config.toml --components_to_spawn=['afspmcon']
 ```
 
 , and then adding 'afspmcon' to your list of components *not* to spawn when spawning the rest of your experiment.
