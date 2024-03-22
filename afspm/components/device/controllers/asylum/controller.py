@@ -221,8 +221,6 @@ class AsylumController(DeviceController):
                     scan.filename = scan_path
                     scans.append(scan)
                 self._old_scans = scans
-                return scans
-
         return self._old_scans
 
     def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:

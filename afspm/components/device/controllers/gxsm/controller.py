@@ -144,7 +144,6 @@ class GxsmController(DeviceController):
         # Not setting data units, as these are linked to scan channel
         return scan_params
 
-
     def poll_scans(self) -> [scan_pb2.Scan2d]:
         """Override scans polling."""
         channel_idx = 0
@@ -153,10 +152,10 @@ class GxsmController(DeviceController):
             while channel_idx < self.MAX_NUM_CHANNELS:
                 fname = gxsm.chfname(channel_idx)
 
-                # Handle comparing against last scan
+                # Avoid reloading scans if the same. Return old scans.
                 if channel_idx == 0:
                     if fname == self.last_scan_fname:
-                        break
+                        return self.old_scans
                     self.last_scan_fname = fname
 
                 # Break if on last 'set' channel
@@ -193,7 +192,6 @@ class GxsmController(DeviceController):
                 scan.filename = fname
                 scans.append(scan)
             self.old_scans = scans
-            return scans
         return self.old_scans
 
     def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
