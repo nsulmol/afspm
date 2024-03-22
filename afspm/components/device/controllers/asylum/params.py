@@ -70,7 +70,7 @@ class AsylumParam(enum.Enum):
 # Creating a dict mapping equivalent to AsylumParameter, to map to necessary
 # str values. We need to get *compare* via this mapping, to ensure we
 # distinguish between duplicates (this is why we cannot use StrEnum).
-PARAM_STR_MAP = MappingProxyType(
+PARAM_STR_MAP = MappingProxyType({
     AsylumParam.TL_X: 'XOffset', AsylumParam.TL_Y: 'YOffset',
     AsylumParam.SCAN_SIZE: 'ScanSize', AsylumParam.SCAN_X_RATIO: 'FastRatio',
     AsylumParam.SCAN_Y_RATIO: 'SlowRatio', AsylumParam.RES_X: 'ScanPoints',
@@ -82,7 +82,7 @@ PARAM_STR_MAP = MappingProxyType(
     })
 
 
- # Holds which parameters are strings instead of variables
+# Holds which parameters are strings instead of variables
 PARAM_IS_STR_TUPLE = (AsylumParam.IMG_PATH, AsylumParam.FORCE_PATH)
 
 # Lookup return indicating a variable lookup failure.
