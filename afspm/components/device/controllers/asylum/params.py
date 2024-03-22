@@ -72,7 +72,6 @@ class AsylumParam(enum.Enum):
     FORCE_STATUS = enum.auto()  # spectroscopic status.
 
     LAST_SCAN = enum.auto()  # are we scanning one time or continuously?
-    SCAN_SPEED = enum.auto()
 
 
 # Creating a dict mapping equivalent to AsylumParameter, to map to necessary
@@ -87,7 +86,7 @@ PARAM_STR_MAP = MappingProxyType({
     AsylumParam.IMG_PATH: 'SaveImage', AsylumParam.FORCE_PATH: 'SaveForce',
     AsylumParam.SAVE_IMAGE: 'SaveImage', AsylumParam.SAVE_FORCE: 'SaveForce',
     AsylumParam.SCAN_STATUS: 'ScanStatus', AsylumParam.FORCE_STATUS: 'FMapStatus',
-    AsylumParam.LAST_SCAN: 'LastScan', AsylumParam.SCAN_SPEED: 'ScanSpeed'
+    AsylumParam.LAST_SCAN: 'LastScan'
     })
 
 
