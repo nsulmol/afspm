@@ -7,6 +7,7 @@ This can be confusing!
 import enum
 import logging
 from typing import Optional, Any
+from types import MappingProxyType  # Immutable dict
 
 from afspm.components.device.controller import DeviceController
 from afspm.components.device import params
@@ -165,7 +166,7 @@ def get_param_list(attrs: list[str]) -> list[float] | None:
 def handle_get_set(attr: str, val: Optional[str] = None,
                    curr_units: str = None,
                    gxsm_units: str = None
-                   ) -> (control_pb2.ControlResponse, str):
+                   ) -> (control_pb2.ControlResponse, str, str):
     """Get (and optionally, set) a gxsm attribute.
 
     If curr_units and gxsm_units are provided, units.convert is used to try
@@ -199,6 +200,6 @@ def get_set_scan_speed(ctrlr: DeviceController, val: Optional[str] = None,
         gxsm_units=gxsm_scan_speed_units)
 
 
-PARAM_METHOD_MAP = {
+PARAM_METHOD_MAP = MappingProxyType({
     params.DeviceParameter.SCAN_SPEED: get_set_scan_speed
-}
+})
