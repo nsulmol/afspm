@@ -36,7 +36,9 @@ class ScanMetadataWriter(afspmc.AfspmComponentBase):
     of both of these reasons, we resort to simply logging context.
 
     Currently, we store the following:
-    # timestamp | filename | control_mode | in_control_id | problems_set
+    # timestamp(s), filename, channel, control_mode, client_id, problems_set
+    (for timestamp clarification, see
+    https://protobuf.dev/reference/protobuf/google.protobuf/#timestamp)
 
     Note that problems_set is an array. We convert it into a str when writing.
     It can be converted back into an array via ast.literal_eval().
@@ -51,7 +53,7 @@ class ScanMetadataWriter(afspmc.AfspmComponentBase):
         quoting: quoting generation determination. Defaults to csv default.
     """
 
-    CSV_FIELDS = ['timestamp_seconds', 'filename', 'channel', 'control_mode',
+    CSV_FIELDS = ['timestamp(s)', 'filename', 'channel', 'control_mode',
                   'client_id', 'problems_set']
 
     def __init__(self, filepath: str = './scan_metadata.csv',
