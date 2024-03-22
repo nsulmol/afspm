@@ -2,11 +2,15 @@
 
 import logging
 import enum
+from typing import Optional, Any
 from types import MappingProxyType  # Immutable dict
 
 from afspm.components.device import params
+from afspm.components.device.controller import DeviceController
 from afspm.components.device.controllers.asylum.client import XopClient
 from afspm.utils import units
+
+from afspm.io.protos.generated import control_pb2
 
 
 logger = logging.getLogger(__name__)
@@ -68,6 +72,7 @@ class AsylumParam(enum.Enum):
     FORCE_STATUS = enum.auto()  # spectroscopic status.
 
     LAST_SCAN = enum.auto()  # are we scanning one time or continuously?
+    SCAN_SPEED = enum.auto()
 
 
 # Creating a dict mapping equivalent to AsylumParameter, to map to necessary
@@ -82,7 +87,7 @@ PARAM_STR_MAP = MappingProxyType({
     AsylumParam.IMG_PATH: 'SaveImage', AsylumParam.FORCE_PATH: 'SaveForce',
     AsylumParam.SAVE_IMAGE: 'SaveImage', AsylumParam.SAVE_FORCE: 'SaveForce',
     AsylumParam.SCAN_STATUS: 'ScanStatus', AsylumParam.FORCE_STATUS: 'FMapStatus',
-    AsylumParam.LAST_SCAN: 'LastScan'
+    AsylumParam.LAST_SCAN: 'LastScan', AsylumParam.SCAN_SPEED: 'ScanSpeed'
     })
 
 
@@ -225,3 +230,62 @@ def set_param_list(client: XopClient, params: tuple[AsylumParam],
     if not all_received:
         logger.error("We failed at setting one of the parameters!")
     return all_received
+
+
+# ----- Get/set handling for DeviceController. Could be elsewhere ----- #
+def handle_get_set(ctrl: DeviceController, attr: str,
+                   val: Optional[str] = None, curr_units: str = None,
+                   ) -> (control_pb2.ControlResponse, str, str):
+    """Get (and optionally, set) an asylum attribute.
+
+    If curr_units is provided and the internal asylum units can be found,
+    units.convert is used to try and convert to desired units.
+
+    Args:
+        attr: name of the attribute, in gxsm terminology.
+        val: optional value to set it to, as a str.
+        curr_units: units of provided value. optional.
+
+    Returns:
+        Tuple (response, val, units), i.e. containing the control response,
+        the value gotten (as a str), and the units of said value (as a str).
+    """
+    if attr not in PARAM_UNITS_MAP:
+        msg = f"Units for {attr} not found, cannot perform get/set."
+        logger.error(msg)
+        return (control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED,
+                "n/a")
+    asylum_units = PARAM_UNITS_MAP[attr]
+
+    if attr not in GENERIC_TO_ASYLUM_PARAM_MAP:
+        msg = "Could not find mapping from generic param name to asylum one."
+        logger.error(msg)
+        return (control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED,
+                asylum_units)
+    asylum_param = GENERIC_TO_ASYLUM_PARAM_MAP[attr]
+
+    if val:
+        if not set_param(ctrl._client, asylum_param, val,
+                         curr_units, asylum_units):
+            logger.error(f"Unable to set val: {val} with units: {curr_units}")
+            return (control_pb2.ControlResponse.REP_PARAM_ERROR, None)
+    return (control_pb2.ControlResponse.REP_SUCCESS,
+            str(get_param(ctrl._client, asylum_param)), asylum_units)
+
+
+# Holds methods to call for each supported parameter.
+PARAM_METHOD_MAP = MappingProxyType({
+    params.DeviceParameter.SCAN_SPEED: handle_get_set
+})
+
+
+# Holds internal asylum units for each supported parameter.
+PARAM_UNITS_MAP = MappingProxyType({
+    params.DeviceParameter.SCAN_SPEED: 'm/s'
+})
+
+
+# Maps a generic parameter to the asylum parameter name
+GENERIC_TO_ASYLUM_PARAM_MAP = MappingProxyType({
+    params.DeviceParameter.SCAN_SPEED: AsylumParam.SCAN_SPEED
+})
