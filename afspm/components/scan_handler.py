@@ -68,6 +68,7 @@ class ScanHandler:
                  next_params_kwargs: dict = None,
                  control_mode: control_pb2.ControlMode =
                  control_pb2.ControlMode.CM_AUTOMATED):
+        """Init class."""
         self.rerun_wait_s = rerun_wait_s
         self.get_next_params = get_next_params
         self.next_params_kwargs = (next_params_kwargs if
@@ -134,7 +135,7 @@ class ScanHandler:
                 self._perform_scanning_logic(control_client)
 
     def _handle_scan_state_receipt(self, proto: scan_pb2.ScanStateMsg):
-        """Updates the desired scan state (getting next scan params if needed).
+        """Update the desired scan state (getting next scan params if needed).
 
         If a scan is finished, it also requests the next scan parameters via
         get_next_params().
@@ -173,7 +174,7 @@ class ScanHandler:
             self._desired_scan_state = scan_pb2.ScanState.SS_SCANNING
 
     def _perform_scanning_logic(self, control_client: ControlClient):
-        """Requests the next scan aspect from client.
+        """Request the next scan aspect from client.
 
         Requests the appropriate scan aspect (e.g. set_scan_params, start_scan)
         for the current scan. Handles reruns if a request fails.
@@ -244,12 +245,14 @@ class ScanningComponent(AfspmComponent):
     Attributes:
         scan_handler: ScanHandler instance.
     """
+
     def __init__(self, rerun_wait_s: int,
                  get_next_params: Callable[[AfspmComponent, Any],
                                            scan_pb2.ScanParameters2d],
                  next_params_kwargs: dict = None,
                  control_mode: control_pb2.ControlMode =
                  control_pb2.ControlMode.CM_AUTOMATED, **kwargs):
+        """Init class."""
         # Pass self as 'component' to next params method.
         next_params_kwargs['component'] = self
         self.scan_handler = ScanHandler(rerun_wait_s, get_next_params,

@@ -58,6 +58,7 @@ class ROIExperimenter(AfspmComponent):
         scan_handler: ScanHandler, for performing scans.
 
     """
+
     def __init__(self, full_scan_res: list[int],
                  full_scan_physical_origin: list[float],
                  full_scan_physical_size: list[float],
@@ -66,7 +67,7 @@ class ROIExperimenter(AfspmComponent):
                  sub_scan_res: list[int],
                  sub_scans_per_full_scan: int, rerun_wait_s: int,
                  **kwargs):
-        """ Initialize ROIExperimenter.
+        """Initialize ROIExperimenter.
 
         Args:
             full_scan_res: the scan resolution of the full scan.
@@ -125,7 +126,7 @@ class ROIExperimenter(AfspmComponent):
 
     def get_scan_params_for_next_scan(self, **kwargs
                                       ) -> scan_pb2.ScanParameters2d:
-        """This is the 'choose the next scan' method for ScanHandler.
+        """Choose the next scan method for ScanHandler.
 
         For ScanHandler, we determine if we are doing a full or sub-scan, and
         create a ScanParameters2d accoridngly. This is what we return (and
@@ -155,7 +156,6 @@ class ROIExperimenter(AfspmComponent):
 
     def _reset_sub_scan_aspects(self):
         """After a full scan, reset our subscan aspects."""
-
         # Update counter to next full scan.
         self.scans_since_last_fscan = 0
 
