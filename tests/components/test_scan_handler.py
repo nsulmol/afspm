@@ -16,7 +16,7 @@ from afspm.io.pubsub.subscriber import Subscriber
 
 from afspm.io import common
 
-from afspm.components.scan_handler import ScanHandler
+from afspm.components.scan.handler import ScanHandler
 
 
 logger = logging.getLogger(__name__)

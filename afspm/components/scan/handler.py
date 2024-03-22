@@ -7,13 +7,13 @@ from typing import Callable, Any
 
 from google.protobuf.message import Message
 
-from .component import AfspmComponent
-from ..io import common
+from ..component import AfspmComponent
+from ...io import common
 
-from ..io.protos.generated import scan_pb2
-from ..io.protos.generated import control_pb2
+from ...io.protos.generated import scan_pb2
+from ...io.protos.generated import control_pb2
 
-from ..io.control.client import ControlClient, send_req_handle_ctrl
+from ...io.control.client import ControlClient, send_req_handle_ctrl
 
 
 logger = logging.getLogger(__name__)

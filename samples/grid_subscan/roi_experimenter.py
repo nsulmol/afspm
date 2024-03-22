@@ -7,7 +7,7 @@ from google.protobuf.message import Message
 
 from afspm.utils.log import LOGGER_ROOT
 from afspm.components.component import AfspmComponent
-from afspm.components.scan_handler import ScanHandler
+from afspm.components.scan.handler import ScanHandler
 from afspm.io import common
 from afspm.io.protos.generated import scan_pb2
 

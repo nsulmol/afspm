@@ -4,12 +4,12 @@ import logging
 import csv
 from typing import Any
 
-from . import component as afspmc
+from .. import component as afspmc
 
 from google.protobuf.message import Message
 
-from ..io.protos.generated import scan_pb2
-from ..io.protos.generated import control_pb2
+from ...io.protos.generated import scan_pb2
+from ...io.protos.generated import control_pb2
 
 
 logger = logging.getLogger(__name__)

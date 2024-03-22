@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from google.protobuf.message import Message
 
 from .component import AfspmComponent
-from .scan_handler import ScanningComponent
+from .scan.handler import ScanningComponent
 
 from ..io.protos.generated import scan_pb2
 from ..io.protos.generated import control_pb2
