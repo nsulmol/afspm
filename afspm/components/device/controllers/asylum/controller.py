@@ -151,6 +151,7 @@ class AsylumController(DeviceController):
     def on_set_zctrl_params(self, zctrl_params: feedback_pb2.ZCtrlParameters
                             ) -> control_pb2.ControlResponse:
         """Override setting zctrl."""
+        # None means default of PHYS_UNITS
         desired_units = (None, None)
         attrs = self.ZCTRL_PARAMS
         vals = (zctrl_params.proportionalGain, zctrl_params.integralGain)
