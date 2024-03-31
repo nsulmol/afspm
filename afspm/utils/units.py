@@ -33,6 +33,10 @@ def convert(val: Any, unit: Optional[str] = None,
     If either unit/desired_unit is None or both are the same, we simply return
     the original value.
 
+    Note: if only one unit is provided (unit or desired_unit), we fail with a
+    ConversionError. We force the user to either (a) convert nothing, or (b)
+    be very explicit about what they wish t convert.
+
     Args:
         val: input value, of a type that pint supports.
         unit: str representation of your current unit.
@@ -45,6 +49,12 @@ def convert(val: Any, unit: Optional[str] = None,
         ConversionError if the conversion fails for some reason. Check the log,
         we likely have elaborated further..
     """
+    if ((unit is not None and desired_unit is None) or
+            (unit is None and desired_unit is not None)):
+        reason = ("One of unit/desired_unit was provided but not the other. "
+                  "Cannot convert. Failing.")
+        logger.error(reason)
+        raise ConversionError(reason)
     if not unit or not desired_unit or unit == desired_unit:
         return val
 
