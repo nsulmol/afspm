@@ -192,7 +192,7 @@ def handle_get_set(attr: str, val: Optional[str] = None,
 
 def get_set_scan_speed(ctrlr: DeviceController, val: Optional[str] = None,
                        units: Optional[str] = None
-                       ) -> (control_pb2.ControlResponse, str):
+                       ) -> (control_pb2.ControlResponse, str, str):
     """Get/set scan speed."""
     gxsm_scan_speed_units = ctrlr.gxsm_physical_units + '/s'
     return handle_get_set(
