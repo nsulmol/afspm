@@ -168,17 +168,15 @@ def set_param(client: XopClient, param: AsylumParam, val: str | float,
         param: AsylumParam to set.
         val: value to set it to.
         curr_unit: units of provided value, as str. Default is None.
-        desired_unit: desired units of value, as str.
+        desired_unit: desired units of value, as str. Default is None.
 
     Returns:
         True if the set succeeds.
     """
-    # Convert value if needed
-    if isinstance(val, float):
-        try:
-            val = units.convert(val, curr_unit, desired_unit)
-        except units.ConversionError:
-            return False
+    try:
+        val = units.convert(val, curr_unit, desired_unit)
+    except units.ConversionError:
+        return False
 
     set_method = (AsylumMethod.SET_STRING if param in PARAM_IS_STR_TUPLE
                   else AsylumMethod.SET_VALUE)
