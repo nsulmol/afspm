@@ -400,19 +400,18 @@ def test_run_scan(client, default_control_state,
     logger.info("First, check if we provided specific scan parameters "
                 "(so the scan is not super long)")
     scan_speed_tuple = get_config_scan_speed(config_dict, client)
+    orig_scan_speed = None
+    if scan_speed_tuple:
+        orig_scan_speed = scan_speed_tuple[1]
+        set_scan_speed(client, scan_speed_tuple[0])
+
     desired_phys_size_nm = get_config_phys_size_nm(config_dict)
     desired_data_shape = get_config_data_shape(config_dict)
-
     orig_scan_params = None
     if desired_phys_size_nm or desired_data_shape:
         orig_scan_params = assert_and_return_message(sub_scan_params)
         set_scan_params(client, orig_scan_params, desired_phys_size_nm,
                         desired_data_shape)
-
-    orig_scan_speed = None
-    if scan_speed_tuple:
-        orig_scan_speed = scan_speed_tuple[1]
-        set_scan_speed(client, scan_speed_tuple[0])
 
     logger.info("Validate we *do not* have an initial scan (in the "
                 "cache), and *do* have an initial scan state (SS_FREE).")
@@ -443,10 +442,10 @@ def test_run_scan(client, default_control_state,
 
     if orig_scan_speed or orig_scan_params:
         logger.info("Reset scan settings to what they were before the test.")
-        if orig_scan_params:
-            set_scan_params(client, orig_scan_params)
         if orig_scan_speed:
             set_scan_speed(client, orig_scan_speed)
+        if orig_scan_params:
+            set_scan_params(client, orig_scan_params)
 
     end_test(client)
     stop_client(client)
