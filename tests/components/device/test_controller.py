@@ -248,9 +248,11 @@ def get_config_scan_speed(config_dict: dict,
             init_val_nm = units.convert(float(init_scan_msg.value),
                                         init_scan_msg.units, 'nm/s')
             return desired_param, init_val_nm
-        logger.info("Controller failed setting/getting scan speed, "
-                    "returned response: %s",
-                    common.get_enum_str(control_pb2.ControlResponse, rep))
+        msg = ("Controller failed setting/getting scan speed, "
+               "returned response: %s",
+               common.get_enum_str(control_pb2.ControlResponse, rep))
+        logger.info(msg)
+        raise Exception(msg)
     return None
 
 
