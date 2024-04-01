@@ -10,6 +10,7 @@ from afspm.components.device.controller import DeviceController
 from afspm.components.device.params import DeviceParameter
 from afspm.components.afspm.controller import AfspmController
 
+from afspm.io import common
 from afspm.io.pubsub.subscriber import Subscriber
 from afspm.io.pubsub.publisher import Publisher
 from afspm.io.pubsub.cache import PubSubCache
@@ -177,10 +178,6 @@ def device_controller_routine(pub_url, server_url, psc_url,
     # Forcing closure of bound sockets (for pytests)
     pub._publisher.close()
     server._server.close()
-
-
-
-from afspm.io import common
 
 
 # --- AfspmController Stuff --- #
