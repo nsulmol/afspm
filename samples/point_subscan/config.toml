@@ -16,7 +16,7 @@ small_scan_origin = [0, 0]
 small_scan_size = [40, 40]  # 200 / 5
 
 # - Data Stuff - #
-data_units = 'nm'
+data_units = 'pixels'
 full_scan_res = [256, 256]
 small_scan_res = [512, 512]
 
