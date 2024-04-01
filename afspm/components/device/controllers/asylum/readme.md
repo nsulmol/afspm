@@ -29,3 +29,9 @@ spawn /path/to/config/config.toml
 To validate that the interface is working:
 1. Run the example program in ZeroMQ-XOP to ensure the XOP is functioning.
 2. Run the DeviceController unit tests in afspm to ensure the Asylum device controller is communicating properly with the Igor Pro software (via the ZeroMQ-XOP interface).
+
+## Notes
+
+The commands used to set variables here *do not* perform the same safety checking that the Asylum control panel does. Particularly, we use the lowest-level 'PV()' methods ('Put Value'), while the control panel uses an Asylum-created FMapSetVar(). The issue is linked to the fact that FMapSetVar() takes a STRUCT as input. Unfortunately, the library we use to communicate with the Asylum/Igor does not support STRUCT parameters sent as input, so we are forced to use the less-safe method instead.
+
+Please keep this limitation in mind when running experiments! It would be smart to test the sample settings you expect to set, to ensure they are within expected ranges.
