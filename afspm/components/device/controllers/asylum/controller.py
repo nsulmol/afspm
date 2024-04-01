@@ -71,6 +71,7 @@ class AsylumController(DeviceController):
                               store_old_vals=True)
 
         super().__init__(**kwargs)
+        self.param_method_map = params.PARAM_METHOD_MAP
 
     def __del__(self):
         """Handle object destruction: reset what we changed on startup."""

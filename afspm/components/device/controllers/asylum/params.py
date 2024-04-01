@@ -265,9 +265,17 @@ def handle_get_set(ctrl: DeviceController, attr: str,
             str(get_param(ctrl._client, asylum_param)), asylum_units)
 
 
+def get_set_scan_speed(ctrlr: DeviceController, val: Optional[str] = None,
+                       units: Optional[str] = None
+                       ) -> (control_pb2.ControlResponse, str, str):
+    """Get/set scan speed."""
+    return handle_get_set(ctrlr, params.DeviceParameter.SCAN_SPEED,
+                          val, units)
+
+
 # Holds methods to call for each supported parameter.
 PARAM_METHOD_MAP = MappingProxyType({
-    params.DeviceParameter.SCAN_SPEED: handle_get_set
+    params.DeviceParameter.SCAN_SPEED: get_set_scan_speed
 })
 
 
