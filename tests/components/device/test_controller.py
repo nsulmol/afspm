@@ -251,7 +251,7 @@ def get_config_scan_speed(config_dict: dict,
         msg = ("Controller failed setting/getting scan speed, "
                "returned response: ",
                common.get_enum_str(control_pb2.ControlResponse, rep))
-        logger.info(msg)
+        logger.error(msg)
         raise Exception(msg)
     return None
 
