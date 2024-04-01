@@ -14,14 +14,14 @@ xop_url = 'tcp://127.0.0.1:5555'  # To be used on zmq-xop server startup in Igor
 # Note: could make these shorter if using a short scan time.
 timeout_ms = 5000
 scan_wait_ms = 180000
-request_timeout_ms=5000  # Starting/stopping scans can take a while!
+request_timeout_ms = 5000  # Starting/stopping scans can take a while!
 
 # --- (Optional) Scan Settings --- #
 # Parameters we try to set to, for a faster scan.
 # Uncomment if desired
-#scan_speed_nm_s = 216  # 36 x 6
-#phys_size_nm = [36.0, 36.0]
-#data_shape = [10, 10]
+#scan_speed_nm_s = 150000  # 25 x 6
+#phys_size_nm = [25000.0, 25000.0]
+#data_shape = [128, 128]
 
 # --- Miscellaneous --- #
 #float_tolerance = 1e-06
