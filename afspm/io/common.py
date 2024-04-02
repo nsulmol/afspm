@@ -14,7 +14,7 @@ ALL_ENVELOPE_LOG = "ALL"
 
 
 # --- Good defaults --- #
-REQUEST_TIMEOUT_MS = 1250  # Linked to TCP delay
+REQUEST_TIMEOUT_MS = 250  # Linked to TCP delay
 POLL_TIMEOUT_MS = 25
 LOOP_SLEEP_S = 0.1  # 100 ms
 HEARTBEAT_PERIOD_S = 5
@@ -23,7 +23,7 @@ BEATS_BEFORE_DEAD = 5
 
 # We appear to need a small startup delay, to allow zmq sockets to properly
 # get setup.
-_STARTUP_SLEEP_S = 1  # 1000 ms
+_STARTUP_SLEEP_S = 0.25  # 250 ms
 
 
 def sleep_on_socket_startup():

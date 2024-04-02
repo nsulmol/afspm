@@ -109,7 +109,7 @@ class AfspmComponentBase:
             logger.warning(f"{self.name}: Interrupt received. Stopping.")
 
         # Terminate (not so gracefully)
-        self.ctx.destroy()
+        self.ctx.destroy()  # TODO: investigate ctx.term() instead.
 
     def _handle_subscriber(self):
         """Poll subscriber and check for a shutdown request.

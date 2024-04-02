@@ -107,7 +107,7 @@ def thread_scan_handler(publisher_url, rerun_wait_s,
                                     server_url, client_uuid, ctx))
     thread.daemon = True
     thread.start()
-    time.sleep(common.REQUEST_TIMEOUT_MS / 1000)
+    time.sleep(2*common.REQUEST_TIMEOUT_MS / 1000)
     return thread
 
 
@@ -162,7 +162,7 @@ def test_scanning(publisher, server, thread_scan_handler,
 
     logger.info("Sending kill signal")
     publisher.send_kill_signal()
-    time.sleep(2*common.REQUEST_TIMEOUT_MS / 1000)
+    time.sleep(4*common.REQUEST_TIMEOUT_MS / 1000)
 
 
 def test_req_ctrl(publisher, server, thread_scan_handler, control_state,
