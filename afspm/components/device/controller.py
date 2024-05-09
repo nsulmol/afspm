@@ -321,7 +321,7 @@ class DeviceController(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                 handler = self.req_handler_map[req]
                 rep = handler(proto) if proto else handler()
 
-                # Special case! If scan was cancelled and succeeded, we
+                # Special case! If scan was cancelled successfully, we
                 # send out an SS_INTERRUPTED state, to allow detecting
                 # interruptions.
                 if (req == control_pb2.ControlRequest.REQ_STOP_SCAN and
