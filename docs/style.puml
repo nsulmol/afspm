@@ -1,0 +1,77 @@
+<style>
+  component {
+    LineColor Gray
+    LineThickness 0
+  }
+  .internal {
+    BackgroundColor LightSteelBlue
+  }
+  .groupinternal {
+    LineColor DarkBlue
+    FontColor DarkBlue
+    BackgroundColor AliceBlue
+  }
+  ' Consider LightCoral '
+  .external {
+    BackgroundColor LightPink
+  }
+  .groupexternal {
+    LineColor DarkRed
+    FontColor DarkRed
+    BackgroundColor LavenderBlush
+  }
+
+  .interface {
+    BackgroundColor LightPink|LightBlue
+  }
+
+  .node {
+    BackgroundColor SeaGreen
+  }
+  .socket {
+    LineColor SeaGreen
+    LineThickness 3
+  }
+
+  .message {
+    BackgroundColor OldLace
+    FontColor Sienna
+    LineColor Sienna
+    LineThickness 2
+  }
+
+  .required {
+    LineThickness 1
+    LineColor Black
+  }
+
+  .optional {
+    LineColor Gray
+  }
+
+  .layout {
+    LineColor Transparent
+  }
+  .center {
+    HorizontalAlignment center
+  }
+  .left {
+    HorizontalAlignment left
+  }
+  .right {
+    HorizontalAlignment right
+  }
+</style>
+
+  skinparam componentStyle rectangle
+  skinparam defaultTextAlignment center
+  'skinparam linetype ortho
+
+  ' wrapping stuff
+  skinparam wrapWidth 200
+  skinparam maxMessageSize 200
+
+  'default line color is grey (to highlight required)'
+  skinparam LineColor Red
+
+  hide stereotype

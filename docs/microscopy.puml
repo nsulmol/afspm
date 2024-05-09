@@ -1,0 +1,10 @@
+!include style.puml
+
+!include <material/microscope>
+!include <material/monitor>
+
+package "microscopy system" <<groupexternal>> as spm_system {
+  component "microscope\n<$ma_microscope>" <<external>> <<required>> as spmdev
+  component "microscope\ncontroller\n<$ma_monitor>" <<external>> <<required>> as spmcon
+  spmcon <--> spmdev: high freq. \ncontrol
+}
