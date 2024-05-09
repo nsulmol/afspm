@@ -184,6 +184,15 @@ Translates data structures into a format that can be stored/communicated).
 ***** ZeroMQ: Communication / Concurrency Library
 Allows data to be sent between 'sockets' via common 'nodes'. Abstracts away protocols used, allowing easy switching between different protocols (e.g., TCP/IP, interprocess communication, threads).
 
+** Example
+#+attr_org: :width 50%
+#+attr_latex: :width 0.8\linewidth
+[[./images/afspm_hl_example.png]]
+
+- *Experiment* constantly decides on the next region to scan.
+- *Tip Detector* constantly evaluates the state of the tip, logging a problem if deemed poor.
+- *Tip Corrector* takes control if 'bad tip' problem has been logged, takes steps to fix it, and releases control once fixed (according to the detector).
+
 * Design Particulars
 ** I/O Paths
 #+beamer:\pause
@@ -257,11 +266,6 @@ All spawned components are *monitored*:
 - If one *stops* beating, it is *restarted*.
 
 This should minimize a crash breaking experiments.
-** Example
-#+attr_org: :width 50%
-#+attr_latex: :width 1.0\linewidth
-[[./images/afspm_hl_example.png]]
-
 ** The End :BMCOL:
 :PROPERTIES:
 :BEAMER_col: 1.0
