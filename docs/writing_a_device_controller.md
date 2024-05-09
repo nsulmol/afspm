@@ -32,6 +32,9 @@ These methods are 'responses' to specific requests. For example, ```on_start_sca
 
 Note that some of these methods are not *strictly* necessary. For example, ```on_set_zctrl_params()``` can return ```REP_CMD_NOT_SUPPORTED``` if it is not. Check the documentation in afspm/components/device/controller.py to see if a particular method *must* be supported or not.
 
+
+THIS DOES NOT THROW AN EXCEPTION BECAUSE WE ARE RESPONDING TO AN EXPLICIT REQUEST!! cLARIFY
+
 ### Implementing ```poll_XXX()``` Methods
 
 These methods are called at a regular cadence by the base DeviceController class, in order to determine whether somethinig has changed. A child class *does not* need to hold state or check if something has 'changed'; it merely needs to return what is requested. The rest will be handled by the base controller.
@@ -43,6 +46,9 @@ Note that ```poll_scans()```implies detecting the latest scan and converting it 
 These methods are called 'polling' methods, because the base controller regularly 'polls' for them. This is the simplest, most naive method of checking state. We purposefully chose this, to try to make the job of implementing a new DeviceController easier.
 
 These methods must return what was requested, but can throw a DeviceError on failure.
+
+
+THIS SHOULD THROW AN EXCEPTION BECAUSE AN ERROR WOULD BE AN UNEXPECTED EVENT WITH NO INPUT (CLARIFY).
 
 ### Missing Support
 

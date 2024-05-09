@@ -160,42 +160,42 @@ afspm will concern itself *only* with automation of high-level, low-frequency de
 :BEAMER_col: 0.55
 :END:
 *afspm* is designed around 'computation' components that correspond to nodes in a network. An experiment contains:
-- *Device Controller*: abstract - specifies the required methods to communicate with an SPM device. Each SPM device will have its own DeviceController implementation.
-- *Afspm Controller*: mediates control of the SPM device (only 1 component in control at a time).
-- *Afspm Components*: the one or more components the user requires to run their experiment.
+- *Microscope Communicator*: communicates with microscope, translating between afspm-generic and microscope-specific language.
+- *Microscope Proxy*: mediates control of the microscope (only 1 component in control at a time) and caches data received from microscope.
+- *Other Components*: the one or more components the user requires to run their experiment.
 ** Communication Protocol
 *** Image :B_ignoreheading:
 :PROPERTIES:
 :BEAMER_env: ignoreheading
 :END:
 #+attr_org: :width 50%
-#+attr_latex: :width 0.35\linewidth
+#+attr_latex: :width 0.5\linewidth
 [[./images/network_framework.png]]
 
 *** Notes :B_ignoreheading:
 :PROPERTIES:
 :BEAMER_env: ignoreheading
 :END:
-*afspm* uses ZeroMQ as its communications/concurrency framework and protobuffers as its serialization layer. Both are cross-platform and cross-language.
+*afspm* uses protobuffers and ZeroMQ (both cross-platform / cross-language).
 #+beamer:\pause
-***** What is ZeroMQ?
-Library that abstracts away protocols used, allowing easy switching of how 'nodes' communicate in a system.
+***** protobuffers: Serialization / Deserialization Library
+Translates data structures into a format that can be stored/communicated).
 #+beamer:\pause
-***** What are protobuffers?
-Library for serializing structured data (translating a data structure into a format that can be stored/communicated).
+***** ZeroMQ: Communication / Concurrency Library
+Allows data to be sent between 'sockets' via common 'nodes'. Abstracts away protocols used, allowing easy switching between different protocols (e.g., TCP/IP, interprocess communication, threads).
 
 * Design Particulars
 ** I/O Paths
 #+beamer:\pause
 *** Publisher-Subscriber Path
-- The DeviceController *publishes* ScanState, ScanParameters, and Scan *changes*.
-- These are passed on by the AfspmController. Data is *stored* in a *cache* and resent to new/crashed components.
+- The MicroscopeCommunicator *publishes* ScanState, ScanParameters, and Scan *changes*.
+- These are passed on by the MicroscopeProxy. Data is *stored* in a *cache* and re-sent to new/crashed components.
 - Each component choose what aspects to *subscribe* to, and receives data from these.
 #+beamer:\pause
 *** Control Path
 - Each component can send *control requests* over its client.
-- The AfspmController determines which *client* is *in-control*, and *forwards* these to the DeviceController.
-- The DeviceController *receives* control requests from one client and *responds*.
+- The MicroscopeProxy determines which *client* is *in-control*, and *forwards* these to the MicroscopeCommunicator.
+- The MicroscopeCommunicator *receives* control requests from one client and *responds*.
 ** afspm: Detailed View
 #+attr_org: :width 50%
 #+attr_latex: :width 1.0\linewidth
@@ -216,7 +216,7 @@ This allows, e.g., detecting a tip crash and attempting to correct it.
 
 #+beamer:\pause
 *** Control Modes
-The AfspmController defines the *control mode*, which can be:
+The MicroscopeProxy defines the *control mode*, which can be:
 - *Automated*: default, automation runs.
 - *Manual*: pause automation.
 - *Problem*: experiment problems are logged, pause automation.
@@ -257,6 +257,11 @@ All spawned components are *monitored*:
 - If one *stops* beating, it is *restarted*.
 
 This should minimize a crash breaking experiments.
+** Example
+#+attr_org: :width 50%
+#+attr_latex: :width 1.0\linewidth
+[[./images/afspm_hl_example.png]]
+
 ** The End :BMCOL:
 :PROPERTIES:
 :BEAMER_col: 1.0
