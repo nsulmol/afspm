@@ -65,8 +65,8 @@
   !include <material/script>
 
   package "afspm abstraction" <<groupinternal>> {
-    component "microscope\ncommunicator\n<$ma_network>" <<interface>> <<required>> as devcon
-    component "microscope proxy\n<$ma_tune>" <<internal>> <<required>> as afspmcon
+    component "microscope\ntranslator\n<$ma_network>" <<interface>> <<required>> as devcon
+    component "microscope\nintermediary\n<$ma_tune>" <<internal>> <<required>> as afspmcon
 
     component "experiment\n<$ma_script>" <<internal>> as exp
     component "visualizer\n<$ma_chart_areaspline>" <<internal>> as viz
@@ -98,8 +98,8 @@
   !include <material/wrench>
 
   package "afspm abstraction" <<groupinternal>> as afspm {
-    component "microscope\ncommunicator\n<$ma_network>" <<interface>> <<required>> as devcon
-    component "microscope proxy\n<$ma_tune>" <<internal>> <<required>> as afspmcon
+    component "microscope\ntranslator\n<$ma_network>" <<interface>> <<required>> as devcon
+    component "microscope\nintermediary\n<$ma_tune>" <<internal>> <<required>> as afspmcon
 
     component "experiment\n<$ma_script>" <<internal>> <<optional>> as exp
     component "tip detector\n<$ma_alert_box>" <<internal>> <<optional>> as tip_detector
@@ -180,7 +180,7 @@
   !include <material/script>
 
   package "afspm abstraction" <<groupinternal>> {
-    component "microscope\ncommunicator\n<$ma_network>" <<interface>> <<required>> as devcon {
+    component "microscope\ntranslator\n<$ma_network>" <<interface>> <<required>> as devcon {
       component "PUB" <<socket>> as dc_pub
       component REP <<socket>> as dc_rep
     }
@@ -218,13 +218,13 @@
   !include <material/script>
 
   package "afspm abstraction" <<groupinternal>> {
-    component "microscope\ncommunicator\n<$ma_network>" <<interface>> <<required>> as devcon {
+    component "microscope\ntranslator\n<$ma_network>" <<interface>> <<required>> as devcon {
       component PUB <<socket>> as dc_pub
       component REP <<socket>> as dc_rep
     }
 
 
-    component "microscope proxy\n<$ma_tune>" <<internal>> <<required>> as afspm_con {
+    component "microscope\nintermediary\n<$ma_tune>" <<internal>> <<required>> as afspm_con {
       component SUB <<socket>> as afspm_sub
       component XPUB <<socket>> as afspm_pub
       component "//cache//" as afspm_cache

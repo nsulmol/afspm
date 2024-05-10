@@ -54,7 +54,7 @@
 #+beamer_header:\documentclass[xcolor=SeaGreen]{beamer}
 
 # Uncomment to skip animations
-# #+latex_class_options: [handout, 9pt]
+#+latex_class_options: [handout, 9pt]
 
 #+property: header-args :mkdirp yes :results value drawer
 
@@ -160,8 +160,8 @@ afspm will concern itself *only* with automation of high-level, low-frequency de
 :BEAMER_col: 0.55
 :END:
 *afspm* is designed around 'computation' components that correspond to nodes in a network. An experiment contains:
-- *Microscope Communicator*: communicates with microscope, translating between afspm-generic and microscope-specific language.
-- *Microscope Proxy*: mediates control of the microscope (only 1 component in control at a time) and caches data received from microscope.
+- *Microscope Translator*: communicates with microscope, translating between afspm-generic and microscope-specific language.
+- *Microscope Intermediary*: mediates control of the microscope (only 1 component in control at a time) and caches data received from microscope.
 - *Other Components*: the one or more components the user requires to run their experiment.
 ** Communication Protocol
 *** Image :B_ignoreheading:
@@ -186,7 +186,7 @@ Allows data to be sent between 'sockets' via common 'nodes'. Abstracts away prot
 
 ** Example
 #+attr_org: :width 50%
-#+attr_latex: :width 0.8\linewidth
+#+attr_latex: :width 0.75\linewidth
 [[./images/afspm_hl_example.png]]
 
 - *Experiment* constantly decides on the next region to scan.
@@ -197,14 +197,14 @@ Allows data to be sent between 'sockets' via common 'nodes'. Abstracts away prot
 ** I/O Paths
 #+beamer:\pause
 *** Publisher-Subscriber Path
-- The MicroscopeCommunicator *publishes* ScanState, ScanParameters, and Scan *changes*.
-- These are passed on by the MicroscopeProxy. Data is *stored* in a *cache* and re-sent to new/crashed components.
+- The MicroscopeTranslator *publishes* ScanState, ScanParameters, and Scan *changes*.
+- These are passed on by the MicroscopeIntermediary. Data is *stored* in a *cache* and re-sent to new/crashed components.
 - Each component choose what aspects to *subscribe* to, and receives data from these.
 #+beamer:\pause
 *** Control Path
 - Each component can send *control requests* over its client.
-- The MicroscopeProxy determines which *client* is *in-control*, and *forwards* these to the MicroscopeCommunicator.
-- The MicroscopeCommunicator *receives* control requests from one client and *responds*.
+- The MicroscopeIntermediary determines which *client* is *in-control*, and *forwards* these to the MicroscopeTranslator.
+- The MicroscopeTranslator *receives* control requests from one client and *responds*.
 ** afspm: Detailed View
 #+attr_org: :width 50%
 #+attr_latex: :width 1.0\linewidth
@@ -225,7 +225,7 @@ This allows, e.g., detecting a tip crash and attempting to correct it.
 
 #+beamer:\pause
 *** Control Modes
-The MicroscopeProxy defines the *control mode*, which can be:
+The MicroscopeIntermediary defines the *control mode*, which can be:
 - *Automated*: default, automation runs.
 - *Manual*: pause automation.
 - *Problem*: experiment problems are logged, pause automation.
