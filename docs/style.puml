@@ -13,16 +13,16 @@
   }
   ' Consider LightCoral '
   .external {
-    BackgroundColor LightPink
+    BackgroundColor Gold
   }
   .groupexternal {
-    LineColor DarkRed
-    FontColor DarkRed
-    BackgroundColor LavenderBlush
+    LineColor GoldenRod
+    FontColor GoldenRod
+    BackgroundColor LightGoldenRodYellow
   }
 
   .interface {
-    BackgroundColor LightPink|LightBlue
+    BackgroundColor Gold|LightBlue
   }
 
   .node {

@@ -28,7 +28,7 @@
 #+beamer_header:\definecolor{mydarkgray}{rgb}{0.4, 0.4, 0.4}
 
 # Main hook: structure. All other theme colors will be based on this.
-#+beamer_header:\setbeamercolor{structure}{fg=mellowgreen}
+#+beamer_header:\setbeamercolor{structure}{fg=mellowblue}
 
 # Change the normal text color, to be less garish
 #+beamer_header:\setbeamercolor{normal text}{fg=mydarkgray}
