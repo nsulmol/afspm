@@ -1,4 +1,5 @@
 #+title: afspm Overview
+#+date:
 #+startup: beamer
 #+latex_class: beamer
 # 10pt dictates the overall font size, from 8-12.
@@ -9,7 +10,7 @@
 #+options: h:2 toc:1
 
 # Set institute
-#+beamer_header:\institute{National Research Council Canada (NRC/CNRC)}
+#+beamer_header:\institute{McGill University}
 
 # Remove weird navigation buttons
 #+beamer_header:\setbeamertemplate{navigation symbols}{}
@@ -161,7 +162,7 @@ afspm will concern itself *only* with automation of high-level, low-frequency de
 :END:
 *afspm* is designed around 'computation' components that correspond to nodes in a network. An experiment contains:
 - *Microscope Translator*: communicates with microscope, translating between afspm-generic and microscope-specific language.
-- *Microscope Intermediary*: mediates control of the microscope (only 1 component in control at a time) and caches data received from microscope.
+- *Afspm Director*: mediates control between components and translator (only 1 component in control at a time) and caches data received.
 - *Other Components*: the one or more components the user requires to run their experiment.
 ** Communication Protocol
 *** Image :B_ignoreheading:
@@ -198,12 +199,12 @@ Allows data to be sent between 'sockets' via common 'nodes'. Abstracts away prot
 #+beamer:\pause
 *** Publisher-Subscriber Path
 - The MicroscopeTranslator *publishes* ScanState, ScanParameters, and Scan *changes*.
-- These are passed on by the MicroscopeIntermediary. Data is *stored* in a *cache* and re-sent to new/crashed components.
+- These are passed on by the AfspmDirector. Data is *stored* in a *cache* and re-sent to new/crashed components.
 - Each component choose what aspects to *subscribe* to, and receives data from these.
 #+beamer:\pause
 *** Control Path
 - Each component can send *control requests* over its client.
-- The MicroscopeIntermediary determines which *client* is *in-control*, and *forwards* these to the MicroscopeTranslator.
+- The AfspmDirector determines which *client* is *in-control*, and *forwards* these to the MicroscopeTranslator.
 - The MicroscopeTranslator *receives* control requests from one client and *responds*.
 ** afspm: Detailed View
 #+attr_org: :width 50%
@@ -225,7 +226,7 @@ This allows, e.g., detecting a tip crash and attempting to correct it.
 
 #+beamer:\pause
 *** Control Modes
-The MicroscopeIntermediary defines the *control mode*, which can be:
+The AfspmDirector defines the *control mode*, which can be:
 - *Automated*: default, automation runs.
 - *Manual*: pause automation.
 - *Problem*: experiment problems are logged, pause automation.
