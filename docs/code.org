@@ -66,7 +66,7 @@
 
   package "afspm abstraction" <<groupinternal>> {
     component "microscope\ntranslator\n<$ma_network>" <<interface>> <<required>> as devcon
-    component "afspm director\n<$ma_tune>" <<internal>> <<required>> as afspmcon
+    component "microscope\nscheduler\n<$ma_tune>" <<internal>> <<required>> as afspmcon
 
     component "experiment\n<$ma_script>" <<internal>> as exp
     component "visualizer\n<$ma_chart_areaspline>" <<internal>> as viz
@@ -99,7 +99,7 @@
 
   package "afspm abstraction" <<groupinternal>> as afspm {
     component "microscope\ntranslator\n<$ma_network>" <<interface>> <<required>> as devcon
-    component "afspm director\n<$ma_tune>" <<internal>> <<required>> as afspmcon
+    component "microscope\nscheduler\n<$ma_tune>" <<internal>> <<required>> as afspmcon
 
     component "experiment\n<$ma_script>" <<internal>> <<optional>> as exp
     component "tip detector\n<$ma_alert_box>" <<internal>> <<optional>> as tip_detector
@@ -224,7 +224,7 @@
     }
 
 
-    component "afspm director\n<$ma_tune>" <<internal>> <<required>> as afspm_con {
+    component "microscope\nscheduler\n<$ma_tune>" <<internal>> <<required>> as afspm_con {
       component SUB <<socket>> as afspm_sub
       component XPUB <<socket>> as afspm_pub
       component "//cache//" as afspm_cache
