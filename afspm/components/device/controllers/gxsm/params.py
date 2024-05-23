@@ -28,12 +28,12 @@ class GxsmParameter(str, enum.Enum):
     # Physical scan parameters
     TL_X = 'OffsetX'  # x-coordinate top-left of scan region (offset).
     TL_Y = 'OffsetY'  # y-coordinate top-left of scan region (offset).
-    SZ_X = 'RangeX'  # x-coordinate size of scan region.
-    SZ_Y = 'RangeY'  # y-coordinate size of scan region.
+    SZ_X = 'RangeX'  # x-dimension of scan region.
+    SZ_Y = 'RangeY'  # y-dimension size of scan region.
 
     # Digital scan parameters
-    RES_X = 'PointsX'  # x-coordinate size of scan array (data points).
-    RES_Y = 'PointsY'  # y-coordinate size of scan array (data points).
+    RES_X = 'PointsX'  # x-resolution of scan array (data points).
+    RES_Y = 'PointsY'  # y-resolution of scan array (data points).
 
     # Feedback parameters
     CP = 'dsp-fbs-cp'  # proportional gain of main feedback loop.
@@ -46,14 +46,13 @@ class GxsmParameter(str, enum.Enum):
 
 GET_FAILURE = '\x04'
 
-
 class GxsmChannelIds(enum.Enum):
     """Channel choice-to-int mapping.
 
     The int values here correspond to the values gxsm associates to the
     different channel options (in the channel selection menu).
 
-    Remember that (with the eception of TOPO), these do not map to traditional
+    Remember that (with the exception of TOPO), these do not map to traditional
     channel types (such as phase or magnitude), but to internal system
     specifics (e.g. ADC channel 1).
     """
