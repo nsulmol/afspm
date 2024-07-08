@@ -224,7 +224,7 @@
     }
 
 
-    component "microscope\nscheduler\n<$ma_tune>" <<internal>> <<required>> as afspm_con {
+    component "afspm director\n<$ma_tune>" <<internal>> <<required>> as afspm_con {
       component SUB <<socket>> as afspm_sub
       component XPUB <<socket>> as afspm_pub
       component "//cache//" as afspm_cache
@@ -284,3 +284,73 @@
   #+attr_latex: :width .90\linewidth
   [[file:images/afspm_control.png]]
   :end:
+* Translator Role
+** Without afspm
+#+begin_src plantuml :file images/code_reuse_without_afspm.png
+  !include style.puml
+  !include <material/microscope>
+  !include <material/monitor>
+  !include <material/script>
+
+  component "**GXSM**\n<$ma_microscope> + <$ma_monitor>" <<example1>> as gxsm
+  component "**Asylum Research**\n<$ma_microscope> + <$ma_monitor>" <<example2>> as asylum
+  component "**Scienta Omicron**\n<$ma_microscope> + <$ma_monitor>" <<example3>> as omicron
+
+  component "GXSM Script\n<$ma_script>" <<example1>> as gxsm_script
+  component "Asylum Script\n<$ma_script>" <<example2>> as asylum_script
+  component "Omicron Script\n<$ma_script>" <<example3>> as omicron_script
+
+  gxsm <-d- gxsm_script: Custom \nPython \nAPI
+  asylum<-d- asylum_script: Custom \nIGOR \nAPI
+  omicron <-d- omicron_script: Custom \nPython \nAPI
+
+  gxsm_script .r.> asylum_script: conversion / \nrewrite
+  asylum_script .r.> omicron_script: conversion / \nrewrite
+#+end_src
+
+#+RESULTS:
+:results:
+[[file:images/code_reuse_without_afspm.png]]
+:end:
+
+** With afspm
+
+#+begin_src plantuml :file images/code_reuse_with_afspm.png
+  !include style.puml
+  !include <material/microscope>
+  !include <material/monitor>
+  !include <material/script>
+  !include <material/network>
+
+  component "**GXSM**\n<$ma_microscope> + <$ma_monitor>" <<example1>> as gxsm
+  component "**Asylum Research**\n<$ma_microscope> + <$ma_monitor>" <<example2>> as asylum
+  component "**Scienta Omicron**\n<$ma_microscope> + <$ma_monitor>" <<example3>> as omicron
+
+  'Enforce order'
+  gxsm -[hidden]r- asylum
+  asylum -[hidden]r- omicron
+
+  package "afspm abstraction" <<groupinternal>> {
+    component "microscope \ntranslators" <<internal>> as translators {
+      component "GXSM \ntranslator\n<$ma_network>" <<example1>> <<required>> as gxsm_tr
+      component "Asylum \ntranslator\n<$ma_network>" <<example2>> <<required>> as asylum_tr
+      component "Omicron \ntranslator\n<$ma_network>" <<example3>> <<required>> as omicron_tr
+    }
+
+    component "afspm script\n<$ma_script>" <<internal>> as exp
+  }
+
+  gxsm_tr -u-> gxsm: Custom \nPython \nAPI
+  asylum_tr -u-> asylum: Custom \nIGOR \nAPI
+  omicron_tr -u-> omicron: Custom \nPython \nAPI
+
+  exp .u.> gxsm_tr: "   afspm"
+  exp .u.> asylum_tr: "   calls"
+  exp .u.> omicron_tr
+
+#+end_src
+
+#+RESULTS:
+:results:
+[[file:images/code_reuse_with_afspm.png]]
+:end:

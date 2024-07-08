@@ -61,6 +61,19 @@
   .right {
     HorizontalAlignment right
   }
+
+  .example1 {
+    BackgroundColor PHYSICAL
+  }
+
+  .example2 {
+    BackgroundColor STRATEGY
+  }
+
+  .example3 {
+    BackgroundColor MOTIVATION
+  }
+
 </style>
 
   skinparam componentStyle rectangle
