@@ -105,7 +105,7 @@ class AfspmControlUI(AfspmComponentBase):
                             [sg.Button(END_EXP)],
                             [sg.Text(ERROR_LOG)],
                             [sg.Text(key=ERROR_LOG_KEY)]])
-        self.window = sg.Window(AFSPM_CTRL, self.layout, finalize=True)  #TODO finalize added...
+        self.window = sg.Window(AFSPM_CTRL, self.layout, finalize=True)  # TODO finalize added...
 
     def _handle_ui_event_loop(self):
         #self.layout[ERROR_LOG_KEY].update(value="")  # Clear error log

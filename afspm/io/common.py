@@ -83,6 +83,7 @@ def get_enum_val(enum_obj: EnumTypeWrapper, name: str) -> int:
     """
     return enum_obj.Value(name)
 
+
 def get_enum_str(enum_obj: EnumTypeWrapper, val: int) -> str:
     """Get the string of a zmq enum value, given said value.
 

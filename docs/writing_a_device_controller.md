@@ -45,8 +45,9 @@ Note that ```poll_scans()```implies detecting the latest scan and converting it 
 
 These methods are called 'polling' methods, because the base controller regularly 'polls' for them. This is the simplest, most naive method of checking state. We purposefully chose this, to try to make the job of implementing a new DeviceController easier.
 
-These methods must return what was requested, but can throw a DeviceError on failure.
+These methods must return what was requested, but can throw an exception on failure.
 
+THIS SHOULD ALLOW *ANY* exception to be logged, not just DeviceError (which is a reasonable example).
 
 THIS SHOULD THROW AN EXCEPTION BECAUSE AN ERROR WOULD BE AN UNEXPECTED EVENT WITH NO INPUT (CLARIFY).
 
@@ -57,6 +58,8 @@ We should note an elephant-in-the-room in terms of missing support: spectroscopi
 ## Supporting Parameter Setting
 
 The above methods define a basic controller. However, an experiment may desire to change some other SPM-specific parameter that is not defined by these. We should note that this 'addditional' parameter support *should* be incredibly rare! We want to minimize the usage of these kinds of calls, as they impose exponential testing and support requirements on every other controller! Because of this, we suggest using additional parameters sparingly.
+
+TODO: Rewrite this section!!! This implies parameters should only be set via operating modes? Weird.
 
 The 'design' workaround to setting other parameters is to encapsulate parameters setting into 'Operating Modes' (discussed later). Efforts should be made to use this approach instead, where possible.
 

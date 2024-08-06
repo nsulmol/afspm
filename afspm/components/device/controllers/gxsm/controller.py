@@ -38,7 +38,7 @@ class GxsmController(DeviceController):
     MOTOR_RUNNING_THRESH = -2
 
     MAX_NUM_CHANNELS = 6
-    CHFNAME_ERROR_STR = 'EE: invalid channel'
+    CHFNAME_ERROR_STR = 'EE: invalid channel'  # TODO: Change name, ugly
 
     def __init__(self,
                  read_channels_config_path: str = None,

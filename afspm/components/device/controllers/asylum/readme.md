@@ -30,6 +30,14 @@ To validate that the interface is working:
 1. Run the example program in ZeroMQ-XOP to ensure the XOP is functioning.
 2. Run the DeviceController unit tests in afspm to ensure the Asylum device controller is communicating properly with the Igor Pro software (via the ZeroMQ-XOP interface).
 
+For (1), you want to call the example script with an expected function, to validate the return is what you expect. For example, to call a 'Get Value' on the parameter 'ScanSize', you would do:
+
+```
+zmq_xop_client.exe "tcp://127.0.0.1:5555" "{ \"version\" : 1, \"CallFunction\" : { \"name\" : \"GV\", \"params\" : [ \"ScanSize\"] } }"
+```
+
+(assuming the zmq node is 'tcp://127.0.0.1:5555').
+
 ## Notes
 
 The commands used to set variables here *do not* perform the same safety checking that the Asylum control panel does. Particularly, we use the lowest-level 'PV()' methods ('Put Value'), while the control panel uses an Asylum-created FMapSetVar(). The issue is linked to the fact that FMapSetVar() takes a STRUCT as input. Unfortunately, the library we use to communicate with the Asylum/Igor does not support STRUCT parameters sent as input, so we are forced to use the less-safe method instead.
