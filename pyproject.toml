@@ -41,6 +41,12 @@ optional = true
 igor2 = "^0.5.3"
 scifireaders = "^0.11.0"
 
+[tool.poetry.group.omicronsxm]
+optional = true
+
+[tool.poetry.group.omicronsxm.dependencies]
+scifireaders = "^0.11.0"
+
 [tool.poetry.scripts]
 spawn = "afspm.spawn:cli_spawn"
 spawn_monitorless = "afspm.spawn:cli_spawn_monitorless"

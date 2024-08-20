@@ -1,4 +1,4 @@
-"""Array converter helers."""
+"""Array converter helpers."""
 
 import logging
 import xarray as xr
