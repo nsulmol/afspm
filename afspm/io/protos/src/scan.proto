@@ -4,7 +4,7 @@
 */
 
 
-// NOTE: Units are used to tell the DeviceController, not to *demand* the
+// NOTE: Units are used to tell the MicroscopeTranslator, not to *demand* the
 // format they should be returned in! The AfspmComponent should read the
 // units and convert to their desired format.
 // Pint can be used on either end.
@@ -26,7 +26,7 @@ enum ScanState {
 }
 
 /* Message to hold ScanState. Remember, any message 'published' by the
- * DeviceController *must* be a protobuf Message, so we have to package in
+ * MicroscopeTranslator *must* be a protobuf Message, so we have to package in
  * this format.
  */
 message ScanStateMsg {

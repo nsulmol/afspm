@@ -28,7 +28,7 @@ class AfspmComponentBase:
     - A Heartbeater instance, to indicate to any listeners when this component
     is alive. This allows a listener (e.g. AfspmComponentsMonitor) to restart
     it on crashing/freezing.
-    - A Subscriber instance, to receive data from the DeviceController. Most
+    - A Subscriber instance, to receive data from the MicroscopeTranslator. Most
     importantly, we receive KILL signals from this subscription, to tell us
     when we should shutdown.
     - A ControlClient instance, to allow sending requests to the SPM device.
@@ -51,7 +51,7 @@ class AfspmComponentBase:
         loop_sleep_s: how long the component sleeps between loops in its main
             loop.
         subscriber: subscriber instance, to receive data from the
-            DeviceController. Note: unless you really know what you are doing,
+            MicroscopeTranslator. Note: unless you really know what you are doing,
             use a subscriber - i.e. do not consider it optional.
         control_client: client to ControlServer, to allow sending requests.
         stay_alive: boolean indicating whether we should continue looping in
@@ -72,7 +72,7 @@ class AfspmComponentBase:
             loop_sleep_s: how long we sleep in our main loop.
             beat_period_s: how frequently we should send a hearbeat.
             subscriber: subscriber instance, to receive data from the
-                DeviceController.
+                MicroscopeTranslator.
             control_client: client to ControlServer, to allow sending requests.
             override_client_uuid: boolean indicating whether we will restart
                 the provided ControlClient with the component's name as its

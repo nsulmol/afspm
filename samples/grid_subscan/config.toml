@@ -48,11 +48,11 @@ proto_with_history_list = 'proto_hist_list'
 cache_logic = 'pbc_scan_logic'
 
 # ----- PubSub ----- #
-[devcon_pub]
+[translator_pub]
 class = 'afspm.io.pubsub.publisher.Publisher'
 url = 'pub_url'
 
-[controller_psc]
+[scheduler_psc]
 class = 'afspm.io.pubsub.cache.PubSubCache'
 url = 'psc_url'
 sub_url = 'pub_url'
@@ -65,11 +65,11 @@ extract_proto_kwargs = 'roi_cache_kwargs'
 update_cache_kwargs = 'roi_cache_kwargs'
 
 # ----- Control Logic ----- #
-[devcon_server]
+[translator_server]
 class = 'afspm.io.control.server.ControlServer'
 url = 'server_url'
 
-[controller_router]
+[scheduler_router]
 class = 'afspm.io.control.router.ControlRouter'
 server_url = 'server_url'
 router_url = 'router_url'
@@ -103,7 +103,7 @@ control_client = 'experiment_client'
 
 [ui]
 component = true
-class = 'afspm.components.afspm.control_ui.AfspmControlUI'
+class = 'afspm.components.control_ui.AfspmControlUI'
 
 subscriber = 'experiment_sub'
 control_client = 'ui_client'
@@ -134,16 +134,16 @@ scan_id = 'Scan2d'
 subscriber = 'experiment_sub'
 control_client = 'ui_client'
 
-[afspm_controller]
+[afspm_scheduler]
 component = true
-class = 'afspm.components.afspm.controller.AfspmController'
+class = 'afspm.components.microscope.scheduler.MicroscopeScheduler'
 
-pubsubcache = 'controller_psc'
-router = 'controller_router'
+pubsubcache = 'scheduler_psc'
+router = 'scheduler_router'
 
 [dev_con]
 component = true
-class = 'afspm.components.device.controllers.image.image_controller.ImageController'
+class = 'afspm.components.microscope.translators.image.translator.ImageTranslator'
 
 physical_origin = 'full_scan_origin'
 physical_size = 'full_scan_size'
@@ -153,6 +153,6 @@ data_units = 'data_units'
 scan_time_s = 5
 move_time_s = 1
 
-publisher = 'devcon_pub'
-control_server = 'devcon_server'
+publisher = 'translator_pub'
+control_server = 'translator_server'
 subscriber = 'experiment_sub'

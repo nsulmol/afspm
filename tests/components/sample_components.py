@@ -6,9 +6,9 @@ from typing import Optional
 
 from afspm.utils.units import convert
 
-from afspm.components.device.controller import DeviceController
-from afspm.components.device.params import DeviceParameter
-from afspm.components.afspm.controller import AfspmController
+from afspm.components.microscope.translator import MicroscopeTranslator
+from afspm.components.microscope.params import MicroscopeParameter
+from afspm.components.microscope.scheduler import MicroscopeScheduler
 
 from afspm.io import common
 from afspm.io.pubsub.subscriber import Subscriber
@@ -28,8 +28,8 @@ from afspm.io.protos.generated import feedback_pb2
 logger = logging.getLogger(__name__)
 
 
-# --- Device Controller Stuff --- #
-class SampleDeviceController(DeviceController):
+# --- Microscope Translator Stuff --- #
+class SampleMicroscopeTranslator(MicroscopeTranslator):
 
     def __init__(self, scan_time_s, move_time_s, **kwargs):
         self.scan_speed = 500
@@ -47,9 +47,9 @@ class SampleDeviceController(DeviceController):
         kwargs['name'] = 'dev_con'
         super().__init__(**kwargs)
 
-        self.param_method_map = {DeviceParameter.SCAN_SPEED:
+        self.param_method_map = {MicroscopeParameter.SCAN_SPEED:
                                  self.handle_scan_speed,
-                                 DeviceParameter.TIP_VIBRATING_AMPL:
+                                 MicroscopeParameter.TIP_VIBRATING_AMPL:
                                  self.fail_on_vib_ampl}
 
     def on_start_scan(self):
@@ -85,14 +85,14 @@ class SampleDeviceController(DeviceController):
     def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
         return feedback_pb2.ZCtrlParameters()
 
-    def handle_scan_speed(self, ctrlr: DeviceController,
+    def handle_scan_speed(self, ctrlr: MicroscopeTranslator,
                           val: Optional[str] = None,
                           units: Optional[str] = None,
                           ) -> (control_pb2.ControlResponse, str, str):
         """Get/set scan speed.
 
         Arguments:
-            ctrl: a reference to the DeviceController.
+            ctrl: a reference to the MicroscopeTranslator.
             val: if not None, the value we should set.
             units: if not None, the units of the provided value.
         Returns:
@@ -107,7 +107,7 @@ class SampleDeviceController(DeviceController):
         return (control_pb2.ControlResponse.REP_SUCCESS, str(self.scan_speed),
                 self.ss_units)
 
-    def fail_on_vib_ampl(self, ctrlr: DeviceController,
+    def fail_on_vib_ampl(self, ctrlr: MicroscopeTranslator,
                          val: Optional[str] = None,
                          units: Optional[str] = None
                          ) -> (control_pb2.ControlResponse, str):
@@ -117,7 +117,7 @@ class SampleDeviceController(DeviceController):
         We simply want to ensure the failure is passed on.
 
         Arguments:
-            ctrlr: a reference to the DeviceController
+            ctrlr: a reference to the MicroscopeTranslator
             val: if not None, the value we should set.
             units: if not None, the units of the provided value.
 
@@ -158,7 +158,7 @@ class SampleDeviceController(DeviceController):
         super().run_per_loop()
 
 
-def device_controller_routine(pub_url, server_url, psc_url,
+def microscope_translator_routine(pub_url, server_url, psc_url,
                               ctx, move_time_ms, scan_time_ms,
                               cache_kwargs):
     pub = Publisher(pub_url, cl.CacheLogic.get_envelope_for_proto)
@@ -170,19 +170,21 @@ def device_controller_routine(pub_url, server_url, psc_url,
         extract_proto_kwargs=cache_kwargs,
         update_cache_kwargs=cache_kwargs)
 
-    devcon = SampleDeviceController(scan_time_ms / 1000, move_time_ms / 1000,
-                                    publisher=pub, control_server=server,
-                                    ctx=ctx, subscriber=sub)
-    devcon.run()
+    translator = SampleMicroscopeTranslator(scan_time_ms / 1000,
+                                            move_time_ms / 1000,
+                                            publisher=pub,
+                                            control_server=server,
+                                            ctx=ctx, subscriber=sub)
+    translator.run()
 
     # Forcing closure of bound sockets (for pytests)
     pub._publisher.close()
     server._server.close()
 
 
-# --- AfspmController Stuff --- #
-def afspm_controller_routine(psc_url, pub_url, server_url, router_url,
-                             cache_kwargs, ctx):
+# --- MicroscopeScheduler Stuff --- #
+def microscope_scheduler_routine(psc_url, pub_url, server_url, router_url,
+                                 cache_kwargs, ctx):
     psc = PubSubCache(psc_url, pub_url,
                       cl.extract_proto,
                       cl.CacheLogic.get_envelope_for_proto,
@@ -191,8 +193,8 @@ def afspm_controller_routine(psc_url, pub_url, server_url, router_url,
                       update_cache_kwargs=cache_kwargs)
     router = ControlRouter(server_url, router_url, ctx)
 
-    controller = AfspmController('afspm_ctrl', psc, router, ctx=ctx)
-    controller.run()
+    scheduler = MicroscopeScheduler('scheduler', psc, router, ctx=ctx)
+    scheduler.run()
 
     # Forcing closure of bound sockets (for pytests)
     psc._backend.close()

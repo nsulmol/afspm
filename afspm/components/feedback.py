@@ -217,7 +217,7 @@ class FeedbackAnalyzer(AfspmComponent):
 
     FeedbackAnalyzer analyzes incoming scans for under- or over- set
     Z-Control Feedback parameters. If either is found, it reports the
-    appropriate problem with the Device Controller. If a publisher is
+    appropriate problem with the microscope translator. If a publisher is
     provided, it publishes the over- and under- setting proportions.
 
     Attributes:
@@ -313,14 +313,14 @@ class FeedbackCorrector(ScanningComponent):
     """Tries to correct ZCtrl feedback settings when improper.
 
     This component will do nothing until EP_FEEDBACK_NON_OPTIMAL is logged. At
-    that point, it attempts to take over the DeviceController, running scans
+    that point, it attempts to take over the MicroscopeTranslator, running scans
     while modifying the ZCtrl feedback parameters. It's goal is to optimize
     these feedback parameters according to the cited paper (see top).Once it
     has properly optimized the parameters, it removes the logged
     EP_FEEDBACK_NOT_OPTIMAL, allowing whatever scanning logic to continue.
 
     In order to function, it expects to receive FeedbackAnalysis data from
-    a FeedbackAnalyzer, as well as standard info from the DeviceController.
+    a FeedbackAnalyzer, as well as standard info from the MicroscopeTranslator.
 
     Note that it is the FeedbackAnalyzer that logs the problem, and this
     FeedbackCorrector that removes it.

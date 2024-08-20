@@ -31,7 +31,7 @@ class ScanMetadataWriter(afspmc.AfspmComponentBase):
     Note that we explicitly *do not* interfere with the scan saving procedure
     performed by the SPM controller. While it may seem ideal to filter files
     *during* the experiment: (a) this imposes an additional requirement on
-    the SPM and Device Controller, and (b) our desired 'filter' may change
+    the SPM and microscope translator, and (b) our desired 'filter' may change
     between the running of an experiment and after-the-fact analysis. Because
     of both of these reasons, we resort to simply logging context.
 

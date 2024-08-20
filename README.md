@@ -8,12 +8,12 @@ In the world of Scanning Probe Microscopy (SPM), many different vendors exist wi
 
 The value of sharing these scripts has increased significantly recently, as recent research has shown high potential in automating multiple aspects of these experiments. 
 
-To aid the situation, we have developed a system-agnostic protocol for communicating between 'components' in a 'network', including communicating with an SPM controller. By developing automation components in this system-agnostic manner, we allow them to be reused by other researchers on their differing SPM systems - all that is needed is a single 'Device Controller' that communicates with the SPM system of interest. 
+To aid the situation, we have developed a system-agnostic protocol for communicating between 'components' in a 'network', including communicating with an SPM controller. By developing automation components in this system-agnostic manner, we allow them to be reused by other researchers on their differing SPM systems - all that is needed is a single 'Microscope Translator' that communicates with the SPM system of interest. 
 
 Put differently:
 - Code can be written in this system-agnostic abstraction.
-- Information is translated into a specific SPM's language and API only at one point: the device controller. Thus, a new SPM system can be made compatible with afspm simply by writing a DeviceController for it.
-- If a researcher uses an SPM system that is already supported by afspm (i.e., a DeviceController for it exists), they can run any of the existing automation components 'for free'.
+- Information is translated into a specific SPM's language and API only at one point: the microscope translator. Thus, a new SPM system can be made compatible with afspm simply by writing a MicroscopeTranslator for it.
+- If a researcher uses an SPM system that is already supported by afspm (i.e., a MicroscopeTranslator for it exists), they can run any of the existing automation components 'for free'.
 
 We aim to develop a number of 'key' automation components within this framework, and hope to incentivize other researchers to develop on top of it.
 
@@ -75,7 +75,7 @@ On Windows (where ```$DIR``` is your chosen directory):
 In doing (2), the protoc executable will be able to find the well-known types (as it will be in ```../include```, relative to the executable). 
 
 #### Compile the protobuf interfaces to your desired language
-We will assume you are dealing in Python by default, since this whole project is Python-based. However, if you need to implement a particular component (e.g. DeviceController) in a different language, modify the below instructions for your required language.
+We will assume you are dealing in Python by default, since this whole project is Python-based. However, if you need to implement a particular component (e.g. MicroscopeTranslator) in a different language, modify the below instructions for your required language.
 
 ``` sh
 cd /path/to/afspm/afspm/
@@ -119,7 +119,7 @@ poetry run spawn --help  # Outside of virtual environment
 
 Note: if your experiment depends on local scripts, ensure you call your script within that directory (e.g. if you have an 'experiment.py' you will use, ensure it is in the directory where you call spawn; this assumes any class within is defined as "class = 'experiment.className' in your config.toml).
 
-Whenever spawn is run, a components monitor is created to monitor all spawned components. This monitor communicates with components over an ipc connection, expecting heartbeats at a regular cadence. If a component does not send a heartbeat in a pre-alloted time, the monitor assumes the component has crashed or is frozen, and proceeds to kill and restart it. Upon restart, 'sufficient' prior data sent to the component will be resent via a cache mechanism within the afspm controller, allowing the component to return to the previous state it was in and continue functioning. The definition of 'sufficient' data is defined by the user in their configuration file. In some cases, it may be as simple as sending the last scan, scan parameters, scan state, etc. However, for more complicated logic, a more involved cache will be necessary.
+Whenever spawn is run, a components monitor is created to monitor all spawned components. This monitor communicates with components over an ipc connection, expecting heartbeats at a regular cadence. If a component does not send a heartbeat in a pre-alloted time, the monitor assumes the component has crashed or is frozen, and proceeds to kill and restart it. Upon restart, 'sufficient' prior data sent to the component will be resent via a cache mechanism within the microscope scheduler, allowing the component to return to the previous state it was in and continue functioning. The definition of 'sufficient' data is defined by the user in their configuration file. In some cases, it may be as simple as sending the last scan, scan parameters, scan state, etc. However, for more complicated logic, a more involved cache will be necessary.
 
 This logic was put into place to try to minimize a crash breaking an experiment. Since individual SPM runs can be long (>8 hours), it is likely a run will be done while the user is at home (assuming any needed automation is in place). Thus, we do not want an unexpected crash of one component to ruin the experiment.
 

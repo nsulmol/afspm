@@ -82,7 +82,7 @@ def spawn_components(config_file: str,
     Notes:
     - $COMPONENT_CLASS$ must be: the module_path + class name:
     'path.to.module.class' (e.g.
-    'afspm.components.device.controller.DeviceController').
+    'afspm.components.microscope.translator.MicroscopeTranslator').
     - We  expect you to have a *single* experiment config file that contains
     all the components you want to run in your experiment. You may instantiate
     these components on multiple different PCs (using different

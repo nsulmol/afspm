@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class ControlServer:
-    """Encapsulates logic for responding to DeviceControl requests.
+    """Encapsulates logic for responding to control requests.
 
     The expected functionality is:
     - Within your main loop, call recv() regularly to check for any

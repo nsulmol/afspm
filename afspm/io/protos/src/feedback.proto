@@ -8,7 +8,7 @@ import "google/protobuf/timestamp.proto";
 
 
 message ZCtrlParameters {
-  optional bool feedbackOn = 1;  // Should only be set by DeviceController
+  optional bool feedbackOn = 1;  // Should only be set by MicroscopeTranslator
   optional float proportionalGain = 2;
   optional float integralGain = 3;
 

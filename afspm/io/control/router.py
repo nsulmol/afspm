@@ -218,7 +218,7 @@ class ControlRouter:
         to be handled by the client.
 
         Args:
-            req: the DeviceControl request to be sent.
+            req: the control request to be sent.
             proto: the associated protobuf message, if applicable.
 
         Returns:

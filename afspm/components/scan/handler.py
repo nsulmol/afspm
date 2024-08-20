@@ -20,11 +20,11 @@ logger = logging.getLogger(__name__)
 
 
 class ScanHandler:
-    """Simplifies requesting a scan from a DeviceController.
+    """Simplifies requesting a scan from a MicroscopeTranslator.
 
     The ScanHandler encapsulates the procedure of getting a scan from a
-    DeviceController, which involes:
-    - Ensuring we have control of the DeviceController.
+    MicroscopeTranslator, which involes:
+    - Ensuring we have control of the MicroscopeTranslator.
     - Setting the scan parameters, which may involve moving the device.
     - Obtaining the scan, once the device has been setup (and moved to the
     right location).
@@ -32,7 +32,7 @@ class ScanHandler:
     If we do not have control, it will log this and continue requesting control
     between sleeps of rerun_wait_s.
 
-    If the DeviceController returns an unexpected error, it will log this and
+    If the MicroscopeTranslator returns an unexpected error, it will log this and
     retry the full request (ensuring parameters are set) between sleeps of
     rerun_wait_s.
 
@@ -46,14 +46,14 @@ class ScanHandler:
 
     Attributes:
         rerun_wait_s: how long to wait before rerunning our scan (on issues
-            with the DeviceController).
+            with the MicroscopeTranslator).
         get_next_params: method to determine the next scan_params to scan. If
             None is provided, it will log this and retry later.
         next_params_kwargs: kwargs for get_next_params.
-        control_mode_to_run: ControlMode to run under. If the controller is not
+        control_mode_to_run: ControlMode to run under. If the scheduler is not
             in this control mode, we do nothing until they switch to it.
 
-        _control_mode: current control mode the controller is in.
+        _control_mode: current control mode the scheduler is in.
         _scan_params: current ScanParameters2d instance.
         _scan_state: current ScanState.
         _desired_scan_state: desired ScanState.
@@ -105,12 +105,12 @@ class ScanHandler:
         """Handle issues requiring us to re-request things.
 
         Two issues can arrise:
-        - DeviceController delays/issues. Here, we need to restart a scan.
+        - MicroscopeTranslator delays/issues. Here, we need to restart a scan.
         - self.get_next_params() is not ready and has returned None. In this
         case, we need to re-request new params until we receive some.
 
         This will handle resending requests if we receive delays/issues from
-        the DeviceController. It should be called in the associated
+        the MicroscopeTranslator. It should be called in the associated
         AfspmComponent's run_per_loop() method.
 
         Note: we assume any appropriate per-loop delaying is handled by the
@@ -232,9 +232,9 @@ class ScanHandler:
 
 
 class ScanningComponent(AfspmComponent):
-    """Component that sends scan commands to controller.
+    """Component that sends scan commands to translator.
 
-    This class automatically handles sending scans to the DeviceController,
+    This class automatically handles sending scans to the MicroscopeTranslator,
     decided via its get_next_params() method. This is effectively an easier
     way to run a scanning component, if you are only interested in using
     the ScanHandler.

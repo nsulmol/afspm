@@ -184,7 +184,7 @@ __Main Socket Types__:
   :results:
   [[file:images/network_framework.png]]
   :end:
-* afspm without afspm controller
+* afspm without microscope scheduler
 
 #+header: :post attr_fit_width(data=*this*, org_percent=75, latex_percent=90)
 #+begin_src plantuml :file images/afspm_without_afspmcon.png
