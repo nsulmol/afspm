@@ -126,8 +126,8 @@ However:
 :BEAMER_col: 0.45
 :END:
 #+attr_org: :width 50%
-#+attr_latex: :width 0.95\linewidth
-[[./images/experiment_with_script.png]]
+#+attr_latex: :width 1.0\linewidth
+[[./images/code_reuse_without_afspm.png]]
 #+beamer:\pause
 *** Note :B_ignoreheading:
 :PROPERTIES:
@@ -140,8 +140,8 @@ However:
 ** Goals and Scope
 #+beamer:\pause
 *** Goals
-- *Clear Decoupling*: of SPM device specifics from the desired experiment; to allow reuse of a given experiment on multiple devices.
-- *Multi-Language Support*: for integration with SPM devices; we should not be the limiting factor to integration.
+- *Clear Decoupling*: of SPM device specifics from the desired experiment.
+- *Multi-Language Support*: we should not be limited by device API constraints.
 - *Pausable Automation*: to allow a researcher to take over.
 - *Separable on Multiple Devices*: composed of concise, separable components.
 #+beamer:\pause
@@ -210,7 +210,7 @@ Allows data to be sent between 'sockets' via common 'nodes'. Abstracts away prot
 #+attr_org: :width 50%
 #+attr_latex: :width 1.0\linewidth
 [[./images/afspm_control.png]]
-** afspm Controller
+** Microscope Scheduler
 #+beamer:\pause
 *** Cache Logic
 Data is *stored* into the *cache* according to a *user-defined configuration*.

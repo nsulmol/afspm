@@ -81,8 +81,8 @@
   'skinparam linetype ortho
 
   ' wrapping stuff
-  skinparam wrapWidth 200
-  skinparam maxMessageSize 200
+  skinparam wrapWidth 300
+  skinparam maxMessageSize 300
 
   'default line color is grey (to highlight required)'
   skinparam LineColor Red

@@ -107,13 +107,13 @@
 
     devcon <--> afspmcon
 
-    afspmcon -l-> exp: scans,\nstate
+    afspmcon -l-> exp: scans,\nscan state
     exp -r-> afspmcon: scan\nparameters
 
     afspmcon --> tip_detector: scans
-    tip_detector .u.> afspmcon: log\nproblem
-    afspmcon -r-> tip_corrector: current\nproblems
-    tip_corrector .l.> afspmcon: fixing\nactions
+    tip_detector .u.> afspmcon: log tip \nproblem
+    afspmcon -r-> tip_corrector: experiment\nproblems
+    tip_corrector .l.> afspmcon: correcting\nactions
   }
 
   spmcon <-r-> devcon: low freq. \ncommands
@@ -141,7 +141,7 @@
     ]
 
     component "list[bytes]" as bytes_a
-    proto_a .u.> bytes_a: serialize
+    proto_a .u.> bytes_a: " serialize\n// (protobuf)//"
     bytes_a .u.> socket_a
   }
 
@@ -157,13 +157,27 @@
 
     component "list[bytes]" as bytes_b
     socket_b .d.> bytes_b
-    bytes_b .d.> proto_b: "deserialize\t"
+    bytes_b .d.> proto_b: " deserialize\n// (protobuf)//"
   }
 
-  interface node <<node>> as "//zmq node//\n(e.g., tcp://localhost:9000)"
-  ' silly hack to add spacing'
-  socket_a --r--> node: "//published to node//"
-  node --r--> socket_b: "//sent to subscribers//"
+  interface addr <<node>> as "//zmq socket address//
+<transport> :// <socket_uuid>
+(e.g., tcp://localhost:9000)
+
+__Transports may be__:
+//inproc//: inter-thread
+//ipc//: inter-process
+//tcp//: tcp
+
+__Main Socket Types__:
+//PUB-SUB//: publisher-subscriber
+//REQ-REP//: request-reply
+//ROUTER//: routes requests (many-to-one)
+//DEALER//: deals replies (one-to-many)
+//PUSH-PULL//: pipeline distribution model"
+
+  socket_a -r-> addr: "//published to address//"
+  addr -r-> socket_b: "//sent to subscribers//"
   #+end_src
 
   #+RESULTS:
@@ -190,7 +204,7 @@
       component REQ <<socket>> as exp_req
     }
 
-    dc_pub -d-> exp_sub: data, \nstatus
+    dc_pub -d-> exp_sub: scans,\nstate
     exp_req -u-> dc_rep: control\nrequests
   }
 
@@ -219,63 +233,46 @@
 
   package "afspm abstraction" <<groupinternal>> {
     component "microscope\ntranslator\n<$ma_network>" <<interface>> <<required>> as devcon {
-      component PUB <<socket>> as dc_pub
       component REP <<socket>> as dc_rep
+      component PUB <<socket>> as dc_pub
     }
 
 
-    component "afspm director\n<$ma_tune>" <<internal>> <<required>> as afspm_con {
-      component SUB <<socket>> as afspm_sub
-      component XPUB <<socket>> as afspm_pub
-      component "//cache//" as afspm_cache
-      afspm_sub .. afspm_cache
-      afspm_cache .. afspm_pub
+    component "microscope\nscheduler\n<$ma_tune>" <<internal>> <<required>> as scheduler {
+      component XPUB <<socket>> as scheduler_pub
+      component SUB <<socket>> as scheduler_sub
+      component "//cache//" as scheduler_cache
+      scheduler_sub .. scheduler_cache
+      scheduler_cache .. scheduler_pub
 
-      component REQ <<socket>> as afspm_req
-      component ROU <<socket>> as afspm_rou
-      component "//control//" as afspm_ctrl
-      afspm_req .. afspm_ctrl
-      afspm_ctrl .. afspm_rou
+      component ROU <<socket>> as scheduler_rou
+      component REQ <<socket>> as scheduler_req
+      component "//control//" as scheduler_ctrl
+      scheduler_req .. scheduler_ctrl
+      scheduler_ctrl .. scheduler_rou
     }
 
-    dc_pub -d-> afspm_sub: data, \nstatus
-    dc_rep <-d- afspm_req: control\nrequests
+    dc_pub -d-> scheduler_sub: data, \nstatus
+    dc_rep <-d- scheduler_req: control\nrequests
 
 
     component "experiment\n<$ma_script>" <<internal>> as exp {
-      component SUB <<socket>> as exp_sub
       component REQ <<socket>> as exp_req
+      component SUB <<socket>> as exp_sub
     }
 
-    afspm_pub --> exp_sub: scan_state
-    afspm_rou <-- exp_req: scan_params\nstart_scan\nstop_scan
+    scheduler_rou <-- exp_req: "scan parameters,\nstart / stop scan requests"
+    scheduler_pub --> exp_sub: scan state
 
     component "visualizer\n<$ma_chart_areaspline>" <<internal>> as viz {
-      component SUB <<socket>> as viz_sub
       component REQ <<socket>> as viz_req
+      component SUB <<socket>> as viz_sub
     }
 
-    afspm_pub --> viz_sub: scans
-    afspm_rou <-r- viz_req: tip_state
+    scheduler_pub --> viz_sub: scan state
   }
 
   spmcon <--> devcon: low freq. \ncommands
-
-  'note as note_cache
-  ''  Cache stores data/state passed to subscribers.
-  ''  When a new subsciption occurs, we send from the cache.
-  ''  If a node crashes, on reconnection it gets this prior history.
-  'end note
-  'note_cache -[hidden]- afspm
-
-  'note as note_control
-  ''  Control handles routing data from 1 or more REQs to the Device Controller.
-  ''  It also allows turning OFF/pausing (for manual control).
-  ''  It also can receive "Problems" (e.g. bad tip state).
-  ''  Upon a problem, automated control pauses until a node states it is fixed.
-  'end note
-  'note_control -[hidden]- afspm
-
   #+end_src
 
   #+RESULTS:
