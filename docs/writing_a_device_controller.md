@@ -32,8 +32,7 @@ These methods are 'responses' to specific requests. For example, ```on_start_sca
 
 Note that some of these methods are not *strictly* necessary. For example, ```on_set_zctrl_params()``` can return ```REP_CMD_NOT_SUPPORTED``` if it is not. Check the documentation in afspm/components/device/controller.py to see if a particular method *must* be supported or not.
 
-
-THIS DOES NOT THROW AN EXCEPTION BECAUSE WE ARE RESPONDING TO AN EXPLICIT REQUEST!! cLARIFY
+If a method fails, return an appropriate response (e.g. $REP_PARAM_ERROR$). If no specific response exists, either (a) create a new one in control.proto (preferred), or (b) use the generic $REP_FAILURE$ response. Note that we do not expect an $on_XXX()$ method to throw an exception, as we are responding to an explicit request. Because of this, returning that an error occurred (and why) should be fine; the experiment can continue running.
 
 ### Implementing ```poll_XXX()``` Methods
 
@@ -45,20 +44,17 @@ Note that ```poll_scans()```implies detecting the latest scan and converting it 
 
 These methods are called 'polling' methods, because the base controller regularly 'polls' for them. This is the simplest, most naive method of checking state. We purposefully chose this, to try to make the job of implementing a new DeviceController easier.
 
-These methods must return what was requested, but can throw a DeviceError on failure.
-
-
-THIS SHOULD THROW AN EXCEPTION BECAUSE AN ERROR WOULD BE AN UNEXPECTED EVENT WITH NO INPUT (CLARIFY).
+These methods must return what was requested, but can throw an exception on failure. An exception on failure is desired here, because failing a poll would be an unexpected event (we should always be able to poll for the latest data).
 
 ### Missing Support
 
 We should note an elephant-in-the-room in terms of missing support: spectroscopic data. Today, afspm does not have the structures/logic implemented to run spectroscopic scans, a very common and essential aspect of many SPM experiments. We plan to implement support for it in the future.
 
-## Supporting Parameter Setting
+## Additional Parameter Setting
 
 The above methods define a basic controller. However, an experiment may desire to change some other SPM-specific parameter that is not defined by these. We should note that this 'addditional' parameter support *should* be incredibly rare! We want to minimize the usage of these kinds of calls, as they impose exponential testing and support requirements on every other controller! Because of this, we suggest using additional parameters sparingly.
 
-The 'design' workaround to setting other parameters is to encapsulate parameters setting into 'Operating Modes' (discussed later). Efforts should be made to use this approach instead, where possible.
+To support extra parameters, we have added a REQ_PARAM request; in the base DeviceController class, it is mapped to the method $_handle_param_request$, which looks for the appropriate method to call for a given parameter by checking for a 'parameter' key in a $ParamMethodMap$ mapping, that maps from string keys to method values. Thus, a DeviceController may implement support for a parameter $PARAM_A$ by adding a key:val pair $PARAM_A$:$SetGetParamA$ to $ParamMethodMap$. If such a key does not exist, $_handle_param_request$ will return a response $REP_PARAM_NOT_SUPPORTED$, indicating that the controller does not support this parameter.
 
 We should note that there is 1 parameter that we *do* suggest implementing, for testing purposes: scan speed. The test_controller.py tests will optionally set the physical scan size, data points, and scan speed in order to speed up the tests.
 
