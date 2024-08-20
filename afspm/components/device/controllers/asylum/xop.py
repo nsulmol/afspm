@@ -49,6 +49,7 @@ class XOPUnsupportedTypeError(TypeError):
 
 class IgorType(str, Enum):
     """String defines the igor data type."""
+
     VARIABLE = 'variable'
     STRING = 'string'
     WAVE = 'wave'
@@ -86,9 +87,10 @@ def convert_igor_path_to_python_path(igor_path: str) -> str:
 
 
 def convert_python_path_to_igor_path(python_path: str) -> str:
-    """Converts a path in python format to Igor format.
+    """Convert a path in python format to Igor format.
 
-    See _convert_igor_path_to_python_path for more info."""
+    See _convert_igor_path_to_python_path for more info.
+    """
     igor_path = python_path.replace(PY_SEP, IGOR_SEP)
     first_idx = igor_path.find(IGOR_SEP + IGOR_SEP)  # Should have '::i
 
