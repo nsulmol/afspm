@@ -1,15 +1,12 @@
 """PySimpleGUI interface for controllling the AfspmController."""
 
 import copy
-from types import MappingProxyType  # Immutable dict
 import logging
-import zmq
 import PySimpleGUI as sg
 
 from google.protobuf.message import Message
 
 from ...io import common
-from ...io.pubsub import subscriber as sub
 from ...io.control import client as ctrl_client
 
 from ..component import AfspmComponentBase
@@ -105,10 +102,10 @@ class AfspmControlUI(AfspmComponentBase):
                             [sg.Button(END_EXP)],
                             [sg.Text(ERROR_LOG)],
                             [sg.Text(key=ERROR_LOG_KEY)]])
-        self.window = sg.Window(AFSPM_CTRL, self.layout, finalize=True)  #TODO finalize added...
+        self.window = sg.Window(AFSPM_CTRL, self.layout, finalize=True)
 
     def _handle_ui_event_loop(self):
-        #self.layout[ERROR_LOG_KEY].update(value="")  # Clear error log
+        # self.layout[ERROR_LOG_KEY].update(value="")  # Clear error log
         event, __ = self.window.read(timeout=self.ui_timeout_ms)
 
         req_methods = []
