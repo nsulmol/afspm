@@ -38,7 +38,12 @@ class GxsmController(DeviceController):
     MOTOR_RUNNING_THRESH = -2
 
     MAX_NUM_CHANNELS = 6
-    CHFNAME_ERROR_STR = 'EE: invalid channel'
+
+    # This error is sent if you request a channel's filename but provide an
+    # invalid channel id. Thus, if iterating through the channels of a scan,
+    # this will be provided when our index is too big (we've gone through all
+    # the channels.
+    CHANNEL_FILENAME_ERROR_STR = 'EE: invalid channel'
 
     def __init__(self,
                  read_channels_config_path: str = None,
@@ -159,7 +164,7 @@ class GxsmController(DeviceController):
                     self.last_scan_fname = fname
 
                 # Break if on last 'set' channel
-                if fname == self.CHFNAME_ERROR_STR:
+                if fname == self.CHANNEL_FILENNAME_ERROR_STR:
                     break
 
                 # Only append actually saved files
