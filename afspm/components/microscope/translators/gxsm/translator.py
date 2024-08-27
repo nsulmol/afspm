@@ -221,13 +221,13 @@ class GxsmTranslator(MicroscopeTranslator):
         svec = gxsm.rtquery('s')
         s = int(svec[0])
         # (2+4) == Scanning; 8 == Vector Probe
-        scanning = (s & (2+4) > GxsmController.STATE_RUNNING_THRESH or
-                    s & 8 > GxsmController.STATE_RUNNING_THRESH)
-        moving = s & 16 > GxsmController.STATE_RUNNING_THRESH
+        scanning = (s & (2+4) > GxsmTranslator.STATE_RUNNING_THRESH or
+                    s & 8 > GxsmTranslator.STATE_RUNNING_THRESH)
+        moving = s & 16 > GxsmTranslator.STATE_RUNNING_THRESH
 
         # TODO: investigate motor logic further...
         motor_running = (get_param(GxsmParameter.MOTOR) <
-                         GxsmController.MOTOR_RUNNING_THRESH)
+                         GxsmTranslator.MOTOR_RUNNING_THRESH)
         if motor_running:
             return scan_pb2.ScanState.SS_MOTOR_RUNNING
         if scanning:
