@@ -65,19 +65,19 @@
   !include <material/script>
 
   package "afspm abstraction" <<groupinternal>> {
-    component "microscope\ntranslator\n<$ma_network>" <<interface>> <<required>> as devcon
-    component "microscope\nscheduler\n<$ma_tune>" <<internal>> <<required>> as afspmcon
+    component "microscope\ntranslator\n<$ma_network>" <<interface>> <<required>> as translator
+    component "microscope\nscheduler\n<$ma_tune>" <<internal>> <<required>> as scheduler
 
     component "experiment\n<$ma_script>" <<internal>> as exp
     component "visualizer\n<$ma_chart_areaspline>" <<internal>> as viz
 
-    devcon <--> afspmcon
+    translator <--> scheduler
 
-    afspmcon <--> exp
-    afspmcon <--> viz
+    scheduler <--> exp
+    scheduler <--> viz
   }
 
-  spmcon <-> devcon: low freq. \ncommands
+  spmcon <-> translator: low freq. \ncommands
   #+end_src
 
   #+RESULTS:
@@ -96,27 +96,31 @@
   !include <material/script>
   !include <material/alert_box>
   !include <material/wrench>
+  !include <material/crop>
 
   package "afspm abstraction" <<groupinternal>> as afspm {
-    component "microscope\ntranslator\n<$ma_network>" <<interface>> <<required>> as devcon
-    component "microscope\nscheduler\n<$ma_tune>" <<internal>> <<required>> as afspmcon
+    component "microscope\ntranslator\n<$ma_network>" <<interface>> <<required>> as translator
+    component "microscope\nscheduler\n<$ma_tune>" <<internal>> <<required>> as scheduler
 
     component "experiment\n<$ma_script>" <<internal>> <<optional>> as exp
+    component "roi analyzer\n<$ma_crop>" <<internal>> as roi
     component "tip detector\n<$ma_alert_box>" <<internal>> <<optional>> as tip_detector
-    component "tip corrector\n<$ma_wrench>" <<internal>> <<optional>> as tip_corrector
+    component "visualizer\n<$ma_chart_areaspline>" <<internal>> as viz
 
-    devcon <--> afspmcon
+    translator <--> scheduler
 
-    afspmcon -l-> exp: scans,\nscan state
-    exp -r-> afspmcon: scan\nparameters
+    scheduler -l-> exp: scan state
+    scheduler --> roi: scans
+    roi -l-> exp: roi points
+    exp -r-> scheduler: scan\nparameters
 
-    afspmcon --> tip_detector: scans
-    tip_detector .u.> afspmcon: log tip \nproblem
-    afspmcon -r-> tip_corrector: experiment\nproblems
-    tip_corrector .l.> afspmcon: correcting\nactions
+    scheduler -r-> tip_detector: scans
+    tip_detector .l.> scheduler: log tip\nproblem
+
+    scheduler --> viz: scans
   }
 
-  spmcon <-r-> devcon: low freq. \ncommands
+  spmcon <-r-> translator: low freq.\ncommands
 
   #+end_src
 
@@ -187,14 +191,14 @@ __Main Socket Types__:
 * afspm without microscope scheduler
 
 #+header: :post attr_fit_width(data=*this*, org_percent=75, latex_percent=90)
-#+begin_src plantuml :file images/afspm_without_afspmcon.png
+#+begin_src plantuml :file images/afspm_without_scheduler.png
   !include style.puml
   !include microscopy.puml
   !include <material/network>
   !include <material/script>
 
   package "afspm abstraction" <<groupinternal>> {
-    component "microscope\ntranslator\n<$ma_network>" <<interface>> <<required>> as devcon {
+    component "microscope\ntranslator\n<$ma_network>" <<interface>> <<required>> as translator {
       component "PUB" <<socket>> as dc_pub
       component REP <<socket>> as dc_rep
     }
@@ -208,14 +212,14 @@ __Main Socket Types__:
     exp_req -u-> dc_rep: control\nrequests
   }
 
-  spmcon <-> devcon: "low freq.\ncommands"
+  spmcon <-> translator: "low freq.\ncommands"
   #+end_src
 
   #+RESULTS:
   :results:
   #+attr_org: :width 75%
   #+attr_latex: :width .90\linewidth
-  [[file:images/afspm_without_afspmcon.png]]
+  [[file:images/afspm_without_scheduler.png]]
   :end:
 
 * afspm control
@@ -232,7 +236,7 @@ __Main Socket Types__:
   !include <material/script>
 
   package "afspm abstraction" <<groupinternal>> {
-    component "microscope\ntranslator\n<$ma_network>" <<interface>> <<required>> as devcon {
+    component "microscope\ntranslator\n<$ma_network>" <<interface>> <<required>> as translator {
       component REP <<socket>> as dc_rep
       component PUB <<socket>> as dc_pub
     }
@@ -272,7 +276,7 @@ __Main Socket Types__:
     scheduler_pub --> viz_sub: scan state
   }
 
-  spmcon <--> devcon: low freq. \ncommands
+  spmcon <--> translator: low freq. \ncommands
   #+end_src
 
   #+RESULTS:

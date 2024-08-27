@@ -1,5 +1,7 @@
-#+title: afspm Overview
+#+title: A Manufacturer-Agnostic Automation Framework for SPM
+#+author: Nick Sullivan Molina
 #+date:
+
 #+startup: beamer
 #+latex_class: beamer
 # 10pt dictates the overall font size, from 8-12.
@@ -29,6 +31,7 @@
 #+beamer_header:\definecolor{mydarkgray}{rgb}{0.4, 0.4, 0.4}
 
 # Main hook: structure. All other theme colors will be based on this.
+
 #+beamer_header:\setbeamercolor{structure}{fg=mellowblue}
 
 # Change the normal text color, to be less garish
@@ -55,17 +58,23 @@
 #+beamer_header:\documentclass[xcolor=SeaGreen]{beamer}
 
 # Uncomment to skip animations
-#+latex_class_options: [handout, 9pt]
+# #+latex_class_options: [handout, 9pt]
+
+#+latex_header:\usepackage[nofloat]{minted}
+#+latex_header:\setminted{fontsize=\footnotesize, frame=lines, framesep=2mm}
+#+latex_header:\usepackage{bytefield}
+
+# Small captions, no 'name'
+#+latex_header:\usepackage[font={scriptsize}]{caption}
+#+latex_header:\captionsetup[figure]{name=}
 
 #+property: header-args :mkdirp yes :results value drawer
 
 * Justification
 ** SPM Basics
-In Scanning Probe Microscopy (SPM), an *atomically-sharp tip* is *scanned* above a *surface*, while *measuring* one or more *properties* gleaned from this tip.
-#+beamer:\medskip
-
-This process allows *atomic-level imaging* of properties, spectroscopic analysis, and even manipulation of a sample (toward *atomic-scale manufacturing*).
-
+- An *atomically-sharp tip* is *scanned* above a *surface* measuring properties.
+  - Allows spatial imaging, spectroscopic analysis, sample manipulation.
+- Usable on various surfaces, only require *relatively flat* sample ($\sim 5 \mu m$).
 *** AFM Configuration :BMCOL:
 :PROPERTIES:
 :BEAMER_col: 0.5
@@ -85,48 +94,36 @@ This process allows *atomic-level imaging* of properties, spectroscopic analysis
 #+caption: Schematics of AFM topographic image forming, Tom Toyosaki, Wikimedia Commons.
 [[./images/Schematics_of_Topographic_image_forming.jpg]]
 
-** Standard Experiment
-*** Image :BMCOL:
-:PROPERTIES:
-:BEAMER_col: 0.45
-:END:
-#+attr_org: :width 50%
-#+attr_latex: :width 0.95\linewidth
-[[./images/experiment_no_automation.png]]
-*** Description :BMCOL:
-:PROPERTIES:
-:BEAMER_col: 0.55
-:END:
-In a traditional SPM experiment, a researcher with domain knowledge will:
-1. *Prepare the system*: including defining the SPM mode (e.g. FM-AFM).
-2. *Run the experiment*: monitoring collected scans, deciding on next scans, and updating any aspects of the experiment.
-3. *Finalize the experiment*: by undoing any experiment-specific setup needed to run.
+** Challenges and Automation
 #+beamer:\pause
-*** Note :B_ignoreheading:
+*** Challenges for Wider Adoption
 :PROPERTIES:
-:BEAMER_env: ignoreheading
+:BEAMER_env: exampleblock
 :END:
-#+beamer:\bigskip
-#+beamer:\centering
-/Running the experiment is often *long*, and requires *constant* researcher *attention*./
+1. Preparing, running, and analyzing requires significant *domain knowledge*.
+2. Running an experiment requires *constant user attention*.
+3. *Statistical* understanding is *limited* by the researcher's *decisions*.
+#+beamer:\pause
+*** Automation Prior Art
+- *Conditioning* of the *tip* for proper surface characterization.
+- *Structure classification*, for *where to scan* next.
+- *Bayesian/Active Learning* for statistical decision making.
 
-** System Scripting and Code Reuse
-*** Description :BMCOL:
-:PROPERTIES:
-:BEAMER_col: 0.55
-:END:
-Many SPM systems allow custom scripts to run an experiment.
-
-#+beamer:\medskip
-However:
-- Scripts written for a *specific* SPM system *cannot be re-used* for other SPM systems: different API/language constraints.
-- While *decoupling* of SPM device and experiment logic *is possible*, it is *rarely* a *priority* for researchers.
-*** Image :BMCOL:
-:PROPERTIES:
-:BEAMER_col: 0.45
-:END:
+** A Remaining Limitation
+# *** Description :BMCOL:
+# :PROPERTIES:
+# :BEAMER_col: 0.5
+# :END:
+Many SPM systems allow custom scripts to run an experiment. But:
+- Scripts written for a *specific* SPM system *cannot be re-used* on others.
+- While *decoupling* is possible, it is *rarely* a *priority* for researchers.
+#+beamer:\pause
+# *** Image :BMCOL:
+# :PROPERTIES:
+# :BEAMER_col: 0.5
+# :END:
 #+attr_org: :width 50%
-#+attr_latex: :width 1.0\linewidth
+#+attr_latex: :width 0.5\linewidth
 [[./images/code_reuse_without_afspm.png]]
 #+beamer:\pause
 *** Note :B_ignoreheading:
@@ -136,34 +133,47 @@ However:
 #+beamer:\bigskip
 #+beamer:\centering
 /Code *reuse* is *rare*./
-* Introduction to afspm
-** Goals and Scope
+* Introduction to =afspm=
+** Goals, Scope, and Design Characteristics
 #+beamer:\pause
 *** Goals
-- *Clear Decoupling*: of SPM device specifics from the desired experiment.
-- *Multi-Language Support*: we should not be limited by device API constraints.
-- *Pausable Automation*: to allow a researcher to take over.
-- *Separable on Multiple Devices*: composed of concise, separable components.
+To facilitate *code sharing* and *reusability* of developed automation.
 #+beamer:\pause
 *** Scope
-afspm will concern itself *only* with automation of high-level, low-frequency decisions a researcher would perform *during* an experiment.
+Concerned with the *choices* a researcher would perform *during* an experiment.
+#+beamer:\pause
+*** Design Characteristics
+- *Standalone components* that each 'do one thing and do it well' (nodes).
+- They communicate over *'pipes'* via generic *schemas*.
+- It is easy to *split up* components among *different* computing *devices*.
+** Principal Components
+#+attr_org: :width 50%
+#+attr_latex: :width 0.4\linewidth
+[[./images/afspm_hl_diagram.png]]
 
-** High-Level Design
-*** Image: :BMCOL:
+#+beamer:\pause
+Any experiment must contain:
+- *Microscope Translator*: translates between afspm-generic and microscope-specific.
+- *Microscope Scheduler*: mediates control between components and translator and caches data.
+** Scripting with / without =afspm=
+*** Left Col: :BMCOL:
 :PROPERTIES:
-:BEAMER_col: 0.45
+:BEAMER_col: 0.5
 :END:
 #+attr_org: :width 50%
-#+attr_latex: :width 0.95\linewidth
-[[./images/afspm_hl_diagram.png]]
-*** Notes :BMCOL:
+#+attr_latex: :width 0.99\linewidth
+#+caption: Code Reuse in SPM Scripting
+[[./images/code_reuse_without_afspm.png]]
+#+beamer:\pause
+*** Right Col: :BMCOL:
 :PROPERTIES:
-:BEAMER_col: 0.55
+:BEAMER_col: 0.5
 :END:
-*afspm* is designed around 'computation' components that correspond to nodes in a network. An experiment contains:
-- *Microscope Translator*: communicates with microscope, translating between afspm-generic and microscope-specific language.
-- *Microscope Scheduler*: mediates control between components and translator (only 1 component in control at a time) and caches data received.
-- *Other Components*: the one or more components the user requires to run their experiment.
+#+attr_org: :width 50%
+#+attr_latex: :width 0.8\linewidth
+#+caption: Approach Taken by afspm
+[[./images/code_reuse_with_afspm.png]]
+
 ** Communication Protocol
 *** Image :B_ignoreheading:
 :PROPERTIES:
@@ -177,96 +187,297 @@ afspm will concern itself *only* with automation of high-level, low-frequency de
 :PROPERTIES:
 :BEAMER_env: ignoreheading
 :END:
-*afspm* uses protobuffers and ZeroMQ (both cross-platform / cross-language).
+#+begin_center
+/Generic *schemas* sent between *network sockets* held by components./
+#+end_center
 #+beamer:\pause
-***** protobuffers: Serialization / Deserialization Library
-Translates data structures into a format that can be stored/communicated).
-#+beamer:\pause
-***** ZeroMQ: Communication / Concurrency Library
-Allows data to be sent between 'sockets' via common 'nodes'. Abstracts away protocols used, allowing easy switching between different protocols (e.g., TCP/IP, interprocess communication, threads).
+***** Serialization / Deserialization
+Translates data structures into a format that can be stored/communicated.
 
+_*=Google Protocol Buffers=*_: avoids schema violations, extra error handling.
+#+beamer:\pause
+***** Data Transmission Protocol
+Handles sending of data between 'sockets' via common 'nodes'.
+
+_*=ZeroMQ=*_: abstracts away transports used, handles common roadblocks.
 ** Example
 #+attr_org: :width 50%
-#+attr_latex: :width 0.75\linewidth
+#+attr_latex: :width 0.7\linewidth
 [[./images/afspm_hl_example.png]]
 
-- *Experiment* constantly decides on the next region to scan.
-- *Tip Detector* constantly evaluates the state of the tip, logging a problem if deemed poor.
-- *Tip Corrector* takes control if 'bad tip' problem has been logged, takes steps to fix it, and releases control once fixed (according to the detector).
+#+beamer:\pause
+- *ROI Analyzer* reviews scans for interesting regions.
+- *Experiment* switches between scanning a large region or a suggested ROI.
+- *Tip Detector* evaluates the state of the tip, logs problem if deemed poor.
+- *Visualizer* visualizes what is being scanned.
 
 * Design Particulars
-** I/O Paths
+** Our publisher-subscriber, control-request world
+#+begin_center
+/We *subscribe* to events published by the SPM and *request* actions of it./
+#+end_center
 #+beamer:\pause
 *** Publisher-Subscriber Path
-- The MicroscopeTranslator *publishes* ScanState, ScanParameters, and Scan *changes*.
-- These are passed on by the MicroscopeScheduler. Data is *stored* in a *cache* and re-sent to new/crashed components.
-- Each component choose what aspects to *subscribe* to, and receives data from these.
+- The SPM *publishes* messages types when its 'state' changes.
+- Components may *subscribe* to only messages of interest.
+- Messages may be *cached* by the Scheduler, to send to new components.
 #+beamer:\pause
 *** Control Path
-- Each component can send *control requests* over its client.
-- The MicroscopeScheduler determines which *client* is *in-control*, and *forwards* these to the MicroscopeTranslator.
-- The MicroscopeTranslator *receives* control requests from one client and *responds*.
+- Components send *requests* to the SPM and receive *responses*.
+- The Scheduler *routes* control to the SPM (one component at a time).
+- Components not in control may flag *problems* -- control is dropped.
+  - A user may *manually* fix a problem and unflag the problem.
+  - A component that *fixes* a flagged problem can grab control.
 ** afspm: Detailed View
 #+attr_org: :width 50%
 #+attr_latex: :width 1.0\linewidth
 [[./images/afspm_control.png]]
-** Microscope Scheduler
-#+beamer:\pause
-*** Cache Logic
-Data is *stored* into the *cache* according to a *user-defined configuration*.
-
-#+beamer:\medskip
-These map a *protobuf message* to a *cache key* (envelope), and vice-versa.
-#+beamer:\pause
-*** Experiment Problems
-Any component can *report* experiment *problems*, indicating issues that should cause the experiment to *pause* until *resolved*, and can *remove* these problems.
-
-#+beamer:\medskip
-This allows, e.g., detecting a tip crash and attempting to correct it.
-
-#+beamer:\pause
-*** Control Modes
-The MicroscopeScheduler defines the *control mode*, which can be:
-- *Automated*: default, automation runs.
-- *Manual*: pause automation.
-- *Problem*: experiment problems are logged, pause automation.
-** The Config File
-*** Description :BMCOL:
-:PROPERTIES:
-:BEAMER_col: 0.6
-:END:
-afspm uses a *single* TOML *configuration file* per experiment.
-
-#+beamer:\medskip
-Within this file, a user defines:
-- The communication protocols used between components.
-- Common variables passed between components (e.g. how big the scan size will be).
-- The components to spawn.
-
-#+beamer:\medskip
-Top-level definitions can function as *variables*: any *references* deeper in the config are *replaced* by them. This should minimize repeating oneself.
-
-*** Image :BMCOL:
+** Publisher-Subscriber Path
+*** Left Column
 :PROPERTIES:
 :BEAMER_col: 0.4
 :END:
-#+attr_org: :width 50%
-#+attr_latex: :width 1.0\linewidth
-[[./images/config_toml.png]]
+#+attr_latex: :options fontsize=\scriptsize, frame=lines, framesep=2mm
+#+begin_src protobuf :results code
+    message DataAspects {
+      optional Size2u shape = 1;
+      optional string units = 2;
+    }
 
+    message SpatialAspects {
+      optional Rect2d roi = 1;
+      optional string units = 2;
+    }
 
-** Spawning the Experiment
+    message ScanParameters2d {
+      optional SpatialAspects spatial = 1;
+      optional DataAspects data = 2;
+    }
+#+end_src
+#+begin_center
+#+latex:\scriptsize{\textbf{2D Scan Parameters Schema}}
+#+end_center
+*** Right Column
+:PROPERTIES:
+:BEAMER_col: 0.52
+:END:
+#+attr_latex: :options fontsize=\scriptsize, frame=lines, framesep=2mm
+#+begin_src protobuf :results code
+message Scan2d {
+  optional ScanParameters2d params = 1;
+  optional google.protobuf.Timestamp timestamp = 2;
+  optional string channel = 3;
+  optional string filename = 5;
+  repeated double values = 4;
+}
+#+end_src
+#+begin_center
+#+latex:\scriptsize{\textbf{2D Scan Schema}}
+#+end_center
 #+beamer:\pause
-*** Distributed Computing
-Components can be *split up* among devices; on startup, the components to spawn can be specified.
-
+*** Break Columns
+:PROPERTIES:
+:BEAMER_env: ignoreheading
+:END:
+\bigskip
+#+begin_center
+#+begin_latex
+\begin{scriptsize}
+\begin{bytefield}[bitwidth=0.75em]{50}
+\bitbox[]{10}{Frame 1} & \bitbox{20}{\texttt{`Scan2d'}} & \bitbox[]{20}{\textit{Envelope}} \\
+\bitbox[]{10}{Frame 2} & \bitbox{20}{\texttt{Scan2d Data}} & \bitbox[]{20}{\textit{Serialized Data Structure}}
+\end{bytefield}
+\end{scriptsize}
+#+end_latex
+#+end_center
+#+begin_center
+#+latex:\scriptsize{\textbf{Message Format}}
+#+end_center
+** Control Path
+*** Left Column
+:PROPERTIES:
+:BEAMER_col: 0.47
+:END:
+#+attr_latex: :options fontsize=\scriptsize, frame=lines, framesep=2mm
+#+begin_src protobuf :results code
+enum ControlRequest {
+  REQ_UNDEFINED = 0;
+  REQ_START_SCAN = 1;     // [...]
+  REQ_REQUEST_CTRL = 4;   // [...]
+  REQ_ADD_EXP_PRBLM = 6;  // [...]
+  REQ_SET_CONTROL_MODE = 8;
+}
+#+end_src
+#+begin_center
+#+latex:\scriptsize{\textbf{Control Request Schema}}
+#+end_center
+*** Right Column
+:PROPERTIES:
+:BEAMER_col: 0.52
+:END:
+#+attr_latex: :options fontsize=\scriptsize, frame=lines, framesep=2mm
+#+begin_src protobuf :results code
+enum ControlResponse {
+  REP_SUCCESS = 0;
+  REP_FAILURE = 1;             // [...]
+  REP_NO_RESPONSE = 3;         // [...]
+  REP_NOT_FREE = 7;            // [...]
+  REP_PARAM_NOT_SUPPORTED = 9; // [...]
+}
+#+end_src
+#+begin_center
+#+latex:\scriptsize{\textbf{Control Response Schema}}
+#+end_center
+*** Break Columns
+:PROPERTIES:
+:BEAMER_env: ignoreheading
+:END:
 #+beamer:\pause
-*** Component Monitoring
-All spawned components are *monitored*:
-- Each sends *heartbeats* at a regular cadence.
-- If one *stops* beating, it is *restarted*.
+*** Left Column
+:PROPERTIES:
+:BEAMER_col: 0.47
+:END:
+#+attr_latex: :options fontsize=\scriptsize, frame=lines, framesep=2mm
+#+begin_src protobuf :results code
+enum ExperimentProblem {
+  EP_NONE = 0;
+  EP_TIP_SHAPE_CHANGED = 1;
+  EP_DEVICE_MALFUNCTION = 2;
+  EP_FEEDBACK_NON_OPTIMAL = 3;
+}
+#+end_src
+#+begin_center
+#+latex:\scriptsize{\textbf{Experiment Problem Schema}}
+#+end_center
+*** Right Column
+:PROPERTIES:
+:BEAMER_col: 0.52
+:END:
+#+attr_latex: :options fontsize=\scriptsize, frame=lines, framesep=2mm
+#+begin_src protobuf :results code
+enum ControlMode {
+  CM_UNDEFINED = 0;
+  CM_MANUAL = 1;
+  CM_AUTOMATED = 2;
+  CM_PROBLEM = 3;
+}
+#+end_src
+#+begin_center
+#+latex:\scriptsize{\textbf{Control Mode Schema}}
+#+end_center
+#+beamer:\pause
+*** Break Columns
+:PROPERTIES:
+:BEAMER_env: ignoreheading
+:END:
+\bigskip
+\bigskip
+#+begin_center
+#+begin_latex
+\begin{scriptsize}
+\begin{bytefield}[bitwidth=0.66em]{60}
+      \bitbox[]{10}{Frame 1} & \bitbox{20}{\texttt{REQ\_REQUEST\_CTRL}} & \bitbox[]{30}{\textit{Command Request Enum}} \\
+      \bitbox[]{10}{Frame 2} & \bitbox{20}{\texttt{EP\_TIP\_SHAPE\_CHANGED}} & \bitbox[]{30}{\textit{Serialized Data Structure(s)}}
+\end{bytefield}
+\end{scriptsize}
+#+end_latex
+#+end_center
+#+begin_center
+#+latex:\scriptsize{\textbf{Message Format}}
+#+end_center
+** Spawning, Monitoring, and the Config File
+#+begin_center
+/An experiment defined via a *config* file, with components *spawned* as needed./
+#+end_center
+#+beamer:\pause
+*** Spawning
+- Each component is instantiated as a child process (independent memory).
+  - One crashed component does not crash all.
+- We can spawn different components on different computers.
+  - The 'spawn' command allows indication of which components to spawn.
+#+beamer:\pause
+*** Monitoring
+- The parent process monitors spawned components for heartbeats.
+- If a process has not 'beat' in a timeframe, it is killed and respawned.
+- Then the caching logic chosen is important -- must be able to run.
+# #+beamer:\pause
+# *** Config File
+# - We use a TOML-based configuration file to define experiments.
+#     - Dict-of-dicts, with parser to allow variable setting.
+** Sample Config File
+*** Left Column
+:PROPERTIES:
+:BEAMER_col: 0.5
+:END:
+#+attr_latex: :options fontsize=\scriptsize, frame=lines, framesep=2mm
+#+begin_src toml :results code
+  # --- URLs --- #
+  pub_url = "tcp://127.0.0.1:9000"
+  psc_url = "tcp://127.0.0.1:9001"
 
-This should minimize a crash breaking experiments.
+  server_url = "tcp://127.0.0.1:6666"
+  router_url = "tcp://127.0.0.1:6667"
+  # [...]
+  exp_scan_res = [256, 256]
+  # [...]
+#+end_src
+#+begin_center
+#+latex:\scriptsize{\textbf{General Variables}}
+#+end_center
+*** Right Column
+:PROPERTIES:
+:BEAMER_col: 0.5
+:END:
+#+attr_latex: :options fontsize=\scriptsize, frame=lines, framesep=2mm
+#+begin_src toml :results code
+  # ----- PubSub ----- #
+  [translator_pub]
+  class = 'afspm.io.pubsub.publisher.Publisher'
+  url = 'pub_url'
+  # [...]
+  [experiment_sub]
+  class = 'afspm.io.pubsub.subscriber.Subscriber'
+  sub_url = 'psc_url'
+  # [...]
+#+end_src
+#+begin_center
+#+latex:\scriptsize{\textbf{Intermediary Classes}}
+#+end_center
+*** Break Columns
+:PROPERTIES:
+:BEAMER_env: ignoreheading
+:END:
+\bigskip
+#+attr_latex: :options fontsize=\scriptsize, frame=lines, framesep=2mm
+#+begin_src toml :results code
+[translator]
+component = true
+class = 'afspm.components.microscope.translators.gxsm.translator.GxsmTranslator'
+publisher = 'translator_pub'
+control_server = 'translator_server'
+# [...]
+#+end_src
+#+begin_center
+#+latex:\scriptsize{\textbf{Config Components}}
+#+end_center
+** Expandability
+#+begin_center
+/We defined a *'basis'* set of schemas we believe are standard./
+
+/But this is quite arbitrary! Here are ways you can expand upon them./
+#+end_center
+#+beamer:\pause
+*** Operating Modes
+- Defined as an SPM config describing cantilever control during a scan.
+- We assume experiment has scan and spectroscopy modes configured.
+- Can change by providing *op. mode* id and =<key:value>= *params* map.
+#+beamer:\pause
+*** Actions
+- Many manufacturers provide some automation tasks (e.g. approach tip).
+- Can send these by providing *action* id and =<key:value>= *params* map.
+#+beamer:\pause
+*** Custom Messages
+- Any user may create custom messages or expand existing ones.
 ** The End :BMCOL:
 :PROPERTIES:
 :BEAMER_col: 1.0
