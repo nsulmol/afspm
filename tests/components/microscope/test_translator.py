@@ -2,7 +2,7 @@
 
 In order to run it, you must:
 1. Start up the scheduler, via a call like the following:
-    poetry run spawn config.toml --components_to_spawn ['scheduler']
+    poetry run spawn config.toml --components_to_spawn=['scheduler']
 2. Start up the microscope translator you wish to test. This startup will be
 implementation-specific (look at the readme for your translator).
 3. Run these tests:
