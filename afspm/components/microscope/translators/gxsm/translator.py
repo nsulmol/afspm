@@ -164,7 +164,7 @@ class GxsmTranslator(MicroscopeTranslator):
                     self.last_scan_fname = fname
 
                 # Break if on last 'set' channel
-                if fname == self.CHANNEL_FILENNAME_ERROR_STR:
+                if fname == self.CHANNEL_FILENAME_ERROR_STR:
                     break
 
                 # Only append actually saved files
