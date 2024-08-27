@@ -17,8 +17,8 @@ ALL_ENVELOPE_LOG = "ALL"
 REQUEST_TIMEOUT_MS = 250  # Linked to TCP delay
 POLL_TIMEOUT_MS = 25
 LOOP_SLEEP_S = 0.1  # 100 ms
-HEARTBEAT_PERIOD_S = 5
-BEATS_BEFORE_DEAD = 5
+HEARTBEAT_PERIOD_S = 1
+BEATS_BEFORE_DEAD = 3
 
 
 # We appear to need a small startup delay, to allow zmq sockets to properly
