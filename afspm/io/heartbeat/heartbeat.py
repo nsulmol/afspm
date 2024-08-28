@@ -142,15 +142,21 @@ class HeartbeatListener:
         """
         curr_ts = time.time()
         if self._subscriber.poll(self._poll_timeout_ms, zmq.POLLIN):
-            msg = self._subscriber.recv(zmq.NOBLOCK)
-            msg_enum = HBMessage(int.from_bytes(msg, 'big'))
-            if msg_enum == HBMessage.HEARTBEAT:
+            # There are messages! We will keep polling until we get
+            # all messages in the queue. Then we will make actions
+            # based on it.
+            messages = []
+            while self._subscriber.poll(0, zmq.POLLIN):
+                messages.append(self._subscriber.recv(zmq.NOBLOCK))
+            messages = [HBMessage(int.from_bytes(msg, 'big'))
+                        for msg in messages]
+
+            if HBMessage.HEARTBEAT in messages:
                 self.received_first_beat = True
                 self._last_beat_ts = curr_ts
-            elif msg_enum == HBMessage.KILL:
+            if HBMessage.KILL in messages:
                 self.received_kill_signal = True
-            else:
-                logger.warning("Received non-HBMessage message. Ignoring.")
+                logger.debug("Listener received kill signal!")
 
         if (curr_ts - self._last_beat_ts >= self._time_before_dead_s or
                 self.received_kill_signal):
