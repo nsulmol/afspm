@@ -170,9 +170,9 @@ class AfspmControlUI(AfspmComponentBase):
         problem_id = common.get_enum_str(ctrl_mode, ctrl_mode.CM_PROBLEM)
         auto_id = common.get_enum_str(ctrl_mode, ctrl_mode.CM_AUTOMATED)
 
-        problem_disabled = button_id != problem_id
-        self.window[problem_id].update(disabled=problem_disabled)
-        self.window[auto_id].update(disabled=not problem_disabled)
+        problems_logged = len(self.control_state.problems_set) != 0
+        self.window[problem_id].update(disabled=not problems_logged)
+        self.window[auto_id].update(disabled=problems_logged)
 
     def _handle_client_changed(self):
         client = self.control_state.client_in_control_id
