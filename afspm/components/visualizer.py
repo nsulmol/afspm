@@ -259,10 +259,7 @@ class Visualizer(AfspmComponent):
         scan_phys_size define the overall size of the image; the full image
         data resolution is calculated from this and the data_res/phys_size.
         """
-        # TODO: Try to reimplement using xarray's merge. You tried previously,
-        # but could not get it working.
         cache_list = self.subscriber.cache[key]
-
         scan_phys_origin = self.scan_phys_origin_map[key]
         scan_phys_size = self.scan_phys_size_map[key]
         data_units = cache_list[0].params.data.units
@@ -283,27 +280,23 @@ class Visualizer(AfspmComponent):
                         full_res[0])
         y = np.linspace(scan_phys_origin[0], scan_phys_size[0],
                         full_res[1])
-        xarr = xr.DataArray(dims=['y', 'x'],
-                            coords={'y': y, 'x': x},
-                            attrs={'units': data_units})
-        xarr.x.attrs['units'] = phys_units
-        xarr.y.attrs['units'] = phys_units
+        full_xarr = xr.DataArray(dims=['y', 'x'],
+                                 coords={'y': y, 'x': x},
+                                 attrs={'units': data_units})
+        full_xarr.x.attrs['units'] = phys_units
+        full_xarr.y.attrs['units'] = phys_units
 
-        for scan in cache_list:
-            # It appears rounding is necessary to account for how we select
-            # via slice() below. TODO: Investigate further.
-            origin = np.round(np.array([scan.params.spatial.roi.top_left.x,
-                                        scan.params.spatial.roi.top_left.y]))
-            size = np.round(np.array([scan.params.spatial.roi.size.x,
-                                      scan.params.spatial.roi.size.y]))
+        # Get all subscans as xarrays, and then interpolate them to have
+        # the same dimensions as our full_xarr.
+        sub_xarrs = [ac.convert_scan_pb2_to_xarray(scan) for scan in cache_list]
+        sub_xarrs = [sub_xarr.interp_like(full_xarr) for sub_xarr in sub_xarrs]
 
-            data = np.array(scan.values, dtype=np.float64)
-            data = data.reshape((scan.params.data.shape.x,
-                                 scan.params.data.shape.y))
-
-            xarr.loc[{'x': slice(origin[0], origin[0] + size[0]),
-                      'y': slice(origin[1], origin[1] + size[1])}] = data
-        return xarr
+        # Now that they are all represent the same data, we can concat them
+        # into a 'new' dimension and than average them. This way, any overlaps
+        # will be averaged, and null data is not considered.
+        full_xarr = xr.concat(sub_xarrs, dim='new')
+        full_xarr = full_xarr.mean(dim='new')
+        return full_xarr
 
     def _add_to_plt_maps(self, key: str):
         self.plt_figures_map[key] = plt.figure()
