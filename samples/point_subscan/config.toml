@@ -195,7 +195,7 @@ visualize_undeclared_scans = true
 scan_id = 'Scan2d'
 
 
-[afspm_scheduler]
+[scheduler]
 component = true
 class = 'afspm.components.microscope.scheduler.MicroscopeScheduler'
 

@@ -1,4 +1,4 @@
-"""Holds base class for all components"""
+"""Holds base class for all components."""
 
 import logging
 import time

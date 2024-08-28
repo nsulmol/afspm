@@ -134,7 +134,7 @@ scan_id = 'Scan2d'
 subscriber = 'experiment_sub'
 control_client = 'ui_client'
 
-[afspm_scheduler]
+[scheduler]
 component = true
 class = 'afspm.components.microscope.scheduler.MicroscopeScheduler'
 
