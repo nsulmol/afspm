@@ -1,4 +1,4 @@
-"""Holds control router, for receiving requests from multiple different REQs."""
+"""Holds control router, for receiving requests from different REQs."""
 
 import copy
 import zmq
@@ -111,7 +111,7 @@ class ControlRouter:
         self._backend.close()
 
     def _handle_control_request(self, client: str,
-                                control_mode: control_pb2.ControlMode,
+                                problem: control_pb2.ExperimentProblem,
                                 ) -> control_pb2.ControlResponse:
         """Set client in control if possible.
 
@@ -122,7 +122,8 @@ class ControlRouter:
 
         Args:
             client: uuid of client.
-            control_mode: ControlMode of the client's request.
+            problem: ExperimentProblem this client solves (EP_NONE if
+                general component).
 
         Returns:
             - REP_SUCCESS if the above are met.
@@ -136,17 +137,29 @@ class ControlRouter:
                          client)
             return control_pb2.ControlResponse.REP_ALREADY_UNDER_CONTROL
 
-        if self._control_mode == control_mode:
+        generic_component_request = (problem ==
+                                     control_pb2.ExperimentProblem.EP_NONE)
+        no_problems_and_generic_component_request = (
+            generic_component_request and len(self._problems_set) == 0)
+        solves_problem = problem in self._problems_set
+
+        if no_problems_and_generic_component_request or solves_problem:
             logger.info("%s gaining control", client)
             self._client_in_control_id = client
             return control_pb2.ControlResponse.REP_SUCCESS
 
-        logger.debug("%s requested control, but sent control mode %s, when" +
-                     "under %s", client,
-                     common.get_enum_str(control_pb2.ControlMode,
-                                         control_mode),
-                     common.get_enum_str(control_pb2.ControlMode,
-                                         self._control_mode))
+        problems_set_str = {common.get_enum_str(control_pb2.ExperimentProblem,
+                                                prblm)
+                            for prblm in self._problems_set}
+        if generic_component_request:
+            logger.debug("General component %s requested control, but ",
+                         "there are logged problems: %s", problems_set_str)
+        else:  # Problems are logged but the presented is not in our set.
+            logger.debug("%s requested control, but resolves problem %s, "
+                         "which is not one of our logged problems: %s", client,
+                         common.get_enum_str(control_pb2.ExperimentProblem,
+                                             problem),
+                         problems_set_str)
         return control_pb2.ControlResponse.REP_WRONG_CONTROL_MODE
 
     def _handle_control_release(self, client: str) -> control_pb2.ControlResponse:
@@ -182,7 +195,7 @@ class ControlRouter:
         Returns:
             ControlMode.SUCCESS if we were able to add it.
         """
-        old_problems_set = copy.deepcopy(self._problems_set)
+        old_mode = copy.deepcopy(self._control_mode)
         if add_problem:
             logger.warning("Adding problem %s",
                            common.get_enum_str(control_pb2.ExperimentProblem,
@@ -194,11 +207,12 @@ class ControlRouter:
                                                exp_problem))
             self._problems_set.remove(exp_problem)
 
-        if not old_problems_set and self._problems_set:
-            logger.warning("Entering problem mode")
+        if self._problems_set:
             self._control_mode = control_pb2.ControlMode.CM_PROBLEM
-            self._client_in_control_id = None
-        elif old_problems_set and not self._problems_set:
+            if old_mode != control_pb2.ControlMode.CM_PROBLEM:
+                logger.warning("Entering problem mode")
+                self._client_in_control_id = None
+        elif old_mode == control_pb2.ControlMode.CM_PROBLEM:
             logger.warning("Exiting problem mode, switching to automated.")
             self._control_mode = control_pb2.ControlMode.CM_AUTOMATED
             self._client_in_control_id = None

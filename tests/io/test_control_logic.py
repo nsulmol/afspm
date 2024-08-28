@@ -77,6 +77,11 @@ def problem():
     return control_pb2.ExperimentProblem.EP_TIP_SHAPE_CHANGED
 
 
+@pytest.fixture
+def no_problem():
+    return control_pb2.ExperimentProblem.EP_NONE
+
+
 # ----- Classes / Methods for communication with server/router threads ----- #
 class CommEnvelope(str, Enum):
     ALL = ""
@@ -101,7 +106,7 @@ def get_comm_info(socket: zmq.Socket,
         rest = None
         if envelope == CommEnvelope.MODE:
             rest = CommMode(msg[1].decode())
-        return envelope,rest
+        return envelope, rest
     return None, None
 
 
@@ -176,8 +181,8 @@ class TestServerWithClient:
                 (srv_client.request_parameter, control_pb2.ParameterMsg())]
 
     @pytest.fixture
-    def srv_client_router_methods(self, srv_client, problem):
-        return [(srv_client.request_control, control_pb2.ControlMode.CM_AUTOMATED),
+    def srv_client_router_methods(self, srv_client, problem, no_problem):
+        return [(srv_client.request_control, no_problem),
                 (srv_client.add_experiment_problem, problem),
                 (srv_client.remove_experiment_problem, problem)]
 
@@ -218,8 +223,8 @@ class TestRouterServerClient:
                 (rtr_client.set_zctrl_params, feedback_pb2.ZCtrlParameters())]
 
     @pytest.fixture
-    def srv_client_router_methods(self, rtr_client, problem):
-        return [(rtr_client.request_control, control_pb2.ControlMode.CM_AUTOMATED),
+    def srv_client_router_methods(self, rtr_client, problem, no_problem):
+        return [(rtr_client.request_control, no_problem),
                 (rtr_client.add_experiment_problem, problem),
                 (rtr_client.remove_experiment_problem, problem)]
 
@@ -237,10 +242,11 @@ class TestRouterServerClient:
 
     def test_requests_with_control(self, ctx, server_url, router_url,
                                    comm_url, comm_pub, timeout_ms,
-                                   thread_srv, thread_rtr,
+                                   thread_srv, thread_rtr, no_problem,
                                    rtr_client, rtr_client_server_methods):
         """Server requests after gaining control should succeed."""
-        rep = rtr_client.request_control(control_pb2.ControlMode.CM_AUTOMATED)
+        rep = rtr_client.request_control(no_problem)
+        # was control_pb2.ControlMode.CM_AUTOMATED)
         assert rep == control_pb2.ControlResponse.REP_SUCCESS
         for method, proto in rtr_client_server_methods:
             rep = method(proto) if proto else method()
@@ -251,10 +257,10 @@ class TestRouterServerClient:
 
     def test_wrong_control_request(self, ctx, server_url, router_url,
                                    comm_url, comm_pub, timeout_ms,
-                                   thread_srv, thread_rtr,
+                                   thread_srv, thread_rtr, problem,
                                    rtr_client, rtr_client_server_methods):
-        """Client requests wrong control mode."""
-        rep = rtr_client.request_control(control_pb2.ControlMode.CM_MANUAL)
+        """Client requests wrong problem."""
+        rep = rtr_client.request_control(problem)
         assert rep == control_pb2.ControlResponse.REP_WRONG_CONTROL_MODE
 
         comm_pub.send_multipart([CommEnvelope.KILL.value.encode(),
@@ -262,12 +268,12 @@ class TestRouterServerClient:
 
     def test_control_after_problem(self, ctx, server_url, router_url,
                                    comm_url, comm_pub, timeout_ms,
-                                   thread_srv, thread_rtr, problem,
+                                   thread_srv, thread_rtr, problem, no_problem,
                                    rtr_client, rtr_client_server_methods):
         """An AUTOMATED client loses control after a PROBLEM is introduced.
         (But reconnecting with PROBLEM control works).
         """
-        rep = rtr_client.request_control(control_pb2.ControlMode.CM_AUTOMATED)
+        rep = rtr_client.request_control(no_problem)
         assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
         rep = rtr_client.add_experiment_problem(problem)
@@ -277,7 +283,7 @@ class TestRouterServerClient:
             rep = method(proto) if proto else method()
             assert rep == control_pb2.ControlResponse.REP_NOT_IN_CONTROL
 
-        rep = rtr_client.request_control(control_pb2.ControlMode.CM_PROBLEM)
+        rep = rtr_client.request_control(problem)
         assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
         for method, proto in rtr_client_server_methods:
@@ -289,24 +295,23 @@ class TestRouterServerClient:
 
     def test_swapping_control(self, ctx, server_url, router_url,
                               comm_url, comm_pub, timeout_ms,
-                              thread_srv, thread_rtr, problem,
+                              thread_srv, thread_rtr, no_problem,
                               rtr_client, rtr_client_server_methods):
         """Two clients can swap control."""
-        rep = rtr_client.request_control(control_pb2.ControlMode.CM_AUTOMATED)
-
+        rep = rtr_client.request_control(no_problem)
         assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
         new_client = ctrl_client.ControlClient(router_url, ctx)
-        rep = new_client.request_control(control_pb2.ControlMode.CM_AUTOMATED)
+        rep = new_client.request_control(no_problem)
         assert rep == control_pb2.ControlResponse.REP_ALREADY_UNDER_CONTROL
 
         rep = rtr_client.release_control()
         assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
-        new_client.request_control(control_pb2.ControlMode.CM_AUTOMATED)
+        new_client.request_control(no_problem)
         assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
-        rep = rtr_client.request_control(control_pb2.ControlMode.CM_AUTOMATED)
+        rep = rtr_client.request_control(no_problem)
         assert rep == control_pb2.ControlResponse.REP_ALREADY_UNDER_CONTROL
 
         comm_pub.send_multipart([CommEnvelope.KILL.value.encode(),
@@ -316,10 +321,10 @@ class TestRouterServerClient:
 class TestCrashRestart:
     """Tests around crashing and restarting a client."""
     def test_no_uuid(self, ctx, router_url, timeout_ms, comm_pub,
-                     thread_srv, thread_rtr):
+                     thread_srv, thread_rtr, no_problem):
         """With no UUID, a reconnection will brick the router (new uuid)."""
         client = ctrl_client.ControlClient(router_url, ctx)
-        rep = client.request_control(control_pb2.ControlMode.CM_AUTOMATED)
+        rep = client.request_control(no_problem)
         assert rep == control_pb2.ControlResponse.REP_SUCCESS
         assert client.start_scan() == control_pb2.ControlResponse.REP_SUCCESS
 
@@ -333,11 +338,11 @@ class TestCrashRestart:
                                  b''])
 
     def test_with_uuid(self, ctx, router_url, timeout_ms, comm_pub,
-                       thread_srv, thread_rtr):
+                       thread_srv, thread_rtr, no_problem):
         """With UUIDs provided, a reconnection should allow us to continue."""
         uuid = "banana"
         client = ctrl_client.ControlClient(router_url, ctx, uuid)
-        rep = client.request_control(control_pb2.ControlMode.CM_AUTOMATED)
+        rep = client.request_control(no_problem)
         assert rep == control_pb2.ControlResponse.REP_SUCCESS
         assert client.start_scan() == control_pb2.ControlResponse.REP_SUCCESS
 

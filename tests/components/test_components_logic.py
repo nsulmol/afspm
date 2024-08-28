@@ -120,6 +120,11 @@ def admin_client(router_url, ctx, component_name):
     return AdminControlClient(router_url, ctx, component_name)
 
 
+@pytest.fixture
+def no_problem():
+    return control_pb2.ExperimentProblem.EP_NONE
+
+
 # --- Main Test Classes --- #
 # -- Microscope Translator Stuff -- #
 @pytest.fixture(scope="module")
@@ -189,11 +194,12 @@ def startup_flush_messages(afspm_component: AfspmComponentBase,
 
 
 def request_control(afspm_component: AfspmComponentBase,
+                    problem: control_pb2.ExperimentProblem,
                     default_control_state: control_pb2.ControlState,
                     component_name: str):
     """Request control with a component (and flush/validate messages)"""
-    rep = afspm_component.control_client.request_control(
-        control_pb2.ControlMode.CM_AUTOMATED)
+    rep = afspm_component.control_client.request_control(problem)
+        #control_pb2.ControlMode.CM_AUTOMATED)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
     cs = copy.deepcopy(default_control_state)
@@ -217,11 +223,12 @@ def wait_on_threads(thread_microscope_translator: threading.Thread,
 
 
 def startup_and_req_ctrl(afspm_component: AfspmComponentBase,
+                         problem: control_pb2.ExperimentProblem,
                          default_control_state: control_pb2.ControlState,
                          component_name: str, wait_count: int):
     """Calls the above 2 one after the other."""
     startup_flush_messages(afspm_component, wait_count)
-    request_control(afspm_component, default_control_state,
+    request_control(afspm_component, problem, default_control_state,
                     component_name)
 
 
@@ -243,11 +250,11 @@ def test_end_experiment(thread_microscope_translator,
 
 
 def test_get_release_control(thread_microscope_translator,
-                             thread_microscope_scheduler,
+                             thread_microscope_scheduler, no_problem,
                              afspm_component, wait_count, move_time_ms,
                              component_name, default_control_state, ctx):
     """Ensure we can obtain and release control."""
-    startup_and_req_ctrl(afspm_component, default_control_state,
+    startup_and_req_ctrl(afspm_component, no_problem, default_control_state,
                          component_name, wait_count)
 
     rep = afspm_component.control_client.release_control()
@@ -260,10 +267,10 @@ def test_get_release_control(thread_microscope_translator,
 
 
 def test_start_scan(thread_microscope_translator, thread_microscope_scheduler,
-                    afspm_component, wait_count, scan_time_ms,
+                    afspm_component, wait_count, scan_time_ms, no_problem,
                     sub_scan2d, component_name, default_control_state):
     """Ensure we receive indication of a scan starting when we request it."""
-    startup_and_req_ctrl(afspm_component, default_control_state,
+    startup_and_req_ctrl(afspm_component, no_problem, default_control_state,
                          component_name, wait_count)
 
     rep = afspm_component.control_client.start_scan()
@@ -290,10 +297,10 @@ def test_start_scan(thread_microscope_translator, thread_microscope_scheduler,
 
 
 def test_stop_scan(thread_microscope_translator, thread_microscope_scheduler,
-                   afspm_component, wait_count, scan_time_ms,
+                   afspm_component, wait_count, scan_time_ms, no_problem,
                    sub_scan2d, default_control_state, component_name):
     """Ensure that we can cancel a scan and receive updates."""
-    startup_and_req_ctrl(afspm_component, default_control_state,
+    startup_and_req_ctrl(afspm_component, no_problem, default_control_state,
                          component_name, wait_count)
 
     rep = afspm_component.control_client.start_scan()
@@ -325,7 +332,7 @@ def test_stop_scan(thread_microscope_translator, thread_microscope_scheduler,
 
 
 def test_set_scan_params(thread_microscope_translator,
-                         thread_microscope_scheduler,
+                         thread_microscope_scheduler, no_problem,
                          afspm_component, wait_count, move_time_ms,
                          sub_scan2d, default_control_state, component_name):
     """Ensure that we receive motion messages when we change scan params.
@@ -333,7 +340,7 @@ def test_set_scan_params(thread_microscope_translator,
     Here, we are explicitly linking a scan params call to SS_MOVING. With a
     real SPM, it would depend on whether the spatial roi has changed.
     """
-    startup_and_req_ctrl(afspm_component, default_control_state,
+    startup_and_req_ctrl(afspm_component, no_problem, default_control_state,
                          component_name, wait_count)
 
     rep = afspm_component.control_client.set_scan_params(
@@ -383,12 +390,12 @@ def test_experiment_problems(thread_microscope_translator, thread_microscope_sch
                          thread_microscope_scheduler)
 
 
-def test_calls_while_scanning(thread_microscope_translator,
+def test_calls_while_scanning(thread_microscope_translator, no_problem,
                               thread_microscope_scheduler, wait_count,
                               afspm_component, default_control_state,
                               component_name, scan_time_ms):
     """Confirm that very few calls can be run while scanning."""
-    startup_and_req_ctrl(afspm_component, default_control_state,
+    startup_and_req_ctrl(afspm_component, no_problem, default_control_state,
                          component_name, wait_count)
 
     rep = afspm_component.control_client.start_scan()
@@ -433,11 +440,12 @@ def test_set_control_mode(thread_microscope_translator, thread_microscope_schedu
                          thread_microscope_scheduler)
 
 
-def test_set_get_params(thread_microscope_translator, thread_microscope_scheduler,
+def test_set_get_params(thread_microscope_translator,
+                        thread_microscope_scheduler, no_problem,
                         afspm_component, wait_count, default_control_state,
                         component_name):
     """Confirm we can get/set supported params, and fail on unsupported."""
-    startup_and_req_ctrl(afspm_component, default_control_state,
+    startup_and_req_ctrl(afspm_component, no_problem, default_control_state,
                          component_name, wait_count)
 
     # Unsupported param returns unsupported message.

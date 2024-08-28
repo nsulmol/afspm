@@ -50,10 +50,11 @@ class ScanHandler:
         get_next_params: method to determine the next scan_params to scan. If
             None is provided, it will log this and retry later.
         next_params_kwargs: kwargs for get_next_params.
-        control_mode_to_run: ControlMode to run under. If the scheduler is not
-            in this control mode, we do nothing until they switch to it.
+        problem_to_solve: ExperimentProblem the calling component solves (
+            EP_NONE if generic). If the scheduler does not have this problem
+            flagged, we do nothing until it does.
 
-        _control_mode: current control mode the scheduler is in.
+        _problems_set: current problems set the scheduler has.
         _scan_params: current ScanParameters2d instance.
         _scan_state: current ScanState.
         _desired_scan_state: desired ScanState.
@@ -66,16 +67,16 @@ class ScanHandler:
                  get_next_params: Callable[[Any],
                                            scan_pb2.ScanParameters2d],
                  next_params_kwargs: dict = None,
-                 control_mode: control_pb2.ControlMode =
-                 control_pb2.ControlMode.CM_AUTOMATED):
+                 problem: control_pb2.ExperimentProblem =
+                 control_pb2.ExperimentProblem.EP_NONE):
         """Init class."""
         self.rerun_wait_s = rerun_wait_s
         self.get_next_params = get_next_params
         self.next_params_kwargs = (next_params_kwargs if
                                    next_params_kwargs else {})
-        self.control_mode_to_run = control_mode
+        self.problem_to_solve = problem
 
-        self._control_mode = control_pb2.ControlMode.CM_UNDEFINED
+        self._problems_set = {}
         self._scan_params = scan_pb2.ScanParameters2d()
         self._scan_state = scan_pb2.ScanState.SS_UNDEFINED
         self._desired_scan_state = scan_pb2.ScanState.SS_UNDEFINED
@@ -96,7 +97,7 @@ class ScanHandler:
             component: AfspmComponent instance.
         """
         if isinstance(proto, control_pb2.ControlState):
-            self._control_mode = proto.control_mode
+            self._problems_set = proto.problems_set
         if isinstance(proto, scan_pb2.ScanStateMsg):
             self._handle_scan_state_receipt(proto)
             self._perform_scanning_logic(control_client)
@@ -119,9 +120,9 @@ class ScanHandler:
         Args:
             control_client: AfspmComponent's control_client.
         """
-        in_desired_control_mode = (self.control_mode_to_run ==
-                                   self._control_mode)
-        if in_desired_control_mode and self._rerun_sleep_ts is not None:
+        problem_in_problems_set = common.is_problem_in_problems_set(
+            self.problem_to_solve, self._problems_set)
+        if problem_in_problems_set and self._rerun_sleep_ts is not None:
             enough_time_has_passed = (time.time() - self._rerun_sleep_ts >
                                       self.rerun_wait_s)
             if enough_time_has_passed:
@@ -184,13 +185,13 @@ class ScanHandler:
         Args:
             control_client: AfspmComponent's ControlClient.
         """
-        in_desired_control_mode = (self.control_mode_to_run ==
-                                   self._control_mode)
+        problem_in_problems_set = common.is_problem_in_problems_set(
+            self.problem_to_solve, self._problems_set)
         scan_state_undefined = (scan_pb2.ScanState.SS_UNDEFINED in
                                 (self._scan_state, self._desired_scan_state))
-        if scan_state_undefined or not in_desired_control_mode:
+        if scan_state_undefined or not problem_in_problems_set:
             logger.debug("Not performing scanning logic because ScanState "
-                         "undefined or ControlMode not desired one.")
+                         "undefined or problem not in problems set.")
             self._handle_rerun(True)
             return  # Early return, we're not ready yet.
 
@@ -219,7 +220,7 @@ class ScanHandler:
                 return
 
             rep = send_req_handle_ctrl(control_client, req_to_call,
-                                       req_params, self.control_mode_to_run)
+                                       req_params, self.problem_to_solve)
             if rep != control_pb2.ControlResponse.REP_SUCCESS:
                 logger.info("Sleeping and retrying later.")
                 self._handle_rerun(True)
@@ -250,13 +251,13 @@ class ScanningComponent(AfspmComponent):
                  get_next_params: Callable[[AfspmComponent, Any],
                                            scan_pb2.ScanParameters2d],
                  next_params_kwargs: dict = None,
-                 control_mode: control_pb2.ControlMode =
-                 control_pb2.ControlMode.CM_AUTOMATED, **kwargs):
+                 problem: control_pb2.ExperimentProblem =
+                 control_pb2.ExperimentProblem.EP_NONE, **kwargs):
         """Init class."""
         # Pass self as 'component' to next params method.
         next_params_kwargs['component'] = self
         self.scan_handler = ScanHandler(rerun_wait_s, get_next_params,
-                                        next_params_kwargs, control_mode)
+                                        next_params_kwargs, problem)
         super().__init__(**kwargs)
 
     def run_per_loop(self):

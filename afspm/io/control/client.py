@@ -193,27 +193,28 @@ class ControlClient:
             control_pb2.ControlRequest.REQ_SET_ZCTRL_PARAMS, zctrl_params)
         return self._try_send_req(msg)
 
-    def request_control(self, control_mode: control_pb2.ControlMode
+    def request_control(self, problem: control_pb2.ExperimentProblem,
                         ) -> control_pb2.ControlResponse:
         """Try to request control of the SPM device.
 
-        To do so, we must indicate what ControlMode this client 'functions'
-        under. On success, it indicates that (a) the SPM system is in the
-        ControlMode of your request, and (b) the SPM system is not already
-        under control.
+        To do so, we must indicate what ExperimentProblem this client
+        fixes (EP_NONE if general). On success, it indicates that (a) the
+        SPM system has the problem of your request, and (b) the SPM system is
+        not already under control.
 
         Args:
-            control_mode: ControlMode enum indicating the control mode this
-                client functions under.
+            problem: ExperimentProblem this client solves (EP_NONE if
+                general component).
 
         Returns:
             A RequestResponse enum indicating the success/failure of the
                 request.
         """
-        logger.debug("Sending request_ctrl with mode: %s",
-                     common.get_enum_str(control_pb2.ControlMode, control_mode))
+        logger.debug("Sending request_ctrl with problem: %s",
+                     common.get_enum_str(control_pb2.ExperimentProblem,
+                                         problem))
         msg = cmd.serialize_request(
-            control_pb2.ControlRequest.REQ_REQUEST_CTRL, control_mode)
+            control_pb2.ControlRequest.REQ_REQUEST_CTRL, problem)
         return self._try_send_req(msg)
 
     def release_control(self) -> control_pb2.ControlResponse:
@@ -337,7 +338,7 @@ class AdminControlClient(ControlClient):
 
 def send_req_handle_ctrl(client: ControlClient,
                          req_method: Callable, params: dict,
-                         control_mode: control_pb2.ControlMode
+                         problem: control_pb2.ExperimentProblem,
                          ) -> control_pb2.ControlResponse:
     """Send a request, trying to gain control if needed.
 
@@ -349,7 +350,8 @@ def send_req_handle_ctrl(client: ControlClient,
         client: Control Client to use for the request.
         req_method: Control Client Callable fo the method to call.
         params: dictionary of parameters to feed to the req_method.
-        control_mode: ControlMode we are requesting control from.
+        problem: ExperimentProblem this client solves (EP_NONE if
+            general component).
 
     Returns:
         Final response to this request.
@@ -359,7 +361,7 @@ def send_req_handle_ctrl(client: ControlClient,
     if rep == control_pb2.ControlResponse.REP_NOT_IN_CONTROL:
         logger.info("Request failed due to not being in control. "
                     "Requesting control.")
-        rep = client.request_control(control_mode)
+        rep = client.request_control(problem)
         if rep == control_pb2.ControlResponse.REP_SUCCESS:
             logger.info("Control received, retrying request.")
             return req_method(**params)

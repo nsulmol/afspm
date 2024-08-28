@@ -317,7 +317,7 @@ class FeedbackCorrector(ScanningComponent):
     while modifying the ZCtrl feedback parameters. It's goal is to optimize
     these feedback parameters according to the cited paper (see top).Once it
     has properly optimized the parameters, it removes the logged
-    EP_FEEDBACK_NOT_OPTIMAL, allowing whatever scanning logic to continue.
+    EP_FEEDBACK_NON_OPTIMAL, allowing whatever scanning logic to continue.
 
     In order to function, it expects to receive FeedbackAnalysis data from
     a FeedbackAnalyzer, as well as standard info from the MicroscopeTranslator.
@@ -384,10 +384,11 @@ class FeedbackCorrector(ScanningComponent):
                              CorrectionState.REVERT_SCAN_PARAMS])
         if self._correction_state in set_zctrl_states:
             logger.info(f"Sending ZCtrl Params: {self._zctrl_params}")
-            rep = send_req_handle_ctrl(self.control_client,
-                                       self.control_client.set_zctrl_params,
-                                       {'zctrl_params': self._zctrl_params},
-                                       control_pb2.ControlMode.CM_PROBLEM)
+            rep = send_req_handle_ctrl(
+                self.control_client,
+                self.control_client.set_zctrl_params,
+                {'zctrl_params': self._zctrl_params},
+                control_pb2.ExperimentProblem.EP_FEEDBACK_NON_OPTIMAL)
             if rep == control_pb2.ControlResponse.REP_SUCCESS:
                 if self._correction_state == CorrectionState.REVERT_SCAN_PARAMS:
                     logger.info("Sending original scan parameters: "

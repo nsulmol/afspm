@@ -74,7 +74,7 @@ class FakeClient:
             self.zctrl = zctrl_params
         return self.rep
 
-    def request_control(self, control_mode: control_pb2.ControlMode
+    def request_control(self, problem: control_pb2.ExperimentProblem
                         ) -> control_pb2.ControlResponse:
         return self.rep
 

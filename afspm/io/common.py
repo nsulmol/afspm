@@ -5,6 +5,7 @@ from google.protobuf.internal.enum_type_wrapper import EnumTypeWrapper
 
 from ..io.protos.generated import scan_pb2
 from ..io.protos.generated import geometry_pb2
+from ..io.protos.generated import control_pb2
 
 
 # --- Common envelope/signal stuff --- #
@@ -112,3 +113,28 @@ def is_str_in_enums(enum_obj: EnumTypeWrapper, name: str) -> bool:
         return val is not None
     except ValueError:
         return False
+
+
+# --- Control Specific Helpers --- #
+def is_problem_in_problems_set(problem: control_pb2.ExperimentProblem,
+                               problems_set: {control_pb2.ExperimentProblem}
+                               ) -> bool:
+    """Determine whether a given problem is in a problems set.
+
+    This logic accounts for the fact that EP_NONE is equivalent to an empty
+    problems set.
+
+    Args:
+        problem: the problem we are checking for.
+        problems_set: the set we are looking in.
+
+    Returns:
+        True if problem is in the problems set (or EP_NONE is the problem and
+            the problems_set is empty). False otherwise.
+    """
+    generic_component_request = (problem ==
+                                 control_pb2.ExperimentProblem.EP_NONE)
+    no_problems_and_generic_component_request = (
+        generic_component_request and len(problems_set) == 0)
+    solves_problem = problem in problems_set
+    return no_problems_and_generic_component_request or solves_problem

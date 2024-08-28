@@ -112,14 +112,16 @@ def thread_scan_handler(publisher_url, rerun_wait_s,
 
 
 # ----- Tests ----- #
-def test_control_mode(publisher, server, thread_scan_handler,
-                      control_state, scan_state_msg):
-    """Validate that we cannot run scans if the control mode is improper."""
-    logger.info("Validate that we cannot run scans if the control mode is "
+def test_experiment_problem(publisher, server, thread_scan_handler,
+                            control_state, scan_state_msg):
+    """Validate that we cannot run scans if the problem is improper."""
+    logger.info("Validate that we cannot run scans if the problem is "
                 "improper.")
-    for mode in [control_pb2.ControlMode.CM_MANUAL,
-                 control_pb2.ControlMode.CM_PROBLEM]:
-        control_state.control_mode = mode
+    for problem in [control_pb2.ExperimentProblem.EP_TIP_SHAPE_CHANGED,
+                    control_pb2.ExperimentProblem.EP_DEVICE_MALFUNCTION,
+                    control_pb2.ExperimentProblem.EP_FEEDBACK_NON_OPTIMAL]:
+        del control_state.problems_set[:]  # Clear problems set
+        control_state.problems_set.append(problem)
         publisher.send_msg(control_state)
         publisher.send_msg(scan_state_msg)
 
@@ -131,7 +133,7 @@ def test_control_mode(publisher, server, thread_scan_handler,
 
 def test_scanning(publisher, server, thread_scan_handler,
                   control_state, scan_state_msg):
-    """Validate we can .go through the scan process properly"""
+    """Validate we can go through the scan process properly"""
     logger.info("Validate we can go through the scan process properly.")
 
     states = [scan_pb2.ScanState.SS_MOVING,
