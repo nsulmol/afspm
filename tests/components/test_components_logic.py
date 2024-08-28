@@ -199,7 +199,6 @@ def request_control(afspm_component: AfspmComponentBase,
                     component_name: str):
     """Request control with a component (and flush/validate messages)"""
     rep = afspm_component.control_client.request_control(problem)
-        #control_pb2.ControlMode.CM_AUTOMATED)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
     cs = copy.deepcopy(default_control_state)
