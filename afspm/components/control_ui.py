@@ -22,7 +22,7 @@ CTRL_MODE = 'Current ControlMode:'
 IN_CTRL = 'In Control By:'
 SCAN_STATE = 'Scan State:'
 PROBLEMS_SET = 'Problem Set:'
-PROBLEMS_SET = 'Flush Problem Set'
+FLUSH_PROBLEMS_SET = 'Flush Problem Set'
 END_EXP = 'End Experiment'
 ERROR_LOG = 'Last Error Log:'
 
@@ -98,7 +98,7 @@ class AfspmControlUI(AfspmComponentBase):
                             [sg.Text(key=SCAN_STATE_KEY)],
                             [sg.Text(PROBLEMS_SET)],
                             [sg.Text(key=PROBLEMS_SET_KEY)],
-                            [sg.Button(PROBLEMS_SET)],
+                            [sg.Button(FLUSH_PROBLEMS_SET)],
                             [sg.Button(END_EXP)],
                             [sg.Text(ERROR_LOG)],
                             [sg.Text(key=ERROR_LOG_KEY)]])
@@ -116,7 +116,7 @@ class AfspmControlUI(AfspmComponentBase):
             req_methods.append(self.control_client.set_control_mode)
             req_args.append(common.get_enum_val(control_pb2.ControlMode,
                                                 event))
-        elif event == PROBLEMS_SET:
+        elif event == FLUSH_PROBLEMS_SET:
             logger.info("Flush problems set selected.")
             problems = copy.deepcopy(self.control_state.problems_set)
             for problem in problems:

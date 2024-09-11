@@ -35,6 +35,7 @@ enum ControlResponse {
     REP_NOT_FREE = 7;
     REP_PARAM_NOT_SUPPORTED = 9; // Parameter does not exist/could not be found.
     REP_PARAM_ERROR = 10; //  Trying to get/set the param failed.
+    REP_WRONG_EXP_PROBLEM = 11;
 }
 
 /* Enum holding the current control mode of afspm. */

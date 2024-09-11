@@ -137,13 +137,15 @@ class ControlRouter:
                          client)
             return control_pb2.ControlResponse.REP_ALREADY_UNDER_CONTROL
 
-        generic_component_request = (problem ==
-                                     control_pb2.ExperimentProblem.EP_NONE)
-        no_problems_and_generic_component_request = (
-            generic_component_request and len(self._problems_set) == 0)
+        in_manual_mode = self._control_mode == control_pb2.ControlMode.CM_MANUAL
+        generic_request = (problem ==
+                           control_pb2.ExperimentProblem.EP_NONE)
+        no_problems_and_generic_request = (
+            generic_request and len(self._problems_set) == 0)
         solves_problem = problem in self._problems_set
 
-        if no_problems_and_generic_component_request or solves_problem:
+        if (not in_manual_mode and no_problems_and_generic_request or
+                solves_problem):
             logger.info("%s gaining control", client)
             self._client_in_control_id = client
             return control_pb2.ControlResponse.REP_SUCCESS
@@ -151,16 +153,21 @@ class ControlRouter:
         problems_set_str = {common.get_enum_str(control_pb2.ExperimentProblem,
                                                 prblm)
                             for prblm in self._problems_set}
-        if generic_component_request:
+        if in_manual_mode:
+            logger.debug("Component %s requested control, but in manual mode",
+                         client)
+            return control_pb2.ControlResponse.REP_WRONG_CONTROL_MODE
+        if generic_request:
             logger.debug("General component %s requested control, but ",
-                         "there are logged problems: %s", problems_set_str)
+                         "there are logged problems: %s", client,
+                         problems_set_str)
         else:  # Problems are logged but the presented is not in our set.
             logger.debug("%s requested control, but resolves problem %s, "
                          "which is not one of our logged problems: %s", client,
                          common.get_enum_str(control_pb2.ExperimentProblem,
                                              problem),
                          problems_set_str)
-        return control_pb2.ControlResponse.REP_WRONG_CONTROL_MODE
+        return control_pb2.ControlResponse.REP_WRONG_EXP_PROBLEM
 
     def _handle_control_release(self, client: str) -> control_pb2.ControlResponse:
         """Release client control if applicable.
