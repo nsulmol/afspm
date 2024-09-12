@@ -1,5 +1,5 @@
 #+title: A Manufacturer-Agnostic Automation Framework for SPM
-#+author: Nick Sullivan Molina
+#+author: Nick Sullivan Molina$^1$, Peter Grutter$^2$, Kirk H. Bevan$^1$
 #+date:
 
 #+startup: beamer
@@ -12,7 +12,10 @@
 #+options: h:2 toc:1
 
 # Set institute
-#+beamer_header:\institute{McGill University}
+#+beamer_header:\institute{Materials and Mining Engineering Department$^1$, McGill University \newline Physics Department$^2$, McGill University\newline\bigskip\includegraphics[width=0.2\paperwidth]{./images/mcgill_sig_red.png}}
+
+# Add mcgill logo to title slide
+# #+beamer_header: \usebackgroundtemplate{\includegraphics[width=0.25\paperwidth]{./images/mcgill_sig_red.png}}
 
 # Remove weird navigation buttons
 #+beamer_header:\setbeamertemplate{navigation symbols}{}
