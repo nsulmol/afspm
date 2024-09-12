@@ -129,6 +129,71 @@
   [[file:images/afspm_hl_example.png]]
   :end:
 
+* afspm High-Level Diagram Example (2)
+
+#+begin_src plantuml :file images/afspm_hl_example2.png
+  !include style.puml
+  !include microscopy.puml
+
+  !include <material/network>
+  !include <material/tune>
+  !include <material/chart_areaspline>
+  !include <material/script>
+  !include <material/alert_box>
+  !include <material/wrench>
+  !include <material/repeat>
+
+  package "generic abstraction" <<groupinternal>> as afspm {
+
+    component "microscope\ntranslator\n<$ma_network>" <<interface>> <<required>> as translator
+    component "microscope\nscheduler\n<$ma_tune>" <<internal>> <<required>> as scheduler
+
+    translator <--> scheduler
+
+    package " " <<layout>> as feedback_group {
+      component "feedback\noptimizer\n<$ma_repeat>" <<internal>> <<optional>> as feedback_optimizer
+      component "feedback\nanalyzer\n<$ma_alert_box>" <<internal>> <<optional>> as feedback_analyzer
+
+      feedback_analyzer -[hidden]down- feedback_optimizer
+    }
+
+
+    package " " <<layout>> as tip_group {
+      component "tip state\nanalyzer\n<$ma_alert_box>" <<internal>> <<optional>> as tip_detector
+      component "tip state\ncorrector\n<$ma_wrench>" <<internal>> <<optional>> as tip_corrector
+
+      tip_detector -[hidden]down- tip_corrector
+    }
+
+    component "experiment\nscript\n<$ma_script>" <<internal>> <<optional>> as exp
+    scheduler -l-> exp: scan state,\nscans
+    exp -r-> scheduler: scan\nparameters
+
+    scheduler -l-> feedback_analyzer: scans
+    feedback_analyzer .r.> scheduler: log\nproblem
+
+    exp -[hidden]down- feedback_analyzer
+
+    scheduler -d-> feedback_optimizer: problems
+    feedback_optimizer .u.> scheduler: feedback\nweights
+
+
+    scheduler -r-> tip_detector: scans
+    tip_detector .l.> scheduler: log\nproblem
+
+    scheduler -d-> tip_corrector: problems
+    tip_corrector .u.> scheduler: corrective\nactions
+  }
+
+  spmcon <-r-> translator: low freq.\ncommands
+
+  #+end_src
+
+  #+RESULTS:
+  :results:
+  [[file:images/afspm_hl_example2.png]]
+  :end:
+
 * afspm Network framework
 
 #+begin_src plantuml :file images/network_framework.png
@@ -293,13 +358,13 @@ __Main Socket Types__:
   !include <material/monitor>
   !include <material/script>
 
-  component "**GXSM**\n<$ma_microscope> + <$ma_monitor>" <<example1>> as gxsm
-  component "**Asylum Research**\n<$ma_microscope> + <$ma_monitor>" <<example2>> as asylum
-  component "**Scienta Omicron**\n<$ma_microscope> + <$ma_monitor>" <<example3>> as omicron
+  component "**GXSM**\n<$ma_microscope> + <$ma_monitor>" <<color1>> as gxsm
+  component "**Asylum Research**\n<$ma_microscope> + <$ma_monitor>" <<color2>> as asylum
+  component "**Scienta Omicron**\n<$ma_microscope> + <$ma_monitor>" <<color3>> as omicron
 
-  component "GXSM Script\n<$ma_script>" <<example1>> as gxsm_script
-  component "Asylum Script\n<$ma_script>" <<example2>> as asylum_script
-  component "Omicron Script\n<$ma_script>" <<example3>> as omicron_script
+  component "GXSM Script\n<$ma_script>" <<color1>> as gxsm_script
+  component "Asylum Script\n<$ma_script>" <<color2>> as asylum_script
+  component "Omicron Script\n<$ma_script>" <<color3>> as omicron_script
 
   gxsm <-d- gxsm_script: Custom \nPython \nAPI
   asylum<-d- asylum_script: Custom \nIGOR \nAPI
@@ -323,9 +388,9 @@ __Main Socket Types__:
   !include <material/script>
   !include <material/network>
 
-  component "**GXSM**\n<$ma_microscope> + <$ma_monitor>" <<example1>> as gxsm
-  component "**Asylum Research**\n<$ma_microscope> + <$ma_monitor>" <<example2>> as asylum
-  component "**Scienta Omicron**\n<$ma_microscope> + <$ma_monitor>" <<example3>> as omicron
+  component "**GXSM**\n<$ma_microscope> + <$ma_monitor>" <<color1>> as gxsm
+  component "**Asylum Research**\n<$ma_microscope> + <$ma_monitor>" <<color2>> as asylum
+  component "**Scienta Omicron**\n<$ma_microscope> + <$ma_monitor>" <<color3>> as omicron
 
   'Enforce order'
   gxsm -[hidden]r- asylum
@@ -333,9 +398,9 @@ __Main Socket Types__:
 
   package "afspm abstraction" <<groupinternal>> {
     component "microscope \ntranslators" <<internal>> as translators {
-      component "GXSM \ntranslator\n<$ma_network>" <<example1>> <<required>> as gxsm_tr
-      component "Asylum \ntranslator\n<$ma_network>" <<example2>> <<required>> as asylum_tr
-      component "Omicron \ntranslator\n<$ma_network>" <<example3>> <<required>> as omicron_tr
+      component "GXSM \ntranslator\n<$ma_network>" <<color1>> <<required>> as gxsm_tr
+      component "Asylum \ntranslator\n<$ma_network>" <<color2>> <<required>> as asylum_tr
+      component "Omicron \ntranslator\n<$ma_network>" <<color3>> <<required>> as omicron_tr
     }
 
     component "afspm script\n<$ma_script>" <<internal>> as exp

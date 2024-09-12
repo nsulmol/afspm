@@ -62,17 +62,25 @@
     HorizontalAlignment right
   }
 
-  .example1 {
+  .color1 {
     BackgroundColor PHYSICAL
   }
 
-  .example2 {
+  .color2 {
     BackgroundColor STRATEGY
   }
 
-  .example3 {
+  .color3 {
     BackgroundColor MOTIVATION
   }
+
+  .layout {
+    borderColor Transparent
+    backgroundColor Transparent
+    fontColor Transparent
+    stereotypeFontColor Transparent
+  }
+}
 
 </style>
 
@@ -85,6 +93,6 @@
   skinparam maxMessageSize 300
 
   'default line color is grey (to highlight required)'
-  skinparam LineColor Red
+  skinparam LineColor Gray
 
   hide stereotype
