@@ -102,12 +102,12 @@ url = 'router_url'
 [exp_data]  # TODO: Try just as dict
 class = 'experiment.ExperimentData'
 phys_units = 'physical_units'
-full_scan_res = 'full_scan_size'
+full_scan_res = 'full_scan_res'
 full_scan_phys_origin = 'full_scan_origin'
 full_scan_phys_size = 'full_scan_size'
 
 data_units = 'data_units'
-sub_scan_res = 'small_scan_size'
+sub_scan_res = 'small_scan_res'
 sub_scan_phys_size = 'small_scan_size'
 
 sub_scans_per_full_scan = 3
@@ -202,7 +202,7 @@ class = 'afspm.components.microscope.scheduler.MicroscopeScheduler'
 pubsubcache = 'scheduler_psc'
 router = 'scheduler_router'
 
-[dev_con]
+[translator]
 component = true
 class = 'afspm.components.microscope.translators.image.translator.ImageTranslator'
 

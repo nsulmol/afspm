@@ -141,7 +141,7 @@ class = 'afspm.components.microscope.scheduler.MicroscopeScheduler'
 pubsubcache = 'scheduler_psc'
 router = 'scheduler_router'
 
-[dev_con]
+[translator]
 component = true
 class = 'afspm.components.microscope.translators.image.translator.ImageTranslator'
 
