@@ -261,7 +261,7 @@ class TestRouterServerClient:
                                    rtr_client, rtr_client_server_methods):
         """Client requests wrong problem."""
         rep = rtr_client.request_control(problem)
-        assert rep == control_pb2.ControlResponse.REP_WRONG_CONTROL_MODE
+        assert rep == control_pb2.ControlResponse.REP_WRONG_EXP_PROBLEM
 
         comm_pub.send_multipart([CommEnvelope.KILL.value.encode(),
                                  b''])
