@@ -1,6 +1,7 @@
 """Holds base class for all components."""
 
 import logging
+import traceback
 import time
 from typing import Callable
 import zmq
@@ -107,6 +108,8 @@ class AfspmComponentBase:
                 time.sleep(self.loop_sleep_s)
         except (KeyboardInterrupt, SystemExit):
             logger.warning(f"{self.name}: Interrupt received. Stopping.")
+        except Exception:
+            logger.error(traceback.format_exc())
 
         # Terminate (not so gracefully)
         self.ctx.destroy()  # TODO: investigate ctx.term() instead.

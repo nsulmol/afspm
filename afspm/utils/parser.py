@@ -8,6 +8,7 @@ All other methods are used within these and thus private.
 """
 
 import copy
+import traceback
 import logging
 from importlib import import_module
 from typing import Any, Callable
@@ -95,9 +96,9 @@ def _expand_variables_recursively(config_dict: dict, sub_dict: dict) -> dict:
             else:  # Copy value over (this is not a variable)
                 logger.trace(f"Keeping {sub_dict[key]} for key {key}.")
                 sub_dict[key] = sub_dict[key]
-    except Exception as error:
+    except Exception:
         logger.error(f"Exception for key:val = {key} : {sub_dict[key]}")
-        logger.exception(error)
+        logger.error(traceback.format_exc())
     return sub_dict
 
 
