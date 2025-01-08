@@ -27,8 +27,8 @@ class ABCSubscriber(ABC):
     """
 
     @abstractmethod
-    def poll_and_store(self) -> list[(str, Message)] | None:
-        """Receive message and store in cache.
+    def poll_and_store(self) -> list[tuple[str, Message]] | None:
+        """Receive message(s) and store in cache.
 
         Returns:
             - A list of tuples containing the envelope key of the emessage
@@ -155,33 +155,38 @@ class Subscriber(ABCSubscriber):
         """Overload parent."""
         return self._shutdown_was_requested
 
-    def poll_and_store(self) -> list[(str, Message)] | None:
-        """Receive message and store in cache.
+    def poll_and_store(self) -> list[tuple[str, Message]] | None:
+        """Receive message(s) and store in cache.
 
-        We use a poll() first, to ensure there is a message to receive.
+        We use a poll() first, to ensure there are messages to receive.
         If self.poll_timeout_ms is None, we do a blocking receive.
 
         Note: recv() *does not* handle KeyboardInterruption exceptions,
         please make sure your calling code does.
 
         Returns:
-            - a tuple containing the envelope/cache key of the message and
-                the protobuf.Message received; or
+            - a list of tuples containing the envelope/cache key of the message
+                and the protobuf.Message received; or
             - None, if no message received.
         """
-        msg = None
+        messages = []
         if self._poll_timeout_ms:
             if self._subscriber.poll(self._poll_timeout_ms, zmq.POLLIN):
-                msg = self._subscriber.recv_multipart(zmq.NOBLOCK)
+                while self._subscriber.poll(0, zmq.POLLIN):
+                    messages.append(self._subscriber.recv_multipart(
+                        zmq.NOBLOCK))
         else:
-            msg = self._subscriber.recv_multipart()
+            messages.append(self._subscriber.recv_multipart())
 
-        if msg:
-            return self._on_message_received(msg)
-        return None
+        decoded = []
+        for msg in messages:
+            dcd = self._on_message_received(msg)
+            if dcd:  # Do not append None messages (KILL signals)
+                decoded.append(dcd)
+        return decoded if len(decoded) > 0 else None
 
     def _on_message_received(self, msg: list[bytes]
-                             ) -> list[(str, Message)] | None:
+                             ) -> tuple[str, Message] | None:
         """Decode message and update cache.
 
         Args:
@@ -203,7 +208,7 @@ class Subscriber(ABCSubscriber):
         logger.debug(f"Message received {envelope}")
         self._update_cache(proto, self._cache,
                            **self._update_cache_kwargs)
-        return [(envelope, proto)]
+        return (envelope, proto)
 
 
 class ComboSubscriber(ABCSubscriber):
@@ -214,16 +219,16 @@ class ComboSubscriber(ABCSubscriber):
         self._subs = subs
         self._cache = {}
 
-    def poll_and_store(self) -> list[(str, Message)] | None:
+    def poll_and_store(self) -> list[tuple[str, Message]] | None:
         """Overload parent class."""
         self._cache = {}
-        messages = []
+        total_messages = []
         for sub in self._subs:
-            msg = sub.poll_and_store()
-            if msg:
-                messages.extend(msg)
+            sub_messages = sub.poll_and_store()
+            if sub_messages:
+                total_messages.extend(sub_messages)
             self._cache |= sub.cache  # Update combined cache!
-        return messages if len(messages) > 0 else None
+        return total_messages if len(total_messages) > 0 else None
 
     @property
     def shutdown_was_requested(self):

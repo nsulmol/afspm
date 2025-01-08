@@ -160,17 +160,31 @@ class PubSubCache:
         # Handle subscriptions
         # (when we get a subscription, we pull data from the cache)
         # I think this means we re-send cache data to *everyone* subscribed :/.
-        if self._backend in events:
-            event = self._backend.recv()
-            # Event is one byte 0=unsub or 1=sub, followed by envelope
-            if event[0] == 1:
-                envelope = event[1:].decode()
-                self._on_new_subscription(envelope)
+        backend_count = (events[self._backend] if self._backend in events
+                         else None)
+        if backend_count:
+            backend_events = []
+            for i in range(backend_count):
+                backend_events.append(self._backend.recv(zmq.NOBLOCK))
+
+            logger.debug(f'backend_events: {backend_events}')
+
+            for event in backend_events:
+                # Event is one byte 0=unsub or 1=sub, followed by envelope
+                if event[0] == 1:
+                    envelope = event[1:].decode()
+                    self._on_new_subscription(envelope)
 
         # Any new envelope data we cache and then forward
-        if self._frontend in events:
-            msg = self._frontend.recv_multipart()
-            self._on_message_received(msg)
+        frontend_count = (events[self._frontend] if self._frontend in events
+                          else None)
+        if frontend_count:
+            frontend_events = []
+            for i in range(frontend_count):
+                frontend_events.append(self._frontend.recv_multipart())
+
+            for event in frontend_events:
+                self._on_message_received(event)
 
     def _on_message_received(self, msg: list[bytes]):
         """Decode message, cache it, and pass on to subscribers.

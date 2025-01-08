@@ -350,9 +350,8 @@ def test_pubsubcache_interaction(psc_url, cache_kwargs, ctx, pub, topics_both,
 
     assert sub_scan.poll_and_store()
     assert sub_control_state.poll_and_store()
-    # Since we have subscribed to 2 topics (and both have messages in the
-    # cache), we validate that we receive data 2x.
-    assert sub_both.poll_and_store()
+    # Although we have subscribed to 2 topics, we should recieve both
+    # messages in a single poll_and_store().
     assert sub_both.poll_and_store()
 
     # Send a scan again, confirm both and sub_scan receive
