@@ -2,53 +2,50 @@
 This file holds general geometric types, for more complex messages.
 */
 
-syntax = "proto3";
+edition = "2023";
 
 // TODO: Standardize this better? Should There be IntVal and DoubleVal,
 // with value and units?
 
 /* 2D unsigned integer point. */
 message Point2u {
-  optional uint32 x = 1;
-  optional uint32 y = 2;
+  uint32 x = 1;
+  uint32 y = 2;
 }
 
 /* 2D double point */
 message Point2d {
-  optional double x = 1;
-  optional double y = 2;
+  double x = 1;
+  double y = 2;
 }
 
 /* 2D unsigned integer size. */
 message Size2u {
-  optional uint32 x = 1;
-  optional uint32 y = 2;
+  uint32 x = 1;
+  uint32 y = 2;
 }
 
 /* 2D double size. */
 message Size2d {
-  optional double x = 1;
-  optional double y = 2;
+  double x = 1;
+  double y = 2;
 }
 
 /* 3D unsigned integer size. */
 message Size3u {
-  optional uint32 x = 1;
-  optional uint32 y = 2;
-  optional uint32 z = 3;
+  uint32 x = 1;
+  uint32 y = 2;
+  uint32 z = 3;
 }
 
 /* ROI Rectangle. */
 message Rect2d {
-  optional Point2d top_left = 1;
-  optional Size2d size = 2;
+  Point2d top_left = 1;
+  Size2d size = 2;
 }
 
 /* ROI Rectangle, integer. */
 message Rect2i {
-  optional Point2u top_left = 1;
-  optional Size2u size = 2;
+  Point2u top_left = 1;
+  Size2u size = 2;
 }
-
-
-// Coordinates (points + units)

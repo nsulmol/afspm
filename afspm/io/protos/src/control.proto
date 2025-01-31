@@ -3,7 +3,7 @@
   any experimental problem that has arisen).
 */
 
-syntax = "proto3";
+edition = "2023";
 
 /* Requests that can be sent to a ControlServer/ControlRouter. */
 enum ControlRequest {
@@ -60,14 +60,14 @@ enum ExperimentProblem {
 
 /* Contains the current overall SPM status. */
 message ControlState {
-    optional ControlMode control_mode = 1;
-    optional string client_in_control_id = 2;
+    ControlMode control_mode = 1;
+    string client_in_control_id = 2;
     repeated ExperimentProblem problems_set = 3;
 }
 
 /* Get/set a system parameter. See afspm.components.device.params.py.*/
 message ParameterMsg {
-    optional string parameter = 1;
-    optional string value = 2;  // If not provided, we treat as a get.
-    optional string units = 3;  // Units associated to value.
+    string parameter = 1;
+    string value = 2;  // If not provided, we treat as a get.
+    string units = 3;  // Units associated to value.
 }

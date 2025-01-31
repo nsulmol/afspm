@@ -9,7 +9,7 @@
 // units and convert to their desired format.
 // Pint can be used on either end.
 
-syntax = "proto3";
+edition = "2023";
 
 import "google/protobuf/timestamp.proto";
 import "geometry.proto";
@@ -36,31 +36,31 @@ message ScanStateMsg {
 
 /* Holds data shape and units. */
 message DataAspects {
-  optional Size2u shape = 1;  // If/when we support spectroscopy, change to 3d
+  Size2u shape = 1;  // If/when we support spectroscopy, change to 3d
   // Note: unimportant when *setting*, useful for *interpreting*.
-  optional string units = 2;
+  string units = 2;
 }
 
 /* Holds spatial roi and units. */
 message SpatialAspects {
-  optional Rect2d roi = 1;
-  optional string units = 2; // Units for y- and x- dimensions
+  Rect2d roi = 1;
+  string units = 2; // Units for y- and x- dimensions
 }
 
 /* ScanParameters contains the parameters of the scan that can be set
   * externally. */
 message ScanParameters2d {
-  optional SpatialAspects spatial = 1;
-  optional DataAspects data = 2;
+  SpatialAspects spatial = 1;
+  DataAspects data = 2;
 }
 
 /* Scan contains the parameters, data array from an individual scan, and
  * any additional data tied to the scan. */
 message Scan2d {
-  optional ScanParameters2d params = 1;
-  optional google.protobuf.Timestamp timestamp = 2;
-  optional string channel = 3; // Channel to save
-  optional string filename = 5;
+  ScanParameters2d params = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  string channel = 3; // Channel to save
+  string filename = 5;
 
   repeated double values = 4; // Expect [y][x]
 }

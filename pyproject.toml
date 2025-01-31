@@ -14,7 +14,7 @@ pyzmq = [
       {version = "~23.2.1", markers = 'sys_platform == "win32"'}
 ]
 numpy = "^1.25.1"
-protobuf = "^4.23.4"
+protobuf = "5.29.3"
 fire = "^0.5.0"
 pysimplegui = "^4.60.5"
 imageio = "^2.31.2"
