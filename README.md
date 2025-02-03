@@ -28,6 +28,7 @@ afspm relies on the following libraries:
 - tomli, to read our TOML-defined configuration files.
 - fire, for argument parsing/handling when invoked from a terminal.
 - pint, for unit conversions.
+- graphviz, to visualize config files (for debugging/validation). (Note that this package expects graphviz to be installed locally and in your PATH. Follow it's documentation for how to do so if not already on your system.)
 
 Additionally, we have the following 'hard' requirements (although they are only used by some components):
 
@@ -130,6 +131,17 @@ afspm integrates with Python's logger functionality, to log communication betwee
 ### Imaging and Visualization Libraries
 
 While afspm uses its own abstraction for passing scan data between components, it contains converters from this Scan2d abstraction to pycroscopy's sidpy image format, and xarray's image format. Both of these libraries contain useful functionality, including visualization (via matplotlib).
+
+### Visualizing Config Files
+
+At times, it may be hard to validate that the components in your config file are properly interfaced (i.e. connected to the write urls). To help, we have provided a 'graphify' script. This script will convert your config file into a graphviz file and render it into an image. With it, you can do a quick check to ensure all components are talking to whom they should.
+
+For info on expected arguments, call:
+
+``` sh
+graphify --help  # Already in virtual environment
+poetry run graphify --help  # Outside of virtual environment
+```
 
 ## Limitations
 
