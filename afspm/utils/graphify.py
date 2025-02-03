@@ -26,7 +26,7 @@ COMPONENTS_COLOR = '/blues3/1'
 NODES_COLOR = 'white'
 EDGE_WIDTH = '2'
 
-STAGGER_NUM = 5  # Stagger dot file for better rendering.
+STAGGER_NUM = 10  # Stagger dot file for better rendering.
 
 
 def graphify(config_file: str, gv_filepath: str = None,
@@ -83,8 +83,36 @@ def graphify(config_file: str, gv_filepath: str = None,
     if not render_filepath:
         render_filepath = filebase + '.pdf'
 
-    dot = graphviz.Graph(name=config_file)
     expanded_dict = expand_variables_in_dict(config_dict)
+    dot = _convert_config_to_graph_file(expanded_dict, config_file)
+
+    dot = dot.unflatten(stagger=STAGGER_NUM)
+    logger.debug(f'Dot source (after staggering): {dot.source}')
+
+    dot.render(filename=gv_filepath, outfile=render_filepath)
+
+
+def _convert_config_to_graph_file(config_dict: dict, config_file: str
+                                  ) -> graphviz.Graph:
+    """Convert TOML config dict to graphviz representation.
+
+    This method converts a provided config file into a graphviz file, so it can
+    be rendered and checked for issues. It exists because config files
+    can become massive and hard to parse visually. By converting to a
+    node-based image, we can more easily check to ensure all of our components
+    are talking to each other in the manner we want.
+
+    Args:
+        config_dict: dict of a TOML config file.
+        config file: filename of the config file, for logging to gv file.
+
+    Returns:
+        A graphviz gv file associated to the config. Note that we focus on
+            components and urls, to see how the different components talk.
+            Other information (of different input parameters, component args
+            are not converted.
+    """
+    dot = graphviz.Graph(name=config_file)
 
     # First pass: get main urls and put into special cluster
     url_colors_dict = {}
@@ -94,7 +122,7 @@ def graphify(config_file: str, gv_filepath: str = None,
         sg.node_attr.update(style='filled', color=NODES_COLOR)
         sg.attr(label='urls')
 
-        for key, val in expanded_dict.items():
+        for key, val in config_dict.items():
             # First, get URLs and make them independent nodes
             if IS_URL_KEY in key:
                 clean_url = _sanitize_url_name(val)
@@ -104,7 +132,7 @@ def graphify(config_file: str, gv_filepath: str = None,
                         color=url_colors_dict[clean_url])
 
     # Now, go through components and create clusters for each.
-    for key, val in expanded_dict.items():
+    for key, val in config_dict.items():
         if _is_component(val):
             component = val
             component_name = COMPONENT_PREPEND + key
@@ -143,10 +171,8 @@ def graphify(config_file: str, gv_filepath: str = None,
                             # Edge from IO node to the url value
                             sg.edge(io_node_name, clean_url,
                                     color=url_colors_dict[clean_url])
-    logger.trace(f'Dot source before staggering: {dot.source}')
-    dot = dot.unflatten(stagger=STAGGER_NUM)
-    logger.debug(f'Dot source: {dot.source}')
-    dot.render(filename=gv_filepath, outfile=render_filepath)
+    logger.trace(f'Dot source: {dot.source}')
+    return dot
 
 
 def _get_class_simple_name(class_name: str) -> str:

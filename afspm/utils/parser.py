@@ -27,6 +27,12 @@ ARG_SEP = ','
 # instantiated
 CLASS_KEY = 'class'
 
+# Key to indicate that the dictionary is a component.
+IS_COMPONENT_KEY = 'component'
+
+# Substring of key indicating the item is a url
+IS_URL_KEY = 'url'
+
 
 def expand_variables_in_dict(config_dict: dict) -> dict:
     """Replace any 'variable' values in a dict with their values.
@@ -78,8 +84,8 @@ def _expand_variables_recursively(config_dict: dict, sub_dict: dict) -> dict:
         config_dict = copy.deepcopy(config_dict)
         sub_dict = config_dict
 
-    try:
-        for key in sub_dict:
+    for key in sub_dict:
+        try:
             if isinstance(sub_dict[key], dict):  # Go deeper in 'tree'
                 logger.trace(f"Going into dict for expansion, with key {key}")
                 sub_dict[key] = _expand_variables_recursively(
@@ -96,9 +102,9 @@ def _expand_variables_recursively(config_dict: dict, sub_dict: dict) -> dict:
             else:  # Copy value over (this is not a variable)
                 logger.trace(f"Keeping {sub_dict[key]} for key {key}.")
                 sub_dict[key] = sub_dict[key]
-    except Exception:
-        logger.error(f"Exception for key:val = {key} : {sub_dict[key]}")
-        logger.error(traceback.format_exc())
+        except Exception:
+            logger.error(f"Exception for key:val = {key} : {sub_dict[key]}")
+            logger.error(traceback.format_exc())
     return sub_dict
 
 
