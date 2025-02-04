@@ -34,7 +34,7 @@ In the top-level readme, you will see that these protos must be *compiled* into 
 Of note, the main protobuffer data structures are found in:
 - ```control.proto```: this defines control requests/responses, control modes, experiment problems, and the structures by which these are all sent (e.g. the ControlState). These protos are sent/received via the 'control' i/o path.
 - ```geometry.proto```: these are base structures for dealing with geometric data, such as points and rectangles associated with scans. They are used by other protos.
-- ```scan.proto```: these are the main messages/structures sent out by the MicroscopeTranslator (i.e., sent out via the 'pubsub' i/o path). The 2d scans are defined here, as is the scan state, and parameters associated with a given scan.
+- ```scan.proto```: these are the main messages/structures sent out by the MicroscopeTranslator (i.e., sent out via the 'pubsub' i/o path). The 2d scans are defined here, as is the scope state, and parameters associated with a given scan.
 - ```analysis.proto```: these are some pre-defined structures for sending analysis results between components.
 
 ## Utils

@@ -135,8 +135,8 @@ def topics_scan_params():
 
 
 @pytest.fixture(scope="module")
-def topics_scan_state():
-    return [cl.CacheLogic.get_envelope_for_proto(scan_pb2.ScanStateMsg())]
+def topics_scope_state():
+    return [cl.CacheLogic.get_envelope_for_proto(scan_pb2.ScopeStateMsg())]
 
 
 @pytest.fixture(scope="module")
@@ -153,9 +153,9 @@ def sub_scan(ctx, topics_scan, scan_wait_ms, psc_url):
 
 
 @pytest.fixture
-def sub_scan_state(ctx, topics_scan_state, timeout_ms, psc_url):
+def sub_scope_state(ctx, topics_scope_state, timeout_ms, psc_url):
     return Subscriber(psc_url,
-                      topics_to_sub=topics_scan_state,
+                      topics_to_sub=topics_scope_state,
                       poll_timeout_ms=timeout_ms)
 
 
@@ -302,52 +302,52 @@ def set_scan_params(client: ControlClient,
 
 # -------------------- Tests -------------------- #
 def test_cancel_scan(client, default_control_state,
-                     sub_scan, sub_scan_state, timeout_ms,
+                     sub_scan, sub_scope_state, timeout_ms,
                      control_mode):
     logger.info("Validate we can start and cancel a scan.")
     startup_grab_control(client, control_mode)
 
     logger.info("First, validate we *do not* have an initial scan (in the "
-                "cache), and *do* have an initial scan state (SS_FREE).")
-    scan_state_msg = scan_pb2.ScanStateMsg(
-        scan_state=scan_pb2.ScanState.SS_FREE)
+                "cache), and *do* have an initial scope state (SS_FREE).")
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_FREE)
 
     # Hack around, make poll short for this.
     tmp_timeout_ms = sub_scan._poll_timeout_ms
     sub_scan._poll_timeout_ms = timeout_ms
     assert not sub_scan.poll_and_store()
-    assert_sub_received_proto(sub_scan_state,
-                              scan_state_msg)
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
     sub_scan._poll_timeout_ms = tmp_timeout_ms  # Return to prior
 
     logger.info("Next, validate that we can start a scan and are notified "
                 "scanning has begun.")
     rep = client.start_scan()
 
-    scan_state_msg = scan_pb2.ScanStateMsg(
-        scan_state=scan_pb2.ScanState.SS_SCANNING)
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_COLLECTING)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
-    assert_sub_received_proto(sub_scan_state,
-                              scan_state_msg)
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
 
     logger.info("Next, cancel the scan before it has finished, and ensure "
                 "we are notified it has been cancelled (via an interruption).")
     rep = client.stop_scan()
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
-    scan_state_msg = scan_pb2.ScanStateMsg(
-        scan_state=scan_pb2.ScanState.SS_INTERRUPTED)
-    assert_sub_received_proto(sub_scan_state,
-                              scan_state_msg)
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_INTERRUPTED)
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
 
     logger.info("Lastly, ensure we are notified the translator is free and no "
                 "scans were received.")
-    scan_state_msg = scan_pb2.ScanStateMsg(
-        scan_state=scan_pb2.ScanState.SS_FREE)
-    assert_sub_received_proto(sub_scan_state,
-                              scan_state_msg)
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_FREE)
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
 
-    assert not sub_scan_state.poll_and_store()
+    assert not sub_scope_state.poll_and_store()
     end_test(client)
     stop_client(client)
 
@@ -392,7 +392,7 @@ def test_scan_params(client, default_control_state,
 
 
 def test_run_scan(client, default_control_state,
-                  sub_scan, sub_scan_state, sub_scan_params, timeout_ms,
+                  sub_scan, sub_scope_state, sub_scan_params, timeout_ms,
                   control_mode, config_dict):
     logger.info("Validate we can start a scan, and receive one on finish.")
     startup_grab_control(client, control_mode)
@@ -414,31 +414,31 @@ def test_run_scan(client, default_control_state,
                         desired_data_shape)
 
     logger.info("Validate we *do not* have an initial scan (in the "
-                "cache), and *do* have an initial scan state (SS_FREE).")
-    scan_state_msg = scan_pb2.ScanStateMsg(
-        scan_state=scan_pb2.ScanState.SS_FREE)
+                "cache), and *do* have an initial scope state (SS_FREE).")
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_FREE)
 
     # Hack around, make poll short for this.
     tmp_timeout_ms = sub_scan._poll_timeout_ms
     sub_scan._poll_timeout_ms = timeout_ms
     assert not sub_scan.poll_and_store()
-    assert_sub_received_proto(sub_scan_state,
-                              scan_state_msg)
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
     sub_scan._poll_timeout_ms = tmp_timeout_ms  # Return to prior
 
     logger.info("Validate that we can start a scan and are notified "
                 "scanning has begun.")
     rep = client.start_scan()
-    scan_state_msg = scan_pb2.ScanStateMsg(
-        scan_state=scan_pb2.ScanState.SS_SCANNING)
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_COLLECTING)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
-    assert_sub_received_proto(sub_scan_state, scan_state_msg)
+    assert_sub_received_proto(sub_scope_state, scope_state_msg)
 
     logger.info("Wait for a predetermined 'long-enough' period, "
                 "and validate the scan finishes.")
     assert sub_scan.poll_and_store()
-    scan_state_msg.scan_state = scan_pb2.ScanState.SS_FREE
-    assert_sub_received_proto(sub_scan_state, scan_state_msg)
+    scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
+    assert_sub_received_proto(sub_scope_state, scope_state_msg)
 
     if orig_scan_speed or orig_scan_params:
         logger.info("Reset scan settings to what they were before the test.")

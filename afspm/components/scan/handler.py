@@ -56,8 +56,8 @@ class ScanHandler:
 
         _problems_set: current problems set the scheduler has.
         _scan_params: current ScanParameters2d instance.
-        _scan_state: current ScanState.
-        _desired_scan_state: desired ScanState.
+        _scope_state: current ScopeState.
+        _desired_scope_state: desired ScopeState.
         _rerun_scanning_logic: whether or not we need to potentially rerun a
             scan.
         _rerun_sleep_ts: a timestamp for determining when to rerun a scan.
@@ -78,15 +78,15 @@ class ScanHandler:
 
         self._problems_set = {}
         self._scan_params = scan_pb2.ScanParameters2d()
-        self._scan_state = scan_pb2.ScanState.SS_UNDEFINED
-        self._desired_scan_state = scan_pb2.ScanState.SS_UNDEFINED
+        self._scope_state = scan_pb2.ScopeState.SS_UNDEFINED
+        self._desired_scope_state = scan_pb2.ScopeState.SS_UNDEFINED
         self._rerun_sleep_ts = None
 
     def on_message_received(self, proto: Message,
                             control_client: ControlClient):
         """Handle scanning logic on an AfspmComponent's message receipt.
 
-        This will update the current scan_state and desired_scan_state, and
+        This will update the current scope_state and desired_scope_state, and
         send out the next request toward performing a scan.
 
         It should be called within the associated AfspmComponent's
@@ -98,8 +98,8 @@ class ScanHandler:
         """
         if isinstance(proto, control_pb2.ControlState):
             self._problems_set = proto.problems_set
-        if isinstance(proto, scan_pb2.ScanStateMsg):
-            self._handle_scan_state_receipt(proto)
+        if isinstance(proto, scan_pb2.ScopeStateMsg):
+            self._handle_scope_state_receipt(proto)
             self._perform_scanning_logic(control_client)
 
     def handle_issues(self, control_client: ControlClient):
@@ -135,44 +135,44 @@ class ScanHandler:
 
                 self._perform_scanning_logic(control_client)
 
-    def _handle_scan_state_receipt(self, proto: scan_pb2.ScanStateMsg):
-        """Update the desired scan state (getting next scan params if needed).
+    def _handle_scope_state_receipt(self, proto: scan_pb2.ScopeStateMsg):
+        """Update the desired scope state (getting next scan params if needed).
 
         If a scan is finished, it also requests the next scan parameters via
         get_next_params().
 
         Args:
-            proto: received ScanStateMsg protobuf from the AfspmComponent.
+            proto: received ScopeStateMsg protobuf from the AfspmComponent.
         """
-        logger.debug("Received new scan state: %s",
-                     common.get_enum_str(scan_pb2.ScanState,
-                                         proto.scan_state))
-        last_state = copy.deepcopy(self._scan_state)
-        self._scan_state = proto.scan_state
+        logger.debug("Received new scope state: %s",
+                     common.get_enum_str(scan_pb2.ScopeState,
+                                         proto.scope_state))
+        last_state = copy.deepcopy(self._scope_state)
+        self._scope_state = proto.scope_state
 
         # Handling desired state logic
-        first_startup = (last_state == scan_pb2.ScanState.SS_UNDEFINED and
-                         self._scan_state == scan_pb2.ScanState.SS_FREE)
-        interrupted = self._scan_state == scan_pb2.SS_INTERRUPTED
-        finished_scanning = (last_state == scan_pb2.ScanState.SS_SCANNING and
-                             self._scan_state == scan_pb2.ScanState.SS_FREE)
-        finished_moving = (last_state == scan_pb2.ScanState.SS_MOVING and
-                           self._scan_state == scan_pb2.ScanState.SS_FREE)
+        first_startup = (last_state == scan_pb2.ScopeState.SS_UNDEFINED and
+                         self._scope_state == scan_pb2.ScopeState.SS_FREE)
+        interrupted = self._scope_state == scan_pb2.SS_INTERRUPTED
+        finished_scanning = (last_state == scan_pb2.ScopeState.SS_COLLECTING and
+                             self._scope_state == scan_pb2.ScopeState.SS_FREE)
+        finished_moving = (last_state == scan_pb2.ScopeState.SS_MOVING and
+                           self._scope_state == scan_pb2.ScopeState.SS_FREE)
 
         if interrupted:
             logger.info("A scan was interrupted! Will restart what we were "
                         "doing.")
-            self._desired_scan_state = scan_pb2.ScanState.SS_MOVING
+            self._desired_scope_state = scan_pb2.ScopeState.SS_MOVING
         elif first_startup or finished_scanning:
             if first_startup:
                 logger.info("First startup, sending first scan params.")
             else:
                 logger.info("Finished scan, preparing next scan params.")
             self._scan_params = self.get_next_params(**self.next_params_kwargs)
-            self._desired_scan_state = scan_pb2.ScanState.SS_MOVING
+            self._desired_scope_state = scan_pb2.ScopeState.SS_MOVING
         elif finished_moving:
             logger.info("Finished moving, will request scan.")
-            self._desired_scan_state = scan_pb2.ScanState.SS_SCANNING
+            self._desired_scope_state = scan_pb2.ScopeState.SS_COLLECTING
 
     def _perform_scanning_logic(self, control_client: ControlClient):
         """Request the next scan aspect from client.
@@ -187,10 +187,10 @@ class ScanHandler:
         """
         problem_in_problems_set = common.is_problem_in_problems_set(
             self.problem_to_solve, self._problems_set)
-        scan_state_undefined = (scan_pb2.ScanState.SS_UNDEFINED in
-                                (self._scan_state, self._desired_scan_state))
-        if scan_state_undefined or not problem_in_problems_set:
-            logger.debug("Not performing scanning logic because ScanState "
+        scope_state_undefined = (scan_pb2.ScopeState.SS_UNDEFINED in
+                                (self._scope_state, self._desired_scope_state))
+        if scope_state_undefined or not problem_in_problems_set:
+            logger.debug("Not performing scanning logic because ScopeState "
                          "undefined or problem not in problems set.")
             self._handle_rerun(True)
             return  # Early return, we're not ready yet.
@@ -198,13 +198,13 @@ class ScanHandler:
         # Handle sending requests (not guaranteed it will work!)
         req_to_call = None
         req_params = {}
-        if self._scan_state != self._desired_scan_state:
+        if self._scope_state != self._desired_scope_state:
             logger.info("In state %s, wanting state %s; requesting.",
-                        common.get_enum_str(scan_pb2.ScanState,
-                                            self._scan_state),
-                        common.get_enum_str(scan_pb2.ScanState,
-                                            self._desired_scan_state))
-            if self._desired_scan_state == scan_pb2.ScanState.SS_MOVING:
+                        common.get_enum_str(scan_pb2.ScopeState,
+                                            self._scope_state),
+                        common.get_enum_str(scan_pb2.ScopeState,
+                                            self._desired_scope_state))
+            if self._desired_scope_state == scan_pb2.ScopeState.SS_MOVING:
                 if not self._scan_params:
                     logger.info("Cannot send scan params, because "
                                 "get_next_params returned None."
@@ -213,7 +213,7 @@ class ScanHandler:
                     return
                 req_to_call = control_client.set_scan_params
                 req_params['scan_params'] = (self._scan_params)
-            elif self._desired_scan_state == scan_pb2.ScanState.SS_SCANNING:
+            elif self._desired_scope_state == scan_pb2.ScopeState.SS_COLLECTING:
                 req_to_call = control_client.start_scan
 
             if not req_to_call:

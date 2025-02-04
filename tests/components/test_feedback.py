@@ -273,7 +273,7 @@ def test_scan_params_over_states(cs_with_problem, feedback_corrector,
     logger.info("We expect scan params to always be the same without "
                 "num_scan_lines or points_per_line.")
     for state in list(feedback.CorrectionState):
-        logger.info("Testing scan state %s", state)
+        logger.info("Testing scope state %s", state)
         # Not sending zctrl_params or feedback analysis to not update state
         step_in_corrector(feedback_corrector, state,
                           scan_params, cs_with_problem,
@@ -295,7 +295,7 @@ def test_scan_params_over_states(cs_with_problem, feedback_corrector,
     logger.info("We expect scan params to always be modified if in config "
                 "states.")
     for state in list(feedback.CorrectionState):
-        logger.info("Testing scan state %s", state)
+        logger.info("Testing scope state %s", state)
         # Not sending zctrl_params or feedback analysis to not update state
         step_in_corrector(feedback_corrector, state,
                           scan_params, cs_with_problem,

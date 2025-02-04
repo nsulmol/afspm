@@ -120,13 +120,13 @@ class GxsmTranslator(MicroscopeTranslator):
             return control_pb2.ControlResponse.REP_SUCCESS
         return control_pb2.ControlResponse.REP_PARAM_ERROR
 
-    def poll_scan_state(self) -> scan_pb2.ScanState:
-        """Return current scan state in accordance with system model."""
-        # Note: updating self.scan_state is handled by the calling method
+    def poll_scope_state(self) -> scan_pb2.ScopeState:
+        """Return current scope state in accordance with system model."""
+        # Note: updating self.scope_state is handled by the calling method
         # in MicroscopeTranslator.
-        state = self._get_current_scan_state()
-        if (self.scan_state == scan_pb2.ScanState.SS_SCANNING and
-                state == scan_pb2.ScanState.SS_FREE):
+        state = self._get_current_scope_state()
+        if (self.scope_state == scan_pb2.ScopeState.SS_COLLECTING and
+                state == scan_pb2.ScopeState.SS_FREE):
             gxsm.autosave()  # Save the images we have recorded
         return state
 
@@ -210,13 +210,13 @@ class GxsmTranslator(MicroscopeTranslator):
         return zctrl_params
 
     @staticmethod
-    def _get_current_scan_state() -> scan_pb2.ScanState:
-        """Return the current scan state.
+    def _get_current_scope_state() -> scan_pb2.ScopeState:
+        """Return the current scope state.
 
-        This queries gxsm for its current scan state.
+        This queries gxsm for its current scope state.
 
         Returns:
-            ScanState, or None if query fails.
+            ScopeState, or None if query fails.
         """
         svec = gxsm.rtquery('s')
         s = int(svec[0])
@@ -229,9 +229,9 @@ class GxsmTranslator(MicroscopeTranslator):
         motor_running = (get_param(GxsmParameter.MOTOR) <
                          GxsmTranslator.MOTOR_RUNNING_THRESH)
         if motor_running:
-            return scan_pb2.ScanState.SS_MOTOR_RUNNING
+            return scan_pb2.ScopeState.SS_MOTOR_RUNNING
         if scanning:
-            return scan_pb2.ScanState.SS_SCANNING
+            return scan_pb2.ScopeState.SS_COLLECTING
         if moving:
-            return scan_pb2.ScanState.SS_MOVING
-        return scan_pb2.ScanState.SS_FREE
+            return scan_pb2.ScopeState.SS_MOVING
+        return scan_pb2.ScopeState.SS_FREE

@@ -109,7 +109,7 @@
 
     translator <--> scheduler
 
-    scheduler -l-> exp: scan state
+    scheduler -l-> exp: scope state
     scheduler --> roi: scans
     roi -l-> exp: roi points
     exp -r-> scheduler: scan\nparameters
@@ -166,7 +166,7 @@
     }
 
     component "experiment\nscript\n<$ma_script>" <<internal>> <<optional>> as exp
-    scheduler -l-> exp: scan state,\nscans
+    scheduler -l-> exp: scope state,\nscans
     exp -r-> scheduler: scan\nparameters
 
     scheduler -l-> feedback_analyzer: scans
@@ -331,14 +331,14 @@ __Main Socket Types__:
     }
 
     scheduler_rou <-- exp_req: "scan parameters,\nstart / stop scan requests"
-    scheduler_pub --> exp_sub: scan state
+    scheduler_pub --> exp_sub: scope state
 
     component "visualizer\n<$ma_chart_areaspline>" <<internal>> as viz {
       component REQ <<socket>> as viz_req
       component SUB <<socket>> as viz_sub
     }
 
-    scheduler_pub --> viz_sub: scan state
+    scheduler_pub --> viz_sub: scope state
   }
 
   spmcon <--> translator: low freq. \ncommands

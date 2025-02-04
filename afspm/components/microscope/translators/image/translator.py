@@ -26,7 +26,7 @@ class ImageTranslator(MicroscopeTranslator):
 
     Attributes:
         dev_img: loaded image, as an xarray DataArray.
-        dev_scan_state: current scanning state.
+        dev_scope_state: current scanning state.
         dev_scan_params: current scan parameters.
         dev_scan: latest scan.
 
@@ -65,7 +65,7 @@ class ImageTranslator(MicroscopeTranslator):
                                                       physical_size,
                                                       physical_units,
                                                       data_units)
-        self.dev_scan_state = scan_pb2.ScanState.SS_FREE
+        self.dev_scope_state = scan_pb2.ScopeState.SS_FREE
         self.dev_scan_params = scan_pb2.ScanParameters2d()
         self.dev_scan = None
         self.file_id = 0
@@ -73,18 +73,18 @@ class ImageTranslator(MicroscopeTranslator):
 
     def on_start_scan(self):
         self.start_ts = time.time()
-        self.dev_scan_state = scan_pb2.ScanState.SS_SCANNING
+        self.dev_scope_state = scan_pb2.ScopeState.SS_COLLECTING
         return control_pb2.ControlResponse.REP_SUCCESS
 
     def on_stop_scan(self):
         self.start_ts = None
-        self.dev_scan_state = scan_pb2.ScanState.SS_FREE
+        self.dev_scope_state = scan_pb2.ScopeState.SS_FREE
         return control_pb2.ControlResponse.REP_SUCCESS
 
     def on_set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
                            ) -> control_pb2.ControlResponse:
         self.start_ts = time.time()
-        self.dev_scan_state = scan_pb2.ScanState.SS_MOVING
+        self.dev_scope_state = scan_pb2.ScopeState.SS_MOVING
         self.dev_scan_params = scan_params
         return control_pb2.ControlResponse.REP_SUCCESS
 
@@ -93,8 +93,8 @@ class ImageTranslator(MicroscopeTranslator):
         """Z-Ctrl doesn't do anything with images, not supported."""
         return control_pb2.ControlResponse.REP_CMD_NOT_SUPPORTED
 
-    def poll_scan_state(self) -> scan_pb2.ScanState:
-        return self.dev_scan_state
+    def poll_scope_state(self) -> scan_pb2.ScopeState:
+        return self.dev_scope_state
 
     def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
         return self.dev_scan_params
@@ -111,17 +111,17 @@ class ImageTranslator(MicroscopeTranslator):
         if self.start_ts:
             duration = None
             update_scan = False
-            if self.dev_scan_state == scan_pb2.ScanState.SS_SCANNING:
+            if self.dev_scope_state == scan_pb2.ScopeState.SS_COLLECTING:
                 duration = self.scan_time_s
                 update_scan = True
-            elif self.dev_scan_state == scan_pb2.ScanState.SS_MOVING:
+            elif self.dev_scope_state == scan_pb2.ScopeState.SS_MOVING:
                 duration = self.move_time_s
 
             if duration:
                 curr_ts = time.time()
                 if curr_ts - self.start_ts > duration:
                     self.start_ts = None
-                    self.dev_scan_state = scan_pb2.ScanState.SS_FREE
+                    self.dev_scope_state = scan_pb2.ScopeState.SS_FREE
                     if update_scan:
                         self.update_scan()
                         self.dev_scan.timestamp.GetCurrentTime()

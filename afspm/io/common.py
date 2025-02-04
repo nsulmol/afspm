@@ -76,8 +76,8 @@ def get_enum_val(enum_obj: EnumTypeWrapper, name: str) -> int:
     """Get the int enum value of a zmq enum, given its name.
 
     Args:
-        enum_obj: the zmq enum object, e.g. scan_pb2.ScanState.
-        name: the string name for the enum value, e.g. SS_SCANNING.
+        enum_obj: the zmq enum object, e.g. scan_pb2.ScopeState.
+        name: the string name for the enum value, e.g. SS_COLLECTING.
 
     Returns:
         the int value of this enum.
@@ -89,11 +89,11 @@ def get_enum_str(enum_obj: EnumTypeWrapper, val: int) -> str:
     """Get the string of a zmq enum value, given said value.
 
     Args:
-        enum_obj: the zmq enum object, e.g. scan_pb2.ScanState.
+        enum_obj: the zmq enum object, e.g. scan_pb2.ScopeState.
         val: the int value of this enum.
 
     Returns:
-        the string name for the enum value, e.g. SS_SCANNING.
+        the string name for the enum value, e.g. SS_COLLECTING.
     """
     return enum_obj.Name(val)
 
@@ -102,8 +102,8 @@ def is_str_in_enums(enum_obj: EnumTypeWrapper, name: str) -> bool:
     """Determine if a string corresponds to one of the enum values.
 
     Args:
-        enum_obj: the zmq enum object, e.g. scan_pb2.ScanState.
-        name: the string name for the enum value, e.g. SS_SCANNING.
+        enum_obj: the zmq enum object, e.g. scan_pb2.ScopeState.
+        name: the string name for the enum value, e.g. SS_COLLECTING.
 
     Returns:
         true if the name corresponds to an enum value, false otherwise.

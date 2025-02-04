@@ -14,36 +14,36 @@ edition = "2023";
 import "google/protobuf/timestamp.proto";
 import "geometry.proto";
 
-/* Enum indicating the current state of scanning */
-enum ScanState {
+/* Enum indicating the current state of the microscope. */
+enum ScopeState {
   SS_UNDEFINED = 0;
   SS_MOVING = 1;  // Tip moving, not scanning
-  SS_SCANNING = 2;
+  SS_COLLECTING = 2; // Collecting data (scan or 1D signal)
   SS_FREE = 3; // Neither scanning nor moving, free to do something else
   SS_INTERRUPTED = 4; // Scan was interrupted mid scan!
-  SS_MOTOR_RUNNING = 5; // A coarse motor is in motion.
-  SS_BUSY_PARAM = 6; // A param request was sent, in process of setting.
+  SS_MOTOR_RUNNING = 5; // A coarse motor is in motion
+  SS_BUSY_PARAM = 6; // A param request was sent, in process of setting
 }
 
-/* Message to hold ScanState. Remember, any message 'published' by the
+/* Message to hold ScopeState. Remember, any message 'published' by the
  * MicroscopeTranslator *must* be a protobuf Message, so we have to package in
  * this format.
  */
-message ScanStateMsg {
-  ScanState scan_state = 1;
+message ScopeStateMsg {
+  ScopeState scope_state = 1;
 }
 
 
 /* Holds data shape and units. */
 message DataAspects {
-  Size2u shape = 1;  // If/when we support spectroscopy, change to 3d
+  Size2u shape = 1;
   // Note: unimportant when *setting*, useful for *interpreting*.
   string units = 2;
 }
 
 /* Holds spatial roi and units. */
 message SpatialAspects {
-  Rect2d roi = 1;
+  Rect2d roi = 1;  // TODO: Change to RotRect2d? What needs to change?
   string units = 2; // Units for y- and x- dimensions
 }
 
@@ -59,7 +59,7 @@ message ScanParameters2d {
 message Scan2d {
   ScanParameters2d params = 1;
   google.protobuf.Timestamp timestamp = 2;
-  string channel = 3; // Channel to save
+  string channel = 3; // Channel saved.
   string filename = 5;
 
   repeated double values = 4; // Expect [y][x]

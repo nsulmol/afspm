@@ -47,9 +47,9 @@ def control_state():
 
 
 @pytest.fixture()
-def scan_state_msg():
-    ss = scan_pb2.ScanStateMsg()
-    ss.scan_state = scan_pb2.ScanState.SS_FREE
+def scope_state_msg():
+    ss = scan_pb2.ScopeStateMsg()
+    ss.scope_state = scan_pb2.ScopeState.SS_FREE
     return ss
 
 
@@ -113,7 +113,7 @@ def thread_scan_handler(publisher_url, rerun_wait_s,
 
 # ----- Tests ----- #
 def test_experiment_problem(publisher, server, thread_scan_handler,
-                            control_state, scan_state_msg):
+                            control_state, scope_state_msg):
     """Validate that we cannot run scans if the problem is improper."""
     logger.info("Validate that we cannot run scans if the problem is "
                 "improper.")
@@ -123,7 +123,7 @@ def test_experiment_problem(publisher, server, thread_scan_handler,
         del control_state.problems_set[:]  # Clear problems set
         control_state.problems_set.append(problem)
         publisher.send_msg(control_state)
-        publisher.send_msg(scan_state_msg)
+        publisher.send_msg(scope_state_msg)
 
         msg = server.poll()
         assert msg == (None, None)
@@ -132,12 +132,12 @@ def test_experiment_problem(publisher, server, thread_scan_handler,
 
 
 def test_scanning(publisher, server, thread_scan_handler,
-                  control_state, scan_state_msg):
+                  control_state, scope_state_msg):
     """Validate we can go through the scan process properly"""
     logger.info("Validate we can go through the scan process properly.")
 
-    states = [scan_pb2.ScanState.SS_MOVING,
-              scan_pb2.ScanState.SS_SCANNING]
+    states = [scan_pb2.ScopeState.SS_MOVING,
+              scan_pb2.ScopeState.SS_COLLECTING]
     requests = [control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS,
                 control_pb2.ControlRequest.REQ_START_SCAN]
 
@@ -145,8 +145,8 @@ def test_scanning(publisher, server, thread_scan_handler,
     publisher.send_msg(control_state)
 
     # Start up in SS_FREE
-    scan_state_msg.scan_state = scan_pb2.ScanState.SS_FREE
-    publisher.send_msg(scan_state_msg)
+    scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
+    publisher.send_msg(scope_state_msg)
 
     # Run 3 scans
     for i in list(range(3)):
@@ -156,11 +156,11 @@ def test_scanning(publisher, server, thread_scan_handler,
             assert req == request
             server.reply(control_pb2.ControlResponse.REP_SUCCESS)
 
-            scan_state_msg.scan_state = state
-            publisher.send_msg(scan_state_msg)
+            scope_state_msg.scope_state = state
+            publisher.send_msg(scope_state_msg)
 
-            scan_state_msg.scan_state = scan_pb2.ScanState.SS_FREE
-            publisher.send_msg(scan_state_msg)
+            scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
+            publisher.send_msg(scope_state_msg)
 
     logger.info("Sending kill signal")
     publisher.send_kill_signal()
@@ -168,13 +168,13 @@ def test_scanning(publisher, server, thread_scan_handler,
 
 
 def test_req_ctrl(publisher, server, thread_scan_handler, control_state,
-                  scan_state_msg, rerun_wait_s):
+                  scope_state_msg, rerun_wait_s):
     """Validate we try to gain control if we are not under control."""
     logger.info("Validate we try to gain control if we are not under control.")
 
     # Inform scan handler we are in the expected control state.
     publisher.send_msg(control_state)
-    publisher.send_msg(scan_state_msg)
+    publisher.send_msg(scope_state_msg)
 
     req, __ = server.poll()
     assert req == control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS

@@ -86,13 +86,13 @@ def topics_scan2d():
 
 @pytest.fixture(scope="module")
 def topics_states():
-    return [cl.CacheLogic.get_envelope_for_proto(scan_pb2.ScanStateMsg()),
+    return [cl.CacheLogic.get_envelope_for_proto(scan_pb2.ScopeStateMsg()),
             cl.CacheLogic.get_envelope_for_proto(control_pb2.ControlState())]
 
 
 # --- I/O Classes (Subscribers, Clients) --- #
 @pytest.fixture
-def sub_scan_state(ctx, psc_url, topics_states, cache_kwargs, wait_ms):
+def sub_scope_state(ctx, psc_url, topics_states, cache_kwargs, wait_ms):
     # Note: we use wait_ms because  we are explicitly checking per-call,
     # rather than looping.
     return Subscriber(
@@ -168,8 +168,8 @@ def component_name():
 
 
 @pytest.fixture
-def afspm_component(sub_scan_state, admin_client, component_name, ctx):
-    return AfspmComponentBase(component_name, sub_scan_state, admin_client,
+def afspm_component(sub_scope_state, admin_client, component_name, ctx):
+    return AfspmComponentBase(component_name, sub_scope_state, admin_client,
                               ctx)
 
 
@@ -273,21 +273,21 @@ def test_start_scan(thread_microscope_translator, thread_microscope_scheduler,
                          component_name, wait_count)
 
     rep = afspm_component.control_client.start_scan()
-    scan_state_msg = scan_pb2.ScanStateMsg(
-        scan_state=scan_pb2.ScanState.SS_SCANNING)
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_COLLECTING)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
     assert_sub_received_proto(afspm_component.subscriber,
-                              scan_state_msg)
+                              scope_state_msg)
     assert not afspm_component.subscriber.poll_and_store()
 
     # Wait for scan to finish
     time.sleep(2 * scan_time_ms / 1000)
 
     # Ensure we received indication the scan ended, and an image
-    scan_state_msg.scan_state = scan_pb2.ScanState.SS_FREE
+    scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
     assert_sub_received_proto(afspm_component.subscriber,
-                              scan_state_msg)
+                              scope_state_msg)
     # Validate we received a new image.
     assert sub_scan2d.poll_and_store()
 
@@ -303,12 +303,12 @@ def test_stop_scan(thread_microscope_translator, thread_microscope_scheduler,
                          component_name, wait_count)
 
     rep = afspm_component.control_client.start_scan()
-    scan_state_msg = scan_pb2.ScanStateMsg(
-        scan_state=scan_pb2.ScanState.SS_SCANNING)
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_COLLECTING)
 
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
     assert_sub_received_proto(afspm_component.subscriber,
-                              scan_state_msg)
+                              scope_state_msg)
     # No more messages until scan done
     assert not afspm_component.subscriber.poll_and_store()
     assert not sub_scan2d.poll_and_store()
@@ -317,11 +317,11 @@ def test_stop_scan(thread_microscope_translator, thread_microscope_scheduler,
     afspm_component.control_client.stop_scan()
 
     # First, will receive an SS_INTERRUPTED state; then, an SS_FREE state.
-    for state in [scan_pb2.ScanState.SS_INTERRUPTED,
-                  scan_pb2.ScanState.SS_FREE]:
-        scan_state_msg.scan_state = state
+    for state in [scan_pb2.ScopeState.SS_INTERRUPTED,
+                  scan_pb2.ScopeState.SS_FREE]:
+        scope_state_msg.scope_state = state
         assert_sub_received_proto(afspm_component.subscriber,
-                                  scan_state_msg)
+                                  scope_state_msg)
 
     assert not sub_scan2d.poll_and_store()
     assert not afspm_component.subscriber.poll_and_store()
@@ -344,20 +344,20 @@ def test_set_scan_params(thread_microscope_translator,
 
     rep = afspm_component.control_client.set_scan_params(
         scan_pb2.ScanParameters2d())
-    scan_state_msg = scan_pb2.ScanStateMsg(
-        scan_state=scan_pb2.ScanState.SS_MOVING)
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_MOVING)
 
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
     assert_sub_received_proto(afspm_component.subscriber,
-                              scan_state_msg)
+                              scope_state_msg)
     assert not sub_scan2d.poll_and_store()
 
     # Wait for move to finish
     time.sleep(2 * move_time_ms / 1000)
 
-    scan_state_msg.scan_state = scan_pb2.ScanState.SS_FREE
+    scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
     assert_sub_received_proto(afspm_component.subscriber,
-                              scan_state_msg)
+                              scope_state_msg)
     assert not sub_scan2d.poll_and_store()
     assert not afspm_component.subscriber.poll_and_store()
 
@@ -398,11 +398,11 @@ def test_calls_while_scanning(thread_microscope_translator, no_problem,
                          component_name, wait_count)
 
     rep = afspm_component.control_client.start_scan()
-    scan_state_msg = scan_pb2.ScanStateMsg(
-        scan_state=scan_pb2.ScanState.SS_SCANNING)
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_COLLECTING)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
     assert_sub_received_proto(afspm_component.subscriber,
-                              scan_state_msg)
+                              scope_state_msg)
 
     # Note: update this if we add more MicroscopeTranslator commands!
     unallowed_commands_for_scan = {

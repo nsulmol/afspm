@@ -91,7 +91,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
     NO SPECIAL CHECKS ARE DONE: caveat emptor.
 
     If setting a param is not immediate (i.e. takes time), you can set
-    self.scan_state to SS_BUSY_PARAM *within* the method. If doing so, you will
+    self.scope_state to SS_BUSY_PARAM *within* the method. If doing so, you will
     need to set it to SS_FREE once ready.
 
     For (3)-(5): these *ARE NOT YET SUPPORTED*. We plan to introduce some
@@ -105,7 +105,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             requests.
         req_handler_map: mapping from ControlRequest to method to call, for
             ease of use within some of the methods.
-        scan_state: device's current ScanState.
+        scope_state: device's current ScopeState.
         scan_params; device's current ScanParameters2d.
         scan: device's most recent Scan2d.
         subscriber: optional subscriber, to hook into (and detect) kill
@@ -150,7 +150,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         self.req_handler_map = self.create_req_handler_map()
 
         # Init our current understanding of state / params
-        self.scan_state = scan_pb2.ScanState.SS_UNDEFINED
+        self.scope_state = scan_pb2.ScopeState.SS_UNDEFINED
         self.scan_params = scan_pb2.ScanParameters2d()
         self.scans = []
 
@@ -199,8 +199,8 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def poll_scan_state(self) -> scan_pb2.ScanState:
-        """Poll the translator for the current scan state.
+    def poll_scope_state(self) -> scan_pb2.ScopeState:
+        """Poll the translator for the current scope state.
 
         Throw MicroscopeError on failure.
         """
@@ -247,16 +247,16 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
     def _handle_polling_device(self):
         """Poll aspects of device, and publishes changes (including scans).
 
-        Note: we expect scan state to be sent *last*, so that any client has
+        Note: we expect scope state to be sent *last*, so that any client has
         the ability to validate the expected changes have taken effect. Put
         differently: any client should get all other changes *before* the
         state change.
         """
-        old_scan_state = copy.deepcopy(self.scan_state)
-        self.scan_state = self.poll_scan_state()
+        old_scope_state = copy.deepcopy(self.scope_state)
+        self.scope_state = self.poll_scope_state()
 
-        if (old_scan_state == scan_pb2.ScanState.SS_SCANNING and
-                self.scan_state != scan_pb2.ScanState.SS_SCANNING):
+        if (old_scope_state == scan_pb2.ScopeState.SS_COLLECTING and
+                self.scope_state != scan_pb2.ScopeState.SS_COLLECTING):
             old_scans = copy.deepcopy(self.scans)
             self.scans = self.poll_scans()
 
@@ -299,21 +299,21 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             logger.info("New zctrl_params, sending out.")
             self.publisher.send_msg(self.zctrl_params)
 
-        # Scan state changes sent *last*!
-        if old_scan_state != self.scan_state:
-            logger.info("New scan state %s, sending out.",
-                        common.get_enum_str(scan_pb2.ScanState,
-                                            self.scan_state))
-            scan_state_msg = scan_pb2.ScanStateMsg(
-                scan_state=self.scan_state)
-            self.publisher.send_msg(scan_state_msg)
+        # scope state changes sent *last*!
+        if old_scope_state != self.scope_state:
+            logger.info("New scope state %s, sending out.",
+                        common.get_enum_str(scan_pb2.ScopeState,
+                                            self.scope_state))
+            scope_state_msg = scan_pb2.ScopeStateMsg(
+                scope_state=self.scope_state)
+            self.publisher.send_msg(scope_state_msg)
 
     def _handle_incoming_requests(self):
         """Poll control_server for requests and responds to them."""
         req, proto = self.control_server.poll()
         if req:  # Ensure we received something
             # Refuse most requests while moving/scanning (not free)
-            if (self.scan_state != scan_pb2.ScanState.SS_FREE and
+            if (self.scope_state != scan_pb2.ScopeState.SS_FREE and
                     req not in self.ALLOWED_COMMANDS_WHILE_NOT_FREE):
                 self.control_server.reply(
                     control_pb2.ControlResponse.REP_NOT_FREE)
@@ -326,12 +326,12 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                 # interruptions.
                 if (req == control_pb2.ControlRequest.REQ_STOP_SCAN and
                         rep == control_pb2.ControlResponse.REP_SUCCESS):
-                    scan_state_msg = scan_pb2.ScanStateMsg(
-                        scan_state=scan_pb2.ScanState.SS_INTERRUPTED)
+                    scope_state_msg = scan_pb2.ScopeStateMsg(
+                        scope_state=scan_pb2.ScopeState.SS_INTERRUPTED)
                     logger.info("Scan interrupted, sending out %s.",
-                                common.get_enum_str(scan_pb2.ScanState,
-                                                    scan_state_msg.scan_state))
-                    self.publisher.send_msg(scan_state_msg)
+                                common.get_enum_str(scan_pb2.ScopeState,
+                                                    scope_state_msg.scope_state))
+                    self.publisher.send_msg(scope_state_msg)
 
                 if isinstance(rep, tuple):  # Special case of rep with obj
                     self.control_server.reply(rep[0], rep[1])
@@ -347,8 +347,8 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         param_method_map, which maps set/get methods to given parameters.
 
         Note: if a parameter SET is requested which induces some delay, change
-        self.scan_state to SS_BUSY_PARAM within the associated set method, and
-        ensure it is updated in poll_scan_state() once ready. This class does
+        self.scope_state to SS_BUSY_PARAM within the associated set method, and
+        ensure it is updated in poll_scope_state() once ready. This class does
         no special checks for this state, so be careful not to cause your
         translator to get stuck in this state!
 

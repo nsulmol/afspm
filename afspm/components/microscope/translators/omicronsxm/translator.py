@@ -134,8 +134,8 @@ class OmicronSXMTranslator(MicroscopeTranslator):
             print(e)
             return control_pb2.ControlResponse.REP_PARAM_ERROR
 
-    def poll_scan_state(self) -> scan_pb2.ScanState:
-        """Poll the controller for the current scan state.
+    def poll_scope_state(self) -> scan_pb2.ScopeState:
+        """Poll the controller for the current scope state.
 
         NOTE: We cannot detect whether the motor is running via SXMRemote.
         Throws a MicroscopeError on failure.
@@ -143,9 +143,9 @@ class OmicronSXMTranslator(MicroscopeTranslator):
         self.reset_DDE()
         scanning = get_param(self.DDE_client, "Scan")
         if scanning: 
-            return scan_pb2.ScanState.SS_SCANNING
+            return scan_pb2.ScopeState.SS_COLLECTING
         else:
-            return scan_pb2.ScanState.SS_FREE
+            return scan_pb2.ScopeState.SS_FREE
 
     def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
         """Poll the controller for the current scan parameters."""

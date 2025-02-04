@@ -13,7 +13,7 @@ from ...protos.generated import analysis_pb2
 # A default proto-history list for a Last-Value Cache (LVC)
 # Please update with new default messages created.
 DEFAULT_PROTO_WITH_HIST_SEQ = ((scan_pb2.Scan2d(), 1),
-                               (scan_pb2.ScanStateMsg(), 1),
+                               (scan_pb2.ScopeStateMsg(), 1),
                                (control_pb2.ControlState(), 1),
                                (scan_pb2.ScanParameters2d(), 1),
                                (feedback_pb2.ZCtrlParameters(), 1),

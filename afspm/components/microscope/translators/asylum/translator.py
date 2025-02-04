@@ -161,15 +161,15 @@ class AsylumTranslator(MicroscopeTranslator):
             return control_pb2.ControlResponse.REP_SUCCESS
         return control_pb2.ControlResponse.REP_PARAM_ERROR
 
-    def poll_scan_state(self) -> scan_pb2.ScanState:
-        """Override scan state polling."""
+    def poll_scope_state(self) -> scan_pb2.ScopeState:
+        """Override scope state polling."""
         scan_status = params.get_param(self._client,
                                        params.AsylumParam.SCAN_STATUS)
 
         if scan_status > 0:  # If 0, not scanning
-            return scan_pb2.ScanState.SS_SCANNING
+            return scan_pb2.ScopeState.SS_COLLECTING
         else:
-            return scan_pb2.ScanState.SS_FREE
+            return scan_pb2.ScopeState.SS_FREE
 
     def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
         """Override polling of scan params."""

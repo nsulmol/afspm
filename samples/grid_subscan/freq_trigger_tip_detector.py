@@ -33,7 +33,7 @@ class FreqTriggerTipDetector(AfspmComponent):
         """Throw a tip problem every N scans (but wait until resolved)."""
         tip_problem = control_pb2.ExperimentProblem.EP_TIP_SHAPE_CHANGED
         if self.problem_resolved:
-            if isinstance(proto, scan_pb2.ScanStateMsg):
+            if isinstance(proto, scan_pb2.ScopeStateMsg):
                 self.scan_count += 1
             if self.scan_count > self.scan_period_raise_problem:
                 rep = self.control_client.add_experiment_problem(tip_problem)

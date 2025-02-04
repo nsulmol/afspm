@@ -20,14 +20,14 @@ logger = logging.getLogger(__name__)
 AFSPM_CTRL = 'AFSPM Control'
 CTRL_MODE = 'Current ControlMode:'
 IN_CTRL = 'In Control By:'
-SCAN_STATE = 'Scan State:'
+SCOPE_STATE = 'Scope State:'
 PROBLEMS_SET = 'Problem Set:'
 FLUSH_PROBLEMS_SET = 'Flush Problem Set'
 END_EXP = 'End Experiment'
 ERROR_LOG = 'Last Error Log:'
 
 IN_CTRL_KEY = 'CTRL'
-SCAN_STATE_KEY = 'SCAN_STATE'
+SCOPE_STATE_KEY = 'SCOPE_STATE'
 PROBLEMS_SET_KEY = 'PRBLM'
 ERROR_LOG_KEY = 'ERROR_LOG'
 
@@ -40,13 +40,13 @@ ALL_TOPICS = ""
 class AfspmControlUI(AfspmComponentBase):
     """Simple UI class to present info from, and control, the scheduler.
 
-    This class will present a simple UI to show current ControlState/ScanState
+    This class will present a simple UI to show current ControlState/ScopeState
     of the afspm system, and allow admin controls of it.
 
     Note that this component *requires*:
     - An AdminControlClient to be provided, so it can use adminc controls.
     - A Subscriber subscribed to control_pb2.ControlState and
-    scan_pb2.ScanStateMsg (alternatively, subscribed to all).
+    scan_pb2.ScopeStateMsg (alternatively, subscribed to all).
 
     Without this, it will not function properly! We avoided overloading the
     constructor to enforce this, as it would create a ton of input arguments
@@ -65,7 +65,7 @@ class AfspmControlUI(AfspmComponentBase):
         self._create_ui()
         self.ui_timeout_ms = ui_timeout_ms
         self.control_state = control_pb2.ControlState()
-        self.scan_state = scan_pb2.ScanState.SS_UNDEFINED
+        self.scope_state = scan_pb2.ScopeState.SS_UNDEFINED
         super().__init__(**kwargs)
 
         if not isinstance(self.control_client, ctrl_client.AdminControlClient):
@@ -94,8 +94,8 @@ class AfspmControlUI(AfspmComponentBase):
         # The rest
         self.layout.extend([[sg.Text(IN_CTRL)],
                             [sg.Text(key=IN_CTRL_KEY)],
-                            [sg.Text(SCAN_STATE)],
-                            [sg.Text(key=SCAN_STATE_KEY)],
+                            [sg.Text(SCOPE_STATE)],
+                            [sg.Text(key=SCOPE_STATE_KEY)],
                             [sg.Text(PROBLEMS_SET)],
                             [sg.Text(key=PROBLEMS_SET_KEY)],
                             [sg.Button(FLUSH_PROBLEMS_SET)],
@@ -153,11 +153,11 @@ class AfspmControlUI(AfspmComponentBase):
                 self._handle_client_changed()
             if (self.control_state.problems_set != last_cs.problems_set):
                 self._handle_problems_changed()
-        elif isinstance(proto, scan_pb2.ScanStateMsg):
-            last_state = copy.deepcopy(self.scan_state)
-            self.scan_state = proto.scan_state
-            if self.scan_state != last_state:
-                self._handle_scan_state_changed()
+        elif isinstance(proto, scan_pb2.ScopeStateMsg):
+            last_state = copy.deepcopy(self.scope_state)
+            self.scope_state = proto.scope_state
+            if self.scope_state != last_state:
+                self._handle_scope_state_changed()
 
     def _handle_mode_changed(self):
         ctrl_mode = control_pb2.ControlMode
@@ -179,9 +179,9 @@ class AfspmControlUI(AfspmComponentBase):
         client = client if client != "" else "None"
         self.window[IN_CTRL_KEY].update(client)
 
-    def _handle_scan_state_changed(self):
-        txt = common.get_enum_str(scan_pb2.ScanState, self.scan_state)
-        self.window[SCAN_STATE_KEY].update(txt)
+    def _handle_scope_state_changed(self):
+        txt = common.get_enum_str(scan_pb2.ScopeState, self.scope_state)
+        self.window[SCOPE_STATE_KEY].update(txt)
 
     def _handle_problems_changed(self):
         problems_set = self.control_state.problems_set
