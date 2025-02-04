@@ -23,7 +23,7 @@ class ScanHandler:
     """Simplifies requesting a scan from a MicroscopeTranslator.
 
     The ScanHandler encapsulates the procedure of getting a scan from a
-    MicroscopeTranslator, which involes:
+    MicroscopeTranslator, which involves:
     - Ensuring we have control of the MicroscopeTranslator.
     - Setting the scan parameters, which may involve moving the device.
     - Obtaining the scan, once the device has been setup (and moved to the
@@ -32,8 +32,8 @@ class ScanHandler:
     If we do not have control, it will log this and continue requesting control
     between sleeps of rerun_wait_s.
 
-    If the MicroscopeTranslator returns an unexpected error, it will log this and
-    retry the full request (ensuring parameters are set) between sleeps of
+    If the MicroscopeTranslator returns an unexpected error, it will log this
+    and retry the full request (ensuring parameters are set) between sleeps of
     rerun_wait_s.
 
     If self.get_next_params() returns None (i.e. it is not ready to provide
@@ -105,7 +105,7 @@ class ScanHandler:
     def handle_issues(self, control_client: ControlClient):
         """Handle issues requiring us to re-request things.
 
-        Two issues can arrise:
+        Two issues can arise:
         - MicroscopeTranslator delays/issues. Here, we need to restart a scan.
         - self.get_next_params() is not ready and has returned None. In this
         case, we need to re-request new params until we receive some.
