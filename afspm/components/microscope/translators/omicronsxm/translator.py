@@ -178,29 +178,36 @@ class OmicronSXMTranslator(MicroscopeTranslator):
         return feedback_params
 
     def poll_scans(self) -> list[scan_pb2.Scan2d]:
-        """Obtain latest performed scans.
-
-        We will compare the timestamp of the first channel of the first scan 
-        to that of the latest scan to determine if the scan succeeded 
-        (i.e. they are different). 
-        """
+        """Obtain latest performed scans."""
         latest_path = get_latest_scan_metadata_path(self.save_directory)
+
+        # Avoid reloading scans if same filename. Return old scans.
+        if latest_path == self.old_scan_fname:
+            return self.old_scans
+
         dt_modified = get_file_modification_datetime(latest)  #this is a datetime
-        
-        #TODO make util to compare DateTime to pb2.Timestamp
-        #for now, we convert the scans to scan.pb2 and compare the timestamps
-        #afterwards
-        reader = pifm.PiFMTranslator(latest_path)
-        res = reader.read()     #returns a list of sidpy datasets
+
+        # TODO: Validate. From code, it would seem we need the path to the .int,
+        # *not* the .txt metadata file...
+        try:
+            logger.debug(f'Getting datasets from {latest_path}.')
+            reader = pifm.PiFMTranslator(latest_path)
+            res = reader.read()     #returns a list of sidpy datasets
+        except Exception as exc:
+            logger.error(f"Failure loading scan at {latest_path}: {exc}")
+            return self.old_scans
+
+        # Convert and prepare scans, update old_scans.
         scans = []
         for dataset in res:
             scan = convert_sidpy_to_scan_pb2(dataset)
+
+            # Set timestamp, filename
             scan.timestamp.FromDateTime(dt_modified)
+            scan.filename = latest_path
             scans.append(scan)
         
-        #we only check timestamps after converting
-        if scans[0] and (scans[0].timestamp != self.old_scans[0].timestamp):
-            self.old_scans = scans
-            self.last_scan_fname = latest_path  #path to metadata is OK?
+        self.old_scans = scans
+        self.last_scan_fname = latest_path  #path to metadata is OK?
 
         return  self.old_scans

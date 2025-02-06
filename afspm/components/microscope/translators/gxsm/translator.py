@@ -153,6 +153,8 @@ class GxsmTranslator(MicroscopeTranslator):
         """Override scans polling."""
         channel_idx = 0
         fnames = []
+        last_scan_fname = None
+
         try:
             while channel_idx < self.MAX_NUM_CHANNELS:
                 fname = gxsm.chfname(channel_idx)
@@ -161,7 +163,7 @@ class GxsmTranslator(MicroscopeTranslator):
                 if channel_idx == 0:
                     if fname == self.last_scan_fname:
                         return self.old_scans
-                    self.last_scan_fname = fname
+                    last_scan_fname = fname
 
                 # Break if on last 'set' channel
                 if fname == self.CHANNEL_FILENAME_ERROR_STR:
@@ -191,11 +193,19 @@ class GxsmTranslator(MicroscopeTranslator):
                     logger.error(f"Could not read scan fname {fname}, "
                                  f"got error {exc}.")
                     continue
+
+                # Grabbing first data variable, since each channel is
+                # stored in its own file (so each file should have only
+                # one data variable).
                 scan = conv.convert_xarray_to_scan_pb2(
-                    ds[list(ds.data_vars)[0]])  # Grabbing first data variable
+                    ds[list(ds.data_vars)[0]])
+
+                # Set timestamp, filename
                 scan.timestamp.FromDatetime(ts)
                 scan.filename = fname
+
                 scans.append(scan)
+            self.last_scan_fname = last_scan_fname
             self.old_scans = scans
         return self.old_scans
 
