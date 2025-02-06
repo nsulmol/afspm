@@ -30,6 +30,7 @@ class GxsmParameter(str, enum.Enum):
     TL_Y = 'OffsetY'  # y-coordinate top-left of scan region (offset).
     SZ_X = 'RangeX'  # x-dimension of scan region.
     SZ_Y = 'RangeY'  # y-dimension size of scan region.
+    ANGLE = 'Angle'  # Angle of the physical scan, in degrees.
 
     # Digital scan parameters
     RES_X = 'PointsX'  # x-resolution of scan array (data points).
@@ -45,6 +46,7 @@ class GxsmParameter(str, enum.Enum):
 
 
 GET_FAILURE = '\x04'
+
 
 class GxsmChannelIds(enum.Enum):
     """Channel choice-to-int mapping.

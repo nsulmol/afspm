@@ -25,6 +25,14 @@ from ...io.protos.generated import feedback_pb2
 logger = logging.getLogger(__name__)
 
 
+# Protos attributes we check for
+TIMESTAMP_ATTRIB = 'timestamp'
+ANGLE_ATTRIB = 'angle'
+PARAM_VALUE_ATTRIB = 'value'
+
+WARNING_SENT_COUNT = 0  # To ensure we don't spam about Scan2d angle issue
+
+
 class MicroscopeError(Exception):
     """General MicroscopeTranslator error."""
 
@@ -116,9 +124,6 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             str input, corresponding to the 'set' value. If none is provided,
             only a 'get' is requested. We expect a (REP, str) as return val.
     """
-
-    TIMESTAMP_ATTRIB = 'timestamp'
-    PARAM_VALUE_ATTRIB = 'value'
 
     # Indicates commands we will allow to be sent while not free
     ALLOWED_COMMANDS_WHILE_NOT_FREE = [control_pb2.ControlRequest.REQ_STOP_SCAN]
@@ -269,8 +274,8 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             only_new_has_scans = (len(self.scans) > 0 and
                                   len(old_scans) == 0)
             both_have_timestamps = both_have_scans and (
-                self.scans[0].HasField(self.TIMESTAMP_ATTRIB) and
-                old_scans[0].HasField(self.TIMESTAMP_ATTRIB))
+                self.scans[0].HasField(TIMESTAMP_ATTRIB) and
+                old_scans[0].HasField(TIMESTAMP_ATTRIB))
 
             # First, check if timestamps are different
             scans_different = both_have_timestamps and (
@@ -284,6 +289,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
 
             if send_scan:
                 logger.info("New scans, sending out.")
+                _check_and_warn_angle_issue(self.scans)
                 for scan in self.scans:
                     self.publisher.send_msg(scan)
 
@@ -365,7 +371,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             return (control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED,
                     param)
 
-        if param.HasField(self.PARAM_VALUE_ATTRIB):
+        if param.HasField(PARAM_VALUE_ATTRIB):
             rep, val, units = self.param_method_map[param.parameter](
                 self, param.value, param.units)
         else:
@@ -380,6 +386,19 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         """Where we monitor for requests and publish results."""
         self._handle_incoming_requests()
         self._handle_polling_device()
+
+
+def _check_and_warn_angle_issue(scans: [scan_pb2.Scan2d]):
+    """Check if the angle parameter was not set. Warn user if so."""
+    global WARNING_SENT_COUNT
+    if (len(scans) > 0 and
+            not scans[0].params.spatial.roi.HasField(ANGLE_ATTRIB) and
+            WARNING_SENT_COUNT == 0):
+        logger.warning('Scans received without ROI angle set. If angles '
+                       'were used during collection, this can cause issues '
+                       'when comparing scan data. Update your translator to '
+                       'set this attribute.')
+        WARNING_SENT_COUNT += 1
 
 
 def get_file_modification_datetime(filename: str) -> datetime.datetime:

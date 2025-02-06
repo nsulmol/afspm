@@ -56,7 +56,6 @@ class ROIExperimenter(AfspmComponent):
         rng: random number generator, to choose the next sub-scan.
 
         scan_handler: ScanHandler, for performing scans.
-
     """
 
     def __init__(self, full_scan_res: list[int],
@@ -66,7 +65,7 @@ class ROIExperimenter(AfspmComponent):
                  sub_rois_per_dim: int,
                  sub_scan_res: list[int],
                  sub_scans_per_full_scan: int, rerun_wait_s: int,
-                 **kwargs):
+                 scan_angle: int = 0, **kwargs):
         """Initialize ROIExperimenter.
 
         Args:
@@ -81,6 +80,7 @@ class ROIExperimenter(AfspmComponent):
             sub_scan_res: the scan resolution of all sub-scans.
             sub_scans_per_full_scan: how many sub-scans we perform between
                 every full scan.
+            scan_angle: rotation angle to be used for scans.
         """
         self.phys_units = physical_units
         self.data_units = data_units
@@ -91,6 +91,7 @@ class ROIExperimenter(AfspmComponent):
         self.sscan_res = np.asarray(sub_scan_res, np.uint)
         self.sscans_per_fscan = sub_scans_per_full_scan
         self.rerun_wait_s = rerun_wait_s
+        self.scan_angle = scan_angle
 
         self.scans_since_last_fscan = self.sscans_per_fscan
 
@@ -152,7 +153,7 @@ class ROIExperimenter(AfspmComponent):
 
         return common.create_scan_params_2d(origin.tolist(), size.tolist(),
                                             self.phys_units, res.tolist(),
-                                            self.data_units)
+                                            self.data_units, self.scan_angle)
 
     def _reset_sub_scan_aspects(self):
         """After a full scan, reset our subscan aspects."""

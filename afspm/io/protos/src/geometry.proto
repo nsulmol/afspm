@@ -49,3 +49,17 @@ message Rect2i {
   Point2u top_left = 1;
   Size2u size = 2;
 }
+
+/* Rotated Rectangle. */
+message RotRect2d {
+  Point2d top_left = 1;
+  Size2d size = 2;
+  int angle = 3; // Rotation angle in degrees.
+}
+
+/* Rotated Rectangle, integer. */
+message RotRect2i {
+  Point2u top_left = 1;
+  Size2u size = 2;
+  int angle = 3; // Rotation angle in degrees.
+}

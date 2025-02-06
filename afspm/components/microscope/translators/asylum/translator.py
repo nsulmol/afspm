@@ -25,6 +25,11 @@ import SciFiReaders as sr
 logger = logging.getLogger(__name__)
 
 
+# Attributes from the read scan file (differs from params.AsylumParameter, which
+# contains UUIDs for getting/setting parameters).
+SCAN_ATTRIB_ANGLE = 'ScanAngle'
+
+
 class AsylumTranslator(MicroscopeTranslator):
     """Handles device communication with the asylum controller.
 
@@ -47,7 +52,8 @@ class AsylumTranslator(MicroscopeTranslator):
                    params.AsylumParam.SCAN_SIZE,
                    params.AsylumParam.SCAN_X_RATIO,
                    params.AsylumParam.SCAN_Y_RATIO,
-                   params.AsylumParam.RES_X, params.AsylumParam.RES_Y)
+                   params.AsylumParam.RES_X, params.AsylumParam.RES_Y,
+                   params.AsylumParam.ANGLE)
 
     ZCTRL_PARAMS = (params.AsylumParam.CP,
                     params.AsylumParam.CI)
@@ -139,11 +145,14 @@ class AsylumTranslator(MicroscopeTranslator):
         vals = (scan_params.spatial.roi.top_left.x,
                 scan_params.spatial.roi.top_left.y,
                 scan_size, scan_x_ratio, scan_y_ratio,
-                scan_params.data.shape.x, scan_params.data.shape.y)
+                scan_params.data.shape.x, scan_params.data.shape.y,
+                scan_params.spatial.roi.angle)
         attr_units = (scan_params.spatial.units, scan_params.spatial.units,
-                      scan_params.spatial.units, None, None, None, None)
+                      scan_params.spatial.units, None, None, None, None,
+                      scan_params.spatial.units)
         asylum_units = (params.PHYS_UNITS, params.PHYS_UNITS,
-                        params.PHYS_UNITS, None, None, None, None)
+                        params.PHYS_UNITS, None, None, None, None,
+                        params.PHYS_UNITS)
 
         if params.set_param_list(self._client, attrs, vals, attr_units,
                                  asylum_units):
@@ -177,6 +186,7 @@ class AsylumTranslator(MicroscopeTranslator):
         scan_params = scan_pb2.ScanParameters2d()
         scan_params.spatial.roi.top_left.x = vals[0]
         scan_params.spatial.roi.top_left.y = vals[1]
+        scan_params.spatial.roi.angle = vals[7]
 
         scan_size = vals[2]
         scan_ratio_w = vals[3]
@@ -219,6 +229,10 @@ class AsylumTranslator(MicroscopeTranslator):
                 ts = get_file_modification_datetime(scan_path)
                 for ds in datasets:
                     scan = conv.convert_sidpy_to_scan_pb2(ds)
+
+                    # Set ROI angle, timestamp, file
+                    scan.params.spatial.roi.angle = ds.original_metadata[
+                        SCAN_ATTRIB_ANGLE]
                     scan.timestamp.FromDatetime(ts)
                     scan.filename = scan_path
                     scans.append(scan)

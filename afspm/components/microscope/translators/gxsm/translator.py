@@ -21,6 +21,11 @@ from gxsmread import read
 logger = logging.getLogger(__name__)
 
 
+# Attributes from the read scan file (differs from params.GxsmParameter, which
+# contains UUIDs for getting/setting parameters).
+SCAN_ATTRIB_ANGLE = 'alpha'
+
+
 class GxsmTranslator(MicroscopeTranslator):
     """Handles device communication with the gxsm3 controller.
 
@@ -83,25 +88,27 @@ class GxsmTranslator(MicroscopeTranslator):
         # linked y when its x is set. Somewhat confusing, in my opinion.
         attrs = [GxsmParameter.TL_X, GxsmParameter.TL_Y,
                  GxsmParameter.SZ_X, GxsmParameter.SZ_Y,
-                 GxsmParameter.RES_X, GxsmParameter.RES_Y]
+                 GxsmParameter.RES_X, GxsmParameter.RES_Y,
+                 GxsmParameter.ANGLE,]
         vals = [scan_params.spatial.roi.top_left.x,
                 scan_params.spatial.roi.top_left.y,
                 scan_params.spatial.roi.size.x,
                 scan_params.spatial.roi.size.y,
                 scan_params.data.shape.x,
-                scan_params.data.shape.y]
+                scan_params.data.shape.y,
+                scan_params.spatial.roi.angle]
         attr_units = [scan_params.spatial.units,
                       scan_params.spatial.units,
                       scan_params.spatial.units,
                       scan_params.spatial.units,
-                      None, None]
+                      None, None, scan_params.spatial.units]
         gxsm_units = [self.gxsm_physical_units,
                       self.gxsm_physical_units,
                       self.gxsm_physical_units,
                       self.gxsm_physical_units,
-                      None, None]
+                      None, None, self.gxsm_physical_units]
 
-        # Note: when setting scan params, data units don't matter! These
+        # Note: when setting scan params, *data* units don't matter! These
         # are only important in explicit scans. When setting scan params,
         # we only care about the data shape, which is pixel-units.
         if set_param_list(attrs, vals, attr_units, gxsm_units):
@@ -134,13 +141,15 @@ class GxsmTranslator(MicroscopeTranslator):
         """Override scan params polling."""
         vals = get_param_list([GxsmParameter.TL_X, GxsmParameter.TL_Y,
                                GxsmParameter.SZ_X, GxsmParameter.SZ_Y,
-                               GxsmParameter.RES_X, GxsmParameter.RES_Y])
+                               GxsmParameter.RES_X, GxsmParameter.RES_Y,
+                               GxsmParameter.ANGLE])
 
         scan_params = scan_pb2.ScanParameters2d()
         scan_params.spatial.roi.top_left.x = vals[0]
         scan_params.spatial.roi.top_left.y = vals[1]
         scan_params.spatial.roi.size.x = vals[2]
         scan_params.spatial.roi.size.y = vals[3]
+        scan_params.spatial.roi.angle = vals[6]
         scan_params.spatial.units = self.gxsm_physical_units
 
         # Note: all gxsm attributes returned as float, must convert to int
@@ -200,7 +209,8 @@ class GxsmTranslator(MicroscopeTranslator):
                 scan = conv.convert_xarray_to_scan_pb2(
                     ds[list(ds.data_vars)[0]])
 
-                # Set timestamp, filename
+                # Set ROI angle, timestamp, filename
+                scan.params.spatial.roi.angle = ds.attrs[SCAN_ATTRIB_ANGLE]
                 scan.timestamp.FromDatetime(ts)
                 scan.filename = fname
 

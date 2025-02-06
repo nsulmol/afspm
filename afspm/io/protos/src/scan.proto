@@ -43,7 +43,7 @@ message DataAspects {
 
 /* Holds spatial roi and units. */
 message SpatialAspects {
-  Rect2d roi = 1;  // TODO: Change to RotRect2d? What needs to change?
+  RotRect2d roi = 1;
   string units = 2; // Units for y- and x- dimensions
 }
 

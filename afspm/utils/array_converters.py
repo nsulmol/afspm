@@ -1,4 +1,16 @@
-"""Array converter helpers."""
+"""Array converter helpers.
+
+Note that the conversions done know nothing about the angle that the
+data was collected with! Unfortunately, most readers provide coordinate/
+physical dimension data in 1D, so the data does not account for rotations
+performed. Instead, the rotation angle is usually stored as a metadata
+attribute (via the 'original_metadata' parameter).
+
+As such, the physical coordinate data is not correct if an angle was used,
+and must be corrected. Please ensure you populate scan_pb2.Scan2d's angle
+parameter so this information is available to other components/methods that
+might fix it.
+"""
 
 import logging
 import xarray as xr
@@ -75,7 +87,7 @@ def convert_xarray_to_scan_pb2(da: xr.DataArray) -> scan_pb2.Scan2d:
         size[key] = da[dim].max().item() - da[dim].min().item()
     top_left = geometry_pb2.Point2d(**tl)
     size = geometry_pb2.Size2d(**size)
-    roi = geometry_pb2.Rect2d(top_left=top_left, size=size)
+    roi = geometry_pb2.RotRect2d(top_left=top_left, size=size)
     physical_units = (da[da.dims[0]].units if 'units' in da[da.dims[0]].attrs
                       else None)
     spatial_aspects = scan_pb2.SpatialAspects(roi=roi,
@@ -135,6 +147,7 @@ def convert_sidpy_to_scan_pb2(ds: Dataset) -> scan_pb2.Scan2d:
 
     Args:
         dataset: sidpy Dataset instance.
+
     Returns:
         protobuf Scan2d message
 
@@ -154,7 +167,7 @@ def convert_sidpy_to_scan_pb2(ds: Dataset) -> scan_pb2.Scan2d:
         size[key] = dim.max().item() - dim.min().item()
     top_left = geometry_pb2.Point2d(**tl)
     size = geometry_pb2.Size2d(**size)
-    roi = geometry_pb2.Rect2d(top_left=top_left, size=size)
+    roi = geometry_pb2.RotRect2d(top_left=top_left, size=size)
     spatial_aspects = scan_pb2.SpatialAspects(roi=roi,
                                               units=ds.x.units)
     data_aspects = scan_pb2.DataAspects(shape=da_shape, units=ds.units)

@@ -41,6 +41,7 @@ def create_scan_params_2d(top_left: tuple[float, float] = None,
                           phys_units: str = None,
                           data_shape: tuple[int, int] = None,
                           data_units: str = None,
+                          angle: int = 0,
                           ) -> scan_pb2.ScanParameters2d:
     """Create ScanParameters2d object.
 
@@ -54,6 +55,7 @@ def create_scan_params_2d(top_left: tuple[float, float] = None,
         data_shape: 2D shape of the 2D scan.
         data_units: units of the z-dimension.
         channel_name: name of the channel this data comes from.
+        angle: rotation angle of physical roi. Defaults to 0.
 
     Returns:
         Initialized ScanParameters2d instance.
@@ -61,7 +63,7 @@ def create_scan_params_2d(top_left: tuple[float, float] = None,
     top_left = (geometry_pb2.Point2d(x=top_left[0], y=top_left[1]) if top_left
                 else None)
     size = geometry_pb2.Size2d(x=size[0], y=size[1]) if size else None
-    roi = geometry_pb2.Rect2d(top_left=top_left, size=size)
+    roi = geometry_pb2.RotRect2d(top_left=top_left, size=size, angle=angle)
     da_shape = (geometry_pb2.Size2u(x=data_shape[0], y=data_shape[1])
                 if data_shape else None)
     spatial_aspects = scan_pb2.SpatialAspects(roi=roi,

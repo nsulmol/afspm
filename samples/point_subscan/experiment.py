@@ -28,6 +28,8 @@ class ExperimentData:
     sub_scans_per_full_scan: int
     points_id: str  # Envelope for detected scan points
 
+    scan_angle: int = 0  # Rotation angle of collected data.
+
     scans_since_last_full_scan: int = 0
 
     def __post_init__(self):
@@ -91,7 +93,8 @@ def get_next_scan_params(component: AfspmComponent,
         exp_data.scans_since_last_full_scan += 1
     return common.create_scan_params_2d(origin, size,
                                         exp_data.phys_units,
-                                        res, exp_data.data_units)
+                                        res, exp_data.data_units,
+                                        exp_data.scan_angle)
 
 
 def get_roi_within_bounds_fix_size(bounds_origin: np.array,

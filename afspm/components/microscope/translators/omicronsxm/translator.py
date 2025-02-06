@@ -202,7 +202,8 @@ class OmicronSXMTranslator(MicroscopeTranslator):
         for dataset in res:
             scan = convert_sidpy_to_scan_pb2(dataset)
 
-            # Set timestamp, filename
+            # Set ROI angle, timestamp, filename
+            # TODO: Set ROI Angle!
             scan.timestamp.FromDateTime(dt_modified)
             scan.filename = latest_path
             scans.append(scan)
