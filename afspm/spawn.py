@@ -6,12 +6,11 @@ import tomli
 import fire
 import zmq
 
-# TODO: Figure out why this can't be relative?
-from afspm.utils.parser import expand_variables_in_dict
-from afspm.components.monitor import AfspmComponentsMonitor
-from afspm.components.logger import get_url_for_logging
-from afspm.utils.parser import construct_and_run_component
-from afspm.utils.log import set_up_logging
+from .utils.parser import expand_variables_in_dict, consider_config_path
+from .components.monitor import AfspmComponentsMonitor
+from .components.logger import get_url_for_logging
+from .utils.parser import construct_and_run_component
+from .utils.log import set_up_logging
 
 
 logger = logging.getLogger(__name__)
