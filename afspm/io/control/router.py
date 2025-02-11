@@ -158,7 +158,7 @@ class ControlRouter:
                          client)
             return control_pb2.ControlResponse.REP_WRONG_CONTROL_MODE
         if generic_request:
-            logger.debug("General component %s requested control, but ",
+            logger.debug("General component %s requested control, but "
                          "there are logged problems: %s", client,
                          problems_set_str)
         else:  # Problems are logged but the presented is not in our set.
