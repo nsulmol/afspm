@@ -57,20 +57,22 @@ def sample_url():
     return 'inproc://banana'
 
 
+# TODO: Test ability to support 'self'?
 def test_import_from_string(control_client_str, sample_url):
     """Validate class importing ability."""
 
     # First, confirm we can import when the module path is provided properly.
-    control_client_class = parser._import_from_string(control_client_str)
+    control_client_class = parser.import_from_string(control_client_str)
     instance = control_client_class(url=sample_url)
     from afspm.io.control.client import ControlClient
     assert isinstance(instance, ControlClient)
 
     # Lastly, confirm we *cannot* import without the module path.
-    # Instead, it just returns the original string and logs a warning.
+    # Instead, it raises an exception.
     no_path_pbc_logic = "ProtoBasedCacheLogic"
-    res = parser._import_from_string(no_path_pbc_logic)
-    assert res == no_path_pbc_logic
+
+    with pytest.raises(Exception):
+        parser.import_from_string(no_path_pbc_logic)
 
 
 @pytest.fixture

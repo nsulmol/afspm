@@ -7,6 +7,8 @@ The two main methods here are:
 All other methods are used within these and thus private.
 """
 
+import sys
+import os
 import copy
 import traceback
 import logging
@@ -363,7 +365,7 @@ def _evaluate_value_str(value: str) -> Any:
                 arg_strs = arg_strs[1:-1].split(ARG_SEP)
                 args = [_evaluate_value_str(arg_str) for arg_str in arg_strs]
 
-        imported = _import_from_string(value)
+        imported = import_from_string(value)
         if args:
             # If there were no arguments, args will be a list with one empty
             # string
@@ -375,7 +377,7 @@ def _evaluate_value_str(value: str) -> Any:
     return value  # Return original string
 
 
-def _import_from_string(obj_path: str) -> Any:
+def import_from_string(obj_path: str) -> Any:
     """Import a class or method given a string like 'a.b.c'.
 
     This method will import:
@@ -397,6 +399,9 @@ def _import_from_string(obj_path: str) -> Any:
 
     Returns:
         The imported object.
+
+    Raises:
+        ModuleNotFoundError if the associated module could not be found.
     """
     top_mod_path, _, top_obj = obj_path.rpartition('.')
     sub_mod_path, _, sub_obj = top_mod_path.rpartition('.')
@@ -417,14 +422,28 @@ def _import_from_string(obj_path: str) -> Any:
                          "requested module not existing. However, it could "
                          "be an import error *within* the requested module. "
                          "We will print the exception in case.")
-            logger.trace(exc)
+            logger.trace(traceback.format_exc())
             caught_exc = exc
             continue
 
     if final_obj:
         return final_obj
     else:
-        logger.warning(f"Could not import {obj_path}, got exception "
-                       f"{caught_exc}. Treating as direct string and "
-                       "continuing.")
-        return obj_path
+        logger.error(f"Could not import {obj_path}, got exception "
+                     f"{caught_exc}.")
+        logger.error(caught_exc)
+        raise caught_exc
+
+
+def consider_config_path(config_file: str):
+    """Add config path to PATH, so we can load modules locally from it.
+
+    This allows the user to provide relative paths for their experiment that
+    are relative to the config file.
+
+    Args:
+        config_file: path to TOML config file.
+    """
+    path = os.path.dirname(os.path.abspath(config_file)) + os.sep
+    logger.trace(f'Adding {path} to executing PATH, so we can find it.')
+    sys.path.append(path)

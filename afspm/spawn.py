@@ -106,6 +106,8 @@ def spawn_components(config_file: str,
     log_args = (log_file, log_to_stdout, log_level)
     log_init_method(*log_args)
 
+    consider_config_path(config_file)
+
     monitor = None
     ctx = None
     config_dict = None
@@ -170,6 +172,7 @@ def spawn_monitorless_component(config_file: str,
         log_level: the log level to use. Default is INFO.
     """
     set_up_logging(log_file, log_to_stdout, log_level)
+    consider_config_path(config_file)
 
     with open(config_file, 'rb') as file:
         config_dict = tomli.load(file)
