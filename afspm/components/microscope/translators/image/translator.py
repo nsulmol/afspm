@@ -142,7 +142,7 @@ class ImageTranslator(MicroscopeTranslator):
 
         # Wrapping in DataArray, to feed coordinates with units.
         # Alternatively, could just feed interp(x=x, y=y)
-        units = self.dev_scan_params.spatial.units
+        units = self.dev_scan_params.spatial.length_units
         da = xr.DataArray(data=None, dims=['y', 'x'],
                           coords={'y': y, 'x': x})
         da.x.attrs['units'] = units

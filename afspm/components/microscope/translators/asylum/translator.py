@@ -147,9 +147,9 @@ class AsylumTranslator(MicroscopeTranslator):
                 scan_size, scan_x_ratio, scan_y_ratio,
                 scan_params.data.shape.x, scan_params.data.shape.y,
                 scan_params.spatial.roi.angle)
-        attr_units = (scan_params.spatial.units, scan_params.spatial.units,
-                      scan_params.spatial.units, None, None, None, None,
-                      scan_params.spatial.units)
+        attr_units = (scan_params.spatial.length_units, scan_params.spatial.length_units,
+                      scan_params.spatial.length_units, None, None, None, None,
+                      scan_params.spatial.length_units)
         asylum_units = (params.PHYS_UNITS, params.PHYS_UNITS,
                         params.PHYS_UNITS, None, None, None, None,
                         params.PHYS_UNITS)
@@ -194,7 +194,7 @@ class AsylumTranslator(MicroscopeTranslator):
 
         scan_params.spatial.roi.size.x = scan_size * scan_ratio_w
         scan_params.spatial.roi.size.y = scan_size * scan_ratio_h
-        scan_params.spatial.units = params.PHYS_UNITS
+        scan_params.spatial.length_units = params.PHYS_UNITS
 
         # Asylum values returned as float, must convert to int?
         scan_params.data.shape.x = int(vals[5])

@@ -336,10 +336,10 @@ def set_pb2_scan_params(client: DDEClient, message: scan_pb2.ScanParameters2d
             message.data.shape.x,
             message.data.shape.y]
 
-    given_units = [message.spatial.units,
-                   message.spatial.units,
-                   message.spatial.units,
-                   message.spatial.units,
+    given_units = [message.spatial.length_units,
+                   message.spatial.length_units,
+                   message.spatial.length_units,
+                   message.spatial.length_units,
                    None, None]
 
     # Convert values to omicron units    TODO can use units.convert_list

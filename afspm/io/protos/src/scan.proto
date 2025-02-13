@@ -44,7 +44,8 @@ message DataAspects {
 /* Holds spatial roi and units. */
 message SpatialAspects {
   RotRect2d roi = 1;
-  string units = 2; // Units for y- and x- dimensions
+  string length_units = 2; // Units for y- and x- dimensions.
+  string angular_units = 3; // Units for rotation.
 }
 
 /* ScanParameters contains the parameters of the scan that can be set

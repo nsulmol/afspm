@@ -157,7 +157,7 @@ class OmicronSXMTranslator(MicroscopeTranslator):
         scan_params.spatial.roi.top_left.y = vals[1]
         scan_params.spatial.roi.size.x = vals[2]
         scan_params.spatial.roi.size.y = vals[2]
-        scan_params.spatial.units = OmicronParameterUnit.X
+        scan_params.spatial.length_units = OmicronParameterUnit.X
     
         # Note: we must provide image resolution as an int, so we convert here 
         scan_params.data.shape.x = int(vals[3])

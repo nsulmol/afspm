@@ -263,7 +263,8 @@ class Visualizer(AfspmComponent):
         scan_phys_origin = self.scan_phys_origin_map[key]
         scan_phys_size = self.scan_phys_size_map[key]
         data_units = cache_list[0].params.data.units
-        phys_units = cache_list[0].params.spatial.units
+        phys_units = cache_list[0].params.spatial.length_units
+        # TODO: Consider angle!!
 
         # Determine res of 'full image'
         sample_scan = ac.convert_scan_pb2_to_xarray(cache_list[0])

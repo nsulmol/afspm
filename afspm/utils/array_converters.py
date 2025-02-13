@@ -58,8 +58,8 @@ def convert_scan_pb2_to_xarray(scan: scan_pb2.Scan2d) -> xr.DataArray:
     da = xr.DataArray(data=data, dims=['y', 'x'],
                       coords={'y': y, 'x': x},
                       attrs={'units': scan.params.data.units})
-    da.x.attrs['units'] = scan.params.spatial.units
-    da.y.attrs['units'] = scan.params.spatial.units
+    da.x.attrs['units'] = scan.params.spatial.length_units
+    da.y.attrs['units'] = scan.params.spatial.length_units
     da.name = scan.channel
     return da
 
@@ -91,7 +91,7 @@ def convert_xarray_to_scan_pb2(da: xr.DataArray) -> scan_pb2.Scan2d:
     physical_units = (da[da.dims[0]].units if 'units' in da[da.dims[0]].attrs
                       else None)
     spatial_aspects = scan_pb2.SpatialAspects(roi=roi,
-                                              units=physical_units)
+                                              length_units=physical_units)
     data_units = da.units if 'units' in da.attrs else None
     data_aspects = scan_pb2.DataAspects(shape=da_shape, units=data_units)
     scan_params = scan_pb2.ScanParameters2d(spatial=spatial_aspects,
@@ -136,7 +136,7 @@ def convert_scan_pb2_to_sidpy(scan: scan_pb2.Scan2d) -> Dataset:
     for dim in [dset.x, dset.y]:
         dim.dimension_type = 'spatial'
         dim.quantity = 'distance'
-        dim.units = scan.params.spatial.units
+        dim.units = scan.params.spatial.length_units
 
     dset.quantity = scan.channel
     return dset
@@ -169,7 +169,7 @@ def convert_sidpy_to_scan_pb2(ds: Dataset) -> scan_pb2.Scan2d:
     size = geometry_pb2.Size2d(**size)
     roi = geometry_pb2.RotRect2d(top_left=top_left, size=size)
     spatial_aspects = scan_pb2.SpatialAspects(roi=roi,
-                                              units=ds.x.units)
+                                              length_units=ds.x.units)
     data_aspects = scan_pb2.DataAspects(shape=da_shape, units=ds.units)
     scan_params = scan_pb2.ScanParameters2d(spatial=spatial_aspects,
                                             data=data_aspects)
