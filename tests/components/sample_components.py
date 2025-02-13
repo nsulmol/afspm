@@ -8,8 +8,8 @@ from google.protobuf.message import Message
 
 from afspm.utils.units import convert
 
-from afspm.components.microscope.translator import (MicroscopeTranslator,
-                                                    MapTranslator)
+from afspm.components.microscope.translator import MicroscopeTranslator
+from afspm.components.microscope.map_translator import MapTranslator
 from afspm.components.microscope.params import (MicroscopeParameter,
                                                 ParameterError)
 from afspm.components.microscope.actions import MicroscopeAction
