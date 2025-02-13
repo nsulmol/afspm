@@ -1,4 +1,18 @@
-"""Holds Abstract Microscope Translator Class (defines translator logic)."""
+"""Holds Abstract Microscope Translator Class (defines translator logic).
+
+This file contains three main classes:
+- MicroscopeTranslator: the base translator class, which shows all the
+methods that must be implemented in order to have a functional translator.
+- MapTranslator: a child class, where MicroscopeParameter and MicroscopeAction
+controls are delegated to two separate dicts/maps.
+- ConfigTranslator: a child class, where MicroscopeParameter and
+MicroscopeAction controls are delegated to two separate classes, each using a
+configuration file to map generic parameter/actions to methods.
+
+It is recommended to sue the ConfigTranslator as your starting point, as this
+has the most inherent functionality (minimizing coding needs for someone
+writing a new translator.)
+"""
 
 import os
 import logging
@@ -9,6 +23,9 @@ from typing import Callable
 from types import MappingProxyType
 import zmq
 from google.protobuf.message import Message
+
+from . import params
+from . import actions
 
 from .. import component as afspmc
 
@@ -42,8 +59,13 @@ class MicroscopeError(Exception):
 class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
     """Handles communicating with SPM device and handling requests.
 
-    The MicroscopeTranslator is the principal node for communicating with an SPM
-    device (usually via an actual SPM controller). It is responsible for:
+    ---
+    NOTE: We recommend using ConfigTranslator as your implementation's base
+    class, as it may simplify the amount of code writing necessary.
+    ---
+
+    The MicroscopeTranslator is the principal node for communicating with an
+    SPM device (usually via an actual SPM controller). It is responsible for:
     - Receiving requests from a ControlClient and responding to them;
     - Sending appropriate requests to the device itself, to perform actions;
     - Monitoring the SPM device for state changes, and reporting these changes
@@ -61,51 +83,35 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
     specific. We expect a MicroscopeTranslator child class for a given SPM
     controller.
 
-    Note: we allow providing a subscriber to MicroscopeTranslator (it inherits
+    ---
+    The MicroscopeTranslator is based around the following capabilities:
+    - Setting scan parameters and starting, stopping, and (if supported)
+    pausing scans.
+    - Modifying the z-controller feedback parameters and slope values
+        (to minimize feedback needs).
+    - Moving the probe position and collecting 1D signals. **NOT YET**
+
+    These capabilities are implemented via set/run calls denominated
+    on_XXX() (e.g. on_start_scan), and get calls polled regularly, denominated
+    poll_XXX() (e.g. poll_scans). In this base class, these are almost all
+    abstract.
+
+    For many experiments, this may be all that is needed! This assumes the
+    researcher has already approached their surface and set the necessary
+    operating mode / parameters for a scan to run. It also assumes the user
+    has set up their scanning 1D signal collection operating modes, so they
+    only need to indicate to perform them.
+
+    For additional parameters needing settings, we introduce the REQ_PARAM
+    method. This allows getting and setting explicit parameters not defined
+    in the on_XXX() / poll_XXX() calls.
+    ---
+
+    Notes:
+    - we allow providing a subscriber to MicroscopeTranslator (it inherits
     from AspmComponent). If subscribed to the PubSubCache, it will receive
     kill signals and shutdown appropriately.
 
-    ---
-    The MicroscopeTranslator is based around the process of setting scan
-    parameters, starting and stopping scans. For many experiments, this
-    may be all that is needed! This assumes the researcher has already
-    approached their surface and set the necessary operating mode /
-    parameters for a scan to run.
-
-    However, it may also be necessary to:
-    1. Set different parameters between scans (e.g. scan speed, feedback
-    PI/PID system parameters).
-    2. Switch operating modes between scans (e.g. dynamic AM-AFM mode, static
-    mode with constant height).
-    3. Explicitly approach/retract the tip, and use a coarse motor to move
-    the scan region further around the surface.
-    4. Perform tip conditioning, by moving the tip and performing one of a set
-    of operations with the surface.
-    5. Perform a 3D form of scanning (e.g. spectroscopy).
-
-    For (1), we have introduced the REQ_PARAM request. The idea is to
-    map settings to a common 'dictionary', with IDs defined in params.py. To
-    set/get a particular parameter, the translator calls self.param_method_map
-    (see ParamMethod at end of file). If a parameter ID is not in these
-    maps, it is not supported.
-
-    (2) will be introduced in the future, via a new REQ_OP_MODE call.
-    Setting/getting an operating mode is the same as setting any other
-    parameter! We make no special checks; it is assumed that an operating mode
-    corresponds to (a) a feedback/z-controller configuration, and (b) a
-    specific set of scan channels being recorded per scan (e.g. topography,
-    phase). Thus, we expect setting a given operating mode ID on two different
-    microscope translators to result in the same output channels per scan. Again,
-    NO SPECIAL CHECKS ARE DONE: caveat emptor.
-
-    If setting a param is not immediate (i.e. takes time), you can set
-    self.scope_state to SS_BUSY_PARAM *within* the method. If doing so, you will
-    need to set it to SS_FREE once ready.
-
-    For (3)-(5): these *ARE NOT YET SUPPORTED*. We plan to introduce some
-    mechanism to run actions (REQ_RUN_ACTION), to support some or all
-    of these.
-    ---
 
     Attributes:
         publisher: Publisher instance, for publishing data.
@@ -118,23 +124,17 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         scan: device's most recent Scan2d.
         subscriber: optional subscriber, to hook into (and detect) kill
             signals.
-
-        param_method_map: a mapping from param id to a method which handles
-            set/get of that parameter. The method should accept an optional
-            str input, corresponding to the 'set' value. If none is provided,
-            only a 'get' is requested. We expect a (REP, str) as return val.
     """
 
     # Indicates commands we will allow to be sent while not free
     ALLOWED_COMMANDS_WHILE_NOT_FREE = [control_pb2.ControlRequest.REQ_STOP_SCAN]
-
 
     def __init__(self, name: str, publisher: pub.Publisher,
                  control_server: ctrl_srvr.ControlServer,
                  loop_sleep_s: int = common.LOOP_SLEEP_S,
                  beat_period_s: float = common.HEARTBEAT_PERIOD_S,
                  ctx: zmq.Context = None, subscriber: sub.Subscriber = None):
-        """Initializes the translator.
+        """Initialize the translator.
 
         Args:
             name: component name.
@@ -161,8 +161,6 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
 
         self.zctrl_params = feedback_pb2.ZCtrlParameters()
 
-        self.param_method_map = {}
-
         # AfspmComponent constructor: no control_client provided, as that
         # logic is handled by the control_server.
         super().__init__(name, subscriber=subscriber, control_client=None,
@@ -179,9 +177,11 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                 self.on_set_scan_params,
             control_pb2.ControlRequest.REQ_SET_ZCTRL_PARAMS:
                 self.on_set_zctrl_params,
-            control_pb2.ControlRequest.REQ_PARAM: self._handle_param_request,
+            control_pb2.ControlRequest.REQ_PARAM: self.on_param_request,
+            control_pb2.ControlRequest.REQ_ACTION: self.on_action_request,
         })
 
+    # ----- 'Action' Handlers ----- #
     @abstractmethod
     def on_start_scan(self) -> control_pb2.ControlResponse:
         """Handle a request to start a scan."""
@@ -190,6 +190,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
     def on_stop_scan(self) -> control_pb2.ControlResponse:
         """Handle a request to stop a scan."""
 
+    # ----- Parameter Handlers ----- #
     @abstractmethod
     def on_set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
                            ) -> control_pb2.ControlResponse:
@@ -203,6 +204,48 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         If not supported, return REP_CMD_NOT_SUPPORTED.
         """
 
+    @abstractmethod
+    def on_param_request(self, param: control_pb2.ParameterMsg
+                         ) -> (control_pb2.ControlResponse,
+                               Message | int | None):
+        """Set or get a device parameter.
+
+        Respond to a ParameterMsg request.
+
+        Note: if a parameter SET is requested which induces some delay, change
+        self.scope_state to SS_BUSY_PARAM within the associated set method, and
+        ensure it is updated in poll_scope_state() once ready. This class does
+        no special checks for this state, so be careful not to cause your
+        translator to get stuck in this state!
+
+        If not supported, return REP_CMD_NOT_SUPPORTED.
+
+        Args:
+            param: ParameterMsg request; if value is not provided, treated as
+                a 'get' request. Otherwise, treated as a 'set' request.
+
+        Returns:
+            - Response to the request.
+            - A ParameterMsg response, indicating the state after the set (or
+                just the state, if it was a get call).
+        """
+
+    @abstractmethod
+    def on_action_request(self, action: control_pb2.ActionMsg
+                          ) -> control_pb2.ControlResponse:
+        """Respond to an action request.
+
+        Given an action, the Microscope should respond.
+
+        Args:
+            action: ActionMsg request containing the desired action to be
+                performed.
+
+        Returns:
+            Response to the request. REP_ACTION
+        """
+
+    # ----- Polling Methods ----- #
     @abstractmethod
     def poll_scope_state(self) -> scan_pb2.ScopeState:
         """Poll the translator for the current scope state.
@@ -339,18 +382,263 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                                                     scope_state_msg.scope_state))
                     self.publisher.send_msg(scope_state_msg)
 
+                # TODO: Special case rep with param
                 if isinstance(rep, tuple):  # Special case of rep with obj
                     self.control_server.reply(rep[0], rep[1])
                 else:
                     self.control_server.reply(rep)
 
-    def _handle_param_request(self, param: control_pb2.ParameterMsg
-                              ) -> (control_pb2.ControlResponse,
-                                    Message | int | None):
+    def run_per_loop(self):
+        """Where we monitor for requests and publish results."""
+        self._handle_incoming_requests()
+        self._handle_polling_device()
+
+
+class MapTranslator(MicroscopeTranslator, metaclass=ABCMeta):
+    """Adds maps to MicroscopeTranslator for parameter and action handling.
+
+    In the MapTranslator, parameter handling and action handling are managed by
+    two maps/dicts: self.param_method_map and self.action_method_map. Each of
+    these maps a generic ID (params.MicroscopeParameter and
+    actions.MicroscopeAction, respectively) to an internal method for handling.
+
+    For parameter handling, each method should have the following prototype:
+        # In: MicroscopeTranslator, value (if setting), units (if setting)
+        # Out: value, units
+        Callable[[MicroscopeTranslator, Any | None, str | None],
+                 tuple[str, str]]
+    (If there is an error with the get/set, raise a params.ParameterError).
+
+    For action handling, each method should have the following prototype:
+        # In: MicroscopeTranslator
+        # Out: None
+        Callable[[MicroscopeTranslator], None]
+    (If there is an error with requesting the action, raise an
+    actions.ActionError).
+
+    In both cases, we feed the translator making the call to allow local
+    variables/logic to be used.
+
+    Args:
+        param_method_map: dict mapping params.MicroscopeParameters to
+            individual methods for handling parameter requests.
+        action_method_map: dict mapping actions.MicroscopeActions to
+            individual methods for handling action requests.
+    """
+
+    def __init__(self, name: str, publisher: pub.Publisher,
+                 control_server: ctrl_srvr.ControlServer,
+                 **kwargs):
+        """Init our map translator.
+
+        Args:
+            name: component name.
+            publisher: Publisher instance, for publishing data.
+            control_server: ControlServer instance, for responding to control
+                requests.
+        """
+        self.param_method_map = {}
+        self.action_method_map = {}  # TODO: Map start/stop_scan to methods!
+        # TODO: Map start/stop signal to methods (when available).
+        super().__init__(name, publisher, control_server, **kwargs)
+
+    def on_param_request(self, param: control_pb2.ParameterMsg
+                         ) -> (control_pb2.ControlResponse,
+                               Message | int | None):
+        """Override method, use param_method_map to map to methods."""
+        logger.warning(f'checking if we can handle param {param}')
+        logger.warning(f'params.PARAMETERS: {params.PARAMETERS}')
+        if param.parameter not in params.PARAMETERS:
+            return (control_pb2.ControlResponse.REP_PARAM_INVALID,
+                    param)
+
+        logger.warning('our param was in our PARAMETERS list. checking if supported.')
+
+        if param.parameter not in self.param_method_map:
+            return (control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED,
+                    param)
+
+        try:
+            # Try to set (if requested)
+            if param.HasField(PARAM_VALUE_ATTRIB):  # This is a 'set'
+                val, units = self.param_method_map[param.parameter](
+                    self, param.value, param.units)
+            else:  # This is a 'get'
+                val, units = self.param_method_map[param.parameter](self)
+        except params.ParameterError:
+            return (control_pb2.ControlResponse.REP_PARAM_ERROR, param)
+
+        if val:
+            param.value = str(val)  # Must convert to str for pb format
+            param.units = units
+        return (control_pb2.ControlResponse.REP_SUCCESS, param)
+
+    def on_action_request(self, action: control_pb2.ActionMsg
+                          ) -> control_pb2.ControlResponse:
+        """Respond to an action request.
+
+        Given an action, the Microscope should respond.
+
+        Args:
+            action: ActionMsg request containing the desired action to be
+                performed.
+
+        Returns:
+            Response to the request.
+        """
+        if (action.action not in actions.ACTIONS):
+            return control_pb2.ControlResponse.REP_ACTION_INVALID
+
+        if action.action not in self.action_method_map:
+            return control_pb2.ControlResponse.REP_ACTION_NOT_SUPPORTED
+
+        try:
+            self.action_method_map[action.action](self)
+        except action.ActionError:
+            return control_pb2.ControlResponse.REP_ACTION_ERROR
+
+        return control_pb2.ControlResponse.REP_SUCCESS
+
+
+class ConfigTranslator(MicroscopeTranslator, metaclass=ABCMeta):
+    """Uses params and actions configs to simplify Microscope communication.
+
+    In the ConfigTranslator, parameter handling and action handling are
+    delegated to a ParameterHandler and ActionHandler, respectively. These
+    two classes map generic parameter/action names to SPM-specific names,
+    and implement the SPM-specific getting/setting calls necessary to
+    communicate with the SPM. In doing so, we conceivably simplify the
+    definition of a translator to:
+    - On the parameters side, writing the get_param_spm() / set_param_spm()
+    methods in ParameterHandler to indicate exactly how to set/get a param;
+    and filling out a simple params_config.toml file.
+    - On the actions side, writing the request_action_spm() method in
+    ActionHandler to indicate exactly how to run an action; and filling out
+    a simple actions_config.toml file.
+    - Implementing poll_scope_state(), which likely involves calling
+    get_param() with ParameterHandler and converting the data to our
+    scan_pb2.ScopeState enum.
+    - Implementing poll_scans(), which likely involves using a pre-existing
+    Python package to read the specific SPM's save files.
+
+    Note that the abstract methods from MicroscopeTranslatorBase that we are
+    implementing here assumes no special state / order necessary to set / get
+    parameters. If your microscope has some unusual state/order necessary, you
+    may need to override some of the methods defined herein.
+
+    Also note that the standard 'action' methods we override here point
+    directly to ActionHandler equivalents. Thus, do not override these 'action'
+    methods; simply implement the method separately and point to it via the
+    ActionHandler config.
+
+    Args:
+        publisher: Publisher instance, for publishing data.
+        control_server: ControlServer instance, for responding to control
+            requests.
+        param_handler: ParameterHandler class, for handling parameter requests.
+        action_handler: ActionHandler class, for handling action requests.
+    """
+
+    def __init__(self, name: str, publisher: pub.Publisher,
+                 control_server: ctrl_srvr.ControlServer,
+                 params_config_path: str, actions_config_path: str,
+                 **kwargs):
+        """Init our configured translator.
+
+        Args:
+            name: component name.
+            publisher: Publisher instance, for publishing data.
+            control_server: ControlServer instance, for responding to control
+                requests.
+            params_config_path: path to our params TOML config file.
+            actions_config_path: path to our actions TOML config file.
+        """
+        self.param_handler = params.ParameterHandler(params_config_path)
+        self.action_handler = actions.ActionHandler(actions_config_path)
+        super().__init__(name, publisher, control_server, **kwargs)
+
+    # ----- Abstract methods needing implementation ----- #
+    @abstractmethod
+    def poll_scope_state(self) -> scan_pb2.ScopeState:
+        """Poll the translator for the current scope state.
+
+        Throw MicroscopeError on failure.
+        """
+
+    @abstractmethod
+    def poll_scans(self) -> list[scan_pb2.Scan2d]:
+        """Obtain latest performed scans.
+
+        We will compare the prior scans (or first of each) to the latest to
+        determine if the scan succeeded (i.e. they are different). Note that
+        each channel is a different scan! Thus, when we say 'latest scans',
+        we really mean the latest single- or multi-channel scan, provided as
+        a list of Scan2ds (with each Scan2d being a channel of the scan).
+
+        Note that we will first consider the timestamp attribute when
+        comparing scans. If this attribute is not passed, we will do
+        a data comparison.
+
+        Throw MicroscopeError on failure.
+
+        To read the creation time of a file using Python, use
+            get_file_modification_datetime()
+        and you can put that in the timestamp param with:
+            scan.timestamp.FromDatetime(ts)
+        """
+
+    # ----- 'Action' Handlers ----- #
+    def on_start_scan(self) -> control_pb2.ControlResponse:
+        """Handle a request to start a scan."""
+        self.action_handler.request_action(actions.MicroscopeAction.START_SCAN)
+
+    def on_stop_scan(self) -> control_pb2.ControlResponse:
+        """Handle a request to stop a scan."""
+        self.action_handler.request_action(actions.MicroscopeAction.STOP_SCAN)
+
+    # ----- Parameter Handlers ----- #
+    def on_set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
+                           ) -> control_pb2.ControlResponse:
+        """Handle a request to change the scan parameters."""
+        vals = [scan_params.spatial.roi.top_left.x,
+                scan_params.spatial.roi.top_left.y,
+                scan_params.spatial.roi.size.x,
+                scan_params.spatial.roi.size.y,
+                scan_params.data.shape.x,
+                scan_params.data.shape.y,
+                scan_params.spatial.roi.angle]
+        attr_units = [scan_params.spatial.length_units,
+                      scan_params.spatial.length_units,
+                      scan_params.spatial.length_units,
+                      scan_params.spatial.length_units,
+                      None, None, scan_params.spatial.angular_units]
+
+        self.param_handler.set_param_list(params.SCAN_PARAMS, vals, attr_units)
+
+    def on_set_zctrl_params(self, zctrl_params: feedback_pb2.ZCtrlParameters
+                            ) -> control_pb2.ControlResponse:
+        """Handle a request to change the Z-Controller Feedback parameters.
+
+        If not supported, return REP_CMD_NOT_SUPPORTED.
+        """
+        attribs = []
+        vals = []
+        attr_units = []
+        for generic_param, attrib_str in zip(params.ZCTRL_PARAMS,
+                                             params.ZCTRL_ATTRIB_STRS):
+            if zctrl_params.HasField(attrib_str):
+                attribs.append(generic_param)
+                vals.append(getattr(zctrl_params, attrib_str))
+                attr_units.append(None)
+
+        self.param_handler.set_param_list(attribs, vals, units)
+
+    def on_param_request(self, param: control_pb2.ParameterMsg
+                         ) -> (control_pb2.ControlResponse,
+                               Message | int | None):
         """Set or get a device parameter.
 
-        Respond to a ParameterMsg request. This method depends entirely on the
-        param_method_map, which maps set/get methods to given parameters.
+        Respond to a ParameterMsg request.
 
         Note: if a parameter SET is requested which induces some delay, change
         self.scope_state to SS_BUSY_PARAM within the associated set method, and
@@ -367,25 +655,106 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             - A ParameterMsg response, indicating the state after the set (or
                 just the state, if it was a get call).
         """
-        if (param.parameter not in self.param_method_map):
-            return (control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED,
+        if (param.parameter not in params.PARAMETERS):
+            return (control_pb2.ControlResponse.REP_PARAM_INVALID,
                     param)
 
-        if param.HasField(PARAM_VALUE_ATTRIB):
-            rep, val, units = self.param_method_map[param.parameter](
-                self, param.value, param.units)
-        else:
-            rep, val, units = self.param_method_map[param.parameter](self)
+        # Try to set (if requested)
+        if param.HasField(PARAM_VALUE_ATTRIB):  # This is a 'set'
+            try:
+                params.set_param(param.parameter, param.value, param.units)
+            except params.ParameterNotSupportedError:
+                return (control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED,
+                        param)
+            except params.ParameterError:
+                return (control_pb2.ControlResponse.REP_PARAM_ERROR,
+                        param)
 
-        if val:
-            param.value = val
-            param.units = units
+        # Now we should get latest
+        try:
+            val = params.get_param(param.parameter)
+            units = params.get_units(param.parameter)
+        except params.ParameterNotSupportedError:
+            return (control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED,
+                    param)
+        except params.ParameterError:
+            return (control_pb2.ControlResponse.REP_PARAM_ERROR,
+                    param)
+
+        # Package and return
+        rep = control_pb2.ControlResponse.REP_SUCCESS
+        param.value = str(val)  # Must convert to str for sending
+        param.units = units
         return (rep, param)
 
-    def run_per_loop(self):
-        """Where we monitor for requests and publish results."""
-        self._handle_incoming_requests()
-        self._handle_polling_device()
+    def on_action_request(self, action: control_pb2.ActionMsg
+                          ) -> control_pb2.ControlResponse:
+        """Respond to an action request.
+
+        Given an action, the Microscope should respond.
+
+        Args:
+            action: ActionMsg request containing the desired action to be
+                performed.
+
+        Returns:
+            Response to the request.
+        """
+        if action.action not in actions.ACTIONS:
+            return control_pb2.ControlResponse.REP_ACTION_INVALID
+
+        try:
+            actions.request_action(action.action)
+        except actions.ActionNotSupportedError:
+            return control_pb2.ControlResponse.REP_ACTION_NOT_SUPPORTED
+        except actions.ActionError:
+            return control_pb2.ControlResponse.REP_ACTION_ERROR
+
+        return control_pb2.ControlResponse.REP_SUCCESS
+
+    # ----- Polling Method ----- #
+    def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
+        """Poll the controller for the current scan parameters.
+
+        Throw MicroscopeError on failure.
+        """
+        length_units = self.param_handler.get_units(params.SCAN_SIZE_X)
+        angular_units = self.param_handler.get_units(params.SCAN_ANGLE)
+
+        vals = self.param_handler.get_param_list(params.SCAN_PARAMS)
+
+        scan_params = scan_pb2.ScanParameters2d()
+        scan_params.spatial.roi.top_left.x = vals[0]
+        scan_params.spatial.roi.top_left.y = vals[1]
+        scan_params.spatial.roi.size.x = vals[2]
+        scan_params.spatial.roi.size.y = vals[3]
+        scan_params.spatial.roi.angle = vals[6]
+        scan_params.spatial.length_units = length_units
+        scan_params.spatial.angular_units = angular_units
+
+        # Note: all gxsm attributes returned as float, must convert to int
+        scan_params.data.shape.x = int(vals[4])
+        scan_params.data.shape.y = int(vals[5])
+        # Not setting data units, as these are linked to scan channel
+        return scan_params
+
+    def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
+        """Poll the controller for the current Z-Control parameters.
+
+        If not supported, return a new ZCtrlParameters instance:
+            return feedback_pb2.ZCtrlParameters()
+
+        Throw MicroscopeError on failure.
+        """
+        vals = self.param_handler.get_param_list(params.ZCTRL_PARAMS)
+
+        zctrl_params = feedback_pb2.ZCtrlParameters()
+        zctrl_params.setPoint = vals[0]
+        zctrl_params.proportionalGain = vals[1]
+        zctrl_params.integralGain = vals[2]
+        zctrl_params.errorGain = vals[3]
+
+        return zctrl_params
 
 
 def _check_and_warn_angle_issue(scans: [scan_pb2.Scan2d]):
@@ -409,21 +778,3 @@ def get_file_modification_datetime(filename: str) -> datetime.datetime:
     """
     return datetime.datetime.fromtimestamp(os.path.getmtime(filename),
                                            tz=datetime.timezone.utc)
-
-
-# Description of method for MicroscopeTranslator.param_method_map).
-#
-# This method takes in the translator, an optional set_value (if setting), and
-# an optional units str (required if are set_value is provided).
-# It returns (ControlResponse, get_value, units) of the operation. Passing the
-# translator allows using internal variables that may be needed/desired.
-#
-# Your ParamMethod is responsible for converting the received value to your
-# internal reference units, if not the same (see utils/units.py). In the same
-# fashion, the component that made this request is responsible for converting
-# the *received* value into *its own* reference units. See
-# docs/design_philosphy.md for more info.
-#
-# NOTE: The input and output params are str!
-ParamMethod = Callable[[MicroscopeTranslator, str | None, str | None],
-                       tuple[control_pb2.ControlResponse, str, str]]

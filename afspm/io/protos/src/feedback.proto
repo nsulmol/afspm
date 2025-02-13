@@ -1,19 +1,29 @@
 /*
-This file holds the Z-Control Feedback messages.
+This file holds logic for handling the Z-axis of the scanner.
 */
 
 edition = "2023";
 
 import "google/protobuf/timestamp.proto";
 
-
+/* Parameters associated with the Z-Control feedback mechanism.
+ *
+ * This struct holds the various controls one may need to change relating to
+ * the SPM's Z-axis control.
+ *
+ * */
 message ZCtrlParameters {
-  bool feedbackOn = 1;  // Should only be set by MicroscopeTranslator
-  float proportionalGain = 2;
-  float integralGain = 3;
+  // TODO: Consider whether or not to have feedbackOn bool. This is
+  // equivalent to gains = 0...
+  float setPoint = 6;  // Set point value of FB control
 
-  // UUID attributes fo associated scan.
+  float proportionalGain = 2;  // Proportional component
+  float integralGain = 3;  // Integral component
+  float errorGain = 5;  // Diff. b/w measured and setpoint (before PI)
+
+  // UUID attributes of associated scan.
   google.protobuf.Timestamp timestamp = 4; // Should match scan timestamp
+  // TODO: Ensure this gets set somehow?? Or remove?
 }
 
 

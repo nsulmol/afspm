@@ -1,4 +1,4 @@
-"""Test the general experiment flow logic (centered on MicroscopeScheduler)."""
+"""Test the general experiment flow logic (centered on MicroscopeTranslator)."""
 
 import logging
 import time
@@ -273,10 +273,10 @@ def test_start_scan(thread_microscope_translator, thread_microscope_scheduler,
                          component_name, wait_count)
 
     rep = afspm_component.control_client.start_scan()
-    scope_state_msg = scan_pb2.ScopeStateMsg(
-        scope_state=scan_pb2.ScopeState.SS_COLLECTING)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_COLLECTING)
     assert_sub_received_proto(afspm_component.subscriber,
                               scope_state_msg)
     assert not afspm_component.subscriber.poll_and_store()
@@ -447,9 +447,15 @@ def test_set_get_params(thread_microscope_translator,
     startup_and_req_ctrl(afspm_component, no_problem, default_control_state,
                          component_name, wait_count)
 
+    # Non-existent param returns invalid param message
+    param_msg = control_pb2.ParameterMsg(parameter='ougadougou')
+    rep, obj = afspm_component.control_client.request_parameter(param_msg)
+    assert rep == control_pb2.ControlResponse.REP_PARAM_INVALID
+
     # Unsupported param returns unsupported message.
     param_msg = control_pb2.ParameterMsg(
         parameter=MicroscopeParameter.TIP_BIAS_VOLTAGE)
+    logger.warning(f'param_msg: {param_msg}')
     rep, obj = afspm_component.control_client.request_parameter(param_msg)
     assert rep == control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED
 
@@ -458,7 +464,9 @@ def test_set_get_params(thread_microscope_translator,
         parameter=MicroscopeParameter.SCAN_SPEED)
     rep, param_msg = afspm_component.control_client.request_parameter(param_msg)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
-    assert param_msg.value == str(500)  # from sample_components.py::SampleMicroscopeTranslator
+
+    # val from sample_components.py::SampleMicroscopeTranslator
+    assert param_msg.value == str(500)
 
     new_val = str(750.0)
     param_msg.value = new_val
@@ -469,7 +477,7 @@ def test_set_get_params(thread_microscope_translator,
     # Setting failure is passed onto client. This one gets properly, but
     # fails on a set.
     param_msg = control_pb2.ParameterMsg(
-        parameter=MicroscopeParameter.TIP_VIBRATING_AMPL)
+        parameter=MicroscopeParameter.MOVING_SPEED)
     rep, param_msg = afspm_component.control_client.request_parameter(param_msg)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
 

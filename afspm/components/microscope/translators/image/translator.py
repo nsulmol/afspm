@@ -7,6 +7,7 @@ from os import sep
 
 import xarray as xr
 import numpy as np
+from google.protobuf.message import Message
 
 from ...translator import MicroscopeTranslator
 from .....io.protos.generated import scan_pb2
@@ -92,6 +93,17 @@ class ImageTranslator(MicroscopeTranslator):
                             ) -> control_pb2.ControlResponse:
         """Z-Ctrl doesn't do anything with images, not supported."""
         return control_pb2.ControlResponse.REP_CMD_NOT_SUPPORTED
+
+    def on_param_request(self, param: control_pb2.ParameterMsg
+                         ) -> (control_pb2.ControlResponse,
+                               Message | int | None):
+        """Not supported, returning message indicating as much."""
+        return control_pb2.REP_CMD_NOT_SUPPORTED, None
+
+    def on_action_request(self, action: control_pb2.ActionMsg
+                          ) -> control_pb2.ControlResponse:
+        """Not supported, returning message indicating as much."""
+        return control_pb2.REP_CMD_NOT_SUPPORTED
 
     def poll_scope_state(self) -> scan_pb2.ScopeState:
         return self.dev_scope_state

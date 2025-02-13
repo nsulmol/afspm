@@ -2,12 +2,16 @@
 
 import time
 import logging
-from typing import Optional
+from typing import Optional, Any
+
+from google.protobuf.message import Message
 
 from afspm.utils.units import convert
 
-from afspm.components.microscope.translator import MicroscopeTranslator
-from afspm.components.microscope.params import MicroscopeParameter
+from afspm.components.microscope.translator import (MicroscopeTranslator,
+                                                    MapTranslator)
+from afspm.components.microscope.params import (MicroscopeParameter,
+                                                ParameterError)
 from afspm.components.microscope.scheduler import MicroscopeScheduler
 
 from afspm.io import common
@@ -29,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 # --- Microscope Translator Stuff --- #
-class SampleMicroscopeTranslator(MicroscopeTranslator):
+class SampleMicroscopeTranslator(MapTranslator):
 
     def __init__(self, scan_time_s, move_time_s, **kwargs):
         self.scan_speed = 500
@@ -49,8 +53,8 @@ class SampleMicroscopeTranslator(MicroscopeTranslator):
 
         self.param_method_map = {MicroscopeParameter.SCAN_SPEED:
                                  self.handle_scan_speed,
-                                 MicroscopeParameter.TIP_VIBRATING_AMPL:
-                                 self.fail_on_vib_ampl}
+                                 MicroscopeParameter.MOVING_SPEED:
+                                 self.fail_on_moving_speed}
 
     def on_start_scan(self):
         self.start_ts = time.time()
@@ -86,9 +90,9 @@ class SampleMicroscopeTranslator(MicroscopeTranslator):
         return feedback_pb2.ZCtrlParameters()
 
     def handle_scan_speed(self, ctrlr: MicroscopeTranslator,
-                          val: Optional[str] = None,
+                          val: Optional[Any] = None,
                           units: Optional[str] = None,
-                          ) -> (control_pb2.ControlResponse, str, str):
+                          ) -> (Any, str):
         """Get/set scan speed.
 
         Arguments:
@@ -96,7 +100,6 @@ class SampleMicroscopeTranslator(MicroscopeTranslator):
             val: if not None, the value we should set.
             units: if not None, the units of the provided value.
         Returns:
-            - success/failure of operation
             - the value at end of the method.
             - the units of value.
         """
@@ -104,13 +107,12 @@ class SampleMicroscopeTranslator(MicroscopeTranslator):
             if not units:
                 return (control_pb2.ControlResponse.REP_PARAM_ERROR, None, None)
             self.scan_speed = convert(float(val), units, self.ss_units)
-        return (control_pb2.ControlResponse.REP_SUCCESS, str(self.scan_speed),
-                self.ss_units)
+        return (self.scan_speed, self.ss_units)
 
-    def fail_on_vib_ampl(self, ctrlr: MicroscopeTranslator,
-                         val: Optional[str] = None,
-                         units: Optional[str] = None
-                         ) -> (control_pb2.ControlResponse, str):
+    def fail_on_moving_speed(self, ctrlr: MicroscopeTranslator,
+                             val: Optional[Any] = None,
+                             units: Optional[str] = None
+                             ) -> (Any, str):
         """Get/set with failure case.
 
         This simulates a 'supported' param which fails on setting.
@@ -122,16 +124,13 @@ class SampleMicroscopeTranslator(MicroscopeTranslator):
             units: if not None, the units of the provided value.
 
         Returns:
-            - success/failure of operation
             - the value of at end of the method.
             - the units of the value.
         """
         if val:
-            return (control_pb2.ControlResponse.REP_PARAM_ERROR, None,
-                    self.vib_ampl_units)
+            raise ParameterError
         else:
-            return (control_pb2.ControlResponse.REP_SUCCESS, "25",
-                    self.vib_ampl_units)
+            return (25, self.vib_ampl_units)
 
     def run_per_loop(self):
         if self.start_ts:
