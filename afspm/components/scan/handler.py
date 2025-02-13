@@ -188,7 +188,8 @@ class ScanHandler:
         problem_in_problems_set = common.is_problem_in_problems_set(
             self.problem_to_solve, self._problems_set)
         scope_state_undefined = (scan_pb2.ScopeState.SS_UNDEFINED in
-                                (self._scope_state, self._desired_scope_state))
+                                 (self._scope_state,
+                                  self._desired_scope_state))
         if scope_state_undefined or not problem_in_problems_set:
             logger.debug("Not performing scanning logic because ScopeState "
                          "undefined or problem not in problems set.")

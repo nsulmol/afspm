@@ -73,6 +73,31 @@ def create_scan_params_2d(top_left: tuple[float, float] = None,
                                      data=data_aspects)
 
 
+def create_action_msg(action: str) -> control_pb2.ActionMsg:
+    """Convert an ActionParameter enum / str to the probotuf message.
+
+    Args:
+        action: str corresponding to the action we
+            wish to send.
+
+    Returns:
+        control_pb2.ActionMsg with action contained in it.
+    """
+    return control_pb2.ActionMsg(action=action)
+
+
+def get_action_from_msg(msg: control_pb2.ActionMsg) -> str:
+    """Extract action str from ActionMsg.
+
+    Args:
+        msg: control_pb2.ActionMsg containing action.
+
+    Returns:
+        action str extracted.
+    """
+    return msg.action
+
+
 # --- Enum Helpers --- #
 def get_enum_val(enum_obj: EnumTypeWrapper, name: str) -> int:
     """Get the int enum value of a zmq enum, given its name.

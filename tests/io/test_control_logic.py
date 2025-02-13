@@ -6,6 +6,8 @@ import threading
 import pytest
 import zmq
 
+from google.protobuf.message import Message
+
 from afspm.io.control import client as ctrl_client
 from afspm.io.control import server as ctrl_srvr
 from afspm.io.control import router as ctrl_rtr
@@ -128,8 +130,7 @@ def server_routine(server_url, comm_url, timeout_ms, ctx):
         req, __ = server.poll()
         if req:
             rep = control_pb2.ControlResponse.REP_CMD_NOT_SUPPORTED
-            if req in [control_pb2.ControlRequest.REQ_START_SCAN,
-                       control_pb2.ControlRequest.REQ_STOP_SCAN,
+            if req in [control_pb2.ControlRequest.REQ_ACTION,
                        control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS,
                        control_pb2.ControlRequest.REQ_SET_ZCTRL_PARAMS,
                        control_pb2.ControlRequest.REQ_PARAM]:
@@ -165,6 +166,17 @@ def router_routine(server_url, router_url, comm_url, timeout_ms, ctx):
                 break
 
 
+def assert_rep(proto: Message, received_rep: control_pb2.ControlResponse,
+               expected_rep: control_pb2.ControlResponse):
+    """Needed whenever testing all requests, as REQ_PARAM is unique."""
+    # Handle special case of parameter set/get, where an obj is
+    # returned.
+    if isinstance(proto, control_pb2.ParameterMsg):
+        assert received_rep[0] == expected_rep
+    else:
+        assert received_rep == expected_rep
+
+
 # ----- Tests ----- #
 class TestServerWithClient:
     """Server + Client tests."""
@@ -178,7 +190,8 @@ class TestServerWithClient:
                 (srv_client.stop_scan, None),
                 (srv_client.set_scan_params, scan_pb2.ScanParameters2d()),
                 (srv_client.set_zctrl_params, feedback_pb2.ZCtrlParameters()),
-                (srv_client.request_parameter, control_pb2.ParameterMsg())]
+                (srv_client.request_parameter, control_pb2.ParameterMsg()),
+                (srv_client.request_action, control_pb2.ActionMsg())]
 
     @pytest.fixture
     def srv_client_router_methods(self, srv_client, problem, no_problem):
@@ -192,13 +205,7 @@ class TestServerWithClient:
         """Ensure server calls suceed."""
         for method, proto in srv_client_server_methods:
             rep = method(proto) if proto else method()
-
-            # Handle special case of parameter set/get, where an obj is
-            # returned.
-            if isinstance(proto, control_pb2.ParameterMsg):
-                assert rep[0] == control_pb2.ControlResponse.REP_SUCCESS
-            else:
-                assert rep == control_pb2.ControlResponse.REP_SUCCESS
+            assert_rep(proto, rep, control_pb2.ControlResponse.REP_SUCCESS)
 
     def test_router_calls(self, ctx, server_url, comm_url, comm_pub,
                           timeout_ms, thread_srv, srv_client,
@@ -220,7 +227,9 @@ class TestRouterServerClient:
         return [(rtr_client.start_scan, None),
                 (rtr_client.stop_scan, None),
                 (rtr_client.set_scan_params, scan_pb2.ScanParameters2d()),
-                (rtr_client.set_zctrl_params, feedback_pb2.ZCtrlParameters())]
+                (rtr_client.set_zctrl_params, feedback_pb2.ZCtrlParameters()),
+                (rtr_client.request_parameter, control_pb2.ParameterMsg()),
+                (rtr_client.request_action, control_pb2.ActionMsg())]
 
     @pytest.fixture
     def srv_client_router_methods(self, rtr_client, problem, no_problem):
@@ -235,7 +244,8 @@ class TestRouterServerClient:
         """Server requests without gaining control should fail."""
         for method, proto in rtr_client_server_methods:
             rep = method(proto) if proto else method()
-            assert rep == control_pb2.ControlResponse.REP_NOT_IN_CONTROL
+            assert_rep(proto, rep,
+                       control_pb2.ControlResponse.REP_NOT_IN_CONTROL)
 
         comm_pub.send_multipart([CommEnvelope.KILL.value.encode(),
                                  b''])
@@ -250,7 +260,8 @@ class TestRouterServerClient:
         assert rep == control_pb2.ControlResponse.REP_SUCCESS
         for method, proto in rtr_client_server_methods:
             rep = method(proto) if proto else method()
-            assert rep == control_pb2.ControlResponse.REP_SUCCESS
+            assert_rep(proto, rep,
+                       control_pb2.ControlResponse.REP_SUCCESS)
 
         comm_pub.send_multipart([CommEnvelope.KILL.value.encode(),
                                  b''])
@@ -281,14 +292,16 @@ class TestRouterServerClient:
 
         for method, proto in rtr_client_server_methods:
             rep = method(proto) if proto else method()
-            assert rep == control_pb2.ControlResponse.REP_NOT_IN_CONTROL
+            assert_rep(proto, rep,
+                       control_pb2.ControlResponse.REP_NOT_IN_CONTROL)
 
         rep = rtr_client.request_control(problem)
         assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
         for method, proto in rtr_client_server_methods:
             rep = method(proto) if proto else method()
-            assert rep == control_pb2.ControlResponse.REP_SUCCESS
+            assert_rep(proto, rep,
+                       control_pb2.ControlResponse.REP_SUCCESS)
 
         comm_pub.send_multipart([CommEnvelope.KILL.value.encode(),
                                  b''])

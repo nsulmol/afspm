@@ -17,6 +17,7 @@ from afspm.io.pubsub.subscriber import Subscriber
 from afspm.io import common
 
 from afspm.components.scan.handler import ScanHandler
+from afspm.components.microscope.actions import MicroscopeAction
 
 
 logger = logging.getLogger(__name__)
@@ -74,11 +75,12 @@ def publisher(publisher_url, ctx):
     return Publisher(publisher_url, ctx=ctx)
 
 
+SCAN_PARAMS = common.create_scan_params_2d([0, 0], [200, 300],
+                                           'nm')
+
 # --- Methods / thread routines --- #
 def next_params_method() -> scan_pb2.ScanParameters2d:
-    scan_params = common.create_scan_params_2d([0, 0], [200, 300],
-                                               'nm')
-    return scan_params
+    return SCAN_PARAMS
 
 
 def scan_handler_routine(publisher_url, rerun_wait_s,
@@ -139,7 +141,9 @@ def test_scanning(publisher, server, thread_scan_handler,
     states = [scan_pb2.ScopeState.SS_MOVING,
               scan_pb2.ScopeState.SS_COLLECTING]
     requests = [control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS,
-                control_pb2.ControlRequest.REQ_START_SCAN]
+                control_pb2.ControlRequest.REQ_ACTION]
+    objects = [SCAN_PARAMS,
+               control_pb2.ActionMsg(action=MicroscopeAction.START_SCAN)]
 
     # Inform scan handler we are in the expected control state.
     publisher.send_msg(control_state)
@@ -151,9 +155,9 @@ def test_scanning(publisher, server, thread_scan_handler,
     # Run 3 scans
     for i in list(range(3)):
         # Go through single scan process
-        for state, request in zip(states, requests):
-            req, __ = server.poll()
-            assert req == request
+        for state, exp_req, exp_obj in zip(states, requests, objects):
+            req, obj = server.poll()
+            assert req == exp_req and obj == exp_obj
             server.reply(control_pb2.ControlResponse.REP_SUCCESS)
 
             scope_state_msg.scope_state = state

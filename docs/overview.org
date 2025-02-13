@@ -301,6 +301,7 @@ message Scan2d {
 :PROPERTIES:
 :BEAMER_col: 0.47
 :END:
+TODO: UPDATE!!!
 #+attr_latex: :options fontsize=\scriptsize, frame=lines, framesep=2mm
 #+begin_src protobuf :results code
 enum ControlRequest {

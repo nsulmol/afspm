@@ -12,6 +12,7 @@ from afspm.components.microscope.translator import (MicroscopeTranslator,
                                                     MapTranslator)
 from afspm.components.microscope.params import (MicroscopeParameter,
                                                 ParameterError)
+from afspm.components.microscope.actions import MicroscopeAction
 from afspm.components.microscope.scheduler import MicroscopeScheduler
 
 from afspm.io import common
@@ -32,9 +33,69 @@ from afspm.io.protos.generated import feedback_pb2
 logger = logging.getLogger(__name__)
 
 
+# ----- 'Action' handling methods ----- #
+def on_start_scan(translator: MicroscopeTranslator):
+    """Handle START_SCAN action."""
+    translator.start_ts = time.time()
+    translator.dev_scope_state = scan_pb2.ScopeState.SS_COLLECTING
+    return control_pb2.ControlResponse.REP_SUCCESS
+
+
+def on_stop_scan(translator: MicroscopeTranslator):
+    """Handle STOP_SCAN action."""
+    translator.start_ts = None
+    translator.dev_scope_state = scan_pb2.ScopeState.SS_FREE
+    return control_pb2.ControlResponse.REP_SUCCESS
+
+
+# ----- Parameter request methods ----- #
+def handle_scan_speed(ctrlr: MicroscopeTranslator,
+                      val: Optional[Any] = None,
+                      units: Optional[str] = None,
+                      ) -> (Any, str):
+    """Get/set scan speed.
+
+    Arguments:
+        ctrl: a reference to the MicroscopeTranslator.
+        val: if not None, the value we should set.
+        units: if not None, the units of the provided value.
+    Returns:
+        - the value at end of the method.
+        - the units of value.
+    """
+    if val:
+        if not units:
+            return (control_pb2.ControlResponse.REP_PARAM_ERROR, None, None)
+        ctrlr.scan_speed = convert(float(val), units, ctrlr.ss_units)
+    return (ctrlr.scan_speed, ctrlr.ss_units)
+
+
+def fail_on_moving_speed(ctrlr: MicroscopeTranslator,
+                         val: Optional[Any] = None,
+                         units: Optional[str] = None
+                         ) -> (Any, str):
+    """Get/set with failure case.
+
+    This simulates a 'supported' param which fails on setting.
+    We simply want to ensure the failure is passed on.
+
+    Arguments:
+        ctrlr: a reference to the MicroscopeTranslator
+        val: if not None, the value we should set.
+        units: if not None, the units of the provided value.
+
+    Returns:
+        - the value of at end of the method.
+        - the units of the value.
+    """
+    if val:
+        raise ParameterError
+    else:
+        return (25, ctrlr.vib_ampl_units)
+
+
 # --- Microscope Translator Stuff --- #
 class SampleMicroscopeTranslator(MapTranslator):
-
     def __init__(self, scan_time_s, move_time_s, **kwargs):
         self.scan_speed = 500
         self.ss_units = 'nm/s'
@@ -51,20 +112,16 @@ class SampleMicroscopeTranslator(MapTranslator):
         kwargs['name'] = 'dev_con'
         super().__init__(**kwargs)
 
-        self.param_method_map = {MicroscopeParameter.SCAN_SPEED:
-                                 self.handle_scan_speed,
-                                 MicroscopeParameter.MOVING_SPEED:
-                                 self.fail_on_moving_speed}
+    def _build_param_method_map(self):
+        self.param_method_map = {
+            MicroscopeParameter.SCAN_SPEED: handle_scan_speed,
+            MicroscopeParameter.MOVING_SPEED: fail_on_moving_speed}
 
-    def on_start_scan(self):
-        self.start_ts = time.time()
-        self.dev_scope_state = scan_pb2.ScopeState.SS_COLLECTING
-        return control_pb2.ControlResponse.REP_SUCCESS
-
-    def on_stop_scan(self):
-        self.start_ts = None
-        self.dev_scope_state = scan_pb2.ScopeState.SS_FREE
-        return control_pb2.ControlResponse.REP_SUCCESS
+    def _build_action_method_map(self):
+        self.action_method_map = {
+            MicroscopeAction.START_SCAN: on_start_scan,
+            MicroscopeAction.STOP_SCAN: on_stop_scan,
+        }
 
     def on_set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
                            ) -> control_pb2.ControlResponse:
@@ -88,49 +145,6 @@ class SampleMicroscopeTranslator(MapTranslator):
 
     def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
         return feedback_pb2.ZCtrlParameters()
-
-    def handle_scan_speed(self, ctrlr: MicroscopeTranslator,
-                          val: Optional[Any] = None,
-                          units: Optional[str] = None,
-                          ) -> (Any, str):
-        """Get/set scan speed.
-
-        Arguments:
-            ctrl: a reference to the MicroscopeTranslator.
-            val: if not None, the value we should set.
-            units: if not None, the units of the provided value.
-        Returns:
-            - the value at end of the method.
-            - the units of value.
-        """
-        if val:
-            if not units:
-                return (control_pb2.ControlResponse.REP_PARAM_ERROR, None, None)
-            self.scan_speed = convert(float(val), units, self.ss_units)
-        return (self.scan_speed, self.ss_units)
-
-    def fail_on_moving_speed(self, ctrlr: MicroscopeTranslator,
-                             val: Optional[Any] = None,
-                             units: Optional[str] = None
-                             ) -> (Any, str):
-        """Get/set with failure case.
-
-        This simulates a 'supported' param which fails on setting.
-        We simply want to ensure the failure is passed on.
-
-        Arguments:
-            ctrlr: a reference to the MicroscopeTranslator
-            val: if not None, the value we should set.
-            units: if not None, the units of the provided value.
-
-        Returns:
-            - the value of at end of the method.
-            - the units of the value.
-        """
-        if val:
-            raise ParameterError
-        else:
-            return (25, self.vib_ampl_units)
 
     def run_per_loop(self):
         if self.start_ts:

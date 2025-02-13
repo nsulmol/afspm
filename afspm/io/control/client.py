@@ -7,6 +7,7 @@ import zmq
 
 from . import commands as cmd
 from .. import common
+from ...components.microscope.actions import MicroscopeAction
 
 from google.protobuf.message import Message
 
@@ -111,7 +112,7 @@ class ControlClient:
                 obj, the default here is False.
 
         Returns:
-            - RequestResponse enum indicating the response to our request.
+            - ControlResponse enum indicating the response to our request.
             - If requested (and applicable), the returned obj. This may be None
             if the reply did not contain one!
         """
@@ -125,7 +126,7 @@ class ControlClient:
                 req, obj = cmd.parse_request(msg)
                 rep, obj = cmd.parse_response(req,
                                               self._client.recv_multipart())
-                logger.debug("Received reply: %s %s",
+                logger.debug("Received reply: %s, %s",
                              common.get_enum_str(control_pb2.ControlResponse,
                                                  rep), obj)
                 return (rep, obj) if keep_obj else rep
@@ -147,21 +148,52 @@ class ControlClient:
         """Request start a scan.
 
         Returns:
-            The received RequestResponse.
+            The received ControlResponse.
         """
-        logger.debug("Sending start_scan request.")
-        msg = cmd.serialize_request(control_pb2.ControlRequest.REQ_START_SCAN)
-        return self._try_send_req(msg)
+        action = control_pb2.ActionMsg(action=MicroscopeAction.START_SCAN)
+        return self.request_action(action)
 
     def stop_scan(self) -> control_pb2.ControlResponse:
         """Request stop a scan.
 
         Returns:
-            The received RequestResponse.
+            The received ControlResponse.
         """
-        logger.debug("Sending stop_scan request.")
-        msg = cmd.serialize_request(control_pb2.ControlRequest.REQ_STOP_SCAN)
+        action = control_pb2.ActionMsg(action=MicroscopeAction.STOP_SCAN)
+        return self.request_action(action)
+
+    def request_action(self, action: control_pb2.ActionMsg
+                       ) -> control_pb2.ControlResponse:
+        """Request an action be performed.
+
+        Args:
+            action: an ActionMsg containing the desired action.
+
+        Returns:
+            The received ControlResponse.
+        """
+        logger.debug(f"Sending {action.action} request.")
+        msg = cmd.serialize_request(control_pb2.ControlRequest.REQ_ACTION,
+                                    action)
         return self._try_send_req(msg)
+
+    def request_parameter(self, param: control_pb2.ParameterMsg
+                          ) -> (control_pb2.ControlResponse,
+                                control_pb2.ParameterMsg):
+        """Get or set a device parameter.
+
+        Args:
+            param: parameter message containing parameter to get/set and
+                set value (if applicable).
+
+        Returns:
+            tuple of ControlResponse and a ParameterMsg response, corresponding
+                to a final get call on the parameter.
+        """
+        logger.debug(f"Sending parameter request with: {param}")
+        msg = cmd.serialize_request(
+            control_pb2.ControlRequest.REQ_PARAM, param)
+        return self._try_send_req(msg, keep_obj=True)
 
     def set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
                         ) -> control_pb2.ControlResponse:
@@ -171,7 +203,7 @@ class ControlClient:
             scan_params: the desired scan parameters for the device.
 
         Returns:
-            The received RequestResponse.
+            The received ControlResponse.
         """
         logger.debug(f"Sending set_scan_params with: {scan_params}")
         msg = cmd.serialize_request(
@@ -186,7 +218,7 @@ class ControlClient:
             zctrl_params: the desired feedback params for the device.
 
         Returns:
-            The received RequestResponse.
+            The received ControlResponse.
         """
         logger.debug("Sending set_zctrl_params with: %s", zctrl_params)
         msg = cmd.serialize_request(
@@ -207,7 +239,7 @@ class ControlClient:
                 general component).
 
         Returns:
-            A RequestResponse enum indicating the success/failure of the
+            A ControlResponse enum indicating the success/failure of the
                 request.
         """
         logger.debug("Sending request_ctrl with problem: %s",
@@ -275,24 +307,6 @@ class ControlClient:
 
         self._uuid = uuid
         self._init_client()
-
-    def request_parameter(self, param: control_pb2.ParameterMsg
-                          ) -> (control_pb2.ControlResponse,
-                                control_pb2.ParameterMsg):
-        """Get or set a device parameter.
-
-        Args:
-            param: parameter message containing parameter to get/set and
-                set value (if applicable).
-
-        Returns:
-            tuple of ControlResponse and a ParameterMsg response, corresponding
-                to a final get call on the parameter.
-        """
-        logger.debug(f"Sending parameter request with: {param}")
-        msg = cmd.serialize_request(
-            control_pb2.ControlRequest.REQ_PARAM, param)
-        return self._try_send_req(msg, keep_obj=True)
 
 
 class AdminControlClient(ControlClient):

@@ -100,11 +100,6 @@ class ImageTranslator(MicroscopeTranslator):
         """Not supported, returning message indicating as much."""
         return control_pb2.REP_CMD_NOT_SUPPORTED, None
 
-    def on_action_request(self, action: control_pb2.ActionMsg
-                          ) -> control_pb2.ControlResponse:
-        """Not supported, returning message indicating as much."""
-        return control_pb2.REP_CMD_NOT_SUPPORTED
-
     def poll_scope_state(self) -> scan_pb2.ScopeState:
         return self.dev_scope_state
 

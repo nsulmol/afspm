@@ -8,12 +8,10 @@ edition = "2023";
 /* Requests that can be sent to a ControlServer/ControlRouter. */
 enum ControlRequest {
     REQ_UNDEFINED = 0;
-    REQ_START_SCAN = 1;
-    REQ_STOP_SCAN = 2;
+    REQ_ACTION = 1;
+    REQ_PARAM = 2;
     REQ_SET_SCAN_PARAMS = 3;
     REQ_SET_ZCTRL_PARAMS = 11;
-    REQ_PARAM = 10;
-    REQ_ACTION = 12;
 
     // The below are specific to ControlRouter
     REQ_REQUEST_CTRL = 4;

@@ -126,8 +126,14 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             signals.
     """
 
+    REQUIRED_ACTIONS = [actions.MicroscopeAction.START_SCAN,
+                        actions.MicroscopeAction.STOP_SCAN]
+
+    STOP_SCAN_REQ = (control_pb2.ControlRequest.REQ_ACTION,
+                     control_pb2.ActionMsg(
+                         action=actions.MicroscopeAction.STOP_SCAN))
     # Indicates commands we will allow to be sent while not free
-    ALLOWED_COMMANDS_WHILE_NOT_FREE = [control_pb2.ControlRequest.REQ_STOP_SCAN]
+    ALLOWED_COMMANDS_WHILE_NOT_FREE = [STOP_SCAN_REQ]
 
     def __init__(self, name: str, publisher: pub.Publisher,
                  control_server: ctrl_srvr.ControlServer,
@@ -171,8 +177,6 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                                              Callable]:
         """Create our req_handler_map, for mapping REQ to methods."""
         return MappingProxyType({
-            control_pb2.ControlRequest.REQ_START_SCAN: self.on_start_scan,
-            control_pb2.ControlRequest.REQ_STOP_SCAN:  self.on_stop_scan,
             control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS:
                 self.on_set_scan_params,
             control_pb2.ControlRequest.REQ_SET_ZCTRL_PARAMS:
@@ -230,7 +234,6 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                 just the state, if it was a get call).
         """
 
-    @abstractmethod
     def on_action_request(self, action: control_pb2.ActionMsg
                           ) -> control_pb2.ControlResponse:
         """Respond to an action request.
@@ -244,6 +247,12 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         Returns:
             Response to the request. REP_ACTION
         """
+        if action.action == actions.MicroscopeAction.START_SCAN:
+            return self.on_start_scan()
+        elif action.action == actions.MicroscopeAction.STOP_SCAN:
+            return self.on_start_scan()
+        # We only support start/stop scan by default.
+        return control_pb2.ControlResponse.REP_ACTION_NOT_SUPPORTED
 
     # ----- Polling Methods ----- #
     @abstractmethod
@@ -363,7 +372,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         if req:  # Ensure we received something
             # Refuse most requests while moving/scanning (not free)
             if (self.scope_state != scan_pb2.ScopeState.SS_FREE and
-                    req not in self.ALLOWED_COMMANDS_WHILE_NOT_FREE):
+                    (req, proto) not in self.ALLOWED_COMMANDS_WHILE_NOT_FREE):
                 self.control_server.reply(
                     control_pb2.ControlResponse.REP_NOT_FREE)
             else:
@@ -373,7 +382,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                 # Special case! If scan was cancelled successfully, we
                 # send out an SS_INTERRUPTED state, to allow detecting
                 # interruptions.
-                if (req == control_pb2.ControlRequest.REQ_STOP_SCAN and
+                if ((req, proto) == self.STOP_SCAN_REQ and
                         rep == control_pb2.ControlResponse.REP_SUCCESS):
                     scope_state_msg = scan_pb2.ScopeStateMsg(
                         scope_state=scan_pb2.ScopeState.SS_INTERRUPTED)
@@ -438,9 +447,25 @@ class MapTranslator(MicroscopeTranslator, metaclass=ABCMeta):
                 requests.
         """
         self.param_method_map = {}
-        self.action_method_map = {}  # TODO: Map start/stop_scan to methods!
-        # TODO: Map start/stop signal to methods (when available).
+        self.action_method_map = {}
         super().__init__(name, publisher, control_server, **kwargs)
+
+        self._build_param_method_map()
+        self._build_action_method_map()
+        self._validate_required_actions_exist()
+
+    @abstractmethod
+    def _build_param_method_map(self):
+        """Build up param method map."""
+
+    @abstractmethod
+    def _build_action_method_map(self):
+        """Build up action method map."""
+
+    def _validate_required_actions_exist(self):
+        """Ensure action_handler at least supports our required actions."""
+        for action in self.REQUIRED_ACTIONS:
+            assert action in self.action_method_map
 
     def on_param_request(self, param: control_pb2.ParameterMsg
                          ) -> (control_pb2.ControlResponse,
@@ -489,6 +514,7 @@ class MapTranslator(MicroscopeTranslator, metaclass=ABCMeta):
         if (action.action not in actions.ACTIONS):
             return control_pb2.ControlResponse.REP_ACTION_INVALID
 
+        # Check methods in action map
         if action.action not in self.action_method_map:
             return control_pb2.ControlResponse.REP_ACTION_NOT_SUPPORTED
 
@@ -498,6 +524,15 @@ class MapTranslator(MicroscopeTranslator, metaclass=ABCMeta):
             return control_pb2.ControlResponse.REP_ACTION_ERROR
 
         return control_pb2.ControlResponse.REP_SUCCESS
+
+    # ----- 'Action' Handlers ----- #
+    def on_start_scan(self) -> control_pb2.ControlResponse:
+        """Do nothing - handled by ActionHandler."""
+        pass
+
+    def on_stop_scan(self) -> control_pb2.ControlResponse:
+        """Do nothing - handled by ActionHandler."""
+        pass
 
 
 class ConfigTranslator(MicroscopeTranslator, metaclass=ABCMeta):
@@ -509,27 +544,19 @@ class ConfigTranslator(MicroscopeTranslator, metaclass=ABCMeta):
     and implement the SPM-specific getting/setting calls necessary to
     communicate with the SPM. In doing so, we conceivably simplify the
     definition of a translator to:
-    - On the parameters side, writing the get_param_spm() / set_param_spm()
-    methods in ParameterHandler to indicate exactly how to set/get a param;
-    and filling out a simple params_config.toml file.
-    - On the actions side, writing the request_action_spm() method in
-    ActionHandler to indicate exactly how to run an action; and filling out
-    a simple actions_config.toml file.
+    - On the parameters side, the ParameterHandler controls how parameters
+    are set/get, which are defined via a simple params_config.toml file.
+    - On the actions side,the ActionHandler controls how actions are requested,
+    defined via a simple actions_config.toml file.
     - Implementing poll_scope_state(), which likely involves calling
     get_param() with ParameterHandler and converting the data to our
     scan_pb2.ScopeState enum.
     - Implementing poll_scans(), which likely involves using a pre-existing
     Python package to read the specific SPM's save files.
 
-    Note that the abstract methods from MicroscopeTranslatorBase that we are
-    implementing here assumes no special state / order necessary to set / get
-    parameters. If your microscope has some unusual state/order necessary, you
-    may need to override some of the methods defined herein.
-
-    Also note that the standard 'action' methods we override here point
-    directly to ActionHandler equivalents. Thus, do not override these 'action'
-    methods; simply implement the method separately and point to it via the
-    ActionHandler config.
+    Also note that the original abstract action methods defined in
+    MicroscopeTranslatorBase do nothing here (since they are already
+    handled by the ActionHandler). Overriding them will not do anything.
 
     Args:
         publisher: Publisher instance, for publishing data.
@@ -556,45 +583,12 @@ class ConfigTranslator(MicroscopeTranslator, metaclass=ABCMeta):
         self.param_handler = params.ParameterHandler(params_config_path)
         self.action_handler = actions.ActionHandler(actions_config_path)
         super().__init__(name, publisher, control_server, **kwargs)
+        self._validate_required_actions_exist()
 
-    # ----- Abstract methods needing implementation ----- #
-    @abstractmethod
-    def poll_scope_state(self) -> scan_pb2.ScopeState:
-        """Poll the translator for the current scope state.
-
-        Throw MicroscopeError on failure.
-        """
-
-    @abstractmethod
-    def poll_scans(self) -> list[scan_pb2.Scan2d]:
-        """Obtain latest performed scans.
-
-        We will compare the prior scans (or first of each) to the latest to
-        determine if the scan succeeded (i.e. they are different). Note that
-        each channel is a different scan! Thus, when we say 'latest scans',
-        we really mean the latest single- or multi-channel scan, provided as
-        a list of Scan2ds (with each Scan2d being a channel of the scan).
-
-        Note that we will first consider the timestamp attribute when
-        comparing scans. If this attribute is not passed, we will do
-        a data comparison.
-
-        Throw MicroscopeError on failure.
-
-        To read the creation time of a file using Python, use
-            get_file_modification_datetime()
-        and you can put that in the timestamp param with:
-            scan.timestamp.FromDatetime(ts)
-        """
-
-    # ----- 'Action' Handlers ----- #
-    def on_start_scan(self) -> control_pb2.ControlResponse:
-        """Handle a request to start a scan."""
-        self.action_handler.request_action(actions.MicroscopeAction.START_SCAN)
-
-    def on_stop_scan(self) -> control_pb2.ControlResponse:
-        """Handle a request to stop a scan."""
-        self.action_handler.request_action(actions.MicroscopeAction.STOP_SCAN)
+    def _validate_required_actions_exist(self):
+        """Ensure action_handler at least supports our required actions."""
+        for action in self.REQUIRED_ACTIONS:
+            assert action in self.action_handler.actions
 
     # ----- Parameter Handlers ----- #
     def on_set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
@@ -704,7 +698,7 @@ class ConfigTranslator(MicroscopeTranslator, metaclass=ABCMeta):
             return control_pb2.ControlResponse.REP_ACTION_INVALID
 
         try:
-            actions.request_action(action.action)
+            self.action_handler.request_action(action.action)
         except actions.ActionNotSupportedError:
             return control_pb2.ControlResponse.REP_ACTION_NOT_SUPPORTED
         except actions.ActionError:
@@ -755,6 +749,15 @@ class ConfigTranslator(MicroscopeTranslator, metaclass=ABCMeta):
         zctrl_params.errorGain = vals[3]
 
         return zctrl_params
+
+    # ----- 'Action' Handlers ----- #
+    def on_start_scan(self) -> control_pb2.ControlResponse:
+        """Do nothing - handled by ActionHandler."""
+        pass
+
+    def on_stop_scan(self) -> control_pb2.ControlResponse:
+        """Do nothing - handled by ActionHandler."""
+        pass
 
 
 def _check_and_warn_angle_issue(scans: [scan_pb2.Scan2d]):
