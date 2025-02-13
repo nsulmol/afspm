@@ -13,8 +13,7 @@ import "google/protobuf/timestamp.proto";
  *
  * */
 message ZCtrlParameters {
-  // TODO: Consider whether or not to have feedbackOn bool. This is
-  // equivalent to gains = 0...
+  bool feedbackOn = 1;  // Should only be set by MicroscopeTranslator
   float setPoint = 6;  // Set point value of FB control
 
   float proportionalGain = 2;  // Proportional component
