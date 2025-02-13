@@ -631,7 +631,7 @@ class ConfigTranslator(MicroscopeTranslator, metaclass=ABCMeta):
                 vals.append(getattr(zctrl_params, attrib_str))
                 attr_units.append(None)
 
-        self.param_handler.set_param_list(attribs, vals, units)
+        self.param_handler.set_param_list(attribs, vals, attr_units)
 
     def on_param_request(self, param: control_pb2.ParameterMsg
                          ) -> (control_pb2.ControlResponse,
