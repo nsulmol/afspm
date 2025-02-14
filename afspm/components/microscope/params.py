@@ -465,18 +465,18 @@ class ParameterHandler(metaclass=ABCMeta):
             - ParameterError if one of the parameters could not be set.
         """
         spm_params = []
-        vals = []
+        spm_vals = []
         for generic_param, val, curr_unit in zip(generic_params, vals,
                                                  curr_units):
             param_info = self._get_param_info(generic_param)
             val = _correct_val_for_sending(val, param_info, generic_param,
                                            curr_unit)
-            spm_params.append(spm_params)
-            vals.append(_cap_val_in_range(val, param_info.range,
-                                          generic_param))
+            spm_params.append(param_info.uuid)
+            spm_vals.append(_cap_val_in_range(val, param_info.range,
+                                              generic_param))
 
-        for spm_param, val in zip(spm_params, vals):
-            self.set_param_spm(spm_param, val)
+        for spm_param, spm_val in zip(spm_params, spm_vals):
+            self.set_param_spm(spm_param, spm_val)
 
 
 def _correct_val_for_sending(val: str, param_info: ParameterInfo,

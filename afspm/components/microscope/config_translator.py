@@ -52,7 +52,8 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
 
     def __init__(self, name: str, publisher: pub.Publisher,
                  control_server: ctrl_srvr.ControlServer,
-                 params_config_path: str, actions_config_path: str,
+                 param_handler: params.ParameterHandler,
+                 action_handler: actions.ActionHandler,
                  **kwargs):
         """Init our configured translator.
 
@@ -61,11 +62,12 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
             publisher: Publisher instance, for publishing data.
             control_server: ControlServer instance, for responding to control
                 requests.
-            params_config_path: path to our params TOML config file.
-            actions_config_path: path to our actions TOML config file.
+            param_handler: ParameterHandler class, for handling parameter
+                requests.
+            action_handler: ActionHandler class, for handling action requests.
         """
-        self.param_handler = params.ParameterHandler(params_config_path)
-        self.action_handler = actions.ActionHandler(actions_config_path)
+        self.param_handler = param_handler
+        self.action_handler = action_handler
         super().__init__(name, publisher, control_server, **kwargs)
         self._validate_required_actions_exist()
 
@@ -89,7 +91,9 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
                       scan_params.spatial.length_units,
                       scan_params.spatial.length_units,
                       scan_params.spatial.length_units,
-                      None, None, scan_params.spatial.angular_units]
+                      scan_params.data.units,
+                      scan_params.data.units,
+                      scan_params.spatial.angular_units]
 
         self.param_handler.set_param_list(params.SCAN_PARAMS, vals, attr_units)
 
@@ -141,24 +145,25 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         # Try to set (if requested)
         if param.HasField(translator.PARAM_VALUE_ATTRIB):
             try:
-                params.set_param(param.parameter, param.value, param.units)
+                self.param_handler.set_param(param.parameter, param.value,
+                                             param.units)
             except params.ParameterNotSupportedError:
                 return (control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED,
-                        param)
+                        None)
             except params.ParameterError:
                 return (control_pb2.ControlResponse.REP_PARAM_ERROR,
-                        param)
+                        None)
 
         # Now we should get latest
         try:
-            val = params.get_param(param.parameter)
-            units = params.get_units(param.parameter)
+            val = self.param_handler.get_param(param.parameter)
+            units = self.param_handler.get_units(param.parameter)
         except params.ParameterNotSupportedError:
             return (control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED,
-                    param)
+                    None)
         except params.ParameterError:
             return (control_pb2.ControlResponse.REP_PARAM_ERROR,
-                    param)
+                    None)
 
         # Package and return
         rep = control_pb2.ControlResponse.REP_SUCCESS
@@ -199,8 +204,12 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
 
         Throw MicroscopeError on failure.
         """
-        length_units = self.param_handler.get_units(params.SCAN_SIZE_X)
-        angular_units = self.param_handler.get_units(params.SCAN_ANGLE)
+        length_units = self.param_handler.get_units(
+            params.MicroscopeParameter.SCAN_SIZE_X)
+        angular_units = self.param_handler.get_units(
+            params.MicroscopeParameter.SCAN_ANGLE)
+        data_units = self.param_handler.get_units(
+            params.MicroscopeParameter.SCAN_RESOLUTION_X)
 
         vals = self.param_handler.get_param_list(params.SCAN_PARAMS)
 
@@ -216,6 +225,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         # Note: all gxsm attributes returned as float, must convert to int
         scan_params.data.shape.x = int(vals[4])
         scan_params.data.shape.y = int(vals[5])
+        scan_params.data.units = data_units
         # Not setting data units, as these are linked to scan channel
         return scan_params
 
