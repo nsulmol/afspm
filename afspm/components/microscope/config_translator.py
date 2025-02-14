@@ -134,8 +134,9 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
                 just the state, if it was a get call).
         """
         if (param.parameter not in params.PARAMETERS):
-            return (control_pb2.ControlResponse.REP_PARAM_INVALID,
-                    param)
+            logger.warning(f'Feeding parameter {param.parameter}, not in' +
+                           'MicroscopeParameter. Consider adding it in ' +
+                           'future.')
 
         # Try to set (if requested)
         if param.HasField(translator.PARAM_VALUE_ATTRIB):
@@ -179,7 +180,9 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
             Response to the request.
         """
         if action.action not in actions.ACTIONS:
-            return control_pb2.ControlResponse.REP_ACTION_INVALID
+            logger.warning(f'Feeding action {action.action}, not in' +
+                           'MicroscopeAction. Consider adding it in ' +
+                           'future.')
 
         try:
             self.action_handler.request_action(action.action)

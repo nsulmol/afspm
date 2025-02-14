@@ -365,7 +365,8 @@ def test_set_scan_params(thread_microscope_translator,
                          thread_microscope_scheduler)
 
 
-def test_experiment_problems(thread_microscope_translator, thread_microscope_scheduler,
+def test_experiment_problems(thread_microscope_translator,
+                             thread_microscope_scheduler,
                              afspm_component, wait_count, move_time_ms,
                              default_control_state):
     """Ensure we can set/unset experiment problems and receive in sub."""
@@ -447,10 +448,10 @@ def test_set_get_params(thread_microscope_translator,
     startup_and_req_ctrl(afspm_component, no_problem, default_control_state,
                          component_name, wait_count)
 
-    # Non-existent param returns invalid param message
+    # Non-existent param is allowed (so the user can add to the base set).
     param_msg = control_pb2.ParameterMsg(parameter='ougadougou')
     rep, obj = afspm_component.control_client.request_parameter(param_msg)
-    assert rep == control_pb2.ControlResponse.REP_PARAM_INVALID
+    assert rep == control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED
 
     # Unsupported param returns unsupported message.
     param_msg = control_pb2.ParameterMsg(

@@ -86,8 +86,9 @@ class MapTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
                                Message | int | None):
         """Override method, use param_method_map to map to methods."""
         if param.parameter not in params.PARAMETERS:
-            return (control_pb2.ControlResponse.REP_PARAM_INVALID,
-                    param)
+            logger.warning(f'Feeding parameter {param.parameter}, not in' +
+                           'MicroscopeParameter. Consider adding it in ' +
+                           'future.')
 
         if param.parameter not in self.param_method_map:
             return (control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED,
@@ -122,7 +123,9 @@ class MapTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
             Response to the request.
         """
         if (action.action not in actions.ACTIONS):
-            return control_pb2.ControlResponse.REP_ACTION_INVALID
+            logger.warning(f'Feeding action {action.action}, not in' +
+                           'MicroscopeAction. Consider adding it in ' +
+                           'future.')
 
         # Check methods in action map
         if action.action not in self.action_method_map:

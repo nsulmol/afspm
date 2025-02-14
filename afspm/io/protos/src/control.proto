@@ -11,16 +11,17 @@ enum ControlRequest {
     REQ_ACTION = 1;
     REQ_PARAM = 2;
     REQ_SET_SCAN_PARAMS = 3;
-    REQ_SET_ZCTRL_PARAMS = 11;
+    REQ_SET_ZCTRL_PARAMS = 4;
+    // TODO: add PROBE_POS command.
 
     // The below are specific to ControlRouter
-    REQ_REQUEST_CTRL = 4;
-    REQ_RELEASE_CTRL = 5;
-    REQ_ADD_EXP_PRBLM = 6;
-    REQ_RMV_EXP_PRBLM = 7;
+    REQ_REQUEST_CTRL = 6;
+    REQ_RELEASE_CTRL = 7;
+    REQ_ADD_EXP_PRBLM = 8;
+    REQ_RMV_EXP_PRBLM = 9;
     // Admin requests
-    REQ_SET_CONTROL_MODE = 8;
-    REQ_END_EXPERIMENT = 9;
+    REQ_SET_CONTROL_MODE = 10;
+    REQ_END_EXPERIMENT = 11;
 }
 
 /* Responses expected from control requests. */
@@ -33,13 +34,11 @@ enum ControlResponse {
     REP_WRONG_CONTROL_MODE = 5;
     REP_NOT_IN_CONTROL = 6;
     REP_NOT_FREE = 7;
-    REP_PARAM_INVALID = 12;  // Parameter does not exist.
-    REP_PARAM_NOT_SUPPORTED = 9;
-    REP_PARAM_ERROR = 10;  //  Trying to get/set the param failed.
-    REP_WRONG_EXP_PROBLEM = 11;
-    REP_ACTION_INVALID = 13;  // Action does not exist.
-    REP_ACTION_NOT_SUPPORTED = 14;
-    REP_ACTION_ERROR = 15;  // Trying to perform action failed.
+    REP_PARAM_NOT_SUPPORTED = 8;
+    REP_PARAM_ERROR = 9;  //  Trying to get/set the param failed.
+    REP_WRONG_EXP_PROBLEM = 10;
+    REP_ACTION_NOT_SUPPORTED = 11;
+    REP_ACTION_ERROR = 12;  // Trying to perform action failed.
 }
 
 /* Enum holding the current control mode of afspm. */
