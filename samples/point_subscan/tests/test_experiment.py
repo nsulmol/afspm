@@ -117,7 +117,7 @@ def sample_points(center_pt):
 def expected_sub_scan(center_pt, sub_scan_size, units, sscan_res):
     origin = (np.array(center_pt) - 0.5 * np.array(sub_scan_size)).tolist()
     return common.create_scan_params_2d(
-        origin, sub_scan_size, units, sscan_res, units)
+        origin, sub_scan_size, units, None, sscan_res, units)
 
 
 @pytest.fixture
@@ -125,7 +125,7 @@ def expected_full_scan(exp_data):
     return common.create_scan_params_2d(
         exp_data.full_scan_phys_origin,
         exp_data.full_scan_phys_size,
-        exp_data.phys_units,
+        exp_data.phys_units, None,
         exp_data.full_scan_res,
         exp_data.data_units)
 

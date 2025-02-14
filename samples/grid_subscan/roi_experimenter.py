@@ -152,7 +152,7 @@ class ROIExperimenter(AfspmComponent):
             self.scans_since_last_fscan += 1
 
         return common.create_scan_params_2d(origin.tolist(), size.tolist(),
-                                            self.phys_units, res.tolist(),
+                                            self.phys_units, None, res.tolist(),
                                             self.data_units, self.scan_angle)
 
     def _reset_sub_scan_aspects(self):

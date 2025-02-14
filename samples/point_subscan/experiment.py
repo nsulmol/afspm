@@ -93,6 +93,7 @@ def get_next_scan_params(component: AfspmComponent,
         exp_data.scans_since_last_full_scan += 1
     return common.create_scan_params_2d(origin, size,
                                         exp_data.phys_units,
+                                        None,  # Nothing for angular units
                                         res, exp_data.data_units,
                                         exp_data.scan_angle)
 

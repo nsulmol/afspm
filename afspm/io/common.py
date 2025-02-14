@@ -38,7 +38,8 @@ def sleep_on_socket_startup():
 # --- Creation Helpers --- #
 def create_scan_params_2d(top_left: tuple[float, float] = None,
                           size: tuple[float, float] = None,
-                          phys_units: str = None,
+                          length_units: str = None,
+                          angular_units: str = None,
                           data_shape: tuple[int, int] = None,
                           data_units: str = None,
                           angle: int = 0,
@@ -51,7 +52,8 @@ def create_scan_params_2d(top_left: tuple[float, float] = None,
     Args:
         top_left: physical roi, top-left position.
         size: physical roi, size.
-        phys_units: units of the physical dimensions.
+        length_units: units of the length/distance dimensions.
+        angular_units: units of the rotation.
         data_shape: 2D shape of the 2D scan.
         data_units: units of the z-dimension.
         channel_name: name of the channel this data comes from.
@@ -67,7 +69,8 @@ def create_scan_params_2d(top_left: tuple[float, float] = None,
     da_shape = (geometry_pb2.Size2u(x=data_shape[0], y=data_shape[1])
                 if data_shape else None)
     spatial_aspects = scan_pb2.SpatialAspects(roi=roi,
-                                              length_units=phys_units)
+                                              length_units=length_units,
+                                              angular_units=angular_units)
     data_aspects = scan_pb2.DataAspects(shape=da_shape, units=data_units)
     return scan_pb2.ScanParameters2d(spatial=spatial_aspects,
                                      data=data_aspects)

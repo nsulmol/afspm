@@ -109,7 +109,7 @@ def zctrl_params():
 def scan_params():
     return common.create_scan_params_2d([50.0, -25.0],
                                         [2000.00, 3000.00],
-                                        'nm', [100, 150],
+                                        'nm', None, [100, 150],
                                         'nm')
 
 
