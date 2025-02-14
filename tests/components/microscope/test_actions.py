@@ -4,7 +4,6 @@ import os
 import sys
 import logging
 import pytest
-from typing import Any, Callable
 import tomli
 
 from afspm.components.microscope import actions

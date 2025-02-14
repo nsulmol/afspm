@@ -4,8 +4,6 @@ import time
 import logging
 from typing import Optional, Any
 
-from google.protobuf.message import Message
-
 from afspm.utils.units import convert
 
 from afspm.components.microscope.translator import MicroscopeTranslator
