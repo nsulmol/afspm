@@ -85,14 +85,9 @@ class MapTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
                          ) -> (control_pb2.ControlResponse,
                                Message | int | None):
         """Override method, use param_method_map to map to methods."""
-        logger.warning(f'checking if we can handle param {param}')
-        logger.warning(f'params.PARAMETERS: {params.PARAMETERS}')
         if param.parameter not in params.PARAMETERS:
             return (control_pb2.ControlResponse.REP_PARAM_INVALID,
                     param)
-
-        logger.warning('our param was in our PARAMETERS list. checking if ' +
-                       'supported.')
 
         if param.parameter not in self.param_method_map:
             return (control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED,
