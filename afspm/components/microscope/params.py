@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 class MicroscopeParameter(str, Enum):
     """Holds generic parameter names that can be set."""
+
     SCOPE_STATE = 'scope-state'
 
     # Physical Scan Parameters
@@ -48,6 +49,10 @@ class MicroscopeParameter(str, Enum):
     ZCTRL_PGAIN = 'zctrl-pgain'
     ZCTRL_IGAIN = 'zctrl-igain'
     ZCTRL_EGAIN = 'zctrl-egain'
+
+    # Sample Slope Correction
+    SAMPLE_SLOPE_X = 'sample-slope-x'
+    SAMPLE_SLOPE_Y = 'sample-slope-y'
 
     # Probe / Scan Parameters
     SCAN_SPEED = 'scan-speed'
@@ -100,6 +105,13 @@ DESCRIPTIONS = {
     MicroscopeParameter.ZCTRL_EGAIN:
     "Desired gain for error fed into feedback loop controlling " +
     "z-height of probe.",
+
+    # Sample Slope Correction
+    MicroscopeParameter.SAMPLE_SLOPE_X:
+    "Slope of sample plane along x-axis.",
+
+    MicroscopeParameter.SAMPLE_SLOPE_Y:
+    "Slope of sample plane along y-axis.",
 
     # Probe / Scan Parameters
     MicroscopeParameter.SCAN_SPEED:
