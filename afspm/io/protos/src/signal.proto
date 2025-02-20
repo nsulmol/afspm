@@ -1,0 +1,53 @@
+/*
+  This file holds 1D signal message types, for sending the results of single
+  point 1D signals (e.g. spectroscopy, force-distance curves) between
+  afspm nodes.
+*/
+
+// NOTE: Units are used to tell the MicroscopeTranslator, not to *demand* the
+// format they should be returned in! The AfspmComponent should read the
+// units and convert to their desired format.
+// Pint can be used on either end.
+
+edition = "2023";
+
+import "google/protobuf/timestamp.proto";
+import "geometry.proto";
+
+/* Position of the probe along (x,y) plane with units. */
+message ProbePosition {
+  Point2d point = 1;
+  string units = 2;
+}
+
+/* Holds data shape and units.
+ * A given 1D signal is a signal y = f(x), where we provide independent inputs
+ * x and measure the dependent outputs y.
+ * */
+message SignalData {
+  // dependent is y for y = f(x)
+  repeated double dependentValues = 1;
+  string dependentUnits = 2;  // Used for interpretation only.
+
+  // independent is x for y = f(x)
+  repeated double independentValues = 3;
+  string independentUnits = 4;  // Used for interpretation only.
+}
+
+/* One-dimensional signal collected at a single (x,y) position.
+ *
+ * Our signal logic assumes a one-to-one relationship between signals and
+ * files. Thus, even if your SPM *supports* multiple signals in one file,
+ * the automation should be saving one-per-file.
+ *
+ * We realize this can be a bit of a mess! You can use components in
+ * components.metadata to save context of scans/signals for later processing.
+ * */
+message Signal1d {
+  ProbePosition position = 1;
+  string type = 2; // Type of signal
+  string filename = 3;  // Assumes one-to-one signal/file relationship.
+  google.protobuf.Timestamp timestamp = 4;  // Timestamp associated with file.
+
+  SignalData data = 5;
+}

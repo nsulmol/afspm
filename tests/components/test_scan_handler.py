@@ -139,7 +139,7 @@ def test_scanning(publisher, server, thread_scan_handler,
     logger.info("Validate we can go through the scan process properly.")
 
     states = [scan_pb2.ScopeState.SS_MOVING,
-              scan_pb2.ScopeState.SS_COLLECTING]
+              scan_pb2.ScopeState.SS_SCANNING]
     requests = [control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS,
                 control_pb2.ControlRequest.REQ_ACTION]
     objects = [SCAN_PARAMS,

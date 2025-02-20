@@ -21,6 +21,7 @@ from afspm.io.control.client import AdminControlClient
 
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
+from afspm.io.protos.generated import signal_pb2
 
 from tests.components import sample_components as sc
 
@@ -90,6 +91,11 @@ def topics_states():
             cl.CacheLogic.get_envelope_for_proto(control_pb2.ControlState())]
 
 
+@pytest.fixture(scope="module")
+def topics_signal():
+    return [cl.CacheLogic.get_envelope_for_proto(
+        signal_pb2.Signal1d())]
+
 # --- I/O Classes (Subscribers, Clients) --- #
 @pytest.fixture
 def sub_scope_state(ctx, psc_url, topics_states, cache_kwargs, wait_ms):
@@ -109,6 +115,18 @@ def sub_scan2d(ctx, psc_url, topics_scan2d, cache_kwargs, wait_ms):
     # rather than looping.
     return Subscriber(
         psc_url, cl.extract_proto, topics_scan2d,
+        cl.update_cache, ctx,
+        extract_proto_kwargs=cache_kwargs,
+        update_cache_kwargs=cache_kwargs,
+        poll_timeout_ms=wait_ms)
+
+
+@pytest.fixture
+def sub_signal(ctx, psc_url, topics_signal, cache_kwargs, wait_ms):
+    # Note: we use wait_ms because  we are explicitly checking per-call,
+    # rather than looping.
+    return Subscriber(
+        psc_url, cl.extract_proto, topics_signal,
         cl.update_cache, ctx,
         extract_proto_kwargs=cache_kwargs,
         update_cache_kwargs=cache_kwargs,
@@ -137,13 +155,19 @@ def move_time_ms(wait_ms):
     return 2 * wait_ms
 
 
+@pytest.fixture(scope="module")
+def signal_time_ms(wait_ms):
+    return 3 * wait_ms
+
+
 @pytest.fixture
-def thread_microscope_translator(pub_url, server_url, psc_url, ctx, move_time_ms,
-                                 scan_time_ms, cache_kwargs):
+def thread_microscope_translator(pub_url, server_url, psc_url, ctx,
+                                 move_time_ms, scan_time_ms, signal_time_ms,
+                                 cache_kwargs):
     thread = threading.Thread(target=sc.microscope_translator_routine,
                               args=(pub_url, server_url, psc_url,
-                                    ctx, move_time_ms,
-                                    scan_time_ms, cache_kwargs))
+                                    ctx, move_time_ms, scan_time_ms,
+                                    signal_time_ms, cache_kwargs))
     thread.daemon = True
     thread.start()
     return thread
@@ -276,7 +300,7 @@ def test_start_scan(thread_microscope_translator, thread_microscope_scheduler,
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
     scope_state_msg = scan_pb2.ScopeStateMsg(
-        scope_state=scan_pb2.ScopeState.SS_COLLECTING)
+        scope_state=scan_pb2.ScopeState.SS_SCANNING)
     assert_sub_received_proto(afspm_component.subscriber,
                               scope_state_msg)
     assert not afspm_component.subscriber.poll_and_store()
@@ -296,7 +320,7 @@ def test_start_scan(thread_microscope_translator, thread_microscope_scheduler,
 
 
 def test_stop_scan(thread_microscope_translator, thread_microscope_scheduler,
-                   afspm_component, wait_count, scan_time_ms, no_problem,
+                   afspm_component, wait_count, no_problem,
                    sub_scan2d, default_control_state, component_name):
     """Ensure that we can cancel a scan and receive updates."""
     startup_and_req_ctrl(afspm_component, no_problem, default_control_state,
@@ -304,7 +328,7 @@ def test_stop_scan(thread_microscope_translator, thread_microscope_scheduler,
 
     rep = afspm_component.control_client.start_scan()
     scope_state_msg = scan_pb2.ScopeStateMsg(
-        scope_state=scan_pb2.ScopeState.SS_COLLECTING)
+        scope_state=scan_pb2.ScopeState.SS_SCANNING)
 
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
     assert_sub_received_proto(afspm_component.subscriber,
@@ -365,6 +389,71 @@ def test_set_scan_params(thread_microscope_translator,
                          thread_microscope_scheduler)
 
 
+def test_start_signal(thread_microscope_translator, thread_microscope_scheduler,
+                      afspm_component, wait_count, signal_time_ms, no_problem,
+                      sub_signal, component_name, default_control_state):
+    """Ensure we receive indication of a scan starting when we request it."""
+    startup_and_req_ctrl(afspm_component, no_problem, default_control_state,
+                         component_name, wait_count)
+
+    rep = afspm_component.control_client.start_signal()
+    assert rep == control_pb2.ControlResponse.REP_SUCCESS
+
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_SIGNALING)
+    assert_sub_received_proto(afspm_component.subscriber,
+                              scope_state_msg)
+    assert not afspm_component.subscriber.poll_and_store()
+
+    # Wait for scan to finish
+    time.sleep(2 * signal_time_ms / 1000)
+
+    # Ensure we received indication the scan ended, and an image
+    scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
+    assert_sub_received_proto(afspm_component.subscriber,
+                              scope_state_msg)
+    # Validate we received a new image.
+    assert sub_signal.poll_and_store()
+
+    end_and_wait_threads(afspm_component, thread_microscope_translator,
+                         thread_microscope_scheduler)
+
+
+def test_stop_signal(thread_microscope_translator, thread_microscope_scheduler,
+                     afspm_component, wait_count, no_problem,
+                     sub_signal, default_control_state, component_name):
+    """Ensure that we can cancel a scan and receive updates."""
+    startup_and_req_ctrl(afspm_component, no_problem, default_control_state,
+                         component_name, wait_count)
+
+    rep = afspm_component.control_client.start_signal()
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_SIGNALING)
+
+    assert rep == control_pb2.ControlResponse.REP_SUCCESS
+    assert_sub_received_proto(afspm_component.subscriber,
+                              scope_state_msg)
+    # No more messages until scan done
+    assert not afspm_component.subscriber.poll_and_store()
+    assert not sub_signal.poll_and_store()
+
+    # Cancel scan before it finishes!
+    afspm_component.control_client.stop_signal()
+
+    # First, will receive an SS_INTERRUPTED state; then, an SS_FREE state.
+    for state in [scan_pb2.ScopeState.SS_INTERRUPTED,
+                  scan_pb2.ScopeState.SS_FREE]:
+        scope_state_msg.scope_state = state
+        assert_sub_received_proto(afspm_component.subscriber,
+                                  scope_state_msg)
+
+    assert not sub_signal.poll_and_store()
+    assert not afspm_component.subscriber.poll_and_store()
+
+    end_and_wait_threads(afspm_component, thread_microscope_translator,
+                         thread_microscope_scheduler)
+
+
 def test_experiment_problems(thread_microscope_translator,
                              thread_microscope_scheduler,
                              afspm_component, wait_count, move_time_ms,
@@ -400,7 +489,7 @@ def test_calls_while_scanning(thread_microscope_translator, no_problem,
 
     rep = afspm_component.control_client.start_scan()
     scope_state_msg = scan_pb2.ScopeStateMsg(
-        scope_state=scan_pb2.ScopeState.SS_COLLECTING)
+        scope_state=scan_pb2.ScopeState.SS_SCANNING)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
     assert_sub_received_proto(afspm_component.subscriber,
                               scope_state_msg)

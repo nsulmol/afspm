@@ -176,7 +176,7 @@ class AsylumTranslator(MicroscopeTranslator):
                                        params.AsylumParam.SCAN_STATUS)
 
         if scan_status > 0:  # If 0, not scanning
-            return scan_pb2.ScopeState.SS_COLLECTING
+            return scan_pb2.ScopeState.SS_SCANNING
         else:
             return scan_pb2.ScopeState.SS_FREE
 

@@ -46,6 +46,10 @@ DESCRIPTIONS = {
     "Stop performing 1D signal collection if in progress."
 }
 
+# TODO: do we need to add start signal/stop signal?
+REQUIRED_ACTIONS = [MicroscopeAction.START_SCAN,
+                    MicroscopeAction.STOP_SCAN]
+
 
 class ActionNotSupportedError(Exception):
     """This action is not supported by this microscope."""

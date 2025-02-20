@@ -6,6 +6,7 @@ from google.protobuf.internal.enum_type_wrapper import EnumTypeWrapper
 from ..io.protos.generated import scan_pb2
 from ..io.protos.generated import geometry_pb2
 from ..io.protos.generated import control_pb2
+from ..io.protos.generated import signal_pb2
 
 
 # --- Common envelope/signal stuff --- #
@@ -75,6 +76,19 @@ def create_scan_params_2d(top_left: tuple[float, float] = None,
     return scan_pb2.ScanParameters2d(spatial=spatial_aspects,
                                      data=data_aspects)
 
+def create_probe_position(pos: tuple[float, float] = None,
+                          units: str = None):
+    """Create ProbePosition object.
+
+    A helper, to avoid annoyances with protobuf data initialization.
+
+    Args:
+        top_left: physical roi, top-left position.
+        units: units of the length/distance dimensions.
+    """
+    pos = (geometry_pb2.Point2d(x=pos[0], y=pos[1]) if pos else None)
+    return signal_pb2.ProbePosition(point=pos, units=units)
+
 
 def create_action_msg(action: str) -> control_pb2.ActionMsg:
     """Convert an ActionParameter enum / str to the probotuf message.
@@ -107,7 +121,7 @@ def get_enum_val(enum_obj: EnumTypeWrapper, name: str) -> int:
 
     Args:
         enum_obj: the zmq enum object, e.g. scan_pb2.ScopeState.
-        name: the string name for the enum value, e.g. SS_COLLECTING.
+        name: the string name for the enum value, e.g. SS_SCANNING.
 
     Returns:
         the int value of this enum.
@@ -123,7 +137,7 @@ def get_enum_str(enum_obj: EnumTypeWrapper, val: int) -> str:
         val: the int value of this enum.
 
     Returns:
-        the string name for the enum value, e.g. SS_COLLECTING.
+        the string name for the enum value, e.g. SS_SCANNING.
     """
     return enum_obj.Name(val)
 
@@ -133,7 +147,7 @@ def is_str_in_enums(enum_obj: EnumTypeWrapper, name: str) -> bool:
 
     Args:
         enum_obj: the zmq enum object, e.g. scan_pb2.ScopeState.
-        name: the string name for the enum value, e.g. SS_COLLECTING.
+        name: the string name for the enum value, e.g. SS_SCANNING.
 
     Returns:
         true if the name corresponds to an enum value, false otherwise.

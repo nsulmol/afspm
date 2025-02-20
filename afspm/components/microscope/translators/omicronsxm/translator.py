@@ -143,7 +143,7 @@ class OmicronSXMTranslator(MicroscopeTranslator):
         self.reset_DDE()
         scanning = get_param(self.DDE_client, "Scan")
         if scanning: 
-            return scan_pb2.ScopeState.SS_COLLECTING
+            return scan_pb2.ScopeState.SS_SCANNING
         else:
             return scan_pb2.ScopeState.SS_FREE
 

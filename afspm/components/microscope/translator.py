@@ -29,6 +29,7 @@ from ...io.control import server as ctrl_srvr
 from ...io.protos.generated import scan_pb2
 from ...io.protos.generated import control_pb2
 from ...io.protos.generated import feedback_pb2
+from ...io.protos.generated import signal_pb2
 
 
 logger = logging.getLogger(__name__)
@@ -118,14 +119,16 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             signals.
     """
 
-    REQUIRED_ACTIONS = [actions.MicroscopeAction.START_SCAN,
-                        actions.MicroscopeAction.STOP_SCAN]
+    # TODO: Is this the best approach?
+    STOP_REQS = [(control_pb2.ControlRequest.REQ_ACTION,
+                  control_pb2.ActionMsg(
+                      action=actions.MicroscopeAction.STOP_SCAN)),
+                 (control_pb2.ControlRequest.REQ_ACTION,
+                  control_pb2.ActionMsg(
+                      action=actions.MicroscopeAction.STOP_SIGNAL))]
 
-    STOP_SCAN_REQ = (control_pb2.ControlRequest.REQ_ACTION,
-                     control_pb2.ActionMsg(
-                         action=actions.MicroscopeAction.STOP_SCAN))
     # Indicates commands we will allow to be sent while not free
-    ALLOWED_COMMANDS_WHILE_NOT_FREE = [STOP_SCAN_REQ]
+    ALLOWED_COMMANDS_WHILE_NOT_FREE = STOP_REQS
 
     def __init__(self, name: str, publisher: pub.Publisher,
                  control_server: ctrl_srvr.ControlServer,
@@ -155,9 +158,11 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         # Init our current understanding of state / params
         self.scope_state = scan_pb2.ScopeState.SS_UNDEFINED
         self.scan_params = scan_pb2.ScanParameters2d()
-        self.scans = []
-
         self.zctrl_params = feedback_pb2.ZCtrlParameters()
+        self.probe_pos = signal_pb2.ProbePosition()
+
+        self.scans = []
+        self.signal = None
 
         # AfspmComponent constructor: no control_client provided, as that
         # logic is handled by the control_server.
@@ -180,22 +185,53 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
     # ----- 'Action' Handlers ----- #
     @abstractmethod
     def on_start_scan(self) -> control_pb2.ControlResponse:
-        """Handle a request to start a scan."""
+        """Handle a request to start a scan.
+
+        Must support.
+        """
 
     @abstractmethod
     def on_stop_scan(self) -> control_pb2.ControlResponse:
-        """Handle a request to stop a scan."""
+        """Handle a request to stop a scan.
+
+        Must support.
+        """
+
+    @abstractmethod
+    def on_start_signal(self) -> control_pb2.ControlResponse:
+        """Handle a request to start a signal collection.
+
+        If not supported, return REP_ACTION_NOT_SUPPORTED.
+        """
+
+    @abstractmethod
+    def on_stop_signal(self) -> control_pb2.ControlResponse:
+        """Handle a request to stop a signal collection.
+
+        If not supported, return REP_ACTION_NOT_SUPPORTED.
+        """
 
     # ----- Parameter Handlers ----- #
     @abstractmethod
     def on_set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
                            ) -> control_pb2.ControlResponse:
-        """Handle a request to change the scan parameters."""
+        """Handle a request to change the scan parameters.
+
+        Must support.
+        """
 
     @abstractmethod
     def on_set_zctrl_params(self, zctrl_params: feedback_pb2.ZCtrlParameters
                             ) -> control_pb2.ControlResponse:
         """Handle a request to change the Z-Controller Feedback parameters.
+
+        If not supported, return REP_CMD_NOT_SUPPORTED.
+        """
+
+    @abstractmethod
+    def on_set_probe_pos(self, probe_position: signal_pb2.ProbePosition
+                         ) -> control_pb2.ControlResponse:
+        """Handle a request to change the probe position of the microscope.
 
         If not supported, return REP_CMD_NOT_SUPPORTED.
         """
@@ -237,13 +273,17 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                 performed.
 
         Returns:
-            Response to the request. REP_ACTION
+            Response to the request. REP_ACTION_NOT_SUPPORTED if that
+            particular action is not supported.
         """
         if action.action == actions.MicroscopeAction.START_SCAN:
             return self.on_start_scan()
         elif action.action == actions.MicroscopeAction.STOP_SCAN:
             return self.on_start_scan()
-        # We only support start/stop scan by default.
+        elif action.action == actions.MicroscopeAction.START_SIGNAL:
+            return self.on_start_signal()
+        elif action.action == actions.MicroscopeAction.STOP_SIGNAL:
+            return self.on_stop_signal()
         return control_pb2.ControlResponse.REP_ACTION_NOT_SUPPORTED
 
     # ----- Polling Methods ----- #
@@ -251,24 +291,28 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
     def poll_scope_state(self) -> scan_pb2.ScopeState:
         """Poll the translator for the current scope state.
 
-        Throw MicroscopeError on failure.
+        Must support. Throw MicroscopeError on failure.
         """
 
     @abstractmethod
     def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
         """Poll the controller for the current scan parameters.
 
-        Throw MicroscopeError on failure.
+        Must support. Throw MicroscopeError on failure.
         """
 
     @abstractmethod
     def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
         """Poll the controller for the current Z-Control parameters.
 
-        If not supported, return a new ZCtrlParameters instance:
-            return feedback_pb2.ZCtrlParameters()
+        If not supported, return None. Throw MicroscopeError on failure.
+        """
 
-        Throw MicroscopeError on failure.
+    @abstractmethod
+    def poll_probe_pos(self) -> signal_pb2.ProbePosition:
+        """Poll the controller for the current probe position.
+
+        If not supported, return None. Throw MicroscopeError on failure.
         """
 
     @abstractmethod
@@ -285,12 +329,30 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         comparing scans. If this attribute is not passed, we will do
         a data comparison.
 
-        Throw MicroscopeError on failure.
+        Must support. Throw MicroscopeError on failure.
 
         To read the creation time of a file using Python, use
             get_file_modification_datetime()
         and you can put that in the timestamp param with:
             scan.timestamp.FromDatetime(ts)
+        """
+
+    @abstractmethod
+    def poll_signal(self) -> signal_pb2.Signal1d:
+        """Obtain latest performed signal(s).
+
+        We will compare the prior signal(s) to the latest to determine if a
+        recent signal collection succeeded (i.e. they are different).
+
+        Note that we will first consider the timestamp attribute when comparing
+        signals. If this attribute is not passed, we will do a data comparison.
+
+        If not supported return None. Throw MicroscopeError on failure.
+
+        To read the creation time of a file using Python, use
+            get_file_modification_datetime()
+        and you can put that in the timestamp param with:
+            signal_collection.timestamp.FromDatetime(ts)
         """
 
     def _handle_polling_device(self):
@@ -304,38 +366,30 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         old_scope_state = copy.deepcopy(self.scope_state)
         self.scope_state = self.poll_scope_state()
 
-        if (old_scope_state == scan_pb2.ScopeState.SS_COLLECTING and
-                self.scope_state != scan_pb2.ScopeState.SS_COLLECTING):
-            old_scans = copy.deepcopy(self.scans)
-            self.scans = self.poll_scans()
+        if (old_scope_state == scan_pb2.ScopeState.SS_SCANNING and
+                self.scope_state != scan_pb2.ScopeState.SS_SCANNING):
+            self._update_scans()
 
-            # If scans are different, assume new and send out!
-            # Test timestamps if they exist. Otherwise, compare
-            # data arrays.
-            send_scan = False
+        if (old_scope_state == scan_pb2.ScopeState.SS_SIGNALING and
+                self.scope_state != scan_pb2.ScopeState.SS_SIGNALING):
+            self._update_signals()
 
-            both_have_scans = len(self.scans) > 0 and len(old_scans) > 0
-            only_new_has_scans = (len(self.scans) > 0 and
-                                  len(old_scans) == 0)
-            both_have_timestamps = both_have_scans and (
-                self.scans[0].HasField(TIMESTAMP_ATTRIB) and
-                old_scans[0].HasField(TIMESTAMP_ATTRIB))
+        # Handle on non-scope-state parameters
+        # NOTE: Something like this does not work, because param = poller()
+        # simply changes the variable param. Annoying.
+        #
+        # parameters = [self.scan_params, self.zctrl_params,
+        #               self.probe_pos]
+        # names = ['scan_params', 'zctrl_params', 'probe_pos']
+        # pollers = [self.poll_scan_params, self.poll_zctrl_params,
+        #            self.poll_probe_pos]
+        # for (param, name, poller) in zip(parameters, names, pollers):
+        #     old_param = copy.deepcopy(param)
+        #     param = poller()
 
-            # First, check if timestamps are different
-            scans_different = both_have_timestamps and (
-                self.scans[0].timestamp != old_scans[0].timestamp)
-            # Only compare scan data if not the case.
-            scans_different = scans_different or both_have_scans and (
-                self.scans[0].values != old_scans[0].values)
-
-            if only_new_has_scans or scans_different:
-                send_scan = True
-
-            if send_scan:
-                logger.info("New scans, sending out.")
-                _check_and_warn_angle_issue(self.scans)
-                for scan in self.scans:
-                    self.publisher.send_msg(scan)
+        #     if old_param != param:
+        #         logger.info(f"New {name}, sending out.")
+        #         self.publisher.send_msg(param)
 
         old_scan_params = copy.deepcopy(self.scan_params)
         self.scan_params = self.poll_scan_params()
@@ -349,6 +403,12 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             logger.info("New zctrl_params, sending out.")
             self.publisher.send_msg(self.zctrl_params)
 
+        old_probe_pos = copy.deepcopy(self.probe_pos)
+        self.probe_pos = self.poll_probe_pos()
+        if old_probe_pos != self.probe_pos:
+            logger.info("New probe position, sending out.")
+            self.publisher.send_msg(self.probe_pos)
+
         # scope state changes sent *last*!
         if old_scope_state != self.scope_state:
             logger.info("New scope state %s, sending out.",
@@ -357,6 +417,68 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             scope_state_msg = scan_pb2.ScopeStateMsg(
                 scope_state=self.scope_state)
             self.publisher.send_msg(scope_state_msg)
+
+    def _update_scans(self):
+        old_scans = copy.deepcopy(self.scans)
+        self.scans = self.poll_scans()
+
+        # If scans are different, assume new and send out!
+        # Test timestamps if they exist. Otherwise, compare
+        # data arrays.
+        send_scan = False
+
+        both_have_scans = len(self.scans) > 0 and len(old_scans) > 0
+        only_new_has_scans = (len(self.scans) > 0 and
+                              len(old_scans) == 0)
+        both_have_timestamps = both_have_scans and (
+            self.scans[0].HasField(TIMESTAMP_ATTRIB) and
+            old_scans[0].HasField(TIMESTAMP_ATTRIB))
+
+        # First, check if timestamps are different
+        scans_different = both_have_timestamps and (
+            self.scans[0].timestamp != old_scans[0].timestamp)
+        # Only compare scan data if not the case.
+        scans_different = scans_different or both_have_scans and (
+            self.scans[0].values != old_scans[0].values)
+
+        if only_new_has_scans or scans_different:
+            send_scan = True
+
+        if send_scan:
+            logger.info("New scans, sending out.")
+            _check_and_warn_angle_issue(self.scans)
+            for scan in self.scans:
+                self.publisher.send_msg(scan)
+
+    def _update_signals(self):
+        old_signal = copy.deepcopy(self.signal)
+        self.signal = self.poll_signal()
+
+        # If signal is different, assume new and send out!
+        # Test timestamps if they exist. Otherwise, compare
+        # data arrays.
+        send_signal = False
+
+        both_have_signal = self.signal and old_signal
+        only_new_has_signal = self.signal and old_signal is None
+        both_have_timestamps = both_have_signal and (
+            self.signal.HasField(TIMESTAMP_ATTRIB) and
+            old_signal.HasField(TIMESTAMP_ATTRIB))
+
+        # First, check if timestamps are different
+        signals_different = both_have_timestamps and (
+            self.signal.timestamp != old_signal.timestamp)
+        # Only compare signal data if not the case.
+        signals_different = signals_different or both_have_signal and (
+            self.signal.signals[0].data.dependentValues !=
+            old_signal.signals[0].data.dependentValues)  # TODO: Check other values?
+
+        if only_new_has_signal or signals_different:
+            send_signal = True
+
+        if send_signal:
+            logger.info("New signal, sending out.")
+            self.publisher.send_msg(self.signal)
 
     def _handle_incoming_requests(self):
         """Poll control_server for requests and responds to them."""
@@ -371,10 +493,10 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                 handler = self.req_handler_map[req]
                 rep = handler(proto) if proto else handler()
 
-                # Special case! If scan was cancelled successfully, we
-                # send out an SS_INTERRUPTED state, to allow detecting
+                # Special case! If scan or signal was cancelled successfully,
+                # we send out an SS_INTERRUPTED state, to allow detecting
                 # interruptions.
-                if ((req, proto) == self.STOP_SCAN_REQ and
+                if ((req, proto) in self.STOP_REQS and
                         rep == control_pb2.ControlResponse.REP_SUCCESS):
                     scope_state_msg = scan_pb2.ScopeStateMsg(
                         scope_state=scan_pb2.ScopeState.SS_INTERRUPTED)

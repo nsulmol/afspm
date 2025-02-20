@@ -10,6 +10,7 @@ from ...io.control import server as ctrl_srvr
 from ...io.protos.generated import scan_pb2
 from ...io.protos.generated import control_pb2
 from ...io.protos.generated import feedback_pb2
+from ...io.protos.generated import signal_pb2
 
 from . import translator
 from . import params
@@ -73,7 +74,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
 
     def _validate_required_actions_exist(self):
         """Ensure action_handler at least supports our required actions."""
-        for action in self.REQUIRED_ACTIONS:
+        for action in actions.REQUIRED_ACTIONS:
             assert action in self.action_handler.actions
 
     # ----- Parameter Handlers ----- #
@@ -114,6 +115,16 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
                 attr_units.append(None)
 
         self.param_handler.set_param_list(attribs, vals, attr_units)
+
+    def on_set_probe_pos(self, probe_position: signal_pb2.ProbePosition
+                              ) -> control_pb2.ControlResponse:
+        """Handle a request to change the probe position of the microscope."""
+        vals = [probe_position.point.x,
+                probe_position.point.y]
+        attr_units = [probe_position.units, probe_position.units]
+
+        self.param_handler.set_param_list(params.PROBE_POS_PARAMS,
+                                          vals, attr_units)
 
     def on_param_request(self, param: control_pb2.ParameterMsg
                          ) -> (control_pb2.ControlResponse,
@@ -247,11 +258,36 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
 
         return zctrl_params
 
+
+    def poll_probe_pos(self) -> signal_pb2.ProbePosition | None:
+        """Poll the controller for the current probe position.
+
+        If not supported, return None. Throw MicroscopeError on failure.
+        """
+        units = self.param_handler.get_units(
+            params.MicroscopeParameter.PROBE_POS_X)
+        vals = self.param_handler.get_param_list(params.PROBE_POS_PARAMS)
+        probe_pos_params = signal_pb2.ProbePosition()
+        probe_pos_params.point.x = vals[0]
+        probe_pos_params.point.y = vals[1]
+        probe_pos_params.units = units
+
+        return probe_pos_params
+
+
     # ----- 'Action' Handlers ----- #
     def on_start_scan(self) -> control_pb2.ControlResponse:
         """Do nothing - handled by ActionHandler."""
         pass
 
     def on_stop_scan(self) -> control_pb2.ControlResponse:
+        """Do nothing - handled by ActionHandler."""
+        pass
+
+    def on_start_signal(self) -> control_pb2.ControlResponse:
+        """Do nothing - handled by ActionHandler."""
+        pass
+
+    def on_stop_signal(self) -> control_pb2.ControlResponse:
         """Do nothing - handled by ActionHandler."""
         pass

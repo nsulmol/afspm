@@ -78,7 +78,7 @@ class MapTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
 
     def _validate_required_actions_exist(self):
         """Ensure action_handler at least supports our required actions."""
-        for action in self.REQUIRED_ACTIONS:
+        for action in actions.REQUIRED_ACTIONS:
             assert action in self.action_method_map
 
     def on_param_request(self, param: control_pb2.ParameterMsg
@@ -144,5 +144,13 @@ class MapTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         pass
 
     def on_stop_scan(self) -> control_pb2.ControlResponse:
+        """Do nothing - handled by ActionHandler."""
+        pass
+
+    def on_start_signal(self) -> control_pb2.ControlResponse:
+        """Do nothing - handled by ActionHandler."""
+        pass
+
+    def on_stop_signal(self) -> control_pb2.ControlResponse:
         """Do nothing - handled by ActionHandler."""
         pass

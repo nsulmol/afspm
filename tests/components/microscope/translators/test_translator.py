@@ -325,7 +325,7 @@ def test_cancel_scan(client, default_control_state,
     rep = client.start_scan()
 
     scope_state_msg = scan_pb2.ScopeStateMsg(
-        scope_state=scan_pb2.ScopeState.SS_COLLECTING)
+        scope_state=scan_pb2.ScopeState.SS_SCANNING)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
     assert_sub_received_proto(sub_scope_state,
                               scope_state_msg)
@@ -430,7 +430,7 @@ def test_run_scan(client, default_control_state,
                 "scanning has begun.")
     rep = client.start_scan()
     scope_state_msg = scan_pb2.ScopeStateMsg(
-        scope_state=scan_pb2.ScopeState.SS_COLLECTING)
+        scope_state=scan_pb2.ScopeState.SS_SCANNING)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
     assert_sub_received_proto(sub_scope_state, scope_state_msg)
 

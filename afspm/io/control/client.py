@@ -14,6 +14,7 @@ from google.protobuf.message import Message
 from ..protos.generated import control_pb2
 from ..protos.generated import scan_pb2
 from ..protos.generated import feedback_pb2
+from ..protos.generated import signal_pb2
 
 
 logger = logging.getLogger(__name__)
@@ -162,6 +163,24 @@ class ControlClient:
         action = control_pb2.ActionMsg(action=MicroscopeAction.STOP_SCAN)
         return self.request_action(action)
 
+    def start_signal(self) -> control_pb2.ControlResponse:
+        """Request start collecting a signal.
+
+        Returns:
+            The received ControlResponse.
+        """
+        action = control_pb2.ActionMsg(action=MicroscopeAction.START_SIGNAL)
+        return self.request_action(action)
+
+    def stop_signal(self) -> control_pb2.ControlResponse:
+        """Request stop collecting a signal.
+
+        Returns:
+            The received ControlResponse.
+        """
+        action = control_pb2.ActionMsg(action=MicroscopeAction.STOP_SIGNAL)
+        return self.request_action(action)
+
     def request_action(self, action: control_pb2.ActionMsg
                        ) -> control_pb2.ControlResponse:
         """Request an action be performed.
@@ -223,6 +242,21 @@ class ControlClient:
         logger.debug("Sending set_zctrl_params with: %s", zctrl_params)
         msg = cmd.serialize_request(
             control_pb2.ControlRequest.REQ_SET_ZCTRL_PARAMS, zctrl_params)
+        return self._try_send_req(msg)
+
+    def set_probe_position(self, probe_position: signal_pb2.ProbePosition
+                           ) -> control_pb2.ControlResponse:
+        """Try to set the probe position of the SPM device.
+
+        Args:
+            probe_position: the desired position of hte probe.
+
+        Returns:
+            The received ControlReesponse.
+        """
+        logger.debug("Sending set_probe_position with: %s", probe_position)
+        msg = cmd.serialize_request(
+            control_pb2.ControlRequest.REQ_SET_PROBE_POSITION, probe_position)
         return self._try_send_req(msg)
 
     def request_control(self, problem: control_pb2.ExperimentProblem,

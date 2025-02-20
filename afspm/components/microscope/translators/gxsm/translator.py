@@ -132,7 +132,7 @@ class GxsmTranslator(MicroscopeTranslator):
         # Note: updating self.scope_state is handled by the calling method
         # in MicroscopeTranslator.
         state = self._get_current_scope_state()
-        if (self.scope_state == scan_pb2.ScopeState.SS_COLLECTING and
+        if (self.scope_state == scan_pb2.ScopeState.SS_SCANNING and
                 state == scan_pb2.ScopeState.SS_FREE):
             gxsm.autosave()  # Save the images we have recorded
         return state
@@ -251,7 +251,7 @@ class GxsmTranslator(MicroscopeTranslator):
         if motor_running:
             return scan_pb2.ScopeState.SS_MOTOR_RUNNING
         if scanning:
-            return scan_pb2.ScopeState.SS_COLLECTING
+            return scan_pb2.ScopeState.SS_SCANNING
         if moving:
             return scan_pb2.ScopeState.SS_MOVING
         return scan_pb2.ScopeState.SS_FREE

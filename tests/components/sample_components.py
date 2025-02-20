@@ -26,6 +26,7 @@ from afspm.io.control.router import ControlRouter
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
 from afspm.io.protos.generated import feedback_pb2
+from afspm.io.protos.generated import signal_pb2
 
 
 logger = logging.getLogger(__name__)
@@ -35,12 +36,26 @@ logger = logging.getLogger(__name__)
 def on_start_scan(translator: MicroscopeTranslator):
     """Handle START_SCAN action."""
     translator.start_ts = time.time()
-    translator.dev_scope_state = scan_pb2.ScopeState.SS_COLLECTING
+    translator.dev_scope_state = scan_pb2.ScopeState.SS_SCANNING
     return control_pb2.ControlResponse.REP_SUCCESS
 
 
 def on_stop_scan(translator: MicroscopeTranslator):
     """Handle STOP_SCAN action."""
+    translator.start_ts = None
+    translator.dev_scope_state = scan_pb2.ScopeState.SS_FREE
+    return control_pb2.ControlResponse.REP_SUCCESS
+
+
+def on_start_signal(translator: MicroscopeTranslator):
+    """Handle START_SIGNAL action."""
+    translator.start_ts = time.time()
+    translator.dev_scope_state = scan_pb2.ScopeState.SS_SIGNALING
+    return control_pb2.ControlResponse.REP_SUCCESS
+
+
+def on_stop_signal(translator: MicroscopeTranslator):
+    """Handle STOP_SIGNAL action."""
     translator.start_ts = None
     translator.dev_scope_state = scan_pb2.ScopeState.SS_FREE
     return control_pb2.ControlResponse.REP_SUCCESS
@@ -94,7 +109,8 @@ def fail_on_moving_speed(ctrlr: MicroscopeTranslator,
 
 # --- Microscope Translator Stuff --- #
 class SampleMicroscopeTranslator(MapTranslator):
-    def __init__(self, scan_time_s, move_time_s, **kwargs):
+    def __init__(self, scan_time_s, move_time_s, signal_time_s,
+                 **kwargs):
         self.scan_speed = 500
         self.ss_units = 'nm/s'
 
@@ -103,10 +119,13 @@ class SampleMicroscopeTranslator(MapTranslator):
         self.start_ts = None
         self.dev_scope_state = scan_pb2.ScopeState.SS_FREE
         self.dev_scan_params = scan_pb2.ScanParameters2d()
+        self.dev_probe_pos = signal_pb2.ProbePosition()
         self.dev_scan = None
+        self.dev_signal = None
 
         self.scan_time_s = scan_time_s
         self.move_time_s = move_time_s
+        self.signal_time_s = signal_time_s
         kwargs['name'] = 'dev_con'
         super().__init__(**kwargs)
 
@@ -119,6 +138,8 @@ class SampleMicroscopeTranslator(MapTranslator):
         self.action_method_map = {
             MicroscopeAction.START_SCAN: on_start_scan,
             MicroscopeAction.STOP_SCAN: on_stop_scan,
+            MicroscopeAction.START_SIGNAL: on_start_signal,
+            MicroscopeAction.STOP_SIGNAL: on_stop_signal,
         }
 
     def on_set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
@@ -132,6 +153,10 @@ class SampleMicroscopeTranslator(MapTranslator):
                             ) -> control_pb2.ControlResponse:
         return control_pb2.ControlResponse.REP_CMD_NOT_SUPPORTED
 
+    def on_set_probe_pos(self, probe_pos: signal_pb2.ProbePosition):
+        self.dev_probe_pos = probe_pos
+        return control_pb2.ControlResponse.REP_SUCCESS
+
     def poll_scope_state(self) -> scan_pb2.ScopeState:
         return self.dev_scope_state
 
@@ -141,18 +166,28 @@ class SampleMicroscopeTranslator(MapTranslator):
     def poll_scans(self) -> list[scan_pb2.Scan2d]:
         return [self.dev_scan] if self.dev_scan else []
 
+    def poll_signal(self) -> signal_pb2.Signal1d:
+        return self.dev_signal
+
     def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
         return feedback_pb2.ZCtrlParameters()
+
+    def poll_probe_pos(self) -> signal_pb2.ProbePosition:
+        return self.dev_probe_pos
 
     def run_per_loop(self):
         if self.start_ts:
             duration = None
             update_scan = False
-            if self.dev_scope_state == scan_pb2.ScopeState.SS_COLLECTING:
+            update_signal = False
+            if self.dev_scope_state == scan_pb2.ScopeState.SS_SCANNING:
                 duration = self.scan_time_s
                 update_scan = True
             elif self.dev_scope_state == scan_pb2.ScopeState.SS_MOVING:
                 duration = self.move_time_s
+            elif self.dev_scope_state == scan_pb2.ScopeState.SS_SIGNALING:
+                duration = self.signal_time_s
+                update_signal = True
 
             if duration:
                 curr_ts = time.time()
@@ -166,12 +201,15 @@ class SampleMicroscopeTranslator(MapTranslator):
                     if update_scan:
                         self.dev_scan = scan_pb2.Scan2d()
                         self.dev_scan.timestamp.GetCurrentTime()
+                    if update_signal:
+                        self.dev_signal = signal_pb2.Signal1d()
+                        self.dev_signal.timestamp.GetCurrentTime()
         super().run_per_loop()
 
 
 def microscope_translator_routine(pub_url, server_url, psc_url,
-                              ctx, move_time_ms, scan_time_ms,
-                              cache_kwargs):
+                                  ctx, move_time_ms, scan_time_ms,
+                                  signal_time_ms, cache_kwargs):
     pub = Publisher(pub_url, cl.CacheLogic.get_envelope_for_proto)
     server = ControlServer(server_url, ctx)
     topics_none = []
@@ -183,6 +221,7 @@ def microscope_translator_routine(pub_url, server_url, psc_url,
 
     translator = SampleMicroscopeTranslator(scan_time_ms / 1000,
                                             move_time_ms / 1000,
+                                            signal_time_ms / 1000,
                                             publisher=pub,
                                             control_server=server,
                                             ctx=ctx, subscriber=sub)

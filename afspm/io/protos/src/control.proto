@@ -12,7 +12,7 @@ enum ControlRequest {
     REQ_PARAM = 2;
     REQ_SET_SCAN_PARAMS = 3;
     REQ_SET_ZCTRL_PARAMS = 4;
-    // TODO: add PROBE_POS command.
+    REQ_SET_PROBE_POSITION = 5;
 
     // The below are specific to ControlRouter
     REQ_REQUEST_CTRL = 6;

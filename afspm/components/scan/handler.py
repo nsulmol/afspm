@@ -154,7 +154,7 @@ class ScanHandler:
         first_startup = (last_state == scan_pb2.ScopeState.SS_UNDEFINED and
                          self._scope_state == scan_pb2.ScopeState.SS_FREE)
         interrupted = self._scope_state == scan_pb2.SS_INTERRUPTED
-        finished_scanning = (last_state == scan_pb2.ScopeState.SS_COLLECTING and
+        finished_scanning = (last_state == scan_pb2.ScopeState.SS_SCANNING and
                              self._scope_state == scan_pb2.ScopeState.SS_FREE)
         finished_moving = (last_state == scan_pb2.ScopeState.SS_MOVING and
                            self._scope_state == scan_pb2.ScopeState.SS_FREE)
@@ -172,7 +172,7 @@ class ScanHandler:
             self._desired_scope_state = scan_pb2.ScopeState.SS_MOVING
         elif finished_moving:
             logger.info("Finished moving, will request scan.")
-            self._desired_scope_state = scan_pb2.ScopeState.SS_COLLECTING
+            self._desired_scope_state = scan_pb2.ScopeState.SS_SCANNING
 
     def _perform_scanning_logic(self, control_client: ControlClient):
         """Request the next scan aspect from client.
@@ -214,7 +214,7 @@ class ScanHandler:
                     return
                 req_to_call = control_client.set_scan_params
                 req_params['scan_params'] = (self._scan_params)
-            elif self._desired_scope_state == scan_pb2.ScopeState.SS_COLLECTING:
+            elif self._desired_scope_state == scan_pb2.ScopeState.SS_SCANNING:
                 req_to_call = control_client.start_scan
 
             if not req_to_call:

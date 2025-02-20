@@ -9,6 +9,7 @@ from google.protobuf.message import Message
 
 from .cache_logic import CacheLogic, DEFAULT_PROTO_WITH_HIST_SEQ
 from ...protos.generated import scan_pb2
+from ...protos.generated import signal_pb2
 from ... import common
 
 
@@ -73,34 +74,44 @@ class ProtoBasedCacheLogic(CacheLogic):
 
 
 class PBCScanLogic(ProtoBasedCacheLogic):
-    """Proto-based-cache with special handling for Scan2d.
+    """Proto-based-cache with special handling for Scan2d and Signal.
 
     This expands upon ProtoBasedCacheLogic, to add individual caches (and
     envelopes) for different physical sizes of Scan2d (i.e. a different
     envelope for each different size) and different scan channels (i.e.
-    channels of a scan).
+    channels of a scan). For signals, it creates individual caches (and
+    envelopes) for different Signal1d types.
 
     Attributes:
         scan_id: holds string uuid for Scan2d, for help parsing.
+        signal_id: holds string uuid for Signal1d, for help parsing.
     """
 
     scan_id = ProtoBasedCacheLogic.get_envelope_for_proto(
         scan_pb2.Scan2d())
+    signal_id = ProtoBasedCacheLogic.get_envelope_for_proto(
+        signal_pb2.Signal1d())
     divider = '_'
 
     def __init__(self, proto_with_history_list: list[(Message, int)] =
                  DEFAULT_PROTO_WITH_HIST_SEQ,
-                 default_scan_history: int = 1, **kwargs):
+                 default_scan_history: int = 1,
+                 default_signal_history: int = 1, **kwargs):
         """Override to force default Scan2d history and protos."""
         super().__init__(proto_with_history_list, **kwargs)
 
         # Even if this was set in proto_with_history_list, override with
         # explicit input variable.
         self.envelope_to_history_map[self.scan_id] = default_scan_history
+        self.envelope_to_history_map[self.signal_id] = default_signal_history
 
         if self.scan_id not in self.envelope_to_proto_map:
             self.envelope_to_proto_map[self.scan_id] = (
                 self.create_default_proto(scan_pb2.Scan2d()))
+
+        if self.signal_id not in self.envelope_to_proto_map:
+            self.envelope_to_proto_map[self.signal_id] = (
+                self.create_default_proto(signal_pb2.Signal1d()))
 
     @staticmethod
     def get_envelope_for_proto(proto: Message,
@@ -118,22 +129,30 @@ class PBCScanLogic(ProtoBasedCacheLogic):
             return (PBCScanLogic.scan_id + PBCScanLogic.divider +
                     proto.channel + PBCScanLogic.divider +
                     str(np.round(proto.params.spatial.roi.size.x)))
+        if (type(proto).__name__ == PBCScanLogic.signal_id and
+                not force_parent):
+            return (PBCScanLogic.signal_id + PBCScanLogic.divider +
+                    proto.type)
         return ProtoBasedCacheLogic.get_envelope_for_proto(proto)
 
     def update_cache(self, proto: Message, cache: dict[str, Iterable]
                      ):
-        """Override: if specific scan2d not in maps, we use default."""
+        """Override: if specific scan2d/signal not in maps, we use default."""
         try:
             super().update_cache(proto, cache)
         except KeyError as exc:
             envelope = self.get_envelope_for_proto(proto)
-            if self.scan_id not in envelope:
+
+            is_scan = self.scan_id in envelope
+            is_signal = self.signal_id in envelope
+            if not is_scan and not is_signal:
                 raise exc
 
             # Non-specific Scan2d like provided. Let's try with the default.
+            proto_id = self.scan_id if is_scan else is_signal
             if envelope not in cache:
                 cache[envelope] = deque(maxlen=self.envelope_to_history_map[
-                    self.scan_id])
+                    proto_id])
             cache[envelope].append(proto)
 
 
@@ -157,8 +176,18 @@ def create_roi_proto_hist_list(sizes_with_hist_list:
     return proto_with_hist_list
 
 
-def create_roi_scan_envelope(size: tuple[float, float]) -> str:
-    """Create envelope for Scan2d of specific size."""
+def create_roi_scan_envelope(size: tuple[float, float],
+                             channel: str = None) -> str:
+    """Create envelope for Scan2d of specific size (and channel)."""
     scan_params = common.create_scan_params_2d(size=[size[0], size[1]])
     scan_2d = scan_pb2.Scan2d(params=scan_params)
+    if channel:
+        scan_2d.channel = channel
     return PBCScanLogic.get_envelope_for_proto(scan_2d)
+
+
+def create_signal_envelope(type: str) -> str:
+    """Create envelope for Signal1d of specific type."""
+    signal = signal_pb2.Signal1d()
+    signal.type = type
+    return PBCScanLogic.get_envelope_for_proto(signal)

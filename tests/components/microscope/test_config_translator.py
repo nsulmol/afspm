@@ -9,11 +9,12 @@ from afspm.components.microscope.translator import MicroscopeError
 from afspm.components.microscope.config_translator import ConfigTranslator
 from afspm.components.microscope import params
 from afspm.components.microscope import actions
-from afspm.io.common import create_scan_params_2d
+from afspm.io.common import create_scan_params_2d, create_probe_position
 
 from afspm.io.protos.generated import control_pb2
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import feedback_pb2
+from afspm.io.protos.generated import signal_pb2
 
 
 logger = logging.getLogger(__name__)
@@ -82,6 +83,19 @@ def param_config_str():
     [zctrl-egain]
     uuid = 'CE'
     type = 1.0
+
+    # Probe Parameters (note, same as top-left scan pos)
+    [probe-pos-x]
+    uuid = 'TL_X'
+    unit = 'nm'
+    type = 1.0
+    range = [0.0, 2.0]
+
+    [probe-pos-y]
+    uuid = 'TL_Y'
+    unit = 'nm'
+    type = 1.0
+    range = [0.0, 2.0]
     """
 
 
@@ -140,6 +154,10 @@ class MyConfigTranslator(ConfigTranslator):
         raise MicroscopeError
 
     def poll_scope_state(self) -> scan_pb2.ScopeState:
+        """Not implementing, not tested here."""
+        raise MicroscopeError
+
+    def poll_signal(self) -> signal_pb2.Signal1d:
         """Not implementing, not tested here."""
         raise MicroscopeError
 
@@ -210,6 +228,21 @@ def test_zctrl_params(param_config_str, vals_dict, action_config_str):
     config_translator.on_set_zctrl_params(exp_zctrl_params)
     curr_zctrl_params = config_translator.poll_zctrl_params()
     assert exp_zctrl_params == curr_zctrl_params
+
+
+def test_probe_position(param_config_str, vals_dict, action_config_str):
+    logger.info('Test that probe positioning work (individual ones).')
+    config_translator = construct_translator(param_config_str, vals_dict,
+                                             action_config_str)
+
+    exp_probe_pos = create_probe_position(pos=(2.0, 1.0), units='nm')
+    curr_probe_pos = config_translator.poll_probe_pos()
+    assert exp_probe_pos == curr_probe_pos
+
+    exp_probe_pos = create_probe_position(pos=(1.1, 1.2), units='nm')
+    config_translator.on_set_probe_pos(exp_probe_pos)
+    curr_probe_pos = config_translator.poll_probe_pos()
+    assert exp_probe_pos == curr_probe_pos
 
 
 def test_req_param(param_config_str, vals_dict, action_config_str):

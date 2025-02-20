@@ -13,6 +13,7 @@ from ...translator import MicroscopeTranslator
 from .....io.protos.generated import scan_pb2
 from .....io.protos.generated import control_pb2
 from .....io.protos.generated import feedback_pb2
+from .....io.protos.generated import signal_pb2
 from .....utils import array_converters as ac
 
 
@@ -74,13 +75,19 @@ class ImageTranslator(MicroscopeTranslator):
 
     def on_start_scan(self):
         self.start_ts = time.time()
-        self.dev_scope_state = scan_pb2.ScopeState.SS_COLLECTING
+        self.dev_scope_state = scan_pb2.ScopeState.SS_SCANNING
         return control_pb2.ControlResponse.REP_SUCCESS
 
     def on_stop_scan(self):
         self.start_ts = None
         self.dev_scope_state = scan_pb2.ScopeState.SS_FREE
         return control_pb2.ControlResponse.REP_SUCCESS
+
+    def on_start_signal(self) -> control_pb2.ControlResponse:
+        return control_pb2.ControlResponse.REP_ACTION_NOT_SUPPORTED
+
+    def on_stop_signal(self) -> control_pb2.ControlResponse:
+        return control_pb2.ControlResponse.REP_ACTION_NOT_SUPPORTED
 
     def on_set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
                            ) -> control_pb2.ControlResponse:
@@ -92,6 +99,10 @@ class ImageTranslator(MicroscopeTranslator):
     def on_set_zctrl_params(self, zctrl_params: feedback_pb2.ZCtrlParameters
                             ) -> control_pb2.ControlResponse:
         """Z-Ctrl doesn't do anything with images, not supported."""
+        return control_pb2.ControlResponse.REP_CMD_NOT_SUPPORTED
+
+    def on_set_probe_pos(self, probe_position: signal_pb2.ProbePosition
+                              ) -> control_pb2.ControlResponse:
         return control_pb2.ControlResponse.REP_CMD_NOT_SUPPORTED
 
     def on_param_request(self, param: control_pb2.ParameterMsg
@@ -110,15 +121,21 @@ class ImageTranslator(MicroscopeTranslator):
         """Z-Ctrl doesn't do anything with images, not supported."""
         return feedback_pb2.ZCtrlParameters()
 
+    def poll_probe_pos(self) -> signal_pb2.ProbePosition:
+        return signal_pb2.ProbePosition()
+
     def poll_scans(self) -> [scan_pb2.Scan2d]:
         return [self.dev_scan] if self.dev_scan else []
+
+    def poll_signal(self) -> signal_pb2.Signal1d:
+        return signal_pb2.Signal1d()
 
     def run_per_loop(self):
         """Main loop, where we indicate when scans and moves are done."""
         if self.start_ts:
             duration = None
             update_scan = False
-            if self.dev_scope_state == scan_pb2.ScopeState.SS_COLLECTING:
+            if self.dev_scope_state == scan_pb2.ScopeState.SS_SCANNING:
                 duration = self.scan_time_s
                 update_scan = True
             elif self.dev_scope_state == scan_pb2.ScopeState.SS_MOVING:
