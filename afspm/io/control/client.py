@@ -244,19 +244,19 @@ class ControlClient:
             control_pb2.ControlRequest.REQ_SET_ZCTRL_PARAMS, zctrl_params)
         return self._try_send_req(msg)
 
-    def set_probe_pos(self, probe_position: signal_pb2.ProbePosition
+    def set_probe_pos(self, probe_pos: signal_pb2.ProbePosition
                       ) -> control_pb2.ControlResponse:
         """Try to set the probe position of the SPM device.
 
         Args:
-            probe_position: the desired position of hte probe.
+            probe_pos: the desired position of hte probe.
 
         Returns:
             The received ControlReesponse.
         """
-        logger.debug("Sending set_probe_pos with: %s", probe_position)
+        logger.debug("Sending set_probe_pos with: %s", probe_pos)
         msg = cmd.serialize_request(
-            control_pb2.ControlRequest.REQ_SET_PROBE_POS, probe_position)
+            control_pb2.ControlRequest.REQ_SET_PROBE_POS, probe_pos)
         return self._try_send_req(msg)
 
     def request_control(self, problem: control_pb2.ExperimentProblem,

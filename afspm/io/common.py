@@ -76,14 +76,15 @@ def create_scan_params_2d(top_left: tuple[float, float] = None,
     return scan_pb2.ScanParameters2d(spatial=spatial_aspects,
                                      data=data_aspects)
 
-def create_probe_position(pos: tuple[float, float] = None,
-                          units: str = None):
+
+def create_probe_pos(pos: tuple[float, float] = None,
+                     units: str = None):
     """Create ProbePosition object.
 
     A helper, to avoid annoyances with protobuf data initialization.
 
     Args:
-        top_left: physical roi, top-left position.
+        probe_pos: desired physical  position of probe.
         units: units of the length/distance dimensions.
     """
     pos = (geometry_pb2.Point2d(x=pos[0], y=pos[1]) if pos else None)

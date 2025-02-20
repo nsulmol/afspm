@@ -9,7 +9,7 @@ from afspm.components.microscope.translator import MicroscopeError
 from afspm.components.microscope.config_translator import ConfigTranslator
 from afspm.components.microscope import params
 from afspm.components.microscope import actions
-from afspm.io.common import create_scan_params_2d, create_probe_position
+from afspm.io.common import create_scan_params_2d, create_probe_pos
 
 from afspm.io.protos.generated import control_pb2
 from afspm.io.protos.generated import scan_pb2
@@ -235,11 +235,11 @@ def test_probe_position(param_config_str, vals_dict, action_config_str):
     config_translator = construct_translator(param_config_str, vals_dict,
                                              action_config_str)
 
-    exp_probe_pos = create_probe_position(pos=(2.0, 1.0), units='nm')
+    exp_probe_pos = create_probe_pos(pos=(2.0, 1.0), units='nm')
     curr_probe_pos = config_translator.poll_probe_pos()
     assert exp_probe_pos == curr_probe_pos
 
-    exp_probe_pos = create_probe_position(pos=(1.1, 1.2), units='nm')
+    exp_probe_pos = create_probe_pos(pos=(1.1, 1.2), units='nm')
     config_translator.on_set_probe_pos(exp_probe_pos)
     curr_probe_pos = config_translator.poll_probe_pos()
     assert exp_probe_pos == curr_probe_pos
