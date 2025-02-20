@@ -8,6 +8,7 @@ import zmq
 
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
+from afspm.io.protos.generated import signal_pb2
 
 from afspm.io.control.client import ControlClient
 from afspm.io.control.server import ControlServer
@@ -77,14 +78,21 @@ def publisher(publisher_url, ctx):
 
 SCAN_PARAMS = common.create_scan_params_2d([0, 0], [200, 300],
                                            'nm')
+PROBE_POS = common.create_probe_pos([1, 2], 'nm')
+
 
 # --- Methods / thread routines --- #
-def next_params_method() -> scan_pb2.ScanParameters2d:
+def next_params_method_scan() -> scan_pb2.ScanParameters2d:
     return SCAN_PARAMS
 
 
+def next_params_method_probe_pos() -> signal_pb2.ProbePosition:
+    return PROBE_POS
+
+
 def scan_handler_routine(publisher_url, rerun_wait_s,
-                         server_url, client_uuid, ctx):
+                         server_url, client_uuid, ctx,
+                         next_params_method):
     logger.info("Startup scan_handler_routine")
     client = ControlClient(server_url, ctx, client_uuid)
     subscriber = Subscriber(publisher_url, ctx=ctx)
@@ -106,7 +114,21 @@ def thread_scan_handler(publisher_url, rerun_wait_s,
                         server_url, client_uuid, ctx):
     thread = threading.Thread(target=scan_handler_routine,
                               args=(publisher_url, rerun_wait_s,
-                                    server_url, client_uuid, ctx))
+                                    server_url, client_uuid, ctx,
+                                    next_params_method_scan))
+    thread.daemon = True
+    thread.start()
+    time.sleep(2*common.REQUEST_TIMEOUT_MS / 1000)
+    return thread
+
+
+@pytest.fixture
+def thread_signal_handler(publisher_url, rerun_wait_s,
+                          server_url, client_uuid, ctx):
+    thread = threading.Thread(target=scan_handler_routine,
+                              args=(publisher_url, rerun_wait_s,
+                                    server_url, client_uuid, ctx,
+                                    next_params_method_probe_pos))
     thread.daemon = True
     thread.start()
     time.sleep(2*common.REQUEST_TIMEOUT_MS / 1000)
@@ -157,7 +179,47 @@ def test_scanning(publisher, server, thread_scan_handler,
         # Go through single scan process
         for state, exp_req, exp_obj in zip(states, requests, objects):
             req, obj = server.poll()
-            assert req == exp_req and obj == exp_obj
+            assert req == exp_req
+            assert obj == exp_obj
+            server.reply(control_pb2.ControlResponse.REP_SUCCESS)
+
+            scope_state_msg.scope_state = state
+            publisher.send_msg(scope_state_msg)
+
+            scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
+            publisher.send_msg(scope_state_msg)
+
+    logger.info("Sending kill signal")
+    publisher.send_kill_signal()
+    time.sleep(4*common.REQUEST_TIMEOUT_MS / 1000)
+
+
+def test_signaling(publisher, server, thread_signal_handler,
+                   control_state, scope_state_msg):
+    """Validate we can go through the scan process properly"""
+    logger.info("Validate we can go through the scan process properly.")
+
+    states = [scan_pb2.ScopeState.SS_MOVING,
+              scan_pb2.ScopeState.SS_SIGNALING]
+    requests = [control_pb2.ControlRequest.REQ_SET_PROBE_POS,
+                control_pb2.ControlRequest.REQ_ACTION]
+    objects = [PROBE_POS,
+               control_pb2.ActionMsg(action=MicroscopeAction.START_SIGNAL)]
+
+    # Inform scan handler we are in the expected control state.
+    publisher.send_msg(control_state)
+
+    # Start up in SS_FREE
+    scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
+    publisher.send_msg(scope_state_msg)
+
+    # Run 3 scans
+    for i in list(range(3)):
+        # Go through single scan process
+        for state, exp_req, exp_obj in zip(states, requests, objects):
+            req, obj = server.poll()
+            assert req == exp_req
+            assert obj == exp_obj
             server.reply(control_pb2.ControlResponse.REP_SUCCESS)
 
             scope_state_msg.scope_state = state

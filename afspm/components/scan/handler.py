@@ -12,6 +12,7 @@ from ...io import common
 
 from ...io.protos.generated import scan_pb2
 from ...io.protos.generated import control_pb2
+from ...io.protos.generated import signal_pb2
 
 from ...io.control.client import ControlClient, send_req_handle_ctrl
 
@@ -19,15 +20,20 @@ from ...io.control.client import ControlClient, send_req_handle_ctrl
 logger = logging.getLogger(__name__)
 
 
+SCAN_PARAMS_KW = 'scan_params'
+PROBE_POS_KW = 'probe_pos'
+
+
 class ScanHandler:
     """Simplifies requesting a scan from a MicroscopeTranslator.
 
-    The ScanHandler encapsulates the procedure of getting a scan from a
-    MicroscopeTranslator, which involves:
+    The ScanHandler encapsulates the procedure of getting a scan or signal
+    from a MicroscopeTranslator, which involves:
     - Ensuring we have control of the MicroscopeTranslator.
-    - Setting the scan parameters, which may involve moving the device.
-    - Obtaining the scan, once the device has been setup (and moved to the
-    right location).
+    - Setting the scan parameters/probe position, which may involve moving the
+    device.
+    - Obtaining the scan/signal, once the device has been setup (and moved to
+    the right location).
 
     If we do not have control, it will log this and continue requesting control
     between sleeps of rerun_wait_s.
@@ -55,13 +61,19 @@ class ScanHandler:
             flagged, we do nothing until it does.
 
         _problems_set: current problems set the scheduler has.
-        _scan_params: current ScanParameters2d instance.
+        _next_params: current ScanParameters2d or ProbePosition instance.
         _scope_state: current ScopeState.
         _desired_scope_state: desired ScopeState.
         _rerun_scanning_logic: whether or not we need to potentially rerun a
             scan.
         _rerun_sleep_ts: a timestamp for determining when to rerun a scan.
     """
+
+    ParamsCallable = Callable[[Any], scan_pb2.ScanParameters2d |
+                              signal_pb2.ProbePosition]
+
+    COLLECTING_STATES = [scan_pb2.ScopeState.SS_SCANNING,
+                         scan_pb2.ScopeState.SS_SIGNALING]
 
     def __init__(self, rerun_wait_s: int,
                  get_next_params: Callable[[Any],
@@ -77,7 +89,7 @@ class ScanHandler:
         self.problem_to_solve = problem
 
         self._problems_set = {}
-        self._scan_params = scan_pb2.ScanParameters2d()
+        self._next_params = None
         self._scope_state = scan_pb2.ScopeState.SS_UNDEFINED
         self._desired_scope_state = scan_pb2.ScopeState.SS_UNDEFINED
         self._rerun_sleep_ts = None
@@ -129,8 +141,8 @@ class ScanHandler:
                 self._rerun_sleep_ts = None
 
                 # If scan params were not available yet, re-request.
-                if not self._scan_params:
-                    self._scan_params = self.get_next_params(
+                if not self._next_params:
+                    self._next_params = self.get_next_params(
                         **self.next_params_kwargs)
 
                 self._perform_scanning_logic(control_client)
@@ -154,8 +166,8 @@ class ScanHandler:
         first_startup = (last_state == scan_pb2.ScopeState.SS_UNDEFINED and
                          self._scope_state == scan_pb2.ScopeState.SS_FREE)
         interrupted = self._scope_state == scan_pb2.SS_INTERRUPTED
-        finished_scanning = (last_state == scan_pb2.ScopeState.SS_SCANNING and
-                             self._scope_state == scan_pb2.ScopeState.SS_FREE)
+        finished_collecting = (last_state in self.COLLECTING_STATES and
+                               self._scope_state == scan_pb2.ScopeState.SS_FREE)
         finished_moving = (last_state == scan_pb2.ScopeState.SS_MOVING and
                            self._scope_state == scan_pb2.ScopeState.SS_FREE)
 
@@ -163,24 +175,23 @@ class ScanHandler:
             logger.info("A scan was interrupted! Will restart what we were "
                         "doing.")
             self._desired_scope_state = scan_pb2.ScopeState.SS_MOVING
-        elif first_startup or finished_scanning:
+        elif first_startup or finished_collecting:
             if first_startup:
                 logger.info("First startup, sending first scan params.")
             else:
                 logger.info("Finished scan, preparing next scan params.")
-            self._scan_params = self.get_next_params(**self.next_params_kwargs)
+            self._next_params = self.get_next_params(**self.next_params_kwargs)
             self._desired_scope_state = scan_pb2.ScopeState.SS_MOVING
         elif finished_moving:
-            logger.info("Finished moving, will request scan.")
-            self._desired_scope_state = scan_pb2.ScopeState.SS_SCANNING
+            logger.info("Finished moving, will request collection.")
+            self._desired_scope_state = self._get_collection_scope_state(
+                self._next_params)
 
     def _perform_scanning_logic(self, control_client: ControlClient):
         """Request the next scan aspect from client.
 
         Requests the appropriate scan aspect (e.g. set_scan_params, start_scan)
         for the current scan. Handles reruns if a request fails.
-
-        TODO: We are definitely missing the feedback control.
 
         Args:
             control_client: AfspmComponent's ControlClient.
@@ -206,16 +217,19 @@ class ScanHandler:
                         common.get_enum_str(scan_pb2.ScopeState,
                                             self._desired_scope_state))
             if self._desired_scope_state == scan_pb2.ScopeState.SS_MOVING:
-                if not self._scan_params:
-                    logger.info("Cannot send scan params, because "
+                if not self._next_params:
+                    logger.info("Cannot send params, because "
                                 "get_next_params returned None."
                                 "Sleeping and retrying.")
                     self._handle_rerun(True)
                     return
-                req_to_call = control_client.set_scan_params
-                req_params['scan_params'] = (self._scan_params)
-            elif self._desired_scope_state == scan_pb2.ScopeState.SS_SCANNING:
-                req_to_call = control_client.start_scan
+
+                req_to_call, req_params = self._get_set_call_for_next(
+                    self._next_params, control_client)
+
+            elif self._desired_scope_state in self.COLLECTING_STATES:
+                req_to_call = self._get_collection_call_for_next(
+                    self._next_params, control_client)
 
             if not req_to_call:
                 return
@@ -225,6 +239,47 @@ class ScanHandler:
             if rep != control_pb2.ControlResponse.REP_SUCCESS:
                 logger.info("Sleeping and retrying later.")
                 self._handle_rerun(True)
+
+    @staticmethod
+    def _get_set_call_for_next(params: scan_pb2.ScanParameters2d |
+                               signal_pb2.ProbePosition,
+                               control_client: ControlClient
+                               ) -> (Callable, dict):
+        """Get set_scan_params or set_probe_pos depending on params fed."""
+        req_to_call = None
+        req_params = {}
+        if isinstance(params, scan_pb2.ScanParameters2d):
+            req_to_call = control_client.set_scan_params
+            req_params[SCAN_PARAMS_KW] = params
+        elif isinstance(params, signal_pb2.ProbePosition):
+            req_to_call = control_client.set_probe_pos
+            req_params[PROBE_POS_KW] = params
+        return req_to_call, req_params
+
+    @staticmethod
+    def _get_collection_call_for_next(params: scan_pb2.ScanParameters2d |
+                                      signal_pb2.ProbePosition,
+                                      control_client: ControlClient
+                                      ) -> Callable:
+        """Get start_scan or start_signal depending on params fed."""
+        req_to_call = None
+        if isinstance(params, scan_pb2.ScanParameters2d):
+            req_to_call = control_client.start_scan
+        elif isinstance(params, signal_pb2.ProbePosition):
+            req_to_call = control_client.start_signal
+        return req_to_call
+
+    @staticmethod
+    def _get_collection_scope_state(params: scan_pb2.ScanParameters2d |
+                                    signal_pb2.ProbePosition,
+                                    ) -> scan_pb2.ScopeState:
+        """Get SS_SCANNING or SS_SIGNALING depending on params fed."""
+        scope_state = scan_pb2.ScopeState.SS_UNDEFINED
+        if isinstance(params, scan_pb2.ScanParameters2d):
+            scope_state = scan_pb2.ScopeState.SS_SCANNING
+        elif isinstance(params, signal_pb2.ProbePosition):
+            scope_state = scan_pb2.ScopeState.SS_SIGNALING
+        return scope_state
 
     def _handle_rerun(self, perform_rerun: bool):
         if perform_rerun:
