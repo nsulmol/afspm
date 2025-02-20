@@ -375,22 +375,6 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             self._update_signals()
 
         # Handle on non-scope-state parameters
-        # NOTE: Something like this does not work, because param = poller()
-        # simply changes the variable param. Annoying.
-        #
-        # parameters = [self.scan_params, self.zctrl_params,
-        #               self.probe_pos]
-        # names = ['scan_params', 'zctrl_params', 'probe_pos']
-        # pollers = [self.poll_scan_params, self.poll_zctrl_params,
-        #            self.poll_probe_pos]
-        # for (param, name, poller) in zip(parameters, names, pollers):
-        #     old_param = copy.deepcopy(param)
-        #     param = poller()
-
-        #     if old_param != param:
-        #         logger.info(f"New {name}, sending out.")
-        #         self.publisher.send_msg(param)
-
         old_scan_params = copy.deepcopy(self.scan_params)
         self.scan_params = self.poll_scan_params()
         if old_scan_params != self.scan_params:
