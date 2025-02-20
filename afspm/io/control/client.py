@@ -244,8 +244,8 @@ class ControlClient:
             control_pb2.ControlRequest.REQ_SET_ZCTRL_PARAMS, zctrl_params)
         return self._try_send_req(msg)
 
-    def set_probe_position(self, probe_position: signal_pb2.ProbePosition
-                           ) -> control_pb2.ControlResponse:
+    def set_probe_pos(self, probe_position: signal_pb2.ProbePosition
+                      ) -> control_pb2.ControlResponse:
         """Try to set the probe position of the SPM device.
 
         Args:
@@ -254,9 +254,9 @@ class ControlClient:
         Returns:
             The received ControlReesponse.
         """
-        logger.debug("Sending set_probe_position with: %s", probe_position)
+        logger.debug("Sending set_probe_pos with: %s", probe_position)
         msg = cmd.serialize_request(
-            control_pb2.ControlRequest.REQ_SET_PROBE_POSITION, probe_position)
+            control_pb2.ControlRequest.REQ_SET_PROBE_POS, probe_position)
         return self._try_send_req(msg)
 
     def request_control(self, problem: control_pb2.ExperimentProblem,
@@ -393,6 +393,11 @@ def send_req_handle_ctrl(client: ControlClient,
     We try to send a request. If it fails due to lack of control,
     we attempt to gain control, and resend the request. If at any
     point we fail in a way we cannot continue, we stop and return.
+
+    Note: you should only use this method if the request you want
+    to send is independent of having lost control! If someone having
+    grabbed control should affect what you send, you should handle
+    that in your own logic.
 
     Args:
         client: Control Client to use for the request.

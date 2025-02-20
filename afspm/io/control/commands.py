@@ -20,7 +20,7 @@ REQ_TO_OBJ_MAP = MappingProxyType({
         scan_pb2.ScanParameters2d(),
     control_pb2.ControlRequest.REQ_SET_ZCTRL_PARAMS:
         feedback_pb2.ZCtrlParameters(),
-    control_pb2.ControlRequest.REQ_SET_PROBE_POSITION:
+    control_pb2.ControlRequest.REQ_SET_PROBE_POS:
         signal_pb2.ProbePosition(),
     control_pb2.ControlRequest.REQ_REQUEST_CTRL:
         control_pb2.ExperimentProblem.EP_NONE,
