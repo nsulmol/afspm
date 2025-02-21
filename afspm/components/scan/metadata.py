@@ -10,6 +10,7 @@ from google.protobuf.message import Message
 
 from ...io.protos.generated import scan_pb2
 from ...io.protos.generated import control_pb2
+from ...io.protos.generated import signal_pb2
 
 
 logger = logging.getLogger(__name__)
@@ -53,7 +54,7 @@ class ScanMetadataWriter(afspmc.AfspmComponentBase):
         quoting: quoting generation determination. Defaults to csv default.
     """
 
-    CSV_FIELDS = ['timestamp(s)', 'filename', 'channel', 'control_mode',
+    CSV_FIELDS = ['timestamp(s)', 'filename', 'channel/type', 'control_mode',
                   'client_id', 'problems_set']
 
     def __init__(self, filepath: str = './scan_metadata.csv',
@@ -79,9 +80,10 @@ class ScanMetadataWriter(afspmc.AfspmComponentBase):
         if isinstance(proto, control_pb2.ControlState):
             logger.debug("New control state received, storing.")
             self.control_state = proto
-        if isinstance(proto, scan_pb2.Scan2d):
-            logger.debug("Scan received, saving context.")
-            self._save_scan_context(proto)
+        if (isinstance(proto, scan_pb2.Scan2d) or
+                isinstance(proto, signal_pb2.Signal1d)):
+            logger.debug("Collection received, saving context.")
+            self._save_collection_context(proto)
 
     def _create_dict_writer(self, csvfile: str) -> csv.DictWriter:
         """Create dict writer from internal variables and provided csv file."""
@@ -95,18 +97,34 @@ class ScanMetadataWriter(afspmc.AfspmComponentBase):
 
         return csv.DictWriter(**kwargs_dict)
 
-    def _save_scan_context(self, scan: scan_pb2.Scan2d):
+    def _save_collection_context(self, collection: scan_pb2.Scan2d |
+                                 signal_pb2.Signal1d):
         """Save the current scan context."""
         if self.control_state is None:
             logger.error("Cannot save metadata: we have not received context.")
 
+        row_vals = self._get_metadata_row(collection)
+        row_dict = dict(zip(self.CSV_FIELDS, row_vals))
+
         with open(self.filepath, 'a', newline='') as csvfile:
             writer = self._create_dict_writer(csvfile)
-
-            row_vals = [scan.timestamp.seconds, scan.filename, scan.channel,
-                        self.control_state.control_mode,
-                        self.control_state.client_in_control_id,
-                        str(self.control_state.problems_set)]
-
-            row_dict = dict(zip(self.CSV_FIELDS, row_vals))
             writer.writerow(row_dict)
+
+    def _get_metadata_row(self, collection: scan_pb2.Scan2d |
+                          signal_pb2.Signal1d) -> [str]:
+        if isinstance(collection, scan_pb2.Scan2d):
+            row_vals = self._get_scan_metadata(collection)
+        else:
+            row_vals = self._get_signal_metadata(collection)
+        row_vals.extend([self.control_state.control_mode,
+                         self.control_state.client_in_control_id,
+                         str(self.control_state.problems_set)])
+        return row_vals
+
+    @staticmethod
+    def _get_scan_metadata(scan: scan_pb2.Scan2d) -> list[Any]:
+        return [scan.timestamp.seconds, scan.filename, scan.channel]
+
+    @staticmethod
+    def _get_signal_metadata(signal: signal_pb2.Signal1d) -> list[Any]:
+        return [signal.timestamp.seconds, signal.filename, signal.type]
