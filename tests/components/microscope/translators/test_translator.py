@@ -36,6 +36,7 @@ from afspm.io.pubsub.logic import cache_logic as cl
 from afspm.io.control.client import ControlClient
 
 from afspm.components.microscope import params
+from afspm.components.microscope import actions
 from afspm.utils.log import LOGGER_ROOT
 from afspm.utils import units
 from afspm.utils.protobuf import check_equal
@@ -43,6 +44,7 @@ from afspm.utils.protobuf import check_equal
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
 from afspm.io.protos.generated import feedback_pb2
+from afspm.io.protos.generated import signal_pb2
 
 
 logger = logging.getLogger(LOGGER_ROOT + '.samples.testing.test_translator.' +
@@ -141,7 +143,18 @@ def topics_scope_state():
 
 @pytest.fixture(scope="module")
 def topics_zctrl():
-    return [cl.CacheLogic.get_envelope_for_proto(feedback_pb2.ZCtrlParameters())]
+    return [cl.CacheLogic.get_envelope_for_proto(
+        feedback_pb2.ZCtrlParameters())]
+
+
+@pytest.fixture(scope="module")
+def topics_probe_pos():
+    return [cl.CacheLogic.get_envelope_for_proto(signal_pb2.ProbePosition())]
+
+
+@pytest.fixture(scope="module")
+def topics_signal():
+    return [cl.CacheLogic.get_envelope_for_proto(signal_pb2.Signal1d())]
 
 
 # --- I/O Classes (Subscribers, Clients) --- #
@@ -171,6 +184,20 @@ def sub_zctrl(ctx, topics_zctrl, timeout_ms, psc_url):
     return Subscriber(psc_url,
                       topics_to_sub=topics_zctrl,
                       poll_timeout_ms=timeout_ms)
+
+
+@pytest.fixture
+def sub_probe_pos(ctx, topics_probe_pos, timeout_ms, psc_url):
+    return Subscriber(psc_url,
+                      topics_to_sub=topics_probe_pos,
+                      poll_timeout_ms=timeout_ms)
+
+
+@pytest.fixture
+def sub_signal(ctx, topics_signal, scan_wait_ms, psc_url):
+    return Subscriber(psc_url,
+                      topics_to_sub=topics_signal,
+                      poll_timeout_ms=scan_wait_ms)
 
 
 @pytest.fixture
@@ -312,13 +339,14 @@ def test_cancel_scan(client, default_control_state,
     scope_state_msg = scan_pb2.ScopeStateMsg(
         scope_state=scan_pb2.ScopeState.SS_FREE)
 
-    # Hack around, make poll short for this.
+    # Checking no scan (hack around, make poll short for this).
     tmp_timeout_ms = sub_scan._poll_timeout_ms
     sub_scan._poll_timeout_ms = timeout_ms
     assert not sub_scan.poll_and_store()
+    sub_scan._poll_timeout_ms = tmp_timeout_ms  # Return to prior
+
     assert_sub_received_proto(sub_scope_state,
                               scope_state_msg)
-    sub_scan._poll_timeout_ms = tmp_timeout_ms  # Return to prior
 
     logger.info("Next, validate that we can start a scan and are notified "
                 "scanning has begun.")
@@ -348,6 +376,13 @@ def test_cancel_scan(client, default_control_state,
                               scope_state_msg)
 
     assert not sub_scope_state.poll_and_store()
+
+    # Checking no scan (hack around, make poll short for this).
+    tmp_timeout_ms = sub_scan._poll_timeout_ms
+    sub_scan._poll_timeout_ms = timeout_ms
+    assert not sub_scan.poll_and_store()
+    sub_scan._poll_timeout_ms = tmp_timeout_ms  # Return to prior
+
     end_test(client)
     stop_client(client)
 
@@ -478,6 +513,194 @@ def test_handle_zctrl(client, default_control_state,
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
     last_params = assert_and_return_message(sub_zctrl)
     assert check_equal(last_params, initial_params, float_tolerance)
+
+    end_test(client)
+    stop_client(client)
+
+
+def test_handle_probe_pos(client, default_control_state,
+                          sub_probe_pos, timeout_ms,
+                          control_mode, float_tolerance):
+    logger.info("Validate we recieve and can set ProbePosition.")
+    startup_grab_control(client, control_mode)
+
+    logger.info("First, ensure we receive initial ProbePosition.")
+    initial_probe_pos = assert_and_return_message(sub_probe_pos)
+
+    modified_probe_pos = copy.deepcopy(initial_probe_pos)
+    modified_probe_pos.point.x *= 0.9
+    modified_probe_pos.point.y *= 0.9
+
+    logger.info("Next, set new ProbePosition. We expect a success.")
+    rep = client.set_probe_pos(modified_probe_pos)
+    assert rep == control_pb2.ControlResponse.REP_SUCCESS
+
+    logger.info("Next, validate that our subscriber receives these new "
+                "params.")
+    last_probe_pos = assert_and_return_message(sub_probe_pos)
+    assert check_equal(last_probe_pos, modified_probe_pos, float_tolerance)
+
+    logger.info("Now, return to our initial parameters.")
+    rep = client.set_probe_pos(initial_probe_pos)
+    assert rep == control_pb2.ControlResponse.REP_SUCCESS
+    last_params = assert_and_return_message(sub_probe_pos)
+    assert check_equal(last_probe_pos, initial_probe_pos, float_tolerance)
+
+    end_test(client)
+    stop_client(client)
+
+
+def test_cancel_signal(client, default_control_state,
+                       sub_signal, sub_scope_state, timeout_ms,
+                       control_mode):
+    logger.info("Validate we can start and cancel a signal collection.")
+    startup_grab_control(client, control_mode)
+
+    logger.info("First, validate we *do not* have an initial signal (in the "
+                "cache), and *do* have an initial scope state (SS_FREE).")
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_FREE)
+
+    # Checking no signal (hack around, make poll short for this).
+    tmp_timeout_ms = sub_signal._poll_timeout_ms
+    sub_signal._poll_timeout_ms = timeout_ms
+    assert not sub_signal.poll_and_store()
+    sub_signal._poll_timeout_ms = tmp_timeout_ms  # Return to prior
+
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
+
+    logger.info("Next, validate that we can start a collection and are "
+                "notified signal collection has begun.")
+    rep = client.start_signal()
+
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_SIGNALING)
+    assert rep == control_pb2.ControlResponse.REP_SUCCESS
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
+
+    logger.info("Next, cancel the collection before it has finished, and "
+                "ensure we are notified it has been cancelled (via "
+                "an interruption).")
+    rep = client.stop_signal()
+    assert rep == control_pb2.ControlResponse.REP_SUCCESS
+
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_INTERRUPTED)
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
+
+    logger.info("Lastly, ensure we are notified the translator is free and no "
+                "scans were received.")
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_FREE)
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
+
+    assert not sub_scope_state.poll_and_store()
+
+    # Checking no signal (hack around, make poll short for this).
+    tmp_timeout_ms = sub_signal._poll_timeout_ms
+    sub_signal._poll_timeout_ms = timeout_ms
+    assert not sub_signal.poll_and_store()
+    sub_signal._poll_timeout_ms = tmp_timeout_ms  # Return to prior
+
+    end_test(client)
+    stop_client(client)
+
+
+def test_run_signal(client, default_control_state,
+                    sub_signal, sub_scope_state, sub_probe_pos, timeout_ms,
+                    control_mode):
+    logger.info("Validate we can start a signal collection, and receive one "
+                + "on finish.")
+    startup_grab_control(client, control_mode)
+
+    logger.info("Validate we *do not* have an initial signal (in the "
+                "cache), and *do* have an initial scope state (SS_FREE).")
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_FREE)
+
+    # Hack around, make poll short for this.
+    tmp_timeout_ms = sub_signal._poll_timeout_ms
+    sub_signal._poll_timeout_ms = timeout_ms
+    assert not sub_signal.poll_and_store()
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
+    sub_signal._poll_timeout_ms = tmp_timeout_ms  # Return to prior
+
+    logger.info("Validate that we can start a signal collection and  "
+                "are notified collection has begun.")
+    rep = client.start_signal()
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_SIGNALING)
+    assert rep == control_pb2.ControlResponse.REP_SUCCESS
+    assert_sub_received_proto(sub_scope_state, scope_state_msg)
+
+    logger.info("Wait for a predetermined 'long-enough' period, "
+                "and validate the scan finishes.")
+    assert sub_signal.poll_and_store()
+    scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
+    assert_sub_received_proto(sub_scope_state, scope_state_msg)
+
+    end_test(client)
+    stop_client(client)
+
+
+def test_parameters(client, control_mode):
+    logger.info("Check which parameters are supported via REQ_PARAM.")
+    startup_grab_control(client, control_mode)
+
+    logger.info("First, does the translator even support REQ_PARAM?")
+    param = control_pb2.ParameterMsg(params.MicroscopeParameter.SCOPE_STATE)
+    rep, rcvd_param = client.request_parameter(param)
+
+    if rep == control_pb2.ControlResponse.CMD_NOT_SUPPORTED:
+        logger.warning("REQ_PARAM is not supported, exiting.")
+        return
+
+    logger.info("Testing individual parameters.")
+    for param_name in params.PARAMETERS:
+        param = control_pb2.ParameterMsg(parameter=param_name)
+        rep, rcvd_param = client.request_parameter(param)
+
+        if rep == control_pb2.ControlResponse.REP_SUCCESS:
+            logger.info(f"Param {param_name} is supported.")
+        elif rep == control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED:
+            logger.warning(f'Param {param_name} is not supported.')
+        elif rep == control_pb2.ControlResponse.REP_PARAM_ERROR:
+            logger.error(f'Param error requesting param {param_name}.')
+        else:
+            logger.error('Response %s for param %s',
+                         common.get_enum_str(control_pb2.ControlResponse,
+                                             rep), param_name)
+
+    end_test(client)
+    stop_client(client)
+
+
+def test_actions(client, control_mode):
+    logger.info('Check which actions are supported via REQ_ACTION.'
+                'Note that this only works for ConfigTranslators.')
+    startup_grab_control(client, control_mode)
+
+    logger.info("Testing individual actions.")
+    for action_name in actions.MicroscopeAction:
+        action = control_pb2.ActionMsg(action=action_name)
+        rep = client.request_action(action)
+
+        if rep == control_pb2.ControlResponse.REP_SUCCESS:
+            logger.info(f"Action {action_name} is supported.")
+        elif rep == control_pb2.ControlResponse.REP_ACTION_NOT_SUPPORTED:
+            logger.warning(f'Action {action_name} is not supported.')
+        elif rep == control_pb2.ControlResponse.REP_ACTION_ERROR:
+            logger.error(f'Action error requesting param {action_name} '
+                         '(should not happen).')
+        else:
+            logger.error('Response %s for action %s',
+                         common.get_enum_str(control_pb2.ControlResponse,
+                                             rep), action_name)
 
     end_test(client)
     stop_client(client)

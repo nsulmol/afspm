@@ -124,7 +124,19 @@ class ActionHandler(metaclass=ABCMeta):
                 SPM to perform this action.
         """
 
-    def _get_action(self, generic_action: MicroscopeAction) -> str:
+    def _get_action(self, generic_action: MicroscopeAction) -> str | Callable:
+        """Get Microscope-specific action UUID or action Callable.
+
+        Args:
+            generic_action: Microscope Action wanting to be performed.
+
+        Returns:
+            scope-specific uuid or action Callable.
+
+        Raises:
+            - ActionNotSupportedError if the action was not found in
+                the actions_config.
+        """
         if generic_action not in self.actions:
             msg = (f'Action {generic_action} not found in params config' +
                    'or value was not string.')

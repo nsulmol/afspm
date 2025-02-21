@@ -195,10 +195,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         Returns:
             Response to the request.
         """
-        if action.action not in actions.ACTIONS:
-            logger.warning(f'Feeding action {action.action}, not in' +
-                           'MicroscopeAction. Consider adding it in ' +
-                           'future.')
+        self._handle_action_not_in_actions(action)
 
         try:
             self.action_handler.request_action(action.action)
@@ -207,6 +204,30 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         except actions.ActionError:
             return control_pb2.ControlResponse.REP_ACTION_ERROR
 
+        return control_pb2.ControlResponse.REP_SUCCESS
+
+    def check_action_support(self, action: control_pb2.ActionMsg
+                             ) -> control_pb2.ControlResponse:
+        """Inform whether this translator supports this action.
+
+        Note: it does not *run* the action. Rather, it simply states whether
+        or not the given action is supported by this translator. This is used
+        to test a translator for support.
+
+        Args:
+            action: ActionMsg request containing the desired action to be
+                performed.
+
+        Returns:
+            Response to the request. REP_ACTION_NOT_SUPPORTED if that
+            particular action is not supported.
+        """
+        self._handle_action_not_in_actions(action)
+
+        try:
+            uuid_or_callable = self.actions._get_action(action)
+        except actions.ActionNotSupportedError:
+            return control_pb2.ControlResponse.REP_ACTION_NOT_SUPPORTED
         return control_pb2.ControlResponse.REP_SUCCESS
 
     # ----- Polling Method ----- #

@@ -276,6 +276,8 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             Response to the request. REP_ACTION_NOT_SUPPORTED if that
             particular action is not supported.
         """
+        self._handle_action_not_in_actions(action)
+
         if action.action == actions.MicroscopeAction.START_SCAN:
             return self.on_start_scan()
         elif action.action == actions.MicroscopeAction.STOP_SCAN:
@@ -285,6 +287,38 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         elif action.action == actions.MicroscopeAction.STOP_SIGNAL:
             return self.on_stop_signal()
         return control_pb2.ControlResponse.REP_ACTION_NOT_SUPPORTED
+
+    def check_action_support(self, action: control_pb2.ActionMsg
+                             ) -> control_pb2.ControlResponse:
+        """Inform whether this translator supports this action.
+
+        Note: it does not *run* the action. Rather, it simply states whether
+        or not the given action is supported by this translator. This is used
+        to test a translator for support.
+
+        Args:
+            action: ActionMsg request containing the desired action to be
+                performed.
+
+        Returns:
+            Response to the request. REP_ACTION_NOT_SUPPORTED if that
+            particular action is not supported.
+        """
+        self._handle_action_not_in_actions(action)
+
+        SUPPORTED_ACTIONS = [actions.MicroscopeAction.START_SCAN,
+                             actions.MicroscopeAction.STOP_SCAN]
+        if action.action in SUPPORTED_ACTIONS:
+            return control_pb2.ControlResponse.REP_SUCCESS
+        return control_pb2.ControlResponse.REP_ACTION_NOT_SUPPORTED
+
+    @staticmethod
+    def _handle_action_not_in_actions(action: control_pb2.ActionMsg):
+        """Log if a requested action is not in generic actions list."""
+        if (action.action not in actions.ACTIONS):
+            logger.warning(f'Feeding action {action.action}, not in' +
+                           'MicroscopeAction. Consider adding it in ' +
+                           'future.')
 
     # ----- Polling Methods ----- #
     @abstractmethod
