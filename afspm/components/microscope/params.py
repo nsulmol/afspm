@@ -56,7 +56,7 @@ class MicroscopeParameter(str, Enum):
 
     # Probe / Scan Parameters
     SCAN_SPEED = 'scan-speed'
-    MOVING_SPEED = 'moving-speed'
+    MOVING_SPEED = 'move-speed'
 
     # Probe Parameters
     PROBE_POS_X = 'probe-pos-x'
@@ -66,7 +66,7 @@ class MicroscopeParameter(str, Enum):
     TIP_BIAS_VOLTAGE = 'tip-bias-voltage'
 
 
-# Helper so you can do if str in PARAMETERS
+# Helpers so you can do if str in PARAMETERS
 PARAMETERS = [param.value for param in MicroscopeParameter]
 
 
@@ -186,16 +186,16 @@ class ParameterMethods:
 
     # NOTE: Here, we provide 'Any' instead of ParameterHandler for the
     # actual Callable arguments. This is due to the fact that we
-    # declare ParameterHandler *after* this. Think about a better
-    # way to do this...
+    # declare ParameterHandler *after* this.
+    # TODO: Think about a better way to do this...
 
     # In: ParameterHandler, val, curr_units
     # Out: None
-    setter: Callable[[Any, str, str], None]
+    setter: Callable[[Any, str, str], None] | None
 
     # In: ParameterHandler
     # Out: val
-    getter: Callable[[Any], Any]
+    getter: Callable[[Any], Any] | None
 
 
 def create_parameter_info(param_dict: dict) -> ParameterInfo:
@@ -351,8 +351,17 @@ class ParameterHandler(metaclass=ABCMeta):
                 # Ceck if we have our own set/get methods
                 param_methods = create_parameter_methods(val)
 
-                if param_methods.setter and param_methods.getter:
-                    logger.debug('Custom setter and getter provided for ' +
+                if param_methods.setter or param_methods.getter:
+                    no_setter_or_getter = (
+                        'setter' if not param_methods.setter
+                        else 'getter' if not param_methods.getter
+                        else None)
+                    if no_setter_or_getter:
+                        logger.warning(f'For parameter {key}'
+                                       f', {no_setter_or_getter} not '
+                                       'provided! Continuing.')
+
+                    logger.debug('Custom setter/getter provided for ' +
                                  f'parameter {key}. Using.')
                     self.param_methods[key] = param_methods
 
@@ -382,9 +391,6 @@ class ParameterHandler(metaclass=ABCMeta):
                            ) -> ParameterMethods:
         """Get ParameterInfo (None if not found)."""
         if generic_param not in self.param_methods:
-            # msg = f'Parameter {generic_param} not found in params config.'
-            # logger.error(msg)
-            # raise ParameterNotSupportedError(msg)
             return None
         return self.param_methods[generic_param]
 
@@ -418,7 +424,7 @@ class ParameterHandler(metaclass=ABCMeta):
             - ParameterError if getting the parameter fails.
         """
         methods = self._get_param_methods(generic_param)
-        if methods:
+        if methods and methods.getter:
             return methods.getter(self)
 
         uuid = self._get_param_info(generic_param).uuid
@@ -442,7 +448,7 @@ class ParameterHandler(metaclass=ABCMeta):
             - ParameterError if the parameter could not be set.
         """
         methods = self._get_param_methods(generic_param)
-        if methods:
+        if methods and methods.setter:
             methods.setter(self, val, curr_unit)
             return
 

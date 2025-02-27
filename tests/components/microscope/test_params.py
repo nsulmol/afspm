@@ -162,19 +162,29 @@ def test_param_missing_setter_getter(config_set_get):
 
     key = params.MicroscopeParameter.SCAN_TOP_LEFT_X
 
+    logger.info('Check that we can function with only a setter or getter.')
+
     logger.info('Trying without setter.')
     params_config = load_config(config_set_get)
     params_config[key].pop('setter', None)
 
-    with pytest.raises(params.ParameterConfigurationError):
-        param_handler = MyParameterHandler(params_config)
+    param_handler = MyParameterHandler(params_config)
+    assert param_handler
 
-    logger.info('Trying without getter.')
+    logger.info('It should fail when we try to set...')
+    key = params.MicroscopeParameter.SCAN_TOP_LEFT_X
+    with pytest.raises(params.ParameterNotSupportedError):
+        param_handler.set_param(key, 1, 'nm')
+
     params_config = load_config(config_set_get)
     params_config[key].pop('getter', None)
+    param_handler = MyParameterHandler(params_config)
+    assert param_handler
 
-    with pytest.raises(params.ParameterConfigurationError):
-        param_handler = MyParameterHandler(params_config)
+    logger.info('It should fail when we try to get...')
+    key = params.MicroscopeParameter.SCAN_TOP_LEFT_X
+    with pytest.raises(params.ParameterNotSupportedError):
+        param_handler.get_param(key)
 
     logger.info('Trying without both.')
     params_config = load_config(config_set_get)
@@ -187,6 +197,7 @@ def test_param_missing_setter_getter(config_set_get):
     logger.info('Trying with both.')
     params_config = load_config(config_set_get)
     param_handler = MyParameterHandler(params_config)
+    assert param_handler
 
 
 def test_choose_setter_getter_priority(config_both, config_param_info):
