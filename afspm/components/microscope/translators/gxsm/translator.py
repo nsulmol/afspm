@@ -80,7 +80,7 @@ class GxsmTranslator(ConfigTranslator):
             param_handler = _init_param_handler()
             if zctrl_channel:  # Update Z-Ctrl feedback channel
                 zctrl_enum = params.GxsmFeedbackChannel(zctrl_channel)
-                param_handler.update_zctrl_channel(zctrl_enum)
+                params.update_zctrl_channel(param_handler, zctrl_enum)
             kwargs['param_handler'] = param_handler
         super().__init__(**kwargs)
 

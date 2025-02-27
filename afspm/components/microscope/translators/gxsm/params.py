@@ -21,21 +21,6 @@ logger = logging.getLogger(__name__)
 MOTOR_PARAM = 'dsp-fbs-motor'  # coarse motor status.
 
 
-class GxsmFeedbackChannel(str, enum.Enum):
-    """Holds SPM-specific IDs for the feedback channel names."""
-
-    MIX0 = 'dsp-fbs-mx0-current'
-    MIX1 = 'dsp-fbs-mx1-freq'
-    MIX2 = 'dsp-fbs-mx2'
-    MIX3 = 'dsp-fbs-mx3'
-
-
-# Combining a Feedback Channel with these strings creates the uuid
-# to query them.
-GXSM_SETPOINT_END = '-set'
-GXSM_EGAIN_END = '-gain'
-
-
 class GxsmParameterHandler(params.ParameterHandler):
     """Implements GXSM-specific getter/setter for parameter handling."""
 
@@ -81,25 +66,42 @@ class GxsmParameterHandler(params.ParameterHandler):
         """
         gxsm.set(spm_uuid, str(spm_val))
 
-    def update_zctrl_channel(self, channel: GxsmFeedbackChannel):
-        """Change the feedback channel in use for ZCtrl.
 
-        Args:
-            channel: enum of desired feedback channel.
-        """
-        logger.debug(f'Trying to set ZCtrl feedback channel to {channel}.')
+class GxsmFeedbackChannel(str, enum.Enum):
+    """Holds SPM-specific IDs for the feedback channel names."""
 
-        keys = [params.MicroscopeParameter.ZCTRL_SETPOINT,
-                params.MicroscopeParameter.ZCTRL_EGAIN]
-        spm_uuids = [channel + GXSM_SETPOINT_END,
-                     channel + GXSM_EGAIN_END]
+    MIX0 = 'dsp-fbs-mx0-current'
+    MIX1 = 'dsp-fbs-mx1-freq'
+    MIX2 = 'dsp-fbs-mx2'
+    MIX3 = 'dsp-fbs-mx3'
 
-        for (key, spm_uuid) in zip(keys, spm_uuids):
-            if key not in self.param_infos:
-                logger.warning(f'{key} was not found in params config. '
-                               'Could not set.')
-            else:
-                self.param_infos[key].uuid = spm_uuid
+
+# Combining a Feedback Channel with these strings creates the uuid
+# to query them.
+GXSM_SETPOINT_END = '-set'
+GXSM_EGAIN_END = '-gain'
+
+
+def update_zctrl_channel(param_handler: params.ParameterHandler,
+                         channel: GxsmFeedbackChannel):
+    """Change the feedback channel in use for ZCtrl.
+
+    Args:
+        channel: enum of desired feedback channel.
+    """
+    logger.debug(f'Trying to set ZCtrl feedback channel to {channel}.')
+
+    keys = [params.MicroscopeParameter.ZCTRL_SETPOINT,
+            params.MicroscopeParameter.ZCTRL_EGAIN]
+    spm_uuids = [channel + GXSM_SETPOINT_END,
+                 channel + GXSM_EGAIN_END]
+
+    for (key, spm_uuid) in zip(keys, spm_uuids):
+        if key not in param_handler.param_infos:
+            logger.warning(f'{key} was not found in params config. '
+                           'Could not set.')
+        else:
+            param_handler.param_infos[key].uuid = spm_uuid
 
 
 class GxsmChannelIds(enum.Enum):
