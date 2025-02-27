@@ -49,6 +49,10 @@ def convert(val: Any, unit: Optional[str] = None,
         ConversionError if the conversion fails for some reason. Check the log,
         we likely have elaborated further..
     """
+    # Convert empty strings to None (we assume its None)
+    unit = None if unit == '' else unit
+    desired_unit = None if desired_unit == '' else desired_unit
+
     if ((unit is not None and desired_unit is None) or
             (unit is None and desired_unit is not None)):
         reason = ("One of unit/desired_unit was provided but not the other. "
