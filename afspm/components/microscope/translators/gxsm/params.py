@@ -6,6 +6,7 @@ This can be confusing!
 
 import enum
 import logging
+from typing import Any
 
 from afspm.components.microscope import params
 from afspm.utils import units
@@ -99,14 +100,3 @@ class GxsmChannelIds(enum.Enum):
     DDIDV = enum.auto()
     I0_AVG = enum.auto()
     COUNTER = enum.auto()
-
-
-
-
-    # In: ParameterHandler, val, curr_units
-    # Out: None
-    setter: Callable[[Any, str, str], None]
-
-    # In: ParameterHandler
-    # Out: val
-    getter: Callable[[Any], Any]

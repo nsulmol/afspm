@@ -22,7 +22,7 @@ enum ScopeState {
   SS_SIGNALING = 7; // Collection signal(s)
   SS_FREE = 3; // Neither scanning nor moving, free to do something else
   SS_INTERRUPTED = 4; // Scan was interrupted mid scan!
-  SS_MOTOR_RUNNING = 5; // A coarse motor is in motion
+  SS_COARSE_MOTOR = 5; // A coarse motor is in motion
   SS_BUSY_PARAM = 6; // A param request was sent, in process of setting
 }
 
@@ -32,6 +32,7 @@ enum ScopeState {
  */
 message ScopeStateMsg {
   ScopeState scope_state = 1;
+  bool scan_paused = 2;  // Whether a scan is currently paused.
 }
 
 
