@@ -138,7 +138,7 @@ class ActionHandler(metaclass=ABCMeta):
                 the actions_config.
         """
         if generic_action not in self.actions:
-            msg = (f'Action {generic_action} not found in params config' +
+            msg = (f'Action {generic_action} not found in params config ' +
                    'or value was not string.')
             logger.error(msg)
             raise ActionNotSupportedError(msg)
