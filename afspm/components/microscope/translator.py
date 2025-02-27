@@ -339,14 +339,16 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
     def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
         """Poll the controller for the current Z-Control parameters.
 
-        If not supported, return None. Throw MicroscopeError on failure.
+        If not supported, return empty ZCtrlParameters.
+        Throw MicroscopeError on failure.
         """
 
     @abstractmethod
     def poll_probe_pos(self) -> signal_pb2.ProbePosition:
         """Poll the controller for the current probe position.
 
-        If not supported, return None. Throw MicroscopeError on failure.
+        If not supported, return empty ProbePosition.
+        Throw MicroscopeError on failure.
         """
 
     @abstractmethod
@@ -381,7 +383,8 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         Note that we will first consider the timestamp attribute when comparing
         signals. If this attribute is not passed, we will do a data comparison.
 
-        If not supported return None. Throw MicroscopeError on failure.
+        If not supported return empty Signal1d.
+        Throw MicroscopeError on failure.
 
         To read the creation time of a file using Python, use
             get_file_modification_datetime()

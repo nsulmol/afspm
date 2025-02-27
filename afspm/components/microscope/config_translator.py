@@ -38,6 +38,9 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
     scan_pb2.ScopeState enum.
     - Implementing poll_scans(), which likely involves using a pre-existing
     Python package to read the specific SPM's save files.
+    - Implementing poll_signal(), which likely involves using a pre-existing
+    Python package to read the specific SPM's save files. Recall that you may
+    simply return an empty Signal1d() if this is not supported.
 
     Also note that the original abstract action methods defined in
     MicroscopeTranslatorBase do nothing here (since they are already
