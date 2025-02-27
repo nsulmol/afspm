@@ -335,8 +335,8 @@ class ParameterHandler(metaclass=ABCMeta):
         """
 
     def _load_config_build_params(self, params_config_path: str):
-        with open(params_config_path, 'rb') as file:
-            params_config = tomli.load(file)
+        with open(params_config_path, 'rb') as f:
+            params_config = tomli.load(f)
             self._build_param_infos_methods(params_config)
 
     def _build_param_infos_methods(self, params_config: dict):

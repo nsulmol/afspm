@@ -100,8 +100,8 @@ class ActionHandler(metaclass=ABCMeta):
                 action-specific.
         """
         self.actions = {}
-        with open(actions_config_path, 'rb') as file:
-            actions_config = tomli.load(actions_config_path)
+        with open(actions_config_path, 'rb') as f:
+            actions_config = tomli.load(f)
             self._build_actions(actions_config)
 
     @abstractmethod
