@@ -29,8 +29,8 @@ range = [0.0, 2.0]
 [scan-angle]
 uuid = 'Rotation'
 unit = 'degrees'
-type = 1
-range = [360, 360]
+type = 1.0
+range = [-360, 360]
 
 # ----- Digital Scan Parameters ----- #
 [scan-resolution-x]  # Unitless, no range enforced.
@@ -71,12 +71,12 @@ type = 1.0
 # ----- Probe / Scan Parameters ----- #
 [scan-speed]
 uuid = 'dsp-fbs-scan-speed-scan'
-units = 'angstrom/s'
+unit = 'angstrom/s'
 type = 1.0
 
 [move-speed]
 uuid = 'dsp-fbs-scan-speed-move'
-units = 'angstrom/s'
+unit = 'angstrom/s'
 type = 1.0
 
 
