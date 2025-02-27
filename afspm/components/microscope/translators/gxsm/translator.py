@@ -152,7 +152,7 @@ class GxsmTranslator(ConfigTranslator):
         return self.old_scans
 
     def poll_signal(self) -> signal_pb2.Signal1d:
-        """Overrides signal polling. For now, not supported."""
+        """Override signal polling. For now, not supported."""
         return signal_pb2.Signal1d()
 
 

@@ -18,8 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 # GXSM-specific params (only used by internal methods)
-MOTOR = 'dsp-fbs-motor'  # coarse motor status.
-
+MOTOR_PARAM = 'dsp-fbs-motor'  # coarse motor status.
 
 
 class GxsmParameterHandler(params.ParameterHandler):
@@ -42,11 +41,11 @@ class GxsmParameterHandler(params.ParameterHandler):
         Raises:
             ParameterError if getting the parameter fails.
         """
-        ret = gxsm.get(attr)
+        ret = gxsm.get(spm_uuid)
         if ret != self.GET_FAILURE:
             return ret
         else:
-            msg = f"Get param failed for {str}"
+            msg = f"Get param failed for {spm_uuid}"
             logger.error(msg)
             raise params.ParameterError(msg)
 
@@ -65,7 +64,7 @@ class GxsmParameterHandler(params.ParameterHandler):
         Raises:
             - ParameterError if the parameter could not be set.
         """
-        gxsm.set(attr, str(val))
+        gxsm.set(spm_uuid, str(spm_val))
 
 
 class GxsmChannelIds(enum.Enum):
