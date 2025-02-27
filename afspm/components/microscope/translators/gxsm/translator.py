@@ -61,6 +61,7 @@ class GxsmTranslator(ConfigTranslator):
                  read_simplify_metadata: bool = True,
                  param_handler: ParameterHandler = None,
                  action_handler: ActionHandler = None,
+                 zctrl_channel: str = None,
                  **kwargs):
         """Initialize internal logic."""
         self.read_channels_config_path = read_channels_config_path
@@ -77,6 +78,9 @@ class GxsmTranslator(ConfigTranslator):
             kwargs['action_handler'] = action_handler
         if not param_handler:
             param_handler = _init_param_handler()
+            if zctrl_channel:  # Update Z-Ctrl feedback channel
+                zctrl_enum = params.GxsmFeedbackChannel(zctrl_channel)
+                param_handler.update_zctrl_channel(zctrl_enum)
             kwargs['param_handler'] = param_handler
         super().__init__(**kwargs)
 
