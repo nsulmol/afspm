@@ -3,40 +3,43 @@
 import os.path
 import logging
 
+from afspm.components.microscope.params import ParameterHandler
+from afspm.components.microscope.actions import (ActionHandler,
+                                                 CallableActionHandler)
 from afspm.components.microscope.translator import (
-    MicroscopeTranslator, get_file_modification_datetime)
-from afspm.components.microscope.translators.gxsm.params import (
-    PARAM_METHOD_MAP, get_param_list, set_param_list, GxsmParameter,
-    get_param)
-
+    get_file_modification_datetime)
+from afspm.components.microscope.config_translator import ConfigTranslator
 from afspm.utils import array_converters as conv
 from afspm.io.protos.generated import scan_pb2
-from afspm.io.protos.generated import control_pb2
-from afspm.io.protos.generated import feedback_pb2
 
 import gxsm  # Dynamic DLL, so not in pyproject.
 from gxsmread import read
+
+from . import params
 
 
 logger = logging.getLogger(__name__)
 
 
-# Attributes from the read scan file (differs from params.GxsmParameter, which
+# Attributes from the read scan file (differs from params.toml, which
 # contains UUIDs for getting/setting parameters).
 SCAN_ATTRIB_ANGLE = 'alpha'
 
+# Default filenames for actions and params config files.
+ACTIONS_FILENAME = 'actions.toml'
+PARAMS_FILENAME = 'params.toml'
 
-class GxsmTranslator(MicroscopeTranslator):
+
+class GxsmTranslator(ConfigTranslator):
     """Handles device communication with the gxsm3 controller.
 
-    Note that GXSM does not currently feed the following info via its remote
-    API:
-    - Chosen physical units: this could be angstrom, nm, etc. This is set in
-    Preferences->User->User/XYUnit.
-    - Whether the z-control feedback is currently on/off. This is set in
-    DSP->Advanced->Z-Control->Enable feedback controller.
+    Note that GXSM does not currently feed the various physical units via
+    the API. This translator uses the defined units in its params.toml file
+    to perform conversions. Therefore it is *IMPORTANT* that you ensure the
+    gxsm UI units match the params.toml ones!
 
-    Since these cannot be set via the API, we read these via the constructor.
+    For units, these can be found/set in Preferences->User->User/XYUnit,
+    for physical XY units, for example.
     """
 
     STATE_RUNNING_THRESH = 0
@@ -55,108 +58,36 @@ class GxsmTranslator(MicroscopeTranslator):
                  read_use_physical_units: bool = True,
                  read_allow_convert_from_metadata: bool = False,
                  read_simplify_metadata: bool = True,
-                 gxsm_physical_units: str = 'angstrom',
-                 is_zctrl_feedback_on: bool = True, **kwargs):
+                 param_handler: ParameterHandler = None,
+                 action_handler: ActionHandler = None,
+                 **kwargs):
         """Initialize internal logic."""
         self.read_channels_config_path = read_channels_config_path
         self.read_use_physical_units = read_use_physical_units
         self.read_allow_convert_from_metadata = read_allow_convert_from_metadata
         self.read_simplify_metadata = read_simplify_metadata
-        self.gxsm_physical_units = gxsm_physical_units  # TODO: read from gxsm?
-        self.is_zctrl_feedback_on = is_zctrl_feedback_on  # TODO: read from gxsm?
 
         self.last_scan_fname = ''
         self.old_scans = []
 
+        # Default initialization of handlers and addition to kwargs
+        if not action_handler:
+            action_handler = _init_action_handler()
+            kwargs['action_handler'] = action_handler
+        if not param_handler:
+            param_handler = _init_param_handler()
+            kwargs['param_handler'] = param_handler
         super().__init__(**kwargs)
-        self.param_method_map = PARAM_METHOD_MAP
-
-    def on_start_scan(self):
-        """Override on starting scan."""
-        gxsm.startscan()
-        return control_pb2.ControlResponse.REP_SUCCESS
-
-    def on_stop_scan(self):
-        """Override on stopping scan."""
-        gxsm.stopscan()
-        return control_pb2.ControlResponse.REP_SUCCESS
-
-    def on_set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
-                           ) -> control_pb2.ControlResponse:
-        """Override on setting scan params."""
-        # We *must* set x-values before y-values, because gxsm will scale the
-        # linked y when its x is set. Somewhat confusing, in my opinion.
-        attrs = [GxsmParameter.TL_X, GxsmParameter.TL_Y,
-                 GxsmParameter.SZ_X, GxsmParameter.SZ_Y,
-                 GxsmParameter.RES_X, GxsmParameter.RES_Y,
-                 GxsmParameter.ANGLE,]
-        vals = [scan_params.spatial.roi.top_left.x,
-                scan_params.spatial.roi.top_left.y,
-                scan_params.spatial.roi.size.x,
-                scan_params.spatial.roi.size.y,
-                scan_params.data.shape.x,
-                scan_params.data.shape.y,
-                scan_params.spatial.roi.angle]
-        attr_units = [scan_params.spatial.length_units,
-                      scan_params.spatial.length_units,
-                      scan_params.spatial.length_units,
-                      scan_params.spatial.length_units,
-                      None, None, scan_params.spatial.length_units]
-        gxsm_units = [self.gxsm_physical_units,
-                      self.gxsm_physical_units,
-                      self.gxsm_physical_units,
-                      self.gxsm_physical_units,
-                      None, None, self.gxsm_physical_units]
-
-        # Note: when setting scan params, *data* units don't matter! These
-        # are only important in explicit scans. When setting scan params,
-        # we only care about the data shape, which is pixel-units.
-        if set_param_list(attrs, vals, attr_units, gxsm_units):
-            return control_pb2.ControlResponse.REP_SUCCESS
-        return control_pb2.ControlResponse.REP_PARAM_ERROR
-
-    def on_set_zctrl_params(self, zctrl_params: feedback_pb2.ZCtrlParameters
-                            ) -> control_pb2.ControlResponse:
-        """Note: there is no error handling, so always return success."""
-        # We *must* set CI before CP, because gxsm will scale CP when
-        # CI is set. Somewhat confusing, in my opinion.
-        nones = [None, None]
-        if set_param_list([GxsmParameter.CI, GxsmParameter.CP],
-                          [zctrl_params.integralGain,
-                           zctrl_params.proportionalGain], nones, nones):
-            return control_pb2.ControlResponse.REP_SUCCESS
-        return control_pb2.ControlResponse.REP_PARAM_ERROR
 
     def poll_scope_state(self) -> scan_pb2.ScopeState:
         """Return current scope state in accordance with system model."""
         # Note: updating self.scope_state is handled by the calling method
         # in MicroscopeTranslator.
-        state = self._get_current_scope_state()
+        state = get_current_scope_state(self.param_handler)
         if (self.scope_state == scan_pb2.ScopeState.SS_SCANNING and
                 state == scan_pb2.ScopeState.SS_FREE):
             gxsm.autosave()  # Save the images we have recorded
         return state
-
-    def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
-        """Override scan params polling."""
-        vals = get_param_list([GxsmParameter.TL_X, GxsmParameter.TL_Y,
-                               GxsmParameter.SZ_X, GxsmParameter.SZ_Y,
-                               GxsmParameter.RES_X, GxsmParameter.RES_Y,
-                               GxsmParameter.ANGLE])
-
-        scan_params = scan_pb2.ScanParameters2d()
-        scan_params.spatial.roi.top_left.x = vals[0]
-        scan_params.spatial.roi.top_left.y = vals[1]
-        scan_params.spatial.roi.size.x = vals[2]
-        scan_params.spatial.roi.size.y = vals[3]
-        scan_params.spatial.roi.angle = vals[6]  # TODO: What about angle units!?
-        scan_params.spatial.length_units = self.gxsm_physical_units
-
-        # Note: all gxsm attributes returned as float, must convert to int
-        scan_params.data.shape.x = int(vals[4])
-        scan_params.data.shape.y = int(vals[5])
-        # Not setting data units, as these are linked to scan channel
-        return scan_params
 
     def poll_scans(self) -> [scan_pb2.Scan2d]:
         """Override scans polling."""
@@ -219,39 +150,44 @@ class GxsmTranslator(MicroscopeTranslator):
             self.old_scans = scans
         return self.old_scans
 
-    def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
-        """Poll the controller for the current Z-Control parameters."""
-        vals = get_param_list([GxsmParameter.CP, GxsmParameter.CI])
 
-        zctrl_params = feedback_pb2.ZCtrlParameters()
-        zctrl_params.feedbackOn = self.is_zctrl_feedback_on
-        zctrl_params.proportionalGain = vals[0]
-        zctrl_params.integralGain = vals[1]
-        return zctrl_params
+def get_current_scope_state(param_handler: ParameterHandler
+                            ) -> scan_pb2.ScopeState:
+    """Return the current scope state.
 
-    @staticmethod
-    def _get_current_scope_state() -> scan_pb2.ScopeState:
-        """Return the current scope state.
+    This queries gxsm for its current scope state.
 
-        This queries gxsm for its current scope state.
+    Returns:
+        ScopeState, or None if query fails.
+    """
+    svec = gxsm.rtquery('s')  # presumably s for state
+    s = int(svec[0])
+    # (2+4) == Scanning; 8 == Vector Probe
+    scanning = (s & (2+4) > GxsmTranslator.STATE_RUNNING_THRESH or
+                s & 8 > GxsmTranslator.STATE_RUNNING_THRESH)
+    moving = s & 16 > GxsmTranslator.STATE_RUNNING_THRESH
 
-        Returns:
-            ScopeState, or None if query fails.
-        """
-        svec = gxsm.rtquery('s')
-        s = int(svec[0])
-        # (2+4) == Scanning; 8 == Vector Probe
-        scanning = (s & (2+4) > GxsmTranslator.STATE_RUNNING_THRESH or
-                    s & 8 > GxsmTranslator.STATE_RUNNING_THRESH)
-        moving = s & 16 > GxsmTranslator.STATE_RUNNING_THRESH
+    # TODO: investigate motor logic further...
+    motor_running = (param_handler.get_param_spm(params.MOTOR_PARAM) <
+                     GxsmTranslator.MOTOR_RUNNING_THRESH)
+    if motor_running:
+        return scan_pb2.ScopeState.SS_COARSE_MOTOR
+    if scanning:
+        return scan_pb2.ScopeState.SS_SCANNING
+    if moving:
+        return scan_pb2.ScopeState.SS_MOVING
+    return scan_pb2.ScopeState.SS_FREE
 
-        # TODO: investigate motor logic further...
-        motor_running = (get_param(GxsmParameter.MOTOR) <
-                         GxsmTranslator.MOTOR_RUNNING_THRESH)
-        if motor_running:
-            return scan_pb2.ScopeState.SS_MOTOR_RUNNING
-        if scanning:
-            return scan_pb2.ScopeState.SS_SCANNING
-        if moving:
-            return scan_pb2.ScopeState.SS_MOVING
-        return scan_pb2.ScopeState.SS_FREE
+
+def _init_action_handler() -> ActionHandler:
+    """Initialize GXSM action handler pointing to defulat config."""
+    actions_config_path = os.path.join(os.path.dirname(__file__),
+                                       ACTIONS_FILENAME)
+    return CallableActionHandler(actions_config_path)
+
+
+def _init_param_handler() -> params.GxsmParameterHandler:
+    """Initialize GXSM action handler pointing to defulat config."""
+    params_config_path = os.path.join(os.path.dirname(__file__),
+                                      PARAMS_FILENAME)
+    return params.GxsmParameterHandler(params_config_path)

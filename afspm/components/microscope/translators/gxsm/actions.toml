@@ -1,0 +1,3 @@
+# This file holds the GXSM actions. It uses a CallableActionHandler.
+start-scan = 'gxsm.startscan'
+stop-scan = 'gxsm.stopscan'

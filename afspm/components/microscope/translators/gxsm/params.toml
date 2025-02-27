@@ -1,0 +1,75 @@
+# This file holds the GXSM parameters. Feel free to modify the
+# parameter range if you want to constrain it further.
+
+# ----- Physical Scan Parameters ----- #
+[scan-top-left-x]
+uuid = 'OffsetX'
+unit = 'angstrom'
+type = 1.0
+range = [0.0, 2.0]
+
+[scan-top-left-y]
+uuid = 'OffsetY'
+unit = 'angstrom'
+type = 1.0
+range = [0.0, 2.0]
+
+[scan-size-x]
+uuid = 'RangeX'
+unit = 'angstrom'
+type = 1.0
+range = [0.0, 2.0]
+
+[scan-size-y]
+uuid = 'RangeY'
+unit = 'angstrom'
+type = 1.0
+range = [0.0, 2.0]
+
+[scan-angle]
+uuid = 'Rotation'
+unit = 'degrees'
+type = 1
+range = [360, 360]
+
+# ----- Digital Scan Parameters ----- #
+[scan-resolution-x]  # Unitless, no range enforced.
+uuid = 'PointsX'
+type = 1
+
+[scan-resolution-y]  # Unitless, no range enforced.
+uuid = 'PointsY'
+type = 1
+
+# ----- Feedback Parameters ----- #
+[zctrl-pgain]  # Unitless, no range enforced.
+uuid = 'dsp-fbs-cp'
+type = 1.0
+
+[zctrl-igain]  # Unitless, no range enforced.
+uuid = 'dsp-fbs-ci'
+type = 1.0
+
+# ----- Sample Slope Correction ----- #
+[sample-slope-x]
+uuid = 'dsp-adv-scan-slope-x'  # TODO: test 'dsp-mk2-hwi-slope-x'
+type = 1.0
+
+[sample-slope-y]
+uuid = 'dsp-adv-scan-slope-y'  # TODO: test 'dsp-mk2-hwi-slope-y'
+type = 1.0
+
+# ----- Probe / Scan Parameters ----- #
+[scan-speed]
+uuid = 'dsp-fbs-scan-speed-scan'
+units = 'angstrom/s'
+type = 1.0
+
+[move-speed]
+uuid = 'dsp-fbs-scan-speed-move'
+units = 'angstrom/s'
+type = 1.0
+
+
+# ----- Other ----- #
+# [tip-bias-voltage]
