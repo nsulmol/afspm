@@ -1,6 +1,6 @@
 """Child of MicroscopeTranslator, uses TOML configs for params/actions."""
 
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta
 import logging
 from google.protobuf.message import Message
 
@@ -117,7 +117,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         self.param_handler.set_param_list(attribs, vals, attr_units)
 
     def on_set_probe_pos(self, probe_position: signal_pb2.ProbePosition
-                              ) -> control_pb2.ControlResponse:
+                         ) -> control_pb2.ControlResponse:
         """Handle a request to change the probe position of the microscope."""
         vals = [probe_position.point.x,
                 probe_position.point.y]
@@ -225,7 +225,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         self._handle_action_not_in_actions(action)
 
         try:
-            uuid_or_callable = self.actions._get_action(action)
+            self.actions._get_action(action)
         except actions.ActionNotSupportedError:
             return control_pb2.ControlResponse.REP_ACTION_NOT_SUPPORTED
         return control_pb2.ControlResponse.REP_SUCCESS
@@ -279,7 +279,6 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
 
         return zctrl_params
 
-
     def poll_probe_pos(self) -> signal_pb2.ProbePosition | None:
         """Poll the controller for the current probe position.
 
@@ -294,7 +293,6 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         probe_pos_params.units = units
 
         return probe_pos_params
-
 
     # ----- 'Action' Handlers ----- #
     def on_start_scan(self) -> control_pb2.ControlResponse:
