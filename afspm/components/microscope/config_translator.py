@@ -152,7 +152,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
                 just the state, if it was a get call).
         """
         if (param.parameter not in params.PARAMETERS):
-            logger.warning(f'Feeding parameter {param.parameter}, not in' +
+            logger.warning(f'Feeding parameter {param.parameter}, not in ' +
                            'MicroscopeParameter. Consider adding it in ' +
                            'future.')
 
@@ -237,14 +237,15 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
     def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
         """Poll the controller for the current scan parameters.
 
+        Note: data_units are not set here as these are linked to scan
+        channel (should be set per-channel in poll_scans()).
+
         Throw MicroscopeError on failure.
         """
         length_units = self.param_handler.get_units(
             params.MicroscopeParameter.SCAN_SIZE_X)
         angular_units = self.param_handler.get_units(
             params.MicroscopeParameter.SCAN_ANGLE)
-        data_units = self.param_handler.get_units(
-            params.MicroscopeParameter.SCAN_RESOLUTION_X)
 
         vals = self.param_handler.get_param_list(params.SCAN_PARAMS)
 
@@ -260,7 +261,6 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         # Note: all gxsm attributes returned as float, must convert to int
         scan_params.data.shape.x = int(vals[4])
         scan_params.data.shape.y = int(vals[5])
-        scan_params.data.units = data_units
         # Not setting data units, as these are linked to scan channel
         return scan_params
 

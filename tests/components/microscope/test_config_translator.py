@@ -57,13 +57,11 @@ def param_config_str():
     # Digital Scan Parameters
     [scan-resolution-x]
     uuid = 'RES_X'
-    unit = 'Hz'
     type = 1
     range = [0, 2000]
 
     [scan-resolution-y]
     uuid = 'RES_Y'
-    unit = 'Hz'
     type = 1.0
     range = [0, 2000]
 
@@ -184,7 +182,6 @@ def test_scan_params(param_config_str, vals_dict, action_config_str):
                                             length_units='nm',
                                             angular_units='degrees',
                                             data_shape=(256, 256),
-                                            data_units='Hz',
                                             angle=0)
 
     curr_scan_params = config_translator.poll_scan_params()
@@ -198,7 +195,6 @@ def test_scan_params(param_config_str, vals_dict, action_config_str):
         angular_units=exp_scan_params.spatial.angular_units,
         data_shape=(exp_scan_params.data.shape.x,
                     exp_scan_params.data.shape.y),
-        data_units=exp_scan_params.data.units,
         angle=35)
     config_translator.on_set_scan_params(exp_scan_params)
     curr_scan_params = config_translator.poll_scan_params()
