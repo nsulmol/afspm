@@ -31,8 +31,6 @@ logger = logging.getLogger(__name__)
 class MicroscopeParameter(str, Enum):
     """Holds generic parameter names that can be set."""
 
-    SCOPE_STATE = 'scope-state'
-
     # Physical Scan Parameters
     SCAN_TOP_LEFT_X = 'scan-top-left-x'
     SCAN_TOP_LEFT_Y = 'scan-top-left-y'
@@ -71,10 +69,6 @@ PARAMETERS = [param.value for param in MicroscopeParameter]
 
 
 DESCRIPTIONS = {
-    MicroscopeParameter.SCOPE_STATE:
-    "An indication of the state of the microscope (expected to match " +
-    "scan_pb2.ScopeState)",
-
     # Physical Scan Parameters
     MicroscopeParameter.SCAN_TOP_LEFT_X:
     "Top-left position of the 2D scan, x-dimension.",

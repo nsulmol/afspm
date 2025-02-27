@@ -653,7 +653,8 @@ def test_parameters(client, control_mode):
     startup_grab_control(client, control_mode)
 
     logger.info("First, does the translator even support REQ_PARAM?")
-    param = control_pb2.ParameterMsg(params.MicroscopeParameter.SCOPE_STATE)
+    param = control_pb2.ParameterMsg(
+        params.MicroscopeParameter.SCAN_TOP_LEFT_X)
     rep, rcvd_param = client.request_parameter(param)
 
     if rep == control_pb2.ControlResponse.CMD_NOT_SUPPORTED:
