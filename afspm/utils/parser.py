@@ -372,7 +372,7 @@ def _evaluate_value_str(value: str) -> Any:
             logger.debug(f"Instantiating {value} with args: {args}")
             instantiated = imported(*args) if args != [''] else imported()
             return instantiated  # Return instantiation of what we imported
-        logger.debug("Imported class/method {imported}")
+        logger.debug(f"Imported class/method {imported}")
         return imported  # Return imported class or method
     return value  # Return original string
 

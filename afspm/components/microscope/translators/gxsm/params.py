@@ -9,7 +9,6 @@ import logging
 from typing import Any
 
 from afspm.components.microscope import params
-from afspm.utils import units
 
 import gxsm
 
@@ -87,6 +86,7 @@ def update_zctrl_channel(param_handler: params.ParameterHandler,
     """Change the feedback channel in use for ZCtrl.
 
     Args:
+        param_handler: ParameterHandler we are using to change.
         channel: enum of desired feedback channel.
     """
     logger.debug(f'Trying to set ZCtrl feedback channel to {channel}.')
