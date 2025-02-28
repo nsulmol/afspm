@@ -4,8 +4,7 @@ import os.path
 import logging
 
 from afspm.components.microscope.params import ParameterHandler
-from afspm.components.microscope.actions import (ActionHandler,
-                                                 CallableActionHandler)
+from afspm.components.microscope.actions import ActionHandler
 from afspm.components.microscope.translator import (
     get_file_modification_datetime)
 from afspm.components.microscope.config_translator import ConfigTranslator
@@ -228,7 +227,7 @@ def _init_action_handler() -> ActionHandler:
     """Initialize GXSM action handler pointing to defulat config."""
     actions_config_path = os.path.join(os.path.dirname(__file__),
                                        ACTIONS_FILENAME)
-    return CallableActionHandler(actions_config_path)
+    return ActionHandler(actions_config_path)
 
 
 def _init_param_handler() -> params.GxsmParameterHandler:
