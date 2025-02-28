@@ -1,3 +1,18 @@
-# This file holds the GXSM actions. It uses a CallableActionHandler.
-start-scan = 'gxsm.startscan'
-stop-scan = 'gxsm.stopscan'
+# This file holds the GXSM actions.
+
+[start-scan]
+method = 'gxsm.startscan'
+
+[stop-scan]
+method = 'gxsm.stopscan'
+
+# TODO: Uncomment when poll_signals is working!
+# [start-signal]
+# method = 'afspm.components.microscope.translators.gxsm.actions.call_action'
+# uuid = 'DSP_VP_FZ_EXECUTE'
+# type = 'PASS_ARGS'
+
+# [stop-signal]
+# method = 'afspm.components.microscope.translators.gxsm.actions.call_action'
+# uuid = 'DSP_VP_ABORT_EXECUTE'
+# type = 'PASS_ARGS'

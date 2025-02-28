@@ -17,6 +17,7 @@ import gxsm  # Dynamic DLL, so not in pyproject.
 from gxsmread import read
 
 from . import params
+from . import actions
 
 
 logger = logging.getLogger(__name__)
@@ -41,6 +42,22 @@ class GxsmTranslator(ConfigTranslator):
 
     For units, these can be found/set in Preferences->User->User/XYUnit,
     for physical XY units, for example.
+
+    Attributes:
+        read_channels_config_path: path to config file to convert from
+            raw data to physical units. See gxsmread documentation.
+        read_use_physical_units: bool, whether or not to show the data
+            in physical units. See gxsmread documentation.
+        read_allow_convert_from_metadata: Use hardcoded info to convert
+            some channels' data to physical units. See gxsmread.
+        read_simplify_metadata: Whether or not to convert all metadata
+            variables to attributes.  See gxsmread documentation.
+        param_handler: ParamHandler instance used to handle parameters.
+        action_handler: ActionHandler instance used to handle actions.
+
+        last_scan_fname: Holds last filename to minimize loading files
+            unnecessarily (basic cache check).
+        old_scans: Holds last scans for cache purposes.
     """
 
     STATE_RUNNING_THRESH = 0
@@ -62,8 +79,24 @@ class GxsmTranslator(ConfigTranslator):
                  param_handler: ParameterHandler = None,
                  action_handler: ActionHandler = None,
                  zctrl_channel: str = None,
+                 signal_mode: str = None,
                  **kwargs):
-        """Initialize internal logic."""
+        """Initialize internal logic.
+
+        Args:
+            read_channels_config_path: path to config file to convert from
+                raw data to physical units. See gxsmread documentation.
+            read_use_physical_units: bool, whether or not to show the data
+                in physical units. See gxsmread documentation.
+            read_allow_convert_from_metadata: Use hardcoded info to convert
+                some channels' data to physical units. See gxsmread.
+            read_simplify_metadata: Whether or not to convert all metadata
+                variables to attributes.  See gxsmread documentation.
+            param_handler: ParamHandler to use. If None, spawns default.
+            action_handler: ActionHandler to use. If None, spawns default.
+            zctrl_channel: Feedback channel for ZCtrl. See gxsm/params.py.
+            signal_mode: Signal mode to be running. See gxsm/actions.py.
+        """
         self.read_channels_config_path = read_channels_config_path
         self.read_use_physical_units = read_use_physical_units
         self.read_allow_convert_from_metadata = read_allow_convert_from_metadata
@@ -75,6 +108,9 @@ class GxsmTranslator(ConfigTranslator):
         # Default initialization of handlers and addition to kwargs
         if not action_handler:
             action_handler = _init_action_handler()
+            if signal_mode:
+                signal_enum = actions.GxsmSignalModeAction(signal_mode)
+                actions.update_signal_mode(action_handler, signal_enum)
             kwargs['action_handler'] = action_handler
         if not param_handler:
             param_handler = _init_param_handler()
