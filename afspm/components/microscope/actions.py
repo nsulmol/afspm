@@ -134,7 +134,6 @@ def set_up_callable(params_dict: dict) -> ActionCallable:
     return action
 
 
-# TODO: Review all comments before pushing!!!
 class ActionHandler(metaclass=ABCMeta):
     """Handles sending action requests to an SPM.
 
