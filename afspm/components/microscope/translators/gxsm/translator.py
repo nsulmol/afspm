@@ -34,14 +34,6 @@ PARAMS_FILENAME = 'params.toml'
 class GxsmTranslator(ConfigTranslator):
     """Handles device communication with the gxsm3 controller.
 
-    Note that GXSM does not currently feed the various physical units via
-    the API. This translator uses the defined units in its params.toml file
-    to perform conversions. Therefore it is *IMPORTANT* that you ensure the
-    gxsm UI units match the params.toml ones!
-
-    For units, these can be found/set in Preferences->User->User/XYUnit,
-    for physical XY units, for example.
-
     Attributes:
         read_channels_config_path: path to config file to convert from
             raw data to physical units. See gxsmread documentation.
