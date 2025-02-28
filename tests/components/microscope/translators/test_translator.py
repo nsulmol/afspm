@@ -99,6 +99,10 @@ def router_url(config_dict):
 
 
 @pytest.fixture(scope="module")
+def exp_problem():
+    return control_pb2.ExperimentProblem.EP_NONE
+
+@pytest.fixture(scope="module")
 def control_mode():
     return control_pb2.ControlMode.CM_AUTOMATED
 
@@ -230,9 +234,9 @@ def stop_client(client: ControlClient):
 
 
 def startup_grab_control(client: ControlClient,
-                         control_mode: control_pb2.ControlMode.CM_AUTOMATED):
+                         exp_problem: control_pb2.ExperimentProblem):
     """Request and get control of the microscope translator."""
-    rep = client.request_control(control_mode)
+    rep = client.request_control(exp_problem)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
 
@@ -330,9 +334,9 @@ def set_scan_params(client: ControlClient,
 # -------------------- Tests -------------------- #
 def test_cancel_scan(client, default_control_state,
                      sub_scan, sub_scope_state, timeout_ms,
-                     control_mode):
+                     exp_problem):
     logger.info("Validate we can start and cancel a scan.")
-    startup_grab_control(client, control_mode)
+    startup_grab_control(client, exp_problem)
 
     logger.info("First, validate we *do not* have an initial scan (in the "
                 "cache), and *do* have an initial scope state (SS_FREE).")
@@ -388,10 +392,10 @@ def test_cancel_scan(client, default_control_state,
 
 
 def test_scan_params(client, default_control_state,
-                     sub_scan_params, control_mode,
+                     sub_scan_params, exp_problem,
                      float_tolerance):
     logger.info("Validate we can set scan parameters.")
-    startup_grab_control(client, control_mode)
+    startup_grab_control(client, exp_problem)
 
     logger.info("First, validate we have initial scan params (from the "
                 "cache).")
@@ -428,9 +432,9 @@ def test_scan_params(client, default_control_state,
 
 def test_run_scan(client, default_control_state,
                   sub_scan, sub_scope_state, sub_scan_params, timeout_ms,
-                  control_mode, config_dict):
+                  exp_problem, config_dict):
     logger.info("Validate we can start a scan, and receive one on finish.")
-    startup_grab_control(client, control_mode)
+    startup_grab_control(client, exp_problem)
 
     logger.info("First, check if we provided specific scan parameters "
                 "(so the scan is not super long)")
@@ -488,9 +492,9 @@ def test_run_scan(client, default_control_state,
 
 def test_handle_zctrl(client, default_control_state,
                       sub_zctrl, timeout_ms,
-                      control_mode, float_tolerance):
+                      exp_problem, float_tolerance):
     logger.info("Validate we recieve and can set ZCtrlParams.")
-    startup_grab_control(client, control_mode)
+    startup_grab_control(client, exp_problem)
 
     logger.info("First, ensure we receive initial ZCtrlParams.")
     initial_params = assert_and_return_message(sub_zctrl)
@@ -520,9 +524,9 @@ def test_handle_zctrl(client, default_control_state,
 
 def test_handle_probe_pos(client, default_control_state,
                           sub_probe_pos, timeout_ms,
-                          control_mode, float_tolerance):
+                          exp_problem, float_tolerance):
     logger.info("Validate we recieve and can set ProbePosition.")
-    startup_grab_control(client, control_mode)
+    startup_grab_control(client, exp_problem)
 
     logger.info("First, ensure we receive initial ProbePosition.")
     initial_probe_pos = assert_and_return_message(sub_probe_pos)
@@ -552,9 +556,9 @@ def test_handle_probe_pos(client, default_control_state,
 
 def test_cancel_signal(client, default_control_state,
                        sub_signal, sub_scope_state, timeout_ms,
-                       control_mode):
+                       exp_problem):
     logger.info("Validate we can start and cancel a signal collection.")
-    startup_grab_control(client, control_mode)
+    startup_grab_control(client, exp_problem)
 
     logger.info("First, validate we *do not* have an initial signal (in the "
                 "cache), and *do* have an initial scope state (SS_FREE).")
@@ -612,10 +616,10 @@ def test_cancel_signal(client, default_control_state,
 
 def test_run_signal(client, default_control_state,
                     sub_signal, sub_scope_state, sub_probe_pos, timeout_ms,
-                    control_mode):
+                    exp_problem):
     logger.info("Validate we can start a signal collection, and receive one "
                 + "on finish.")
-    startup_grab_control(client, control_mode)
+    startup_grab_control(client, exp_problem)
 
     logger.info("Validate we *do not* have an initial signal (in the "
                 "cache), and *do* have an initial scope state (SS_FREE).")
@@ -648,9 +652,9 @@ def test_run_signal(client, default_control_state,
     stop_client(client)
 
 
-def test_parameters(client, control_mode):
+def test_parameters(client, exp_problem):
     logger.info("Check which parameters are supported via REQ_PARAM.")
-    startup_grab_control(client, control_mode)
+    startup_grab_control(client, exp_problem)
 
     logger.info("First, does the translator even support REQ_PARAM?")
     param = control_pb2.ParameterMsg(
@@ -681,10 +685,10 @@ def test_parameters(client, control_mode):
     stop_client(client)
 
 
-def test_actions(client, control_mode):
+def test_actions(client, exp_problem):
     logger.info('Check which actions are supported via REQ_ACTION.'
                 'Note that this only works for ConfigTranslators.')
-    startup_grab_control(client, control_mode)
+    startup_grab_control(client, exp_problem)
 
     logger.info("Testing individual actions.")
     for action_name in actions.MicroscopeAction:
