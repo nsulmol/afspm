@@ -110,8 +110,10 @@ def vals_dict():
 @pytest.fixture
 def action_config_str():
     return """
-    start-scan = 'bananer'
-    stop-scan = 'appler'
+    [start-scan]
+    method = 'test_actions.on_start_scan'
+    [stop-scan]
+    method = 'test_actions.on_start_scan'
     """
 
 
@@ -135,7 +137,7 @@ class MyParameterHandler(params.ParameterHandler):
         self.vals[spm_uuid] = spm_val
 
 
-class MyStringActionHandler(actions.StringActionHandler):
+class MyActionHandler(actions.ActionHandler):
     last_call_uuid = None
 
     def __init__(self, actions_config: dict):
@@ -165,7 +167,7 @@ def construct_translator(param_config_str, vals_dict, action_config_str):
     action_config = load_config(action_config_str)
 
     param_handler = MyParameterHandler(param_config, vals_dict)
-    action_handler = MyStringActionHandler(action_config)
+    action_handler = MyActionHandler(action_config)
     config_translator = MyConfigTranslator('my_translator', None, None,
                                            param_handler,
                                            action_handler)

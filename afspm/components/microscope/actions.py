@@ -10,18 +10,19 @@ class to implement the try_action_spm() method.
 
 import logging
 
-from enum import Enum
+import enum
 from typing import Callable
 from abc import ABCMeta, abstractmethod
+from dataclasses import dataclass
 import tomli
 
-from ...utils.parser import import_from_string
+from ...utils.parser import _evaluate_values_recursively
 
 
 logger = logging.getLogger(__name__)
 
 
-class MicroscopeAction(str, Enum):
+class MicroscopeAction(str, enum.Enum):
     """Holds generic action names that can be performed."""
 
     START_SCAN = 'start-scan'
@@ -63,30 +64,103 @@ class ActionError(Exception):
     pass
 
 
+# ----- Action Handling Logic ----- #
+# Keys used to populate callables
+METHOD_KEY = 'method'
+TYPE_KEY = 'type'
+
+
+class CallableType(enum.Enum):
+    """Differentiate between callable types, for logic handling below."""
+
+    NORMAL = enum.auto()
+    PASS_SELF = enum.auto()
+
+
+@dataclass
+class ActionCallable:
+    """Holds attributes necessary to run a callable."""
+
+    method: Callable  # Extracted Callable (method).
+    kwargs: dict  # Dictionary of kwargs we pass to Callable when calling.
+    type: CallableType = CallableType.NORMAL  # Determines calling logic.
+
+
+def set_up_callable(params_dict: dict) -> ActionCallable:
+    """Populate an ActionCallable from dict.
+
+    The dict is expected to have the following keys:
+    - METHOD_KEY: str of the Callable, including modules path (see
+    parser._evaluate_values_recursively for more info).
+    - TYPE_KEY: (optional) indicates the 'type' of our Callable. For now, if it
+     is PASS_SELF, we feed whatever our 'self' is. If not provided, we default
+    to NORMAL.
+
+    Any other key:val pairs are fed when the Callable is called.
+
+    Args:
+        params_dict: dict containing what we need to populate our Callable.
+
+    Returns:
+        Constructed ActionCallable.
+
+    Raises:
+        KeyError if we did not get the required keys.
+
+    """
+    if METHOD_KEY not in params_dict:
+        msg = (f'Require {METHOD_KEY} to set up a callable. Failed '
+               f'for: {params_dict}')
+        logger.error(msg)
+        raise KeyError(msg)
+
+    evaluated_dict = _evaluate_values_recursively(params_dict)
+    kwargs = evaluated_dict  # Do I need to deep copy?
+
+    method = evaluated_dict[METHOD_KEY]
+    del kwargs[METHOD_KEY]
+
+    type = CallableType.NORMAL
+    if TYPE_KEY in evaluated_dict:
+        # Allow CallableType.NORMAL or 'NORMAL' to be provided.
+        type = (CallableType[evaluated_dict[TYPE_KEY].upper()] if
+                isinstance(evaluated_dict[TYPE_KEY], str) else
+                evaluated_dict[TYPE_KEY])
+        del kwargs[TYPE_KEY]
+
+    action = ActionCallable(method=method,
+                            type=type,
+                            kwargs=kwargs)
+    return action
+
+
+# TODO: Review all comments before pushing!!!
 class ActionHandler(metaclass=ABCMeta):
     """Handles sending action requests to an SPM.
 
-    This abstract class defines the interface for the action handler. For
-    actual use, consider one of its children (below).
-
     This class simplifies sending action requests to a microscope. Rather than
-    having a large amount of custom methods, it allows simplified requests by:
-    1. Using a config file mechanism to map from generic action names to
-    SPM-specific ones.
-    2. It requires only implementing the request_action_spm() method, assuming
-    all action calls are similar in nature, with only *something* changing
-    for different actions (and requiring no input arguments).
+    having a large amount of custom methods, it allows simplified requests by
+    using a config file mechanism to map from generic action names to
+    SPM-specific methods. For each supported action, one indicates the
+    following in the config file:
+    - method: a str of the method to call;
+    - type (optional): if the method expects the ActionHandler as input,
+    set to 'PASS_SELF'. If this is not expected, you can either set it to
+    'NORMAL', or simply not add this attribute.
+    - additional args (optional): any additional arguments you would feed
+    to this method can be passed.
+    For example:
 
-    The relationship between generic_params (MicroscopeAction) to this
-    *something* is maintained by a TOML config file of str:str key:val pairs,
-    which is passed to this class's constructor. The constructor (via
-    _build_actions() then builds up a local dict actions, which contains
-    the MicroscopeAction:*something* key:val pairs. If this is confusing,
-    scroll down to the child classes to see examples of what *something*
-    may be.
+        [start-scan]
+        method = 'a.b.startscan'
+        type = 'PASS_SELF
+        uuid = 'HELLO'
+
+    In this case, we will call the method as:
+        a.b.startscan(handler: action_handler, uuid: str = 'HELLO')
 
     Attributes:
-        actions: dict of key:val pairs containing generic_param:something,
+        actions: dict of key:val pairs containing our method configurations,
             where something is an action-specific thing we can use to
             send that action request.
     """
@@ -104,15 +178,20 @@ class ActionHandler(metaclass=ABCMeta):
             actions_config = tomli.load(f)
             self._build_actions(actions_config)
 
-    @abstractmethod
     def _build_actions(self, actions_config: dict):
         """Construct self.actions based on actions_config."""
+        logger.trace('Building up actions.')
+        for key, val in actions_config.items():
+            logger.trace(f'Checking {key}:{val.__class__}')
+            if isinstance(val, dict):
+                logger.trace(f'Trying to set up callable for {key}.')
+                action_callable = set_up_callable(val)
+                self.actions[key] = action_callable
 
-    @abstractmethod
     def request_action(self, generic_action: MicroscopeAction):
         """Request action from SPM given generic action.
 
-        Calls the SPM-specific action for this generic action.
+        Calls the SPM-specific ActionCallable for this generic action.
 
         Args:
             generic_action: Microscope Action wanting to be performed.
@@ -123,15 +202,27 @@ class ActionHandler(metaclass=ABCMeta):
             - ActionError if some other error occurred while asking the
                 SPM to perform this action.
         """
+        action_callable = self._get_action(generic_action)
 
-    def _get_action(self, generic_action: MicroscopeAction) -> str | Callable:
-        """Get Microscope-specific action UUID or action Callable.
+        if action_callable.type == CallableType.PASS_SELF:
+            if action_callable.kwargs:
+                action_callable.method(self, **action_callable.kwargs)
+            else:
+                action_callable.method(self)
+        elif action_callable.type == CallableType.NORMAL:
+            if action_callable.kwargs:
+                action_callable.method(**action_callable.kwargs)
+            else:
+                action_callable.method()
+
+    def _get_action(self, generic_action: MicroscopeAction) -> ActionCallable:
+        """Get Microscope-specific ActionCallable.
 
         Args:
             generic_action: Microscope Action wanting to be performed.
 
         Returns:
-            scope-specific uuid or action Callable.
+            ActionCallable.
 
         Raises:
             - ActionNotSupportedError if the action was not found in
@@ -143,129 +234,3 @@ class ActionHandler(metaclass=ABCMeta):
             logger.error(msg)
             raise ActionNotSupportedError(msg)
         return self.actions[generic_action]
-
-
-class CallableActionHandler(ActionHandler):
-    """ActionHandler that maps generic actions to explicit Callables.
-
-    For the config file, we assume a TOML file containing key:val pairs with
-    the key corresponding to a generic MicroscopeAction string, and the val
-    a string that will be converted to a callable (to be called by
-    request_action).
-
-    For example, for a GXSM Controller, where the MicroscopeAction START_SCAN
-    is gxsm.start_scan(), the config file would be:
-        'start-scan': 'gxsm.start_scan'
-    We will import this string to convert it to a Callable and add it to
-    self.actions, to be able to be called later.
-
-    The expected Callable format is:
-        # In: Nothing
-        # Out: Nothing
-        Callable[[]]
-
-    Attributes:
-        actions: dict of key:val pairs containing generic_param:Callable.
-    """
-
-    def _build_actions(self, actions_config: dict):
-        for key, val in actions_config.items():
-            if isinstance(val, str):
-                self.actions[key] = import_from_string(val)
-
-    def request_action(self, generic_action: MicroscopeAction):
-        """Request action from SPM given generic action.
-
-        Tries to obtain the SPM-specific callable for this action and then
-        runs it.
-
-        Args:
-            generic_action: Microscope Action wanting to be performed.
-
-        Raises:
-            - ActionNotSupportedError if the action was not found in
-                the actions_config.
-            - ActionError if some other error occurred while asking the
-                SPM to perform this action.
-        """
-        spm_callable = self._get_action(generic_action)
-        spm_callable()
-
-
-class CallableWithSelfActionHandler(CallableActionHandler):
-    """Differs from CallableActionHandler as self is an arg to callable.
-
-    This allows the user to hold state inside self (CallableActionHandler)
-    when writing their Callables.
-
-    The expected Callable format is:
-        # In: ActionHandler
-        # Out: Nothing
-        Callable[[ActionHandler]]
-    """
-
-    def request_action(self, generic_action: MicroscopeAction):
-        """Request action from SPM given generic action.
-
-        Tries to obtain the SPM-specific callable for this action and then
-        runs it.
-
-        Args:
-            generic_action: Microscope Action wanting to be performed.
-
-        Raises:
-            - ActionNotSupportedError if the action was not found in
-                the actions_config.
-            - ActionError if some other error occurred while asking the
-                SPM to perform this action.
-        """
-        spm_callable = self._get_action(generic_action)
-        spm_callable(self)
-
-
-class StringActionHandler(ActionHandler, metaclass=ABCMeta):
-    """ActionHandler that maps generic actions to microscope-specific strs.
-
-    With this ActionHandler, we assume there is a common method
-    request_action_spm() which we can call, where the only thing that varies
-    between actions is a unique string.
-
-    Attributes:
-        actions: dict of key:val pairs containing generic_param:str,
-            where str is an action-specific uuid str.
-    """
-
-    @abstractmethod
-    def request_action_spm(self, spm_uuid: str):
-        """Request provided action of SPM.
-
-        This method should only concern itself with sending the specified
-        request to the SPM and handling any exceptions with it.
-
-        Raises:
-            - ActionError if some other error occurred while asking the
-                SPM to perform this action.
-        """
-
-    def _build_actions(self, actions_config: dict):
-        for key, val in actions_config.items():
-            if isinstance(val, str):
-                self.actions[key] = val
-
-    def request_action(self, generic_action: MicroscopeAction):
-        """Request action from SPM given generic action.
-
-        Tries to obtain the SPM-specific callable for this action and then
-        runs it.
-
-        Args:
-            generic_action: Microscope Action wanting to be performed.
-
-        Raises:
-            - ActionNotSupportedError if the action was not found in
-                the actions_config.
-            - ActionError if some other error occurred while asking the
-                SPM to perform this action.
-        """
-        spm_uuid = self._get_action(generic_action)
-        self.request_action_spm(spm_uuid)
