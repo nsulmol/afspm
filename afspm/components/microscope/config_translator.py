@@ -294,8 +294,8 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
 
         zctrl_params = feedback_pb2.ZCtrlParameters()
         zctrl_params.setPoint = vals[0]
-        zctrl_params.proportionalGain = vals[1]
-        zctrl_params.integralGain = vals[2]
+        zctrl_params.integralGain = vals[1]
+        zctrl_params.proportionalGain = vals[2]
         zctrl_params.errorGain = vals[3]
 
         return zctrl_params

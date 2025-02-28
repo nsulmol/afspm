@@ -134,11 +134,11 @@ SCAN_PARAMS = [MicroscopeParameter.SCAN_TOP_LEFT_X,
                MicroscopeParameter.SCAN_ANGLE]
 
 ZCTRL_PARAMS = [MicroscopeParameter.ZCTRL_SETPOINT,
-                MicroscopeParameter.ZCTRL_PGAIN,
                 MicroscopeParameter.ZCTRL_IGAIN,
+                MicroscopeParameter.ZCTRL_PGAIN,
                 MicroscopeParameter.ZCTRL_EGAIN]
 # Attrib names from feedback.proto
-ZCTRL_ATTRIB_STRS = ['setPoint', 'proportionalGain', 'integralGain',
+ZCTRL_ATTRIB_STRS = ['setPoint', 'integralGain', 'proportionalGain',
                      'errorGain']
 
 PROBE_POS_PARAMS = [MicroscopeParameter.PROBE_POS_X,
@@ -419,10 +419,14 @@ class ParameterHandler(metaclass=ABCMeta):
         """
         methods = self._get_param_methods(generic_param)
         if methods and methods.getter:
-            return methods.getter(self)
+            val = methods.getter(self)
+            logger.trace(f'Got {val} for {generic_param}.')
+            return val
 
         uuid = self._get_param_info(generic_param).uuid
-        return self.get_param_spm(uuid)
+        val = self.get_param_spm(uuid)
+        logger.trace(f'Got {val} for {generic_param}.')
+        return val
 
     def set_param(self, generic_param: MicroscopeParameter, val: str,
                   curr_unit: str = None):
@@ -443,12 +447,15 @@ class ParameterHandler(metaclass=ABCMeta):
         """
         methods = self._get_param_methods(generic_param)
         if methods and methods.setter:
+            logger.trace(f'Setting {generic_param} to {val} {curr_unit}.')
             methods.setter(self, val, curr_unit)
             return
 
         param_info = self._get_param_info(generic_param)
         val = _correct_val_for_sending(val, param_info, generic_param,
                                        curr_unit)
+
+        logger.trace(f'Setting {val} to {curr_unit}.')
         self.set_param_spm(param_info.uuid, val)
 
     def get_param_list(self, generic_params: list[MicroscopeParameter]
