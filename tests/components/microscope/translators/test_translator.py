@@ -84,6 +84,10 @@ def timeout_ms(config_dict):
 
 
 @pytest.fixture(scope="module")
+def move_wait_ms(config_dict):
+    return config_dict['move_wait_ms']
+
+@pytest.fixture(scope="module")
 def scan_wait_ms(config_dict):
     return config_dict['scan_wait_ms']
 
@@ -170,10 +174,10 @@ def sub_scan(ctx, topics_scan, scan_wait_ms, psc_url):
 
 
 @pytest.fixture
-def sub_scope_state(ctx, topics_scope_state, timeout_ms, psc_url):
+def sub_scope_state(ctx, topics_scope_state, move_wait_ms, psc_url):
     return Subscriber(psc_url,
                       topics_to_sub=topics_scope_state,
-                      poll_timeout_ms=timeout_ms)
+                      poll_timeout_ms=move_wait_ms)
 
 
 @pytest.fixture
@@ -191,10 +195,10 @@ def sub_zctrl(ctx, topics_zctrl, timeout_ms, psc_url):
 
 
 @pytest.fixture
-def sub_probe_pos(ctx, topics_probe_pos, timeout_ms, psc_url):
+def sub_probe_pos(ctx, topics_probe_pos, move_wait_ms, psc_url):
     return Subscriber(psc_url,
                       topics_to_sub=topics_probe_pos,
-                      poll_timeout_ms=timeout_ms)
+                      poll_timeout_ms=move_wait_ms)
 
 
 @pytest.fixture
@@ -392,14 +396,21 @@ def test_cancel_scan(client, default_control_state,
 
 
 def test_scan_params(client, default_control_state,
-                     sub_scan_params, exp_problem,
+                     sub_scan_params, sub_scope_state, exp_problem,
                      float_tolerance):
     logger.info("Validate we can set scan parameters.")
     startup_grab_control(client, exp_problem)
 
     logger.info("First, validate we have initial scan params (from the "
-                "cache).")
+                "cache), and scope state is free.")
     initial_params = assert_and_return_message(sub_scan_params)
+
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_FREE)
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
+
+    # Modify scan params.
     modified_params = copy.deepcopy(initial_params)
     modified_params.spatial.roi.top_left.x *= 1.1
     modified_params.spatial.roi.top_left.y *= 1.1
@@ -416,6 +427,23 @@ def test_scan_params(client, default_control_state,
     logger.info("Next, validate that our subscriber receives these new "
                 "params.")
     last_params = assert_and_return_message(sub_scan_params)
+
+    if (initial_params.spatial.roi.top_left.x != 0 or
+        initial_params.spatial.roi.top_left.y != 0):
+        logger.info('Requested new position of top left point. Expect '
+                    'scope state change too, because we are moving to it.')
+        scope_state_msg = scan_pb2.ScopeStateMsg(
+            scope_state=scan_pb2.ScopeState.SS_MOVING)
+        assert rep == control_pb2.ControlResponse.REP_SUCCESS
+        assert_sub_received_proto(sub_scope_state,
+                                  scope_state_msg)
+
+        logger.info('Next, we should become free (stopped moving).')
+        scope_state_msg = scan_pb2.ScopeStateMsg(
+            scope_state=scan_pb2.ScopeState.SS_FREE)
+        assert rep == control_pb2.ControlResponse.REP_SUCCESS
+        assert_sub_received_proto(sub_scope_state,
+                                  scope_state_msg)
 
     assert check_equal(last_params, modified_params, float_tolerance)
 
@@ -490,7 +518,7 @@ def test_run_scan(client, default_control_state,
     stop_client(client)
 
 
-def test_handle_zctrl(client, default_control_state,
+def test_zctrl(client, default_control_state,
                       sub_zctrl, timeout_ms,
                       exp_problem, float_tolerance):
     logger.info("Validate we recieve and can set ZCtrlParams.")
@@ -522,14 +550,19 @@ def test_handle_zctrl(client, default_control_state,
     stop_client(client)
 
 
-def test_handle_probe_pos(client, default_control_state,
-                          sub_probe_pos, timeout_ms,
+def test_probe_pos(client, default_control_state,
+                          sub_probe_pos, sub_scope_state,
                           exp_problem, float_tolerance):
     logger.info("Validate we recieve and can set ProbePosition.")
     startup_grab_control(client, exp_problem)
 
-    logger.info("First, ensure we receive initial ProbePosition.")
+    logger.info("First, ensure we receive initial ProbePosition "
+                "and scope state is free.")
     initial_probe_pos = assert_and_return_message(sub_probe_pos)
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_FREE)
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
 
     modified_probe_pos = copy.deepcopy(initial_probe_pos)
     modified_probe_pos.point.x *= 0.9
@@ -544,10 +577,28 @@ def test_handle_probe_pos(client, default_control_state,
     last_probe_pos = assert_and_return_message(sub_probe_pos)
     assert check_equal(last_probe_pos, modified_probe_pos, float_tolerance)
 
+
+    if (initial_probe_pos.point.x != 0 or
+        initial_probe_pos.point.y != 0):
+        logger.info('Requested new position of probe. Expect '
+                    'scope state change too, because we are moving to it.')
+        scope_state_msg = scan_pb2.ScopeStateMsg(
+            scope_state=scan_pb2.ScopeState.SS_MOVING)
+        assert rep == control_pb2.ControlResponse.REP_SUCCESS
+        assert_sub_received_proto(sub_scope_state,
+                                  scope_state_msg)
+
+        logger.info('Next, we should become free (stopped moving).')
+        scope_state_msg = scan_pb2.ScopeStateMsg(
+            scope_state=scan_pb2.ScopeState.SS_FREE)
+        assert rep == control_pb2.ControlResponse.REP_SUCCESS
+        assert_sub_received_proto(sub_scope_state,
+                                  scope_state_msg)
+
     logger.info("Now, return to our initial parameters.")
     rep = client.set_probe_pos(initial_probe_pos)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
-    last_params = assert_and_return_message(sub_probe_pos)
+    last_probe_pos = assert_and_return_message(sub_probe_pos)
     assert check_equal(last_probe_pos, initial_probe_pos, float_tolerance)
 
     end_test(client)
@@ -658,10 +709,10 @@ def test_parameters(client, exp_problem):
 
     logger.info("First, does the translator even support REQ_PARAM?")
     param = control_pb2.ParameterMsg(
-        params.MicroscopeParameter.SCAN_TOP_LEFT_X)
+        parameter=params.MicroscopeParameter.SCAN_TOP_LEFT_X)
     rep, rcvd_param = client.request_parameter(param)
 
-    if rep == control_pb2.ControlResponse.CMD_NOT_SUPPORTED:
+    if rep == control_pb2.ControlResponse.REP_CMD_NOT_SUPPORTED:
         logger.warning("REQ_PARAM is not supported, exiting.")
         return
 
