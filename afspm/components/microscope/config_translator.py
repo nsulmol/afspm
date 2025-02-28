@@ -99,7 +99,13 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
                       scan_params.data.units,
                       scan_params.spatial.angular_units]
 
-        self.param_handler.set_param_list(params.SCAN_PARAMS, vals, attr_units)
+        try:
+            self.param_handler.set_param_list(params.SCAN_PARAMS, vals, attr_units)
+        except params.ParameterNotSupportedError:
+            return control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED
+        except params.ParameterError:
+            return control_pb2.ControlResponse.REP_PARAM_ERROR
+        return control_pb2.ControlResponse.REP_SUCCESS
 
     def on_set_zctrl_params(self, zctrl_params: feedback_pb2.ZCtrlParameters
                             ) -> control_pb2.ControlResponse:
@@ -117,7 +123,13 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
                 vals.append(getattr(zctrl_params, attrib_str))
                 attr_units.append(None)
 
-        self.param_handler.set_param_list(attribs, vals, attr_units)
+        try:
+            self.param_handler.set_param_list(attribs, vals, attr_units)
+        except params.ParameterNotSupportedError:
+            return control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED
+        except params.ParameterError:
+            return control_pb2.ControlResponse.REP_PARAM_ERROR
+        return control_pb2.ControlResponse.REP_SUCCESS
 
     def on_set_probe_pos(self, probe_position: signal_pb2.ProbePosition
                          ) -> control_pb2.ControlResponse:
@@ -126,8 +138,14 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
                 probe_position.point.y]
         attr_units = [probe_position.units, probe_position.units]
 
-        self.param_handler.set_param_list(params.PROBE_POS_PARAMS,
-                                          vals, attr_units)
+        try:
+            self.param_handler.set_param_list(params.PROBE_POS_PARAMS,
+                                            vals, attr_units)
+        except params.ParameterNotSupportedError:
+            return control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED
+        except params.ParameterError:
+            return control_pb2.ControlResponse.REP_PARAM_ERROR
+        return control_pb2.ControlResponse.REP_SUCCESS
 
     def on_param_request(self, param: control_pb2.ParameterMsg
                          ) -> (control_pb2.ControlResponse,
