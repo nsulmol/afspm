@@ -6,78 +6,102 @@
 uuid = 'OffsetX'
 unit = 'angstrom'
 type = 1.0
-range = [0.0, 2.0]
+range = [-11000.0, 11000.0]
 
 [scan-top-left-y]
 uuid = 'OffsetY'
 unit = 'angstrom'
 type = 1.0
-range = [0.0, 2.0]
+range = [-11000.0, 11000.0]
 
 [scan-size-x]
 uuid = 'RangeX'
 unit = 'angstrom'
 type = 1.0
-range = [0.0, 2.0]
+range = [0.0, 22131.0]
 
 [scan-size-y]
 uuid = 'RangeY'
 unit = 'angstrom'
 type = 1.0
-range = [0.0, 2.0]
+range = [0.0, 22131.0]
 
 [scan-angle]
 uuid = 'Rotation'
 unit = 'degrees'
 type = 1.0
-range = [-360, 360]
+range = [-360.0, 360.0]
 
 # ----- Digital Scan Parameters ----- #
 [scan-resolution-x]  # Unitless, no range enforced.
 uuid = 'PointsX'
 type = 1
+range = [0, 32000]
 
 [scan-resolution-y]  # Unitless, no range enforced.
 uuid = 'PointsY'
 type = 1
+range = [0, 32000]
 
 # ----- Feedback Parameters ----- #
 # NOTE: Update zctrl channel in GxsmTranslator constructor.
 [zctrl-setpoint]
 uuid = 'dsp-fbs-mx0-current-set'
 type = 1.0
+range = [-100, 100]
 
 [zctrl-egain]
 uuid = 'dsp-fbs-mx0-current-gain'
 type = 1.0
+range = [-0.5, 0.5]
 
 [zctrl-pgain]  # Unitless, no range enforced.
 uuid = 'dsp-fbs-cp'
 type = 1.0
+range = [0, 200]
 
 [zctrl-igain]  # Unitless, no range enforced.
 uuid = 'dsp-fbs-ci'
 type = 1.0
+range = [0, 200]
 
 # ----- Sample Slope Correction ----- #
 [sample-slope-x]
 uuid = 'dsp-adv-scan-slope-x'  # TODO: test 'dsp-mk2-hwi-slope-x'
 type = 1.0
+range = [-0.2, 0.2]
 
 [sample-slope-y]
 uuid = 'dsp-adv-scan-slope-y'  # TODO: test 'dsp-mk2-hwi-slope-y'
 type = 1.0
+range = [-0.2, 0.2]
 
 # ----- Probe / Scan Parameters ----- #
 [scan-speed]
 uuid = 'dsp-fbs-scan-speed-scan'
 unit = 'angstrom/s'
 type = 1.0
+range = [0.1, 10000]
 
 [move-speed]
 uuid = 'dsp-fbs-scan-speed-move'
 unit = 'angstrom/s'
 type = 1.0
+range = [0.1, 10000]
+
+# ----- Probe Parameters ----- #
+[probe-pos-x]
+uuid = 'OffsetX'
+unit = 'angstrom'
+type = 1.0
+range = [-11000.0, 11000.0]
+
+[probe-pos-y]
+uuid = 'OffsetY'
+unit = 'angstrom'
+type = 1.0
+range = [-11000.0, 11000.0]
+
 
 
 # ----- Other ----- #
