@@ -68,13 +68,14 @@ class ActionError(Exception):
 # Keys used to populate callables
 METHOD_KEY = 'method'
 TYPE_KEY = 'type'
+PASS_SELF_KEY = 'pass_self'
 
 
 class CallableType(enum.Enum):
     """Differentiate between callable types, for logic handling below."""
 
-    NORMAL = enum.auto()
-    PASS_SELF = enum.auto()
+    PASS_KWARGS = enum.auto()  # Dict unpacks when feeding args to method
+    PASS_ARGS = enum.auto()  # List unpacks when feeding args to method
 
 
 @dataclass
@@ -83,7 +84,8 @@ class ActionCallable:
 
     method: Callable  # Extracted Callable (method).
     kwargs: dict  # Dictionary of kwargs we pass to Callable when calling.
-    type: CallableType = CallableType.NORMAL  # Determines calling logic.
+    type: CallableType = CallableType.PASS_ARGS  # Calling logic.
+    pass_self: bool = True  # Whether or not to pass ActionHandler in.
 
 
 def set_up_callable(params_dict: dict) -> ActionCallable:
@@ -92,11 +94,11 @@ def set_up_callable(params_dict: dict) -> ActionCallable:
     The dict is expected to have the following keys:
     - METHOD_KEY: str of the Callable, including modules path (see
     parser._evaluate_values_recursively for more info).
-    - TYPE_KEY: (optional) indicates the 'type' of our Callable. For now, if it
-     is PASS_SELF, we feed whatever our 'self' is. If not provided, we default
-    to NORMAL.
-
-    Any other key:val pairs are fed when the Callable is called.
+    - PASS_SELF_KEY: (optional) bool indicating whether or ont we pass
+    ActionHandler as the first argument to the method.
+    - TYPE_KEY: (optional) if PASS_KWARGS, we pass the additional key:vals
+    as an unpacked dict. If PASS_ARGS, we pass them as an unpacked list.
+    Defaults to PASS_ARGS.
 
     Args:
         params_dict: dict containing what we need to populate our Callable.
@@ -120,7 +122,12 @@ def set_up_callable(params_dict: dict) -> ActionCallable:
     method = evaluated_dict[METHOD_KEY]
     del kwargs[METHOD_KEY]
 
-    type = CallableType.NORMAL
+    pass_self = False
+    if PASS_SELF_KEY in evaluated_dict:
+        pass_self = evaluated_dict[PASS_SELF_KEY]
+        del kwargs[PASS_SELF_KEY]
+
+    type = CallableType.PASS_ARGS
     if TYPE_KEY in evaluated_dict:
         # Allow CallableType.NORMAL or 'NORMAL' to be provided.
         type = (CallableType[evaluated_dict[TYPE_KEY].upper()] if
@@ -129,6 +136,7 @@ def set_up_callable(params_dict: dict) -> ActionCallable:
         del kwargs[TYPE_KEY]
 
     action = ActionCallable(method=method,
+                            pass_self=pass_self,
                             type=type,
                             kwargs=kwargs)
     return action
@@ -143,20 +151,34 @@ class ActionHandler(metaclass=ABCMeta):
     SPM-specific methods. For each supported action, one indicates the
     following in the config file:
     - method: a str of the method to call;
-    - type (optional): if the method expects the ActionHandler as input,
-    set to 'PASS_SELF'. If this is not expected, you can either set it to
-    'NORMAL', or simply not add this attribute.
+    - pass_self (optional): whether or not the ActionHandler should be passed
+        as input. Default to False.
+    - type (optional): whether any additional arguments should be fed as
+        a list or a dict. If dict, the key:val pairs are fed. If a list,
+        only the vals are fed. Linked to CallableType. Defaults to
+        PASS_ARGS.
     - additional args (optional): any additional arguments you would feed
     to this method can be passed.
     For example:
 
         [start-scan]
         method = 'a.b.startscan'
-        type = 'PASS_SELF
+        type = 'PASS_KWARGS'
+        pass_self = true
+        uuid = 'HELLO'
+
+    NOTE: in TOML, it's true/false, not True/False. Confusing.
+
+    In this case, we will call the method as:
+        a.b.startscan(action_handler, uuid='HELLO')
+
+        [start-scan]
+        method = 'a.b.startscan'
+        type = 'PASS_ARGS'
         uuid = 'HELLO'
 
     In this case, we will call the method as:
-        a.b.startscan(handler: action_handler, uuid: str = 'HELLO')
+        a.b.startscan('HELLO')
 
     Attributes:
         actions: dict of key:val pairs containing our method configurations,
@@ -203,14 +225,22 @@ class ActionHandler(metaclass=ABCMeta):
         """
         action_callable = self._get_action(generic_action)
 
-        if action_callable.type == CallableType.PASS_SELF:
+        # This is so ugly -- I'm sorry.
+        if action_callable.pass_self:
             if action_callable.kwargs:
-                action_callable.method(self, **action_callable.kwargs)
+                if action_callable.type == CallableType.PASS_ARGS:
+                    action_callable.method(self,
+                                           *action_callable.kwargs.values())
+                else:
+                    action_callable.method(self, **action_callable.kwargs)
             else:
                 action_callable.method(self)
-        elif action_callable.type == CallableType.NORMAL:
+        else:
             if action_callable.kwargs:
-                action_callable.method(**action_callable.kwargs)
+                if action_callable.type == CallableType.PASS_ARGS:
+                    action_callable.method(*action_callable.kwargs.values())
+                else:
+                    action_callable.method(**action_callable.kwargs)
             else:
                 action_callable.method()
 

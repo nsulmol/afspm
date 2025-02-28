@@ -66,7 +66,7 @@ def callable_with_self_config():
     return """
     [start-scan]
     method = 'test_actions.on_start_scan_with_self'
-    type = 'PASS_SELF'
+    pass_self = true
     """
 
 
@@ -84,7 +84,7 @@ def callable_str_with_self_config():
     return """
     [start-scan]
     method = 'test_actions.on_start_scan_str_with_self'
-    type = 'PASS_SELF'
+    pass_self = true
     uuid = 'HELLO'
     """
 
@@ -140,8 +140,23 @@ def test_callable_str_handler(callable_str_config):
 
     generic_action = actions.MicroscopeAction.START_SCAN
     assert LAST_CALL_UUID is None
+
+    logger.info('First, test PASS_ARGS (default).')
     callback_handler.request_action(generic_action)
     assert LAST_CALL_UUID == 'HELLO'
+
+    logger.info('Then, test PASS_KWARGS.')
+    callback_handler.actions[generic_action].type = (
+        actions.CallableType.PASS_KWARGS)
+    callback_handler.request_action(generic_action)
+    assert LAST_CALL_UUID == 'HELLO'
+
+    logger.info('Now, confirm it fails if we pass the wrong key.')
+    callback_handler.actions[generic_action].kwargs['poof'] = (
+        callback_handler.actions[generic_action].kwargs['uuid'])
+    del callback_handler.actions[generic_action].kwargs['uuid']
+    with pytest.raises(TypeError):
+        callback_handler.request_action(generic_action)
 
     logger.info('If an unsupported action is fed, throws an error.')
     generic_action = actions.MicroscopeAction.STOP_SCAN
@@ -161,8 +176,23 @@ def test_callable_str_with_self_handler(callable_str_with_self_config):
 
     generic_action = actions.MicroscopeAction.START_SCAN
     assert callback_handler.last_call_uuid is None
+
+    logger.info('First, test PASS_ARGS (default).')
     callback_handler.request_action(generic_action)
     assert callback_handler.last_call_uuid == 'HELLO'
+
+    logger.info('Then, test PASS_KWARGS.')
+    callback_handler.actions[generic_action].type = (
+        actions.CallableType.PASS_KWARGS)
+    callback_handler.request_action(generic_action)
+    assert callback_handler.last_call_uuid == 'HELLO'
+
+    logger.info('Now, confirm it fails if we pass the wrong key.')
+    callback_handler.actions[generic_action].kwargs['poof'] = (
+        callback_handler.actions[generic_action].kwargs['uuid'])
+    del callback_handler.actions[generic_action].kwargs['uuid']
+    with pytest.raises(TypeError):
+        callback_handler.request_action(generic_action)
 
     logger.info('If an unsupported action is fed, throws an error.')
     generic_action = actions.MicroscopeAction.STOP_SCAN
