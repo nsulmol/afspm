@@ -174,12 +174,13 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                                              Callable]:
         """Create our req_handler_map, for mapping REQ to methods."""
         return MappingProxyType({
+            control_pb2.ControlRequest.REQ_ACTION: self.on_action_request,
+            control_pb2.ControlRequest.REQ_PARAM: self.on_param_request,
             control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS:
                 self.on_set_scan_params,
             control_pb2.ControlRequest.REQ_SET_ZCTRL_PARAMS:
                 self.on_set_zctrl_params,
-            control_pb2.ControlRequest.REQ_PARAM: self.on_param_request,
-            control_pb2.ControlRequest.REQ_ACTION: self.on_action_request,
+            control_pb2.ControlRequest.REQ_SET_PROBE_POS: self.on_set_probe_pos,
         })
 
     # ----- 'Action' Handlers ----- #
