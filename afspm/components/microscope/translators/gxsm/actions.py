@@ -44,7 +44,7 @@ def update_signal_mode(action_handler: actions.ActionHandler,
         return
 
     # Update the action!
-    callable_dict =P{}
+    callable_dict = {}
     callable_dict[actions.METHOD_KEY] = (GXSM_ACTION_CALL + '(' +
                                          signal_mode_action + ')')
     callable_dict[actions.TYPE_KEY] = actions.CallableType.PASS_ARGS
