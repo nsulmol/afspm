@@ -56,6 +56,11 @@ def topics_scan2d():
 
 
 @pytest.fixture(scope="module")
+def topics_sca():
+    return ['Sca']  # Subset of 'Scan2d'
+
+
+@pytest.fixture(scope="module")
 def topics_control_state():
     return [cl.CacheLogic.get_envelope_for_proto(control_pb2.ControlState())]
 
@@ -107,6 +112,17 @@ def sub_scan_psc(ctx, psc_url, topics_scan2d, cache_kwargs, wait_ms):
         update_cache_kwargs=cache_kwargs,
         poll_timeout_ms=wait_ms)
 
+
+@pytest.fixture
+def sub_sca_psc(ctx, psc_url, topics_sca, cache_kwargs, wait_ms):
+    # Note: we use wait_ms because  we are explicitly checking per-call,
+    # rather than looping.
+    return subscriber.Subscriber(
+        psc_url, cl.extract_proto, topics_sca,
+        cl.update_cache, ctx,
+        extract_proto_kwargs=cache_kwargs,
+        update_cache_kwargs=cache_kwargs,
+        poll_timeout_ms=wait_ms)
 
 @pytest.fixture
 def sub_control_state_psc(ctx, psc_url, topics_control_state, cache_kwargs,
@@ -314,7 +330,7 @@ def test_pubsubcache_kill_signal(sub_all_topics_psc, wait_ms, wait_count,
 
 
 def test_pubsubcache_interaction(psc_url, cache_kwargs, ctx, pub, topics_both,
-                                 sub_scan_psc, sub_control_state_psc,
+                                 sub_scan_psc, sub_control_state_psc, sub_sca_psc,
                                  sample_scan, control_state, wait_ms, wait_count,
                                  thread_psc, comm_pub):
     """ Test a pub-sub network *with* our pubsubcache.
@@ -359,6 +375,11 @@ def test_pubsubcache_interaction(psc_url, cache_kwargs, ctx, pub, topics_both,
     assert not sub_control_state.poll_and_store()
     assert_sub_received_proto(sub_both, sample_scan)
     assert_sub_received_proto(sub_scan, sample_scan)
+
+    # Lastly, confirm that we can receive cached from 'Scan2d' by feeding
+    # a sub-string ('Sca'). This allows us to subscribe to higher-level
+    # topics.
+    assert sub_sca_psc.poll_and_store()
 
     kill_and_wait(comm_pub, wait_ms, wait_count, thread_psc)
 

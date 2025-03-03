@@ -209,16 +209,20 @@ class PubSubCache:
                         if envelope == common.ALL_ENVELOPE else envelope)
         logger.info(f"New subscription to {envelope_log}")
 
-        # If "ALL" subscribed, send all envelopes in our cache
+        # If "ALL" subscribed, send all envelopes in our cache.
+        # Otherwise, match cache keys to envelope (envelope can be a
+        # subset of a key, e.g. 'Scan2d' for 'Scan2d_Topo-Xp_50.0').
         envelopes_to_send = (list(self.cache.keys())
                              if envelope == common.ALL_ENVELOPE
-                             else [envelope])
+                             else [key for key in list(self.cache.keys())
+                                   if len(key) >= len(envelope) and
+                                   envelope == key[0:len(envelope)]])
+
         for env in envelopes_to_send:
-            if env in self.cache:
-                logger.info(f"Subscription: cache for {env} being sent out.")
-                for proto in self.cache[env]:
-                    self._backend.send_multipart([env.encode(),
-                                                  proto.SerializeToString()])
+            logger.info(f"Subscription: cache for {env} being sent out.")
+            for proto in self.cache[env]:
+                self._backend.send_multipart([env.encode(),
+                                                proto.SerializeToString()])
 
     def send_message(self, proto: Message):
         """Cache message and pass on to subscribers.
