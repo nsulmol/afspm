@@ -284,7 +284,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         if action.action == actions.MicroscopeAction.START_SCAN:
             return self.on_start_scan()
         elif action.action == actions.MicroscopeAction.STOP_SCAN:
-            return self.on_start_scan()
+            return self.on_stop_scan()
         elif action.action == actions.MicroscopeAction.START_SIGNAL:
             return self.on_start_signal()
         elif action.action == actions.MicroscopeAction.STOP_SIGNAL:
