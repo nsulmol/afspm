@@ -189,7 +189,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         # Now we should get latest
         try:
             val = self.param_handler.get_param(param.parameter)
-            units = self.param_handler.get_units(param.parameter)
+            units = self.param_handler.get_unit(param.parameter)
         except params.ParameterNotSupportedError:
             return (control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED,
                     None)
@@ -200,7 +200,8 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         # Package and return
         rep = control_pb2.ControlResponse.REP_SUCCESS
         param.value = str(val)  # Must convert to str for sending
-        param.units = units
+        if units:  # Set units if this param has any defined.
+            param.units = units
         return (rep, param)
 
     def on_action_request(self, action: control_pb2.ActionMsg
@@ -260,9 +261,9 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
 
         Throw MicroscopeError on failure.
         """
-        length_units = self.param_handler.get_units(
+        length_units = self.param_handler.get_unit(
             params.MicroscopeParameter.SCAN_SIZE_X)
-        angular_units = self.param_handler.get_units(
+        angular_units = self.param_handler.get_unit(
             params.MicroscopeParameter.SCAN_ANGLE)
 
         vals = self.param_handler.get_param_list(params.SCAN_PARAMS)
@@ -305,7 +306,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
 
         If not supported, return None. Throw MicroscopeError on failure.
         """
-        units = self.param_handler.get_units(
+        units = self.param_handler.get_unit(
             params.MicroscopeParameter.PROBE_POS_X)
         vals = self.param_handler.get_param_list(params.PROBE_POS_PARAMS)
         probe_pos_params = signal_pb2.ProbePosition()

@@ -169,7 +169,7 @@ class ParameterInfo:
     """Holds microscope-specific info from a parameters config file."""
 
     uuid: str  # Microscope-specific param UUID
-    unit: str  # Microscope units for this param
+    unit: str | None  # Microscope units for this param
     range: tuple[Any]  # Acceptable range for this param.
     type: Any  # A sample value of the type of this param, for type handling
 
@@ -388,14 +388,14 @@ class ParameterHandler(metaclass=ABCMeta):
             return None
         return self.param_methods[generic_param]
 
-    def get_units(self, generic_param: MicroscopeParameter) -> str:
-        """Get the scope-specific units for the provided parameter.
+    def get_unit(self, generic_param: MicroscopeParameter) -> str | None:
+        """Get the scope-specific unit for the provided parameter.
 
         Args:
             generic_param: MicroscopeParameter we want to get.
 
         Returns:
-            Units as str.
+            Units as str, None if no unit is defined.
 
         Raises:
             ParameterNotSupportedError if the parameter was not found
