@@ -31,7 +31,8 @@ REQ_TO_OBJ_MAP = MappingProxyType({
     control_pb2.ControlRequest.REQ_SET_CONTROL_MODE:
         control_pb2.ControlMode.CM_UNDEFINED,
     control_pb2.ControlRequest.REQ_PARAM: control_pb2.ParameterMsg(),
-    control_pb2.ControlRequest.REQ_ACTION: control_pb2.ActionMsg()
+    control_pb2.ControlRequest.REQ_ACTION: control_pb2.ActionMsg(),
+    control_pb2.ControlRequest.REQ_ACTION_SUPPORT: control_pb2.ActionMsg(),
 })
 
 # Mapping from request to proto/enum *returned* from it (if applicable).

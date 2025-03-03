@@ -9,6 +9,7 @@ edition = "2023";
 enum ControlRequest {
     REQ_UNDEFINED = 0;
     REQ_ACTION = 1;
+    REQ_ACTION_SUPPORT = 12;  // Query if an action is supported
     REQ_PARAM = 2;
     REQ_SET_SCAN_PARAMS = 3;
     REQ_SET_ZCTRL_PARAMS = 4;

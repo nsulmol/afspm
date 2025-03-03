@@ -175,6 +175,8 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         """Create our req_handler_map, for mapping REQ to methods."""
         return MappingProxyType({
             control_pb2.ControlRequest.REQ_ACTION: self.on_action_request,
+            control_pb2.ControlRequest.REQ_ACTION_SUPPORT:
+                self.on_check_action_support,
             control_pb2.ControlRequest.REQ_PARAM: self.on_param_request,
             control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS:
                 self.on_set_scan_params,
@@ -289,8 +291,8 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             return self.on_stop_signal()
         return control_pb2.ControlResponse.REP_ACTION_NOT_SUPPORTED
 
-    def check_action_support(self, action: control_pb2.ActionMsg
-                             ) -> control_pb2.ControlResponse:
+    def on_check_action_support(self, action: control_pb2.ActionMsg
+                                ) -> control_pb2.ControlResponse:
         """Inform whether this translator supports this action.
 
         Note: it does not *run* the action. Rather, it simply states whether

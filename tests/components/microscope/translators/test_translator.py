@@ -744,7 +744,7 @@ def test_actions(client, exp_problem):
     logger.info("Testing individual actions.")
     for action_name in actions.MicroscopeAction:
         action = control_pb2.ActionMsg(action=action_name)
-        rep = client.request_action(action)
+        rep = client.check_action_support(action)
 
         if rep == control_pb2.ControlResponse.REP_SUCCESS:
             logger.info(f"Action {action_name} is supported.")

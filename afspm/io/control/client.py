@@ -196,6 +196,21 @@ class ControlClient:
                                     action)
         return self._try_send_req(msg)
 
+    def check_action_support(self, action: control_pb2.ActionMsg
+                             ) -> control_pb2.ControlResponse:
+        """Check if an action is supported by the microscope.
+
+        Args:
+            action: an ActionMsg containing the action to check.
+
+        Returns:
+            The received ControlResponse.
+        """
+        logger.debug(f"Checking if {action.action} is supported.")
+        msg = cmd.serialize_request(control_pb2.ControlRequest.REQ_ACTION_SUPPORT,
+                                    action)
+        return self._try_send_req(msg)
+
     def request_parameter(self, param: control_pb2.ParameterMsg
                           ) -> (control_pb2.ControlResponse,
                                 control_pb2.ParameterMsg):
