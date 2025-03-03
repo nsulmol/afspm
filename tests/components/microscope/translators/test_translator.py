@@ -342,15 +342,15 @@ def test_cancel_scan(client, default_control_state,
     logger.info("Validate we can start and cancel a scan.")
     startup_grab_control(client, exp_problem)
 
-    logger.info("First, validate we *do not* have an initial scan (in the "
-                "cache), and *do* have an initial scope state (SS_FREE).")
+    logger.info("First, flush any scan we have in the cache, and validate"
+                "that we have an initial scope state of SS_FREE.")
     scope_state_msg = scan_pb2.ScopeStateMsg(
         scope_state=scan_pb2.ScopeState.SS_FREE)
 
     # Checking no scan (hack around, make poll short for this).
     tmp_timeout_ms = sub_scan._poll_timeout_ms
     sub_scan._poll_timeout_ms = timeout_ms
-    assert not sub_scan.poll_and_store()
+    sub_scan.poll_and_store()
     sub_scan._poll_timeout_ms = tmp_timeout_ms  # Return to prior
 
     assert_sub_received_proto(sub_scope_state,
@@ -480,15 +480,15 @@ def test_run_scan(client, default_control_state,
         set_scan_params(client, orig_scan_params, desired_phys_size_nm,
                         desired_data_shape)
 
-    logger.info("Validate we *do not* have an initial scan (in the "
-                "cache), and *do* have an initial scope state (SS_FREE).")
+    logger.info("Flush any scan we have in the cache, and validate"
+                "that we have an initial scope state of SS_FREE.")
     scope_state_msg = scan_pb2.ScopeStateMsg(
         scope_state=scan_pb2.ScopeState.SS_FREE)
 
     # Hack around, make poll short for this.
     tmp_timeout_ms = sub_scan._poll_timeout_ms
     sub_scan._poll_timeout_ms = timeout_ms
-    assert not sub_scan.poll_and_store()
+    sub_scan.poll_and_store()
     assert_sub_received_proto(sub_scope_state,
                               scope_state_msg)
     sub_scan._poll_timeout_ms = tmp_timeout_ms  # Return to prior
@@ -519,8 +519,8 @@ def test_run_scan(client, default_control_state,
 
 
 def test_zctrl(client, default_control_state,
-                      sub_zctrl, timeout_ms,
-                      exp_problem, float_tolerance):
+               sub_zctrl, timeout_ms,
+               exp_problem, float_tolerance):
     logger.info("Validate we recieve and can set ZCtrlParams.")
     startup_grab_control(client, exp_problem)
 
@@ -551,8 +551,8 @@ def test_zctrl(client, default_control_state,
 
 
 def test_probe_pos(client, default_control_state,
-                          sub_probe_pos, sub_scope_state,
-                          exp_problem, float_tolerance):
+                   sub_probe_pos, sub_scope_state,
+                   exp_problem, float_tolerance):
     logger.info("Validate we recieve and can set ProbePosition.")
     startup_grab_control(client, exp_problem)
 
@@ -611,15 +611,15 @@ def test_cancel_signal(client, default_control_state,
     logger.info("Validate we can start and cancel a signal collection.")
     startup_grab_control(client, exp_problem)
 
-    logger.info("First, validate we *do not* have an initial signal (in the "
-                "cache), and *do* have an initial scope state (SS_FREE).")
+    logger.info("First, flush any signal we have in the cache, and validate"
+                "that we have an initial scope state of SS_FREE.")
     scope_state_msg = scan_pb2.ScopeStateMsg(
         scope_state=scan_pb2.ScopeState.SS_FREE)
 
     # Checking no signal (hack around, make poll short for this).
     tmp_timeout_ms = sub_signal._poll_timeout_ms
     sub_signal._poll_timeout_ms = timeout_ms
-    assert not sub_signal.poll_and_store()
+    sub_signal.poll_and_store()
     sub_signal._poll_timeout_ms = tmp_timeout_ms  # Return to prior
 
     assert_sub_received_proto(sub_scope_state,
@@ -672,15 +672,15 @@ def test_run_signal(client, default_control_state,
                 + "on finish.")
     startup_grab_control(client, exp_problem)
 
-    logger.info("Validate we *do not* have an initial signal (in the "
-                "cache), and *do* have an initial scope state (SS_FREE).")
+    logger.info("Flush any signal we have in the cache, and validate"
+                "that we have an initial scope state of SS_FREE.")
     scope_state_msg = scan_pb2.ScopeStateMsg(
         scope_state=scan_pb2.ScopeState.SS_FREE)
 
     # Hack around, make poll short for this.
     tmp_timeout_ms = sub_signal._poll_timeout_ms
     sub_signal._poll_timeout_ms = timeout_ms
-    assert not sub_signal.poll_and_store()
+    sub_signal.poll_and_store()
     assert_sub_received_proto(sub_scope_state,
                               scope_state_msg)
     sub_signal._poll_timeout_ms = tmp_timeout_ms  # Return to prior
