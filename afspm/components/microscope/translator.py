@@ -157,6 +157,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
 
         # Init our current understanding of state / params
         self.scope_state = scan_pb2.ScopeState.SS_UNDEFINED
+        self._was_interrupted = False
         self.scan_params = scan_pb2.ScanParameters2d()
         self.zctrl_params = feedback_pb2.ZCtrlParameters()
         self.probe_pos = signal_pb2.ProbePosition()
@@ -406,6 +407,11 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         old_scope_state = copy.deepcopy(self.scope_state)
         self.scope_state = self.poll_scope_state()
 
+        # If we were interrupted, skip the scope state update for one iteration.
+        if self._was_interrupted:
+            self.scope_state = old_scope_state
+            self._was_interrupted = False
+
         if (old_scope_state == scan_pb2.ScopeState.SS_SCANNING and
                 self.scope_state != scan_pb2.ScopeState.SS_SCANNING):
             self._update_scans()
@@ -529,6 +535,8 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                                     scan_pb2.ScopeState,
                                     scope_state_msg.scope_state))
                     self.publisher.send_msg(scope_state_msg)
+                    self.scope_state = scan_pb2.ScopeState.SS_INTERRUPTED
+                    self._was_interrupted = True
 
                 # TODO: Special case rep with param
                 if isinstance(rep, tuple):  # Special case of rep with obj
