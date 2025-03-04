@@ -6,12 +6,12 @@ method = 'gxsm.startscan'
 [stop-scan]
 method = 'gxsm.stopscan'
 
-[start-signal]
+[start-spec]
 method = 'gxsm.action'
 uuid = 'DSP_VP_FZ_EXECUTE'
 type = 'PASS_ARGS'
 
-[stop-signal]
+[stop-spec]
 method = 'gxsm.action'
 uuid = 'DSP_VP_ABORT_EXECUTE'
 type = 'PASS_ARGS'
