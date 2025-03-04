@@ -342,7 +342,7 @@ def test_cancel_scan(client, default_control_state,
     logger.info("Validate we can start and cancel a scan.")
     startup_grab_control(client, exp_problem)
 
-    logger.info("First, flush any scan we have in the cache, and validate"
+    logger.info("First, flush any scan we have in the cache, and validate "
                 "that we have an initial scope state of SS_FREE.")
     scope_state_msg = scan_pb2.ScopeStateMsg(
         scope_state=scan_pb2.ScopeState.SS_FREE)
@@ -671,7 +671,7 @@ def test_run_spec(client, default_control_state,
                 + "on finish.")
     startup_grab_control(client, exp_problem)
 
-    logger.info("Flush any spec we have in the cache, and validate"
+    logger.info("Flush any spec we have in the cache, and validate "
                 "that we have an initial scope state of SS_FREE.")
     scope_state_msg = scan_pb2.ScopeStateMsg(
         scope_state=scan_pb2.ScopeState.SS_FREE)
@@ -693,7 +693,7 @@ def test_run_spec(client, default_control_state,
     assert_sub_received_proto(sub_scope_state, scope_state_msg)
 
     logger.info("Wait for a predetermined 'long-enough' period, "
-                "and validate the scan finishes.")
+                "and validate the spec finishes.")
     assert sub_spec.poll_and_store()
     scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
     assert_sub_received_proto(sub_scope_state, scope_state_msg)
@@ -736,8 +736,7 @@ def test_parameters(client, exp_problem):
 
 
 def test_actions(client, exp_problem):
-    logger.info('Check which actions are supported via REQ_ACTION.'
-                'Note that this only works for ConfigTranslators.')
+    logger.info('Check which actions are supported via REQ_ACTION.')
     startup_grab_control(client, exp_problem)
 
     logger.info("Testing individual actions.")

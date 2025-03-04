@@ -420,12 +420,10 @@ class ParameterHandler(metaclass=ABCMeta):
         methods = self._get_param_methods(generic_param)
         if methods and methods.getter:
             val = methods.getter(self)
-            logger.trace(f'Got {val} for {generic_param}.')
             return val
 
         uuid = self._get_param_info(generic_param).uuid
         val = self.get_param_spm(uuid)
-        logger.trace(f'Got {val} for {generic_param}.')
         return val
 
     def set_param(self, generic_param: MicroscopeParameter, val: str,
