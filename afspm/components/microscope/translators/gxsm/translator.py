@@ -76,7 +76,7 @@ class GxsmTranslator(ConfigTranslator):
                  param_handler: ParameterHandler = None,
                  action_handler: ActionHandler = None,
                  zctrl_channel: str = None,
-                 signal_mode: str = None,
+                 spec_mode: str = None,
                  **kwargs):
         """Initialize internal logic.
 
@@ -92,7 +92,7 @@ class GxsmTranslator(ConfigTranslator):
             param_handler: ParamHandler to use. If None, spawns default.
             action_handler: ActionHandler to use. If None, spawns default.
             zctrl_channel: Feedback channel for ZCtrl. See gxsm/params.py.
-            signal_mode: Signal mode to be running. See gxsm/actions.py.
+            spec_mode: Spec mode to be running. See gxsm/actions.py.
         """
         self.read_channels_config_path = read_channels_config_path
         self.read_use_physical_units = read_use_physical_units
@@ -107,9 +107,9 @@ class GxsmTranslator(ConfigTranslator):
         # Default initialization of handlers and addition to kwargs
         if not action_handler:
             action_handler = _init_action_handler()
-            if signal_mode:
-                signal_enum = actions.GxsmSignalModeAction(signal_mode)
-                actions.update_signal_mode(action_handler, signal_enum)
+            if spec_mode:
+                spec_enum = actions.GxsmSpecModeAction(spec_mode)
+                actions.update_spec_mode(action_handler, spec_enum)
             kwargs['action_handler'] = action_handler
         if not param_handler:
             param_handler = _init_param_handler()

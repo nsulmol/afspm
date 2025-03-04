@@ -163,7 +163,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         self.probe_pos = spec_pb2.ProbePosition()
 
         self.scans = []
-        self.signal = None
+        self.spec = None
 
         # AfspmComponent constructor: no control_client provided, as that
         # logic is handled by the control_server.
@@ -418,7 +418,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
 
         if (old_scope_state == scan_pb2.ScopeState.SS_SPEC and
                 self.scope_state != scan_pb2.ScopeState.SS_SPEC):
-            self._update_signals()
+            self._update_specs()
 
         # Handle on non-scope-state parameters
         old_scan_params = copy.deepcopy(self.scan_params)
@@ -480,35 +480,35 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             for scan in self.scans:
                 self.publisher.send_msg(scan)
 
-    def _update_signals(self):
-        old_signal = copy.deepcopy(self.signal)
-        self.signal = self.poll_spec()
+    def _update_specs(self):
+        old_spec = copy.deepcopy(self.spec)
+        self.spec = self.poll_spec()
 
-        # If signal is different, assume new and send out!
+        # If spec is different, assume new and send out!
         # Test timestamps if they exist. Otherwise, compare
         # data arrays.
-        send_signal = False
+        send_spec = False
 
-        both_have_signal = self.signal and old_signal
-        only_new_has_signal = self.signal and old_signal is None
-        both_have_timestamps = both_have_signal and (
-            self.signal.HasField(TIMESTAMP_ATTRIB) and
-            old_signal.HasField(TIMESTAMP_ATTRIB))
+        both_have_spec = self.spec and old_spec
+        only_new_has_spec = self.spec and old_spec is None
+        both_have_timestamps = both_have_spec and (
+            self.spec.HasField(TIMESTAMP_ATTRIB) and
+            old_spec.HasField(TIMESTAMP_ATTRIB))
 
         # First, check if timestamps are different
-        signals_different = both_have_timestamps and (
-            self.signal.timestamp != old_signal.timestamp)
-        # Only compare signal data if not the case.
-        signals_different = signals_different or both_have_signal and (
-            self.signal.signals[0].data.dependentValues !=
-            old_signal.signals[0].data.dependentValues)  # TODO: Check other values?
+        specs_different = both_have_timestamps and (
+            self.spec.timestamp != old_spec.timestamp)
+        # Only compare spec data if not the case.
+        specs_different = specs_different or both_have_spec and (
+            self.spec.data.values !=
+            old_spec.data.values)  # TODO: Check other values?
 
-        if only_new_has_signal or signals_different:
-            send_signal = True
+        if only_new_has_spec or specs_different:
+            send_spec = True
 
-        if send_signal:
-            logger.info("New signal, sending out.")
-            self.publisher.send_msg(self.signal)
+        if send_spec:
+            logger.info("New spec, sending out.")
+            self.publisher.send_msg(self.spec)
 
     def _handle_incoming_requests(self):
         """Poll control_server for requests and responds to them."""
@@ -523,7 +523,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                 handler = self.req_handler_map[req]
                 rep = handler(proto) if proto else handler()
 
-                # Special case! If scan or signal was cancelled successfully,
+                # Special case! If scan or spec was cancelled successfully,
                 # we send out an SS_INTERRUPTED state, to allow detecting
                 # interruptions.
                 if ((req, proto) in self.STOP_REQS and

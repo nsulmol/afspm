@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 GXSM_ACTION_CALL = 'gxsm.action'
 
 
-class GxsmSignalModeAction(str, enum.Enum):
-    """Action names for different signal collection modes."""
+class GxsmSpecModeAction(str, enum.Enum):
+    """Action names for different spec collection modes."""
 
     IV_CURVE = 'DSP_VP_IV_EXECUTE'
     Z_SPEC = 'DSP_VP_FZ_EXECUTE'
@@ -27,17 +27,17 @@ class GxsmSignalModeAction(str, enum.Enum):
     ABORT = 'DSP_VP_ABORT_EXECUTE'
 
 
-def update_signal_mode(action_handler: actions.ActionHandler,
-                       signal_mode_action: GxsmSignalModeAction):
-    """Change the signal mode linked to start_signal.
+def update_spec_mode(action_handler: actions.ActionHandler,
+                     spec_mode_action: GxsmSpecModeAction):
+    """Change the spec mode linked to start_spec.
 
     Args:
-        signal_mode_action: enum of desired signal mode.
+        spec_mode_action: enum of desired spec mode.
     """
-    logger.debug('Trying to set signal collection mode to '
-                 f'{signal_mode_action}.')
+    logger.debug('Trying to set spec collection mode to '
+                 f'{spec_mode_action}.')
 
-    key = actions.ActionParameter.START_SIGNAL
+    key = actions.ActionParameter.START_SPEC
     if key not in action_handler.actions:
         logger.warning(f'{key} was not found in actions config. '
                        'Could not set.')
@@ -47,5 +47,5 @@ def update_signal_mode(action_handler: actions.ActionHandler,
     callable_dict = {}
     callable_dict[actions.METHOD_KEY] = GXSM_ACTION_CALL
     callable_dict[actions.TYPE_KEY] = actions.CallableType.PASS_ARGS
-    callable_dict['uuid'] = signal_mode_action
+    callable_dict['uuid'] = spec_mode_action
     action_handler.actions[key] = actions.set_up_callable(callable_dict)

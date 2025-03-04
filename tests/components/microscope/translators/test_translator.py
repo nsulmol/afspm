@@ -161,7 +161,7 @@ def topics_probe_pos():
 
 
 @pytest.fixture(scope="module")
-def topics_signal():
+def topics_spec():
     return [cl.CacheLogic.get_envelope_for_proto(spec_pb2.Spec1d())]
 
 
@@ -202,9 +202,9 @@ def sub_probe_pos(ctx, topics_probe_pos, move_wait_ms, psc_url):
 
 
 @pytest.fixture
-def sub_signal(ctx, topics_signal, scan_wait_ms, psc_url):
+def sub_spec(ctx, topics_spec, scan_wait_ms, psc_url):
     return Subscriber(psc_url,
-                      topics_to_sub=topics_signal,
+                      topics_to_sub=topics_spec,
                       poll_timeout_ms=scan_wait_ms)
 
 
@@ -577,7 +577,6 @@ def test_probe_pos(client, default_control_state,
     last_probe_pos = assert_and_return_message(sub_probe_pos)
     assert check_equal(last_probe_pos, modified_probe_pos, float_tolerance)
 
-
     if (initial_probe_pos.point.x != 0 or
             initial_probe_pos.point.y != 0):
         logger.info('Requested new position of probe. Expect '
@@ -605,29 +604,29 @@ def test_probe_pos(client, default_control_state,
     stop_client(client)
 
 
-def test_cancel_signal(client, default_control_state,
-                       sub_signal, sub_scope_state, timeout_ms,
-                       exp_problem):
-    logger.info("Validate we can start and cancel a signal collection.")
+def test_cancel_spec(client, default_control_state,
+                     sub_spec, sub_scope_state, timeout_ms,
+                     exp_problem):
+    logger.info("Validate we can start and cancel a spec collection.")
     startup_grab_control(client, exp_problem)
 
-    logger.info("First, flush any signal we have in the cache, and validate"
+    logger.info("First, flush any spec we have in the cache, and validate"
                 "that we have an initial scope state of SS_FREE.")
     scope_state_msg = scan_pb2.ScopeStateMsg(
         scope_state=scan_pb2.ScopeState.SS_FREE)
 
-    # Checking no signal (hack around, make poll short for this).
-    tmp_timeout_ms = sub_signal._poll_timeout_ms
-    sub_signal._poll_timeout_ms = timeout_ms
-    sub_signal.poll_and_store()
-    sub_signal._poll_timeout_ms = tmp_timeout_ms  # Return to prior
+    # Checking no spec (hack around, make poll short for this).
+    tmp_timeout_ms = sub_spec._poll_timeout_ms
+    sub_spec._poll_timeout_ms = timeout_ms
+    sub_spec.poll_and_store()
+    sub_spec._poll_timeout_ms = tmp_timeout_ms  # Return to prior
 
     assert_sub_received_proto(sub_scope_state,
                               scope_state_msg)
 
     logger.info("Next, validate that we can start a collection and are "
-                "notified signal collection has begun.")
-    rep = client.start_signal()
+                "notified spec collection has begun.")
+    rep = client.start_spec()
 
     scope_state_msg = scan_pb2.ScopeStateMsg(
         scope_state=scan_pb2.ScopeState.SS_SPEC)
@@ -638,7 +637,7 @@ def test_cancel_signal(client, default_control_state,
     logger.info("Next, cancel the collection before it has finished, and "
                 "ensure we are notified it has been cancelled (via "
                 "an interruption).")
-    rep = client.stop_signal()
+    rep = client.stop_spec()
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
     scope_state_msg = scan_pb2.ScopeStateMsg(
@@ -655,39 +654,39 @@ def test_cancel_signal(client, default_control_state,
 
     assert not sub_scope_state.poll_and_store()
 
-    # Checking no signal (hack around, make poll short for this).
-    tmp_timeout_ms = sub_signal._poll_timeout_ms
-    sub_signal._poll_timeout_ms = timeout_ms
-    assert not sub_signal.poll_and_store()
-    sub_signal._poll_timeout_ms = tmp_timeout_ms  # Return to prior
+    # Checking no spec (hack around, make poll short for this).
+    tmp_timeout_ms = sub_spec._poll_timeout_ms
+    sub_spec._poll_timeout_ms = timeout_ms
+    assert not sub_spec.poll_and_store()
+    sub_spec._poll_timeout_ms = tmp_timeout_ms  # Return to prior
 
     end_test(client)
     stop_client(client)
 
 
-def test_run_signal(client, default_control_state,
-                    sub_signal, sub_scope_state, sub_probe_pos, timeout_ms,
-                    exp_problem):
-    logger.info("Validate we can start a signal collection, and receive one "
+def test_run_spec(client, default_control_state,
+                  sub_spec, sub_scope_state, sub_probe_pos, timeout_ms,
+                  exp_problem):
+    logger.info("Validate we can start a spec collection, and receive one "
                 + "on finish.")
     startup_grab_control(client, exp_problem)
 
-    logger.info("Flush any signal we have in the cache, and validate"
+    logger.info("Flush any spec we have in the cache, and validate"
                 "that we have an initial scope state of SS_FREE.")
     scope_state_msg = scan_pb2.ScopeStateMsg(
         scope_state=scan_pb2.ScopeState.SS_FREE)
 
     # Hack around, make poll short for this.
-    tmp_timeout_ms = sub_signal._poll_timeout_ms
-    sub_signal._poll_timeout_ms = timeout_ms
-    sub_signal.poll_and_store()
+    tmp_timeout_ms = sub_spec._poll_timeout_ms
+    sub_spec._poll_timeout_ms = timeout_ms
+    sub_spec.poll_and_store()
     assert_sub_received_proto(sub_scope_state,
                               scope_state_msg)
-    sub_signal._poll_timeout_ms = tmp_timeout_ms  # Return to prior
+    sub_spec._poll_timeout_ms = tmp_timeout_ms  # Return to prior
 
-    logger.info("Validate that we can start a signal collection and  "
+    logger.info("Validate that we can start a spec collection and  "
                 "are notified collection has begun.")
-    rep = client.start_signal()
+    rep = client.start_spec()
     scope_state_msg = scan_pb2.ScopeStateMsg(
         scope_state=scan_pb2.ScopeState.SS_SPEC)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
@@ -695,7 +694,7 @@ def test_run_signal(client, default_control_state,
 
     logger.info("Wait for a predetermined 'long-enough' period, "
                 "and validate the scan finishes.")
-    assert sub_signal.poll_and_store()
+    assert sub_spec.poll_and_store()
     scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
     assert_sub_received_proto(sub_scope_state, scope_state_msg)
 
