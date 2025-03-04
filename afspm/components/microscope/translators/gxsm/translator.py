@@ -10,7 +10,7 @@ from afspm.components.microscope.translator import (
 from afspm.components.microscope.config_translator import ConfigTranslator
 from afspm.utils import array_converters as conv
 from afspm.io.protos.generated import scan_pb2
-from afspm.io.protos.generated import signal_pb2
+from afspm.io.protos.generated import spec_pb2
 
 import gxsm  # Dynamic DLL, so not in pyproject.
 from gxsmread import read
@@ -182,9 +182,9 @@ class GxsmTranslator(ConfigTranslator):
             self.old_scans = scans
         return self.old_scans
 
-    def poll_signal(self) -> signal_pb2.Signal1d:
-        """Override signal polling. For now, not supported."""
-        return signal_pb2.Signal1d()
+    def poll_spec(self) -> spec_pb2.Spec1d:
+        """Override spec polling. For now, not supported."""
+        return spec_pb2.Spec1d()
 
 
 def get_current_scope_state(param_handler: ParameterHandler

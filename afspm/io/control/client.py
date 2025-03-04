@@ -14,7 +14,7 @@ from google.protobuf.message import Message
 from ..protos.generated import control_pb2
 from ..protos.generated import scan_pb2
 from ..protos.generated import feedback_pb2
-from ..protos.generated import signal_pb2
+from ..protos.generated import spec_pb2
 
 
 logger = logging.getLogger(__name__)
@@ -163,22 +163,22 @@ class ControlClient:
         action = control_pb2.ActionMsg(action=MicroscopeAction.STOP_SCAN)
         return self.request_action(action)
 
-    def start_signal(self) -> control_pb2.ControlResponse:
-        """Request start collecting a signal.
+    def start_spec(self) -> control_pb2.ControlResponse:
+        """Request start collecting a spec.
 
         Returns:
             The received ControlResponse.
         """
-        action = control_pb2.ActionMsg(action=MicroscopeAction.START_SIGNAL)
+        action = control_pb2.ActionMsg(action=MicroscopeAction.START_SPEC)
         return self.request_action(action)
 
-    def stop_signal(self) -> control_pb2.ControlResponse:
-        """Request stop collecting a signal.
+    def stop_spec(self) -> control_pb2.ControlResponse:
+        """Request stop collecting a spec.
 
         Returns:
             The received ControlResponse.
         """
-        action = control_pb2.ActionMsg(action=MicroscopeAction.STOP_SIGNAL)
+        action = control_pb2.ActionMsg(action=MicroscopeAction.STOP_SPEC)
         return self.request_action(action)
 
     def request_action(self, action: control_pb2.ActionMsg
@@ -259,7 +259,7 @@ class ControlClient:
             control_pb2.ControlRequest.REQ_SET_ZCTRL_PARAMS, zctrl_params)
         return self._try_send_req(msg)
 
-    def set_probe_pos(self, probe_pos: signal_pb2.ProbePosition
+    def set_probe_pos(self, probe_pos: spec_pb2.ProbePosition
                       ) -> control_pb2.ControlResponse:
         """Try to set the probe position of the SPM device.
 

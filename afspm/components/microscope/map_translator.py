@@ -167,10 +167,10 @@ class MapTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         """Do nothing - handled by ActionHandler."""
         pass
 
-    def on_start_signal(self) -> control_pb2.ControlResponse:
+    def on_start_spec(self) -> control_pb2.ControlResponse:
         """Do nothing - handled by ActionHandler."""
         pass
 
-    def on_stop_signal(self) -> control_pb2.ControlResponse:
+    def on_stop_spec(self) -> control_pb2.ControlResponse:
         """Do nothing - handled by ActionHandler."""
         pass

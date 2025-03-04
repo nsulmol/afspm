@@ -10,7 +10,7 @@ from ...io.control import server as ctrl_srvr
 from ...io.protos.generated import scan_pb2
 from ...io.protos.generated import control_pb2
 from ...io.protos.generated import feedback_pb2
-from ...io.protos.generated import signal_pb2
+from ...io.protos.generated import spec_pb2
 
 from . import translator
 from . import params
@@ -38,9 +38,9 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
     scan_pb2.ScopeState enum.
     - Implementing poll_scans(), which likely involves using a pre-existing
     Python package to read the specific SPM's save files.
-    - Implementing poll_signal(), which likely involves using a pre-existing
+    - Implementing poll_spec(), which likely involves using a pre-existing
     Python package to read the specific SPM's save files. Recall that you may
-    simply return an empty Signal1d() if this is not supported.
+    simply return an empty Spec1d() if this is not supported.
 
     Also note that the original abstract action methods defined in
     MicroscopeTranslatorBase do nothing here (since they are already
@@ -131,7 +131,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
             return control_pb2.ControlResponse.REP_PARAM_ERROR
         return control_pb2.ControlResponse.REP_SUCCESS
 
-    def on_set_probe_pos(self, probe_position: signal_pb2.ProbePosition
+    def on_set_probe_pos(self, probe_position: spec_pb2.ProbePosition
                          ) -> control_pb2.ControlResponse:
         """Handle a request to change the probe position of the microscope."""
         vals = [probe_position.point.x,
@@ -301,7 +301,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
 
         return zctrl_params
 
-    def poll_probe_pos(self) -> signal_pb2.ProbePosition | None:
+    def poll_probe_pos(self) -> spec_pb2.ProbePosition | None:
         """Poll the controller for the current probe position.
 
         If not supported, return None. Throw MicroscopeError on failure.
@@ -309,7 +309,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         units = self.param_handler.get_unit(
             params.MicroscopeParameter.PROBE_POS_X)
         vals = self.param_handler.get_param_list(params.PROBE_POS_PARAMS)
-        probe_pos_params = signal_pb2.ProbePosition()
+        probe_pos_params = spec_pb2.ProbePosition()
         probe_pos_params.point.x = vals[0]
         probe_pos_params.point.y = vals[1]
         probe_pos_params.units = units
@@ -325,10 +325,10 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         """Do nothing - handled by ActionHandler."""
         pass
 
-    def on_start_signal(self) -> control_pb2.ControlResponse:
+    def on_start_spec(self) -> control_pb2.ControlResponse:
         """Do nothing - handled by ActionHandler."""
         pass
 
-    def on_stop_signal(self) -> control_pb2.ControlResponse:
+    def on_stop_spec(self) -> control_pb2.ControlResponse:
         """Do nothing - handled by ActionHandler."""
         pass

@@ -10,7 +10,7 @@ from afspm.io import common
 
 from afspm.io.protos.generated import control_pb2
 from afspm.io.protos.generated import scan_pb2
-from afspm.io.protos.generated import signal_pb2
+from afspm.io.protos.generated import spec_pb2
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +37,8 @@ def scan_2d():
 
 
 @pytest.fixture
-def signal_1d():
-    return signal_pb2.Signal1d(type='hammock', filename='oh hai')
+def spec_1d():
+    return spec_pb2.Spec1d(type='hammock', filename='oh hai')
 
 
 @pytest.fixture
@@ -55,7 +55,7 @@ def fake_metadata_writer(control_state):
 
 
 # ----- Tests ----- #
-def test_writing(fake_metadata_writer, scan_2d, signal_1d, control_state):
+def test_writing(fake_metadata_writer, scan_2d, spec_1d, control_state):
     logger.info('Validate that we can write scan params and probe position.')
 
     rows = fake_metadata_writer._get_metadata_row(scan_2d)
@@ -64,7 +64,7 @@ def test_writing(fake_metadata_writer, scan_2d, signal_1d, control_state):
                 'id0', str([control_pb2.ExperimentProblem.EP_NONE])]
     assert rows == exp_rows
 
-    rows = fake_metadata_writer._get_metadata_row(signal_1d)
+    rows = fake_metadata_writer._get_metadata_row(spec_1d)
     exp_rows = [0, 'oh hai', 'hammock',
                 control_pb2.ControlMode.CM_AUTOMATED,
                 'id0', str([control_pb2.ExperimentProblem.EP_NONE])]
@@ -77,5 +77,5 @@ def test_writing(fake_metadata_writer, scan_2d, signal_1d, control_state):
     exp_rows = [0, 'oh hai', 'hammock',
                 control_pb2.ControlMode.CM_AUTOMATED, 'id0',
                 str([control_pb2.ExperimentProblem.EP_TIP_SHAPE_CHANGED])]
-    rows = fake_metadata_writer._get_metadata_row(signal_1d)
+    rows = fake_metadata_writer._get_metadata_row(spec_1d)
     assert rows == exp_rows

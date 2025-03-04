@@ -44,7 +44,7 @@ from afspm.utils.protobuf import check_equal
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
 from afspm.io.protos.generated import feedback_pb2
-from afspm.io.protos.generated import signal_pb2
+from afspm.io.protos.generated import spec_pb2
 
 
 logger = logging.getLogger(LOGGER_ROOT + '.samples.testing.test_translator.' +
@@ -157,12 +157,12 @@ def topics_zctrl():
 
 @pytest.fixture(scope="module")
 def topics_probe_pos():
-    return [cl.CacheLogic.get_envelope_for_proto(signal_pb2.ProbePosition())]
+    return [cl.CacheLogic.get_envelope_for_proto(spec_pb2.ProbePosition())]
 
 
 @pytest.fixture(scope="module")
 def topics_signal():
-    return [cl.CacheLogic.get_envelope_for_proto(signal_pb2.Signal1d())]
+    return [cl.CacheLogic.get_envelope_for_proto(spec_pb2.Spec1d())]
 
 
 # --- I/O Classes (Subscribers, Clients) --- #
@@ -630,7 +630,7 @@ def test_cancel_signal(client, default_control_state,
     rep = client.start_signal()
 
     scope_state_msg = scan_pb2.ScopeStateMsg(
-        scope_state=scan_pb2.ScopeState.SS_SIGNALING)
+        scope_state=scan_pb2.ScopeState.SS_SPEC)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
     assert_sub_received_proto(sub_scope_state,
                               scope_state_msg)
@@ -689,7 +689,7 @@ def test_run_signal(client, default_control_state,
                 "are notified collection has begun.")
     rep = client.start_signal()
     scope_state_msg = scan_pb2.ScopeStateMsg(
-        scope_state=scan_pb2.ScopeState.SS_SIGNALING)
+        scope_state=scan_pb2.ScopeState.SS_SPEC)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
     assert_sub_received_proto(sub_scope_state, scope_state_msg)
 

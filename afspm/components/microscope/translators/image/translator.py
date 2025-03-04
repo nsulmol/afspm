@@ -13,7 +13,7 @@ from ...translator import MicroscopeTranslator
 from .....io.protos.generated import scan_pb2
 from .....io.protos.generated import control_pb2
 from .....io.protos.generated import feedback_pb2
-from .....io.protos.generated import signal_pb2
+from .....io.protos.generated import spec_pb2
 from .....utils import array_converters as ac
 
 
@@ -83,10 +83,10 @@ class ImageTranslator(MicroscopeTranslator):
         self.dev_scope_state = scan_pb2.ScopeState.SS_FREE
         return control_pb2.ControlResponse.REP_SUCCESS
 
-    def on_start_signal(self) -> control_pb2.ControlResponse:
+    def on_start_spec(self) -> control_pb2.ControlResponse:
         return control_pb2.ControlResponse.REP_ACTION_NOT_SUPPORTED
 
-    def on_stop_signal(self) -> control_pb2.ControlResponse:
+    def on_stop_spec(self) -> control_pb2.ControlResponse:
         return control_pb2.ControlResponse.REP_ACTION_NOT_SUPPORTED
 
     def on_set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
@@ -101,7 +101,7 @@ class ImageTranslator(MicroscopeTranslator):
         """Z-Ctrl doesn't do anything with images, not supported."""
         return control_pb2.ControlResponse.REP_CMD_NOT_SUPPORTED
 
-    def on_set_probe_pos(self, probe_position: signal_pb2.ProbePosition
+    def on_set_probe_pos(self, probe_position: spec_pb2.ProbePosition
                               ) -> control_pb2.ControlResponse:
         return control_pb2.ControlResponse.REP_CMD_NOT_SUPPORTED
 
@@ -121,14 +121,14 @@ class ImageTranslator(MicroscopeTranslator):
         """Z-Ctrl doesn't do anything with images, not supported."""
         return feedback_pb2.ZCtrlParameters()
 
-    def poll_probe_pos(self) -> signal_pb2.ProbePosition:
-        return signal_pb2.ProbePosition()
+    def poll_probe_pos(self) -> spec_pb2.ProbePosition:
+        return spec_pb2.ProbePosition()
 
     def poll_scans(self) -> [scan_pb2.Scan2d]:
         return [self.dev_scan] if self.dev_scan else []
 
-    def poll_signal(self) -> signal_pb2.Signal1d:
-        return signal_pb2.Signal1d()
+    def poll_spec(self) -> spec_pb2.Spec1d:
+        return spec_pb2.Spec1d()
 
     def run_per_loop(self):
         """Main loop, where we indicate when scans and moves are done."""

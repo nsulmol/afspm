@@ -7,7 +7,7 @@ from google.protobuf.message import Message
 from ..protos.generated import scan_pb2
 from ..protos.generated import control_pb2
 from ..protos.generated import feedback_pb2
-from ..protos.generated import signal_pb2
+from ..protos.generated import spec_pb2
 
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ REQ_TO_OBJ_MAP = MappingProxyType({
     control_pb2.ControlRequest.REQ_SET_ZCTRL_PARAMS:
         feedback_pb2.ZCtrlParameters(),
     control_pb2.ControlRequest.REQ_SET_PROBE_POS:
-        signal_pb2.ProbePosition(),
+        spec_pb2.ProbePosition(),
     control_pb2.ControlRequest.REQ_REQUEST_CTRL:
         control_pb2.ExperimentProblem.EP_NONE,
     control_pb2.ControlRequest.REQ_ADD_EXP_PRBLM:

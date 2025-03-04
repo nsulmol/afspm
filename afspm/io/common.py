@@ -6,7 +6,7 @@ from google.protobuf.internal.enum_type_wrapper import EnumTypeWrapper
 from ..io.protos.generated import scan_pb2
 from ..io.protos.generated import geometry_pb2
 from ..io.protos.generated import control_pb2
-from ..io.protos.generated import signal_pb2
+from ..io.protos.generated import spec_pb2
 
 
 # --- Common envelope/signal stuff --- #
@@ -88,7 +88,7 @@ def create_probe_pos(pos: tuple[float, float] = None,
         units: units of the length/distance dimensions.
     """
     pos = (geometry_pb2.Point2d(x=pos[0], y=pos[1]) if pos else None)
-    return signal_pb2.ProbePosition(point=pos, units=units)
+    return spec_pb2.ProbePosition(point=pos, units=units)
 
 
 def create_action_msg(action: str) -> control_pb2.ActionMsg:

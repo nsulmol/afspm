@@ -8,7 +8,7 @@ import zmq
 
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
-from afspm.io.protos.generated import signal_pb2
+from afspm.io.protos.generated import spec_pb2
 
 from afspm.io.control.client import ControlClient
 from afspm.io.control.server import ControlServer
@@ -86,7 +86,7 @@ def next_params_method_scan() -> scan_pb2.ScanParameters2d:
     return SCAN_PARAMS
 
 
-def next_params_method_probe_pos() -> signal_pb2.ProbePosition:
+def next_params_method_probe_pos() -> spec_pb2.ProbePosition:
     return PROBE_POS
 
 
@@ -194,17 +194,17 @@ def test_scanning(publisher, server, thread_scan_handler,
     time.sleep(4*common.REQUEST_TIMEOUT_MS / 1000)
 
 
-def test_signaling(publisher, server, thread_signal_handler,
-                   control_state, scope_state_msg):
-    """Validate we can go through the scan process properly"""
-    logger.info("Validate we can go through the scan process properly.")
+def test_spec(publisher, server, thread_signal_handler,
+                      control_state, scope_state_msg):
+    """Validate we can go through the spec process properly"""
+    logger.info("Validate we can go through the spec process properly.")
 
     states = [scan_pb2.ScopeState.SS_MOVING,
-              scan_pb2.ScopeState.SS_SIGNALING]
+              scan_pb2.ScopeState.SS_SPEC]
     requests = [control_pb2.ControlRequest.REQ_SET_PROBE_POS,
                 control_pb2.ControlRequest.REQ_ACTION]
     objects = [PROBE_POS,
-               control_pb2.ActionMsg(action=MicroscopeAction.START_SIGNAL)]
+               control_pb2.ActionMsg(action=MicroscopeAction.START_SPEC)]
 
     # Inform scan handler we are in the expected control state.
     publisher.send_msg(control_state)

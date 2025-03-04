@@ -188,8 +188,8 @@ class TestServerWithClient:
     def srv_client_server_methods(self, srv_client):
         return [(srv_client.start_scan, None),
                 (srv_client.stop_scan, None),
-                (srv_client.start_signal, None),
-                (srv_client.stop_signal, None),
+                (srv_client.start_spec, None),
+                (srv_client.stop_spec, None),
                 (srv_client.set_scan_params, scan_pb2.ScanParameters2d()),
                 (srv_client.set_zctrl_params, feedback_pb2.ZCtrlParameters()),
                 (srv_client.request_parameter, control_pb2.ParameterMsg()),
@@ -228,8 +228,8 @@ class TestRouterServerClient:
     def rtr_client_server_methods(self, rtr_client):
         return [(rtr_client.start_scan, None),
                 (rtr_client.stop_scan, None),
-                (rtr_client.start_signal, None),
-                (rtr_client.stop_signal, None),
+                (rtr_client.start_spec, None),
+                (rtr_client.stop_spec, None),
                 (rtr_client.set_scan_params, scan_pb2.ScanParameters2d()),
                 (rtr_client.set_zctrl_params, feedback_pb2.ZCtrlParameters()),
                 (rtr_client.request_parameter, control_pb2.ParameterMsg()),

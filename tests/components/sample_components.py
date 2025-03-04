@@ -26,7 +26,7 @@ from afspm.io.control.router import ControlRouter
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
 from afspm.io.protos.generated import feedback_pb2
-from afspm.io.protos.generated import signal_pb2
+from afspm.io.protos.generated import spec_pb2
 
 
 logger = logging.getLogger(__name__)
@@ -47,15 +47,15 @@ def on_stop_scan(translator: MicroscopeTranslator):
     return control_pb2.ControlResponse.REP_SUCCESS
 
 
-def on_start_signal(translator: MicroscopeTranslator):
-    """Handle START_SIGNAL action."""
+def on_start_spec(translator: MicroscopeTranslator):
+    """Handle START_SPEC action."""
     translator.start_ts = time.time()
-    translator.dev_scope_state = scan_pb2.ScopeState.SS_SIGNALING
+    translator.dev_scope_state = scan_pb2.ScopeState.SS_SPEC
     return control_pb2.ControlResponse.REP_SUCCESS
 
 
-def on_stop_signal(translator: MicroscopeTranslator):
-    """Handle STOP_SIGNAL action."""
+def on_stop_spec(translator: MicroscopeTranslator):
+    """Handle STOP_SPEC action."""
     translator.start_ts = None
     translator.dev_scope_state = scan_pb2.ScopeState.SS_FREE
     return control_pb2.ControlResponse.REP_SUCCESS
@@ -109,7 +109,7 @@ def fail_on_moving_speed(ctrlr: MicroscopeTranslator,
 
 # --- Microscope Translator Stuff --- #
 class SampleMicroscopeTranslator(MapTranslator):
-    def __init__(self, scan_time_s, move_time_s, signal_time_s,
+    def __init__(self, scan_time_s, move_time_s, spec_time_s,
                  **kwargs):
         self.scan_speed = 500
         self.ss_units = 'nm/s'
@@ -119,13 +119,13 @@ class SampleMicroscopeTranslator(MapTranslator):
         self.start_ts = None
         self.dev_scope_state = scan_pb2.ScopeState.SS_FREE
         self.dev_scan_params = scan_pb2.ScanParameters2d()
-        self.dev_probe_pos = signal_pb2.ProbePosition()
+        self.dev_probe_pos = spec_pb2.ProbePosition()
         self.dev_scan = None
-        self.dev_signal = None
+        self.dev_spec = None
 
         self.scan_time_s = scan_time_s
         self.move_time_s = move_time_s
-        self.signal_time_s = signal_time_s
+        self.spec_time_s = spec_time_s
         kwargs['name'] = 'dev_con'
         super().__init__(**kwargs)
 
@@ -138,8 +138,8 @@ class SampleMicroscopeTranslator(MapTranslator):
         self.action_method_map = {
             MicroscopeAction.START_SCAN: on_start_scan,
             MicroscopeAction.STOP_SCAN: on_stop_scan,
-            MicroscopeAction.START_SIGNAL: on_start_signal,
-            MicroscopeAction.STOP_SIGNAL: on_stop_signal,
+            MicroscopeAction.START_SPEC: on_start_spec,
+            MicroscopeAction.STOP_SPEC: on_stop_spec,
         }
 
     def on_set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
@@ -153,7 +153,7 @@ class SampleMicroscopeTranslator(MapTranslator):
                             ) -> control_pb2.ControlResponse:
         return control_pb2.ControlResponse.REP_CMD_NOT_SUPPORTED
 
-    def on_set_probe_pos(self, probe_pos: signal_pb2.ProbePosition):
+    def on_set_probe_pos(self, probe_pos: spec_pb2.ProbePosition):
         self.dev_probe_pos = probe_pos
         return control_pb2.ControlResponse.REP_SUCCESS
 
@@ -166,28 +166,28 @@ class SampleMicroscopeTranslator(MapTranslator):
     def poll_scans(self) -> list[scan_pb2.Scan2d]:
         return [self.dev_scan] if self.dev_scan else []
 
-    def poll_signal(self) -> signal_pb2.Signal1d:
-        return self.dev_signal
+    def poll_spec(self) -> spec_pb2.Spec1d:
+        return self.dev_spec
 
     def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
         return feedback_pb2.ZCtrlParameters()
 
-    def poll_probe_pos(self) -> signal_pb2.ProbePosition:
+    def poll_probe_pos(self) -> spec_pb2.ProbePosition:
         return self.dev_probe_pos
 
     def run_per_loop(self):
         if self.start_ts:
             duration = None
             update_scan = False
-            update_signal = False
+            update_spec = False
             if self.dev_scope_state == scan_pb2.ScopeState.SS_SCANNING:
                 duration = self.scan_time_s
                 update_scan = True
             elif self.dev_scope_state == scan_pb2.ScopeState.SS_MOVING:
                 duration = self.move_time_s
-            elif self.dev_scope_state == scan_pb2.ScopeState.SS_SIGNALING:
-                duration = self.signal_time_s
-                update_signal = True
+            elif self.dev_scope_state == scan_pb2.ScopeState.SS_SPEC:
+                duration = self.spec_time_s
+                update_spec = True
 
             if duration:
                 curr_ts = time.time()
@@ -201,15 +201,15 @@ class SampleMicroscopeTranslator(MapTranslator):
                     if update_scan:
                         self.dev_scan = scan_pb2.Scan2d()
                         self.dev_scan.timestamp.GetCurrentTime()
-                    if update_signal:
-                        self.dev_signal = signal_pb2.Signal1d()
-                        self.dev_signal.timestamp.GetCurrentTime()
+                    if update_spec:
+                        self.dev_spec = spec_pb2.Spec1d()
+                        self.dev_spec.timestamp.GetCurrentTime()
         super().run_per_loop()
 
 
 def microscope_translator_routine(pub_url, server_url, psc_url,
                                   ctx, move_time_ms, scan_time_ms,
-                                  signal_time_ms, cache_kwargs):
+                                  spec_time_ms, cache_kwargs):
     pub = Publisher(pub_url, cl.CacheLogic.get_envelope_for_proto)
     server = ControlServer(server_url, ctx)
     topics_none = []
@@ -221,7 +221,7 @@ def microscope_translator_routine(pub_url, server_url, psc_url,
 
     translator = SampleMicroscopeTranslator(scan_time_ms / 1000,
                                             move_time_ms / 1000,
-                                            signal_time_ms / 1000,
+                                            spec_time_ms / 1000,
                                             publisher=pub,
                                             control_server=server,
                                             ctx=ctx, subscriber=sub)

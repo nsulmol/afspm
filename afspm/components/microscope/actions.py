@@ -28,8 +28,8 @@ class MicroscopeAction(str, enum.Enum):
     START_SCAN = 'start-scan'
     STOP_SCAN = 'stop-scan'
 
-    START_SIGNAL = 'start-signal'
-    STOP_SIGNAL = 'stop-signal'
+    START_SPEC = 'start-spec'
+    STOP_SPEC = 'stop-spec'
 
 
 # Helper so you can do if str in ACTIONS
@@ -41,13 +41,13 @@ DESCRIPTIONS = {
     "Start scanning a current ScanParameters location.",
     MicroscopeAction.STOP_SCAN:
     "Stop scanning if in progress.",
-    MicroscopeAction.START_SIGNAL:
-    "Start performing 1D signal collection.",
-    MicroscopeAction.STOP_SIGNAL:
-    "Stop performing 1D signal collection if in progress."
+    MicroscopeAction.START_SPEC:
+    "Start performing 1D spec collection.",
+    MicroscopeAction.STOP_SPEC:
+    "Stop performing 1D spec collection if in progress."
 }
 
-# TODO: do we need to add start signal/stop signal?
+# TODO: do we need to add start spec/stop spec?
 REQUIRED_ACTIONS = [MicroscopeAction.START_SCAN,
                     MicroscopeAction.STOP_SCAN]
 

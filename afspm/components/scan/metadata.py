@@ -10,7 +10,7 @@ from google.protobuf.message import Message
 
 from ...io.protos.generated import scan_pb2
 from ...io.protos.generated import control_pb2
-from ...io.protos.generated import signal_pb2
+from ...io.protos.generated import spec_pb2
 
 
 logger = logging.getLogger(__name__)
@@ -81,7 +81,7 @@ class ScanMetadataWriter(afspmc.AfspmComponentBase):
             logger.debug("New control state received, storing.")
             self.control_state = proto
         if (isinstance(proto, scan_pb2.Scan2d) or
-                isinstance(proto, signal_pb2.Signal1d)):
+                isinstance(proto, spec_pb2.Spec1d)):
             logger.debug("Collection received, saving context.")
             self._save_collection_context(proto)
 
@@ -98,7 +98,7 @@ class ScanMetadataWriter(afspmc.AfspmComponentBase):
         return csv.DictWriter(**kwargs_dict)
 
     def _save_collection_context(self, collection: scan_pb2.Scan2d |
-                                 signal_pb2.Signal1d):
+                                 spec_pb2.Spec1d):
         """Save the current scan context."""
         if self.control_state is None:
             logger.error("Cannot save metadata: we have not received context.")
@@ -111,11 +111,11 @@ class ScanMetadataWriter(afspmc.AfspmComponentBase):
             writer.writerow(row_dict)
 
     def _get_metadata_row(self, collection: scan_pb2.Scan2d |
-                          signal_pb2.Signal1d) -> [str]:
+                          spec_pb2.Spec1d) -> [str]:
         if isinstance(collection, scan_pb2.Scan2d):
             row_vals = self._get_scan_metadata(collection)
         else:
-            row_vals = self._get_signal_metadata(collection)
+            row_vals = self._get_spec_metadata(collection)
         row_vals.extend([self.control_state.control_mode,
                          self.control_state.client_in_control_id,
                          str(self.control_state.problems_set)])
@@ -126,5 +126,5 @@ class ScanMetadataWriter(afspmc.AfspmComponentBase):
         return [scan.timestamp.seconds, scan.filename, scan.channel]
 
     @staticmethod
-    def _get_signal_metadata(signal: signal_pb2.Signal1d) -> list[Any]:
-        return [signal.timestamp.seconds, signal.filename, signal.type]
+    def _get_spec_metadata(spec: spec_pb2.Spec1d) -> list[Any]:
+        return [spec.timestamp.seconds, spec.filename, spec.type]

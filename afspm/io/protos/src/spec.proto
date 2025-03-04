@@ -1,0 +1,55 @@
+/*
+  This file holds 1D spectroscopy message types, for sending the results of single
+  point 1D specs (e.g. STS, force-distance curves) between
+  afspm nodes.
+*/
+
+// NOTE: Units are used to tell the MicroscopeTranslator, not to *demand* the
+// format they should be returned in! The AfspmComponent should read the
+// units and convert to their desired format.
+// Pint can be used on either end.
+
+edition = "2023";
+
+import "google/protobuf/timestamp.proto";
+import "geometry.proto";
+
+/* Position of the probe along (x,y) plane with units. */
+message ProbePosition {
+  Point2d point = 1;
+  string units = 2;
+}
+
+/* Holds spectroscopy data, variables names, and units.*/
+message SpecData {
+  uint32 numVariables = 1;
+  uint32 dataPerVariable = 2;
+  repeated string names = 3;  // Should be length of numVariables
+  repeated string units = 4;  // Should be length of numVariables
+  repeated double values = 5;  // 2D array of arr[numVariables][dataPerVariable]
+}
+
+/* One-dimensional spectroscopy signal collected at a single (x,y) position.
+ *
+ * Our spec logic assumes a one-to-one relationship between spectroscopies and
+ * files. Thus, even if your SPM *supports* multiple specs in one file,
+ * the automation should be saving one-per-file.
+ *
+ * We realize this can be a bit of a mess! You can use components in
+ * components.metadata to save context of scans/specs for later processing.
+ * */
+
+message Spec1d  // Tabular data of one-dimensional physical run.
+{
+  ProbePosition position = 1;
+  string filename = 2;  // Assumes one-to-one spec/file relationship.
+  google.protobuf.Timestamp timestamp = 3;  // Timestamp associated with file.
+  string type = 5;  // String tag indicating type of spectroscopy (optional).
+
+  SpecData data = 4;
+}
+
+// TODO: If it turns out type is not in most SPM's specs, change:
+// - scan/metadata.py
+// - and pbc_logic.py!
+// accordingly.

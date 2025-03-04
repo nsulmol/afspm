@@ -14,7 +14,7 @@ from afspm.io.common import create_scan_params_2d, create_probe_pos
 from afspm.io.protos.generated import control_pb2
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import feedback_pb2
-from afspm.io.protos.generated import signal_pb2
+from afspm.io.protos.generated import spec_pb2
 
 
 logger = logging.getLogger(__name__)
@@ -157,7 +157,7 @@ class MyConfigTranslator(ConfigTranslator):
         """Not implementing, not tested here."""
         raise MicroscopeError
 
-    def poll_signal(self) -> signal_pb2.Signal1d:
+    def poll_spec(self) -> spec_pb2.Spec1d:
         """Not implementing, not tested here."""
         raise MicroscopeError
 

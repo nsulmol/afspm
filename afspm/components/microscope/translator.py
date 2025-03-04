@@ -29,7 +29,7 @@ from ...io.control import server as ctrl_srvr
 from ...io.protos.generated import scan_pb2
 from ...io.protos.generated import control_pb2
 from ...io.protos.generated import feedback_pb2
-from ...io.protos.generated import signal_pb2
+from ...io.protos.generated import spec_pb2
 
 
 logger = logging.getLogger(__name__)
@@ -82,7 +82,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
     pausing scans.
     - Modifying the z-controller feedback parameters and slope values
         (to minimize feedback needs).
-    - Moving the probe position and collecting 1D signals. **NOT YET**
+    - Moving the probe position and collecting 1D specs.
 
     These capabilities are implemented via set/run calls denominated
     on_XXX() (e.g. on_start_scan), and get calls polled regularly, denominated
@@ -92,7 +92,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
     For many experiments, this may be all that is needed! This assumes the
     researcher has already approached their surface and set the necessary
     operating mode / parameters for a scan to run. It also assumes the user
-    has set up their scanning 1D signal collection operating modes, so they
+    has set up their scanning 1D spec collection operating modes, so they
     only need to indicate to perform them.
 
     For additional parameters needing settings, we introduce the REQ_PARAM
@@ -103,7 +103,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
     Notes:
     - we allow providing a subscriber to MicroscopeTranslator (it inherits
     from AspmComponent). If subscribed to the PubSubCache, it will receive
-    kill signals and shutdown appropriately.
+    kill specs and shutdown appropriately.
 
 
     Attributes:
@@ -125,7 +125,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                       action=actions.MicroscopeAction.STOP_SCAN)),
                  (control_pb2.ControlRequest.REQ_ACTION,
                   control_pb2.ActionMsg(
-                      action=actions.MicroscopeAction.STOP_SIGNAL))]
+                      action=actions.MicroscopeAction.STOP_SPEC))]
 
     # Indicates commands we will allow to be sent while not free
     ALLOWED_COMMANDS_WHILE_NOT_FREE = STOP_REQS
@@ -160,7 +160,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         self._was_interrupted = False
         self.scan_params = scan_pb2.ScanParameters2d()
         self.zctrl_params = feedback_pb2.ZCtrlParameters()
-        self.probe_pos = signal_pb2.ProbePosition()
+        self.probe_pos = spec_pb2.ProbePosition()
 
         self.scans = []
         self.signal = None
@@ -202,15 +202,15 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def on_start_signal(self) -> control_pb2.ControlResponse:
-        """Handle a request to start a signal collection.
+    def on_start_spec(self) -> control_pb2.ControlResponse:
+        """Handle a request to start a spec collection.
 
         If not supported, return REP_ACTION_NOT_SUPPORTED.
         """
 
     @abstractmethod
-    def on_stop_signal(self) -> control_pb2.ControlResponse:
-        """Handle a request to stop a signal collection.
+    def on_stop_spec(self) -> control_pb2.ControlResponse:
+        """Handle a request to stop a spec collection.
 
         If not supported, return REP_ACTION_NOT_SUPPORTED.
         """
@@ -233,7 +233,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def on_set_probe_pos(self, probe_position: signal_pb2.ProbePosition
+    def on_set_probe_pos(self, probe_position: spec_pb2.ProbePosition
                          ) -> control_pb2.ControlResponse:
         """Handle a request to change the probe position of the microscope.
 
@@ -286,10 +286,10 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             return self.on_start_scan()
         elif action.action == actions.MicroscopeAction.STOP_SCAN:
             return self.on_stop_scan()
-        elif action.action == actions.MicroscopeAction.START_SIGNAL:
-            return self.on_start_signal()
-        elif action.action == actions.MicroscopeAction.STOP_SIGNAL:
-            return self.on_stop_signal()
+        elif action.action == actions.MicroscopeAction.START_SPEC:
+            return self.on_start_spec()
+        elif action.action == actions.MicroscopeAction.STOP_SPEC:
+            return self.on_stop_spec()
         return control_pb2.ControlResponse.REP_ACTION_NOT_SUPPORTED
 
     def on_check_action_support(self, action: control_pb2.ActionMsg
@@ -348,7 +348,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def poll_probe_pos(self) -> signal_pb2.ProbePosition:
+    def poll_probe_pos(self) -> spec_pb2.ProbePosition:
         """Poll the controller for the current probe position.
 
         If not supported, return empty ProbePosition.
@@ -378,22 +378,22 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def poll_signal(self) -> signal_pb2.Signal1d:
-        """Obtain latest performed signal(s).
+    def poll_spec(self) -> spec_pb2.Spec1d:
+        """Obtain latest performed spec(s).
 
-        We will compare the prior signal(s) to the latest to determine if a
-        recent signal collection succeeded (i.e. they are different).
+        We will compare the prior spec(s) to the latest to determine if a
+        recent spec collection succeeded (i.e. they are different).
 
         Note that we will first consider the timestamp attribute when comparing
-        signals. If this attribute is not passed, we will do a data comparison.
+        specs. If this attribute is not passed, we will do a data comparison.
 
-        If not supported return empty Signal1d.
+        If not supported return empty Spec1d.
         Throw MicroscopeError on failure.
 
         To read the creation time of a file using Python, use
             get_file_modification_datetime()
         and you can put that in the timestamp param with:
-            signal_collection.timestamp.FromDatetime(ts)
+            spec.timestamp.FromDatetime(ts)
         """
 
     def _handle_polling_device(self):
@@ -416,8 +416,8 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                 self.scope_state != scan_pb2.ScopeState.SS_SCANNING):
             self._update_scans()
 
-        if (old_scope_state == scan_pb2.ScopeState.SS_SIGNALING and
-                self.scope_state != scan_pb2.ScopeState.SS_SIGNALING):
+        if (old_scope_state == scan_pb2.ScopeState.SS_SPEC and
+                self.scope_state != scan_pb2.ScopeState.SS_SPEC):
             self._update_signals()
 
         # Handle on non-scope-state parameters
@@ -482,7 +482,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
 
     def _update_signals(self):
         old_signal = copy.deepcopy(self.signal)
-        self.signal = self.poll_signal()
+        self.signal = self.poll_spec()
 
         # If signal is different, assume new and send out!
         # Test timestamps if they exist. Otherwise, compare

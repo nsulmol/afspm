@@ -12,7 +12,7 @@ from ...io import common
 
 from ...io.protos.generated import scan_pb2
 from ...io.protos.generated import control_pb2
-from ...io.protos.generated import signal_pb2
+from ...io.protos.generated import spec_pb2
 
 from ...io.control.client import ControlClient, send_req_handle_ctrl
 
@@ -27,12 +27,12 @@ PROBE_POS_KW = 'probe_pos'
 class ScanHandler:
     """Simplifies requesting a scan from a MicroscopeTranslator.
 
-    The ScanHandler encapsulates the procedure of getting a scan or signal
+    The ScanHandler encapsulates the procedure of getting a scan or spec
     from a MicroscopeTranslator, which involves:
     - Ensuring we have control of the MicroscopeTranslator.
     - Setting the scan parameters/probe position, which may involve moving the
     device.
-    - Obtaining the scan/signal, once the device has been setup (and moved to
+    - Obtaining the scan/spec, once the device has been setup (and moved to
     the right location).
 
     If we do not have control, it will log this and continue requesting control
@@ -70,10 +70,10 @@ class ScanHandler:
     """
 
     ParamsCallable = Callable[[Any], scan_pb2.ScanParameters2d |
-                              signal_pb2.ProbePosition]
+                              spec_pb2.ProbePosition]
 
     COLLECTING_STATES = [scan_pb2.ScopeState.SS_SCANNING,
-                         scan_pb2.ScopeState.SS_SIGNALING]
+                         scan_pb2.ScopeState.SS_SPEC]
 
     def __init__(self, rerun_wait_s: int,
                  get_next_params: Callable[[Any],
@@ -242,7 +242,7 @@ class ScanHandler:
 
     @staticmethod
     def _get_set_call_for_next(params: scan_pb2.ScanParameters2d |
-                               signal_pb2.ProbePosition,
+                               spec_pb2.ProbePosition,
                                control_client: ControlClient
                                ) -> (Callable, dict):
         """Get set_scan_params or set_probe_pos depending on params fed."""
@@ -251,34 +251,34 @@ class ScanHandler:
         if isinstance(params, scan_pb2.ScanParameters2d):
             req_to_call = control_client.set_scan_params
             req_params[SCAN_PARAMS_KW] = params
-        elif isinstance(params, signal_pb2.ProbePosition):
+        elif isinstance(params, spec_pb2.ProbePosition):
             req_to_call = control_client.set_probe_pos
             req_params[PROBE_POS_KW] = params
         return req_to_call, req_params
 
     @staticmethod
     def _get_collection_call_for_next(params: scan_pb2.ScanParameters2d |
-                                      signal_pb2.ProbePosition,
+                                      spec_pb2.ProbePosition,
                                       control_client: ControlClient
                                       ) -> Callable:
-        """Get start_scan or start_signal depending on params fed."""
+        """Get start_scan or start_spec depending on params fed."""
         req_to_call = None
         if isinstance(params, scan_pb2.ScanParameters2d):
             req_to_call = control_client.start_scan
-        elif isinstance(params, signal_pb2.ProbePosition):
-            req_to_call = control_client.start_signal
+        elif isinstance(params, spec_pb2.ProbePosition):
+            req_to_call = control_client.start_spec
         return req_to_call
 
     @staticmethod
     def _get_collection_scope_state(params: scan_pb2.ScanParameters2d |
-                                    signal_pb2.ProbePosition,
+                                    spec_pb2.ProbePosition,
                                     ) -> scan_pb2.ScopeState:
-        """Get SS_SCANNING or SS_SIGNALING depending on params fed."""
+        """Get SS_SCANNING or SS_SPEC depending on params fed."""
         scope_state = scan_pb2.ScopeState.SS_UNDEFINED
         if isinstance(params, scan_pb2.ScanParameters2d):
             scope_state = scan_pb2.ScopeState.SS_SCANNING
-        elif isinstance(params, signal_pb2.ProbePosition):
-            scope_state = scan_pb2.ScopeState.SS_SIGNALING
+        elif isinstance(params, spec_pb2.ProbePosition):
+            scope_state = scan_pb2.ScopeState.SS_SPEC
         return scope_state
 
     def _handle_rerun(self, perform_rerun: bool):
