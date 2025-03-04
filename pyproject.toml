@@ -1,56 +1,67 @@
-[tool.poetry]
+[project]
 name = "afspm"
 version = "0.1.0"
 description = "Automation Framework for SPM"
-authors = ["Nick Sullivan <nsulmol@gmail.com>"]
-license = "GPL"
+authors = [{ name = "Nick Sullivan Molina", email =  "nsulmol@gmail.com" }]
+maintainers = [{ name = "Nick Sullivan Molina", email =  "nsulmol@gmail.com" }]
+license = { text = "GPL-2.0-only" }
+
 readme = "README.md"
+packages = [{include = "afspm"}]
 
-[tool.poetry.dependencies]
-python = "^3.9"
-xarray = "^2023.7.0"
-pyzmq = [
-      {version = "^25.1.0", markers = 'sys_platform != "win32"'},
-      {version = "~23.2.1", markers = 'sys_platform == "win32"'}
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Topic :: Scientific/Engineering :: Information Analysis",
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
+  "Operating System :: OS Independent",
 ]
-numpy = "^1.25.1"
-protobuf = "5.29.3"
-fire = "^0.5.0"
-pysimplegui = "^4.60.5"
-imageio = "^2.31.2"
-tomli = "^2.0.1"
-pint = "^0.22"
-scipy = "^1.12.0"
-matplotlib = "^3.8.2"
-colorlog = "^6.8.2"
 
-[tool.poetry.group.dev.dependencies]
-debugpy = "^1.6.7"
-pytest = "^7.4.0"
+requires-python = ">=3.9, <4"
+dependencies = [
+  "xarray (>=2023.7.0, <2024.0.0)",
+  "pyzmq (>=25.1.0, <26.0.0) ; sys_platform != 'win32'",
+  "pyzmq (>=23.2.1, <23.3.0) ; sys_platform == 'win32'",
+  "numpy (>=1.25.1, <2.0.0)",
+  "protobuf (>=5.29.3, <6.0.0)",
+  "fire (>=0.5.0, <0.6.0)",
+#  "pysimplegui (>=4.60.5, <5.0.0)",  # TODO: Replace with other UI library!
+  "imageio (>=2.31.2, <3.0.0)",
+  "tomli (>=2.0.1, <3.0.0)",
+  "pint (>=0.22, <0.23)",
+  "scipy (>=1.12.0, <2.0.0)",
+  "matplotlib (>=3.8.2, <4.0.0)",
+  "colorlog (>=6.8.2, <7.0.0)",
+]
 
-[tool.poetry.group.gxsm]
-optional = true
+[project.optional-dependencies]
+dev = [
+  "debugpy (>=1.6.7, <2.0.0)",
+  "pytest (>=7.4.0, <8.0.0)",
+]
+gxsm = [
+  "gxsmread (>=0.2.3, <0.3.0)",
+]
+asylum = [
+  "igor2 (>=0.5.3, <0.6.0)",
+  "scifireaders (>=0.11.0, <0.12.0)",
+]
+omicronsxm = [
+  "scifireaders (>=0.11.0, <0.12.0)",
+]
 
-[tool.poetry.group.gxsm.dependencies]
-gxsmread = {path = "../gxsmread"}
 
-[tool.poetry.group.asylum]
-optional = true
-
-[tool.poetry.group.asylum.dependencies]
-igor2 = "^0.5.3"
-scifireaders = "^0.11.0"
-
-[tool.poetry.group.omicronsxm]
-optional = true
-
-[tool.poetry.group.omicronsxm.dependencies]
-scifireaders = "^0.11.0"
-
-[tool.poetry.scripts]
+[project.scripts]
 spawn = "afspm.spawn:cli_spawn"
 spawn_monitorless = "afspm.spawn:cli_spawn_monitorless"
+
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+
+[project.urls]
+Homepage = "https://github.com/nsulmol/afspm"
+Repository = "https://github.com/nsulmol/afspm.git"
