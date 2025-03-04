@@ -225,7 +225,7 @@ class ActionHandler(metaclass=ABCMeta):
         """
         action_callable = self._get_action(generic_action)
 
-        # This is so ugly -- I'm sorry.
+        # This is somewhat ugly -- I'm sorry.
         if action_callable.pass_self:
             if action_callable.kwargs:
                 if action_callable.type == CallableType.PASS_ARGS:
@@ -258,8 +258,7 @@ class ActionHandler(metaclass=ABCMeta):
                 the actions_config.
         """
         if generic_action not in self.actions:
-            msg = (f'Action {generic_action} not found in params config ' +
-                   'or value was not string.')
+            msg = (f'Action {generic_action} not found in actions config.')
             logger.error(msg)
             raise ActionNotSupportedError(msg)
         return self.actions[generic_action]
