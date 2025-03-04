@@ -1,7 +1,5 @@
 """Test the actions logic (principally ActionHandler)."""
 
-import os
-import sys
 import logging
 import pytest
 import tomli
