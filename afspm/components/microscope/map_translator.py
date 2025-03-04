@@ -135,8 +135,8 @@ class MapTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
 
         return control_pb2.ControlResponse.REP_SUCCESS
 
-    def check_action_support(self, action: control_pb2.ActionMsg
-                             ) -> control_pb2.ControlResponse:
+    def on_check_action_support(self, action: control_pb2.ActionMsg
+                                ) -> control_pb2.ControlResponse:
         """Inform whether this translator supports this action.
 
         Note: it does not *run* the action. Rather, it simply states whether

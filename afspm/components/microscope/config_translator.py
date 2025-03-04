@@ -228,8 +228,8 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
 
         return control_pb2.ControlResponse.REP_SUCCESS
 
-    def check_action_support(self, action: control_pb2.ActionMsg
-                             ) -> control_pb2.ControlResponse:
+    def on_check_action_support(self, action: control_pb2.ActionMsg
+                                ) -> control_pb2.ControlResponse:
         """Inform whether this translator supports this action.
 
         Note: it does not *run* the action. Rather, it simply states whether
@@ -247,7 +247,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         self._handle_action_not_in_actions(action)
 
         try:
-            self.actions._get_action(action)
+            self.action_handler._get_action(action.action)
         except actions.ActionNotSupportedError:
             return control_pb2.ControlResponse.REP_ACTION_NOT_SUPPORTED
         return control_pb2.ControlResponse.REP_SUCCESS
