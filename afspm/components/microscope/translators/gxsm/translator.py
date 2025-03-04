@@ -125,8 +125,12 @@ class GxsmTranslator(ConfigTranslator):
         # in MicroscopeTranslator.
         state = get_current_scope_state(self.param_handler)
         if (self.scope_state == scan_pb2.ScopeState.SS_SCANNING and
-                state == scan_pb2.ScopeState.SS_FREE):
-            gxsm.autosave()  # Save the images we have recorded
+            state == scan_pb2.ScopeState.SS_FREE):
+            gxsm.autosave()  # Save the scans we have recorded
+       if (self.scope_state == scan_pb2.ScopeState.SS_SPEC and
+           state == scan_pb2.ScopeState.SS_FREE):
+           logger.warning('Need to save scans. How do we do that!?')
+           # TODO: Save the specs...
         return state
 
     def poll_scans(self) -> [scan_pb2.Scan2d]:
@@ -209,12 +213,19 @@ class GxsmTranslator(ConfigTranslator):
 
     def _get_latest_spec_filename(self) -> str | None:
         """Obtain latest spec filename (or None if not found)."""
+        # TODO FIX ME! Only works if we have run a scan?
         chfname = gxsm.chfname(0)
+        logger.warning(f'chfname: {chfname}')
         spec_search = (os.path.dirname(os.path.abspath(chfname)) + os.sep
                        + SPEC_EXT_SEARCH)
+        logger.warning(f'spec_search: {spec_search}')
         files_list = glob.glob(spec_search)
-        latest_spec = max(files_list, key=os.path.getctime)
-        return latest_spec
+        logger.warning(f'files_list: {files_list}')
+        if len(files_list) > 0:
+            latest_spec_filename = max(files_list, key=os.path.getctime)
+            logger.warning(f'latest_spec: {latest_spec}')
+            return latest_spec_filename
+        return None
 
     def _load_spec(self, fname: str) -> spec_pb2.Spec1d | None:
         """Load Spec1d from provided filename (None on failure)."""
