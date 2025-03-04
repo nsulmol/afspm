@@ -123,19 +123,30 @@ class GxsmTranslator(ConfigTranslator):
 
     def poll_scans(self) -> [scan_pb2.Scan2d]:
         """Override scans polling."""
+        last_scan_fname = None
+        fnames = self._get_channel_filenames()
+
+        # Avoid reloading scans if they are not new.
+        there_are_scans = len(fnames) > 0
+        scans_same_as_last = (there_are_scans and
+                              fnames[0] == self.last_scan_fname)
+        if there_are_scans and not scans_same_as_last:
+            scans = []
+            for fname in fnames:
+                scan = self._load_scan(fname)
+                if scan:
+                    scans.append(scan)
+            self.last_scan_fname = last_scan_fname
+            self.old_scans = scans
+        return self.old_scans
+
+    def _get_channel_filenames(self) -> list[str]:
+        """Request channel filenames from gxsm as list of strs."""
         channel_idx = 0
         fnames = []
-        last_scan_fname = None
-
         try:
             while channel_idx < self.MAX_NUM_CHANNELS:
                 fname = gxsm.chfname(channel_idx)
-
-                # Avoid reloading scans if the same. Return old scans.
-                if channel_idx == 0:
-                    if fname == self.last_scan_fname:
-                        return self.old_scans
-                    last_scan_fname = fname
 
                 # Break if on last 'set' channel
                 if fname == self.CHANNEL_FILENAME_ERROR_STR:
@@ -148,39 +159,35 @@ class GxsmTranslator(ConfigTranslator):
         except Exception as exc:
             logger.trace(f"Exception with requesting channel {channel_idx}: "
                          f"{str(exc)}")
+        return fnames
 
-        # Avoid reloading scans if they are not new.
-        if len(fnames) > 0:
-            scans = []
-            for fname in fnames:
-                ts = get_file_modification_datetime(fname)
-                try:
-                    ds = read.open_dataset(
-                        fname, self.read_channels_config_path,
-                        self.read_use_physical_units,
-                        self.read_allow_convert_from_metadata,
-                        self.read_simplify_metadata,
-                        engine='scipy')
-                except Exception as exc:
-                    logger.error(f"Could not read scan fname {fname}, "
-                                 f"got error {exc}.")
-                    continue
+    def _load_scan(self, fname: str) -> scan_pb2.Scan2d | None:
+        """Try to load a scan from a given filename (None on error)."""
+        ts = get_file_modification_datetime(fname)
+        try:
+            ds = read.open_dataset(
+                fname, self.read_channels_config_path,
+                self.read_use_physical_units,
+                self.read_allow_convert_from_metadata,
+                self.read_simplify_metadata,
+                engine='scipy')
 
-                # Grabbing first data variable, since each channel is
-                # stored in its own file (so each file should have only
-                # one data variable).
-                scan = conv.convert_xarray_to_scan_pb2(
-                    ds[list(ds.data_vars)[0]])
+            # Grabbing first data variable, since each channel is
+            # stored in its own file (so each file should have only
+            # one data variable).
+            scan = conv.convert_xarray_to_scan_pb2(
+                ds[list(ds.data_vars)[0]])
 
-                # Set ROI angle, timestamp, filename
-                scan.params.spatial.roi.angle = ds.attrs[SCAN_ATTRIB_ANGLE]
-                scan.timestamp.FromDatetime(ts)
-                scan.filename = fname
+            # Set ROI angle, timestamp, filename
+            scan.params.spatial.roi.angle = ds.attrs[SCAN_ATTRIB_ANGLE]
+            scan.timestamp.FromDatetime(ts)
+            scan.filename = fname
 
-                scans.append(scan)
-            self.last_scan_fname = last_scan_fname
-            self.old_scans = scans
-        return self.old_scans
+            return scan
+        except Exception as exc:
+            logger.error(f"Could not read scan fname {fname}, "
+                         f"got error {exc}.")
+            return None
 
     def poll_spec(self) -> spec_pb2.Spec1d:
         """Override spec polling. For now, not supported."""
