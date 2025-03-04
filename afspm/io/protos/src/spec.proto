@@ -22,11 +22,11 @@ message ProbePosition {
 
 /* Holds spectroscopy data, variables names, and units.*/
 message SpecData {
-  uint32 numVariables = 1;
-  uint32 dataPerVariable = 2;
+  uint32 num_variables = 1;
+  uint32 data_per_variable = 2;
   repeated string names = 3;  // Should be length of numVariables
   repeated string units = 4;  // Should be length of numVariables
-  repeated double values = 5;  // 2D array of arr[numVariables][dataPerVariable]
+  repeated double values = 5;  // 2D array of arr[dataPerVariable][numVariables]
 }
 
 /* One-dimensional spectroscopy signal collected at a single (x,y) position.

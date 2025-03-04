@@ -2,6 +2,8 @@
 
 import os.path
 import logging
+import glob
+import pandas as pd
 
 from afspm.components.microscope.params import ParameterHandler
 from afspm.components.microscope.actions import ActionHandler
@@ -9,11 +11,12 @@ from afspm.components.microscope.translator import (
     get_file_modification_datetime)
 from afspm.components.microscope.config_translator import ConfigTranslator
 from afspm.utils import array_converters as conv
+from afspm.io.protos.generated import geometry_pb2
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import spec_pb2
 
 import gxsm  # Dynamic DLL, so not in pyproject.
-from gxsmread import read
+from gxsmread import read, spec
 
 from . import params
 from . import actions
@@ -29,6 +32,9 @@ SCAN_ATTRIB_ANGLE = 'alpha'
 # Default filenames for actions and params config files.
 ACTIONS_FILENAME = 'actions.toml'
 PARAMS_FILENAME = 'params.toml'
+
+
+SPEC_EXT_SEARCH = '*.vpdata'
 
 
 class GxsmTranslator(ConfigTranslator):
@@ -95,6 +101,8 @@ class GxsmTranslator(ConfigTranslator):
 
         self.last_scan_fname = ''
         self.old_scans = []
+        self.last_spec_fname = ''
+        self.old_spec = None
 
         # Default initialization of handlers and addition to kwargs
         if not action_handler:
@@ -191,7 +199,59 @@ class GxsmTranslator(ConfigTranslator):
 
     def poll_spec(self) -> spec_pb2.Spec1d:
         """Override spec polling. For now, not supported."""
-        return spec_pb2.Spec1d()
+        spec_fname = self._get_latest_spec_filename()
+        if spec_fname and spec_fname != self.last_spec_fname:
+            spec = self._load_spec()
+            if spec:
+                self.last_spec_fname = spec_fname
+                self.old_spec = spec
+        return self.old_spec
+
+    def _get_latest_spec_filename(self) -> str | None:
+        """Obtain latest spec filename (or None if not found)."""
+        chfname = gxsm.chfname(0)
+        spec_search = (os.path.dirname(os.path.abspath(chfname)) + os.sep
+                       + SPEC_EXT_SEARCH)
+        files_list = glob.glob(spec_search)
+        latest_spec = max(files_list, key=os.path.getctime)
+        return latest_spec
+
+    def _load_spec(self, fname: str) -> spec_pb2.Spec1d | None:
+        """Load Spec1d from provided filename (None on failure)."""
+        ts = get_file_modification_datetime(fname)
+        try:
+            df = read.open_spec(fname)
+            spec = convert_dataframe_to_spec1d(df)
+
+            spec.timestamp.FromDateTime(ts)
+            spec.filename = fname
+            return spec
+        except Exception as exc:
+            logger.error(f"Could not read spec fname {fname}, "
+                         f"got error {exc}.")
+            return None
+
+
+def convert_dataframe_to_spec1d(df: pd.DataFrame) -> spec_pb2.Spec1d:
+    """Convert pandas DataFrame to spec_pb2.Spec1d."""
+    point_2d = geometry_pb2.Point2d(x=float(df.attrs[spec.PROBE_POS_X]),
+                                    y=float(df.attrs[spec.PROBE_POS_Y]))
+    probe_pos = spec_pb2.ProbePosition(point=point_2d,
+                                       units=df.attrs[spec.PROBE_POS_UNIT])
+
+    units_dict = df.attrs[spec.KEY_UNITS]
+    names = list(units_dict.keys())
+    units = list(units_dict.values())
+    data = df.values
+
+    spec_data = spec_pb2.SpecData(num_variables=data.shape[0],
+                                  data_per_variable=data.shape[1],
+                                  names=names, units=units,
+                                  values=data.ravel().tolist())
+
+    spec = spec_pb2.Spec1d(position=probe_pos,
+                           data=spec_data)
+    return spec
 
 
 def get_current_scope_state(param_handler: ParameterHandler
@@ -206,8 +266,8 @@ def get_current_scope_state(param_handler: ParameterHandler
     svec = gxsm.rtquery('s')  # presumably s for state
     s = int(svec[0])
     # (2+4) == Scanning; 8 == Vector Probe
-    scanning = (s & (2+4) > GxsmTranslator.STATE_RUNNING_THRESH or
-                s & 8 > GxsmTranslator.STATE_RUNNING_THRESH)
+    scanning = s & (2+4) > GxsmTranslator.STATE_RUNNING_THRESH
+    specing = s & 8 > GxsmTranslator.STATE_RUNNING_THRESH
     moving = s & 16 > GxsmTranslator.STATE_RUNNING_THRESH
 
     # TODO: investigate motor logic further...
@@ -217,6 +277,8 @@ def get_current_scope_state(param_handler: ParameterHandler
         return scan_pb2.ScopeState.SS_COARSE_MOTOR
     if scanning:
         return scan_pb2.ScopeState.SS_SCANNING
+    if specing:
+        return scan_pb2.ScopeState.SS_SPEC
     if moving:
         return scan_pb2.ScopeState.SS_MOVING
     return scan_pb2.ScopeState.SS_FREE
