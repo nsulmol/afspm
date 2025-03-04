@@ -579,7 +579,7 @@ def test_probe_pos(client, default_control_state,
 
 
     if (initial_probe_pos.point.x != 0 or
-        initial_probe_pos.point.y != 0):
+            initial_probe_pos.point.y != 0):
         logger.info('Requested new position of probe. Expect '
                     'scope state change too, because we are moving to it.')
         scope_state_msg = scan_pb2.ScopeStateMsg(
