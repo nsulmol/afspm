@@ -5,19 +5,25 @@ In order to run it, you must:
     poetry run spawn config.toml --components_to_spawn=['scheduler']
 2. Start up the microscope translator you wish to test. This startup will be
 implementation-specific (look at the readme for your translator).
-3. Run these tests:
-    poetry run pytest $PATH_TO_TEST/test_translator.py --config_path $CONFIG_FILE_PATH
+3. Run these tests (backslash just to fit in line length limits):
+    poetry run pytest $PATH_TO_TEST/test_translator.py --config_path \
+    $CONFIG_FILE_PATH
 Note the default config path is './config.toml'.
 
 Your config file contains the parameters for our tests. See sample_config.toml
 for guidance.
 
-Ideally, you should set your translator's scan parameters to scan quickly
+NOTES:
+- Ideally, you should set your translator's scan parameters to scan quickly
 before running these tests. For example, increase your scan speed and
 decrease your ROI size to pass the test more quickly. This can be accomplished
 by including SCAN_SPEED_KEY, PHYS_SIZE_KEY, and DATA_SHAPE_KEY keys in your
 config, with appropriate values. See these variables below, or look at
 sample_config.toml.
+- We do not have accessors for spectroscopic parameters (as we are trying to
+minimize the parameters needed to support). So, you will need to manually set
+the spectroscopic parameters to smaller values if you want the test to run more
+quickly.
 """
 
 from typing import Optional
@@ -87,6 +93,7 @@ def timeout_ms(config_dict):
 def move_wait_ms(config_dict):
     return config_dict['move_wait_ms']
 
+
 @pytest.fixture(scope="module")
 def scan_wait_ms(config_dict):
     return config_dict['scan_wait_ms']
@@ -105,6 +112,7 @@ def router_url(config_dict):
 @pytest.fixture(scope="module")
 def exp_problem():
     return control_pb2.ExperimentProblem.EP_NONE
+
 
 @pytest.fixture(scope="module")
 def control_mode():
