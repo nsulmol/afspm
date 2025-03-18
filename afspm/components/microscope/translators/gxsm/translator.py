@@ -2,6 +2,7 @@
 
 import os.path
 import logging
+import traceback
 import glob
 import pandas as pd
 
@@ -16,7 +17,9 @@ from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import spec_pb2
 
 import gxsm  # Dynamic DLL, so not in pyproject.
-from gxsmread import read, spec
+from gxsmread import read
+from gxsmread.spec import (KEY_PROBE_POS_X, KEY_PROBE_POS_Y,
+                           KEY_PROBE_POS_UNITS, KEY_UNITS)
 
 from . import params
 from . import actions
@@ -213,16 +216,17 @@ class GxsmTranslator(ConfigTranslator):
             scan.filename = fname
 
             return scan
-        except Exception as exc:
+        except Exception:
             logger.error(f"Could not read scan fname {fname}, "
-                         f"got error {exc}.")
+                         f"got error.")
+            logger.error(traceback.format_exc())
             return None
 
     def poll_spec(self) -> spec_pb2.Spec1d:
         """Override spec polling. For now, not supported."""
         spec_fname = self._get_latest_spec_filename()
         if spec_fname and spec_fname != self.last_spec_fname:
-            spec = self._load_spec()
+            spec = self._load_spec(spec_fname)
             if spec:
                 self.last_spec_fname = spec_fname
                 self.old_spec = spec
@@ -230,17 +234,17 @@ class GxsmTranslator(ConfigTranslator):
 
     def _get_latest_spec_filename(self) -> str | None:
         """Obtain latest spec filename (or None if not found)."""
-        # TODO FIX ME! Only works if we have run a scan?
-        chfname = gxsm.chfname(0)
-        logger.warning(f'chfname: {chfname}')
+        chfname = gxsm.chfname(0)  # NOTE: Assumes a scan has been done.
+        if chfname == self.CHANNEL_FILENAME_ERROR_STR:
+            return None
+
         spec_search = (os.path.dirname(os.path.abspath(chfname)) + os.sep
                        + SPEC_EXT_SEARCH)
-        logger.warning(f'spec_search: {spec_search}')
         files_list = glob.glob(spec_search)
-        logger.warning(f'files_list: {files_list}')
+
         if len(files_list) > 0:
             latest_spec_filename = max(files_list, key=os.path.getctime)
-            logger.warning(f'latest_spec: {latest_spec}')
+            logger.warning(f'latest_spec: {latest_spec_filename}')
             return latest_spec_filename
         return None
 
@@ -251,23 +255,24 @@ class GxsmTranslator(ConfigTranslator):
             df = read.open_spec(fname)
             spec = convert_dataframe_to_spec1d(df)
 
-            spec.timestamp.FromDateTime(ts)
+            spec.timestamp.FromDatetime(ts)
             spec.filename = fname
             return spec
-        except Exception as exc:
+        except Exception:
             logger.error(f"Could not read spec fname {fname}, "
-                         f"got error {exc}.")
+                         f"got error.")
+            logger.error(traceback.format_exc())
             return None
 
 
 def convert_dataframe_to_spec1d(df: pd.DataFrame) -> spec_pb2.Spec1d:
     """Convert pandas DataFrame to spec_pb2.Spec1d."""
-    point_2d = geometry_pb2.Point2d(x=float(df.attrs[spec.PROBE_POS_X]),
-                                    y=float(df.attrs[spec.PROBE_POS_Y]))
+    point_2d = geometry_pb2.Point2d(x=float(df.attrs[KEY_PROBE_POS_X]),
+                                    y=float(df.attrs[KEY_PROBE_POS_Y]))
     probe_pos = spec_pb2.ProbePosition(point=point_2d,
-                                       units=df.attrs[spec.PROBE_POS_UNIT])
+                                       units=df.attrs[KEY_PROBE_POS_UNITS])
 
-    units_dict = df.attrs[spec.KEY_UNITS]
+    units_dict = df.attrs[KEY_UNITS]
     names = list(units_dict.keys())
     units = list(units_dict.values())
     data = df.values
