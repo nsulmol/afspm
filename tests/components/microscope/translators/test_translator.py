@@ -95,6 +95,11 @@ def move_wait_ms(config_dict):
 
 
 @pytest.fixture(scope="module")
+def spec_wait_ms(config_dict):
+    return config_dict['spec_wait_ms']
+
+
+@pytest.fixture(scope="module")
 def scan_wait_ms(config_dict):
     return config_dict['scan_wait_ms']
 
@@ -210,10 +215,10 @@ def sub_probe_pos(ctx, topics_probe_pos, move_wait_ms, psc_url):
 
 
 @pytest.fixture
-def sub_spec(ctx, topics_spec, scan_wait_ms, psc_url):
+def sub_spec(ctx, topics_spec, spec_wait_ms, psc_url):
     return Subscriber(psc_url,
                       topics_to_sub=topics_spec,
-                      poll_timeout_ms=scan_wait_ms)
+                      poll_timeout_ms=spec_wait_ms)
 
 
 @pytest.fixture

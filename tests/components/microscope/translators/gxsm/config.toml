@@ -10,6 +10,7 @@ router_url = 'tcp://127.0.0.1:7779'
 timeout_ms = 5000
 move_wait_ms = 10000
 scan_wait_ms = 180000
+spec_wait_ms = 30000
 
 # --- (Optional) Scan Settings --- #
 # Parameters we try to set to, for a faster scan.
