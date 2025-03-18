@@ -40,6 +40,10 @@ SPEC_EXT_SEARCH = '*.vpdata'
 class GxsmTranslator(ConfigTranslator):
     """Handles device communication with the gxsm3 controller.
 
+    NOTE: GXSM is unable to run spectroscopies *before* a scan has run.
+    This means that test_translator runs where spectroscopic tests are
+    run *before* scan tests will likely fail. Please keep this in mind!
+
     Attributes:
         read_channels_config_path: path to config file to convert from
             raw data to physical units. See gxsmread documentation.
@@ -108,7 +112,7 @@ class GxsmTranslator(ConfigTranslator):
         if not action_handler:
             action_handler = _init_action_handler()
             if spec_mode:
-                spec_enum = actions.GxsmSpecModeAction(spec_mode)
+                spec_enum = actions.GxsmSpecMode(spec_mode)
                 actions.update_spec_mode(action_handler, spec_enum)
             kwargs['action_handler'] = action_handler
         if not param_handler:
@@ -119,18 +123,31 @@ class GxsmTranslator(ConfigTranslator):
             kwargs['param_handler'] = param_handler
         super().__init__(**kwargs)
 
+        self._setup_save_spectroscopies()
+
+    def _setup_save_spectroscopies(self):
+        """Tell GXSM to autosave all spectroscopies.
+
+        GXSM does not currently have a way to manually save these, so this
+        is the only real way around it.
+
+        NOTE: We are not saving the prior state and resetting on closure.
+        This may cause some annoyance with users. Consider changing later.
+
+        NOTE: no error handling, it seems. Nothing happens if mode doesn't
+        exist.
+        """
+        for mode in actions.SPEC_MODES:
+            gxsm.action(actions._get_spec_autosave_str(mode))
+
     def poll_scope_state(self) -> scan_pb2.ScopeState:
         """Return current scope state in accordance with system model."""
         # Note: updating self.scope_state is handled by the calling method
         # in MicroscopeTranslator.
         state = get_current_scope_state(self.param_handler)
         if (self.scope_state == scan_pb2.ScopeState.SS_SCANNING and
-            state == scan_pb2.ScopeState.SS_FREE):
+                state == scan_pb2.ScopeState.SS_FREE):
             gxsm.autosave()  # Save the scans we have recorded
-       if (self.scope_state == scan_pb2.ScopeState.SS_SPEC and
-           state == scan_pb2.ScopeState.SS_FREE):
-           logger.warning('Need to save scans. How do we do that!?')
-           # TODO: Save the specs...
         return state
 
     def poll_scans(self) -> [scan_pb2.Scan2d]:
