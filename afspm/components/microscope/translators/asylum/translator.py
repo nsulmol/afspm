@@ -2,24 +2,35 @@
 
 import os
 import logging
+from typing import Any
 import glob
+import SciFiReaders as sr
 
+from afspm.components.microscope.params import (ParameterHandler,
+                                                ParameterError,
+                                                MicroscopeParameter,
+                                                _cap_val_in_range)
+from afspm.components.microscope.actions import (ActionHandler,
+                                                 ActionError,
+                                                 MicroscopeAction)
 from afspm.components.microscope.translator import (
-    MicroscopeTranslator,
-    get_file_modification_datetime,
-    MicroscopeError)
+    get_file_modification_datetime, MicroscopeError)
+from afspm.components.microscope.config_translator import ConfigTranslator
 
 from afspm.components.microscope.translators.asylum.client import XopClient
-from afspm.components.microscope.translators.asylum import params
 from afspm.components.microscope.translators.asylum.xop import (
     convert_igor_path_to_python_path)
 
 from afspm.utils import array_converters as conv
+from afspm.utils import units
 from afspm.io.protos.generated import scan_pb2
+from afspm.io.protos.generated import spec_pb2
 from afspm.io.protos.generated import control_pb2
 from afspm.io.protos.generated import feedback_pb2
 
-import SciFiReaders as sr
+
+from . import params
+from . import actions
 
 
 logger = logging.getLogger(__name__)
@@ -30,7 +41,12 @@ logger = logging.getLogger(__name__)
 SCAN_ATTRIB_ANGLE = 'ScanAngle'
 
 
-class AsylumTranslator(MicroscopeTranslator):
+# Default filenames for actions and params config files.
+ACTIONS_FILENAME = 'actions.toml'
+PARAMS_FILENAME = 'params.toml'
+
+
+class AsylumTranslator(ConfigTranslator):
     """Handles device communication with the asylum controller.
 
     The AsylumTranslator communicates with the Asylum Research software via the
@@ -39,52 +55,95 @@ class AsylumTranslator(MicroscopeTranslator):
     https://github.com/AllenInstitute/ZeroMQ-XOP
 
     Attributes:
-        _client: XOPClient for communicating with Asylum Research exe.
         _old_scan_path: the prior scan filepath. We use this to avoid loading
             the same scans multiple times.
+        _old_spec_path: the prior spec filepath. We use this to avoid loading
+            the same spectroscopies multiple times.
         _old_save_state: the prior state of whether or not we were saving
             scans.
         _old_last_scan: the prior state of whether or not we were scanning 1x
             per request.
+        _old_last_spec: the prior state of whether or not we were spec'ing 1x
+            per request.
     """
 
-    SCAN_PARAMS = (params.AsylumParam.TL_X, params.AsylumParam.TL_Y,
-                   params.AsylumParam.SCAN_SIZE,
-                   params.AsylumParam.SCAN_X_RATIO,
-                   params.AsylumParam.SCAN_Y_RATIO,
-                   params.AsylumParam.RES_X, params.AsylumParam.RES_Y,
-                   params.AsylumParam.ANGLE)
+    IMG_EXT = '.ibw'
+    SCAN_PREFIX = 'Image'
+    SPEC_PREFIX = 'Force'
 
-    ZCTRL_PARAMS = (params.AsylumParam.CP,
-                    params.AsylumParam.CI)
+    # TODO: on startup, you need to call InitProbePos().
+    def __init__(self, param_handler: ParameterHandler = None,
+                 action_handler: ActionHandler = None,
+                 xop_client: XopClient = None,
+                 **kwargs):
+        """Init things, ensure we can hook into XOP Client.
 
-    IMG_EXT = ".ibw"
-
-    def __init__(self, xop_client: XopClient, **kwargs):
-        """Init things, ensure we can hook into XOP Client."""
-        if xop_client is None:
-            msg = "No xop client provided, cannot continue!"
-            logger.critical(msg)
-            raise AttributeError(msg)
-
-        self._client = xop_client
+        Args:
+            param_handler: ParamHandler to use. If None, spawns default.
+            action_handler: ActionHandler to use. If None, spawns default.
+            xop_client: the xop client, used to intialize the ParamHandler
+                and ActionHandler if these were not provided. If None,
+                we spawn a default.
+        """
         self._old_scan_path = None
         self._old_scans = []
+        self._old_spec_path = None
+        self._old_spec = None
 
         self._old_save_state = None
         self._old_last_scan = None
+        # Default initialization of handler
+        kwargs = self._init_handlers(xop_client, param_handler, action_handler,
+                                     kwargs)
+        super().__init__(**kwargs)
+        self.param_method_map = params.PARAM_METHOD_MAP
+
+        # Do some setup
+        self._setup_probe_pos()
         self._set_save_params(save_state=params.ASYLUM_TRUE,
                               last_scan=params.ASYLUM_TRUE,
                               store_old_vals=True)
 
-        super().__init__(**kwargs)
-        self.param_method_map = params.PARAM_METHOD_MAP
 
     def __del__(self):
         """Handle object destruction: reset what we changed on startup."""
         self._set_save_params(save_state=self._old_save_state,
                               last_scan=self._old_last_scan,
                               store_old_vals=False)
+
+    def _init_handlers(client: XopClient,
+                       param_handler: ParameterHandler,
+                       action_handler: ActionHandler,
+                       **kwargs) -> dict:
+        """Init handlers and update kwargs."""
+        if not client:
+            client = XopClient()
+        if not param_handler:
+            param_handler = _init_param_handler(client)
+            kwargs['param_handler'] = param_handler
+        if not action_handler:
+            action_handler = _init_action_handler(client)
+            kwargs['action_handler'] = action_handler
+        return kwargs
+
+    def _setup_probe_pos(self):
+        """Set up probe positioning so we can use it.
+
+        The probe position logic is stored in Asylum via 3 WAVES:
+        - root:Packages:MFP3D:Force:SpotX: 1D array of x-dimension positions
+            where the probe could be moved to (in scan CS).
+        - root:Packages:MFP3D:Force:SpotY: 1D array of y-dimension positions
+            where the probe could be moved to (in scan CS).
+        - root:Packages:MFP3D:Force:SpotNum: 0-indexed index of which
+            spot we are using.
+
+        By default, the arrays have only 1 value, and this value is in the
+        middle of the scan CS.
+
+        This method makes these arrays have 2 values, with the 2nd value being
+        where we want it to run scans.
+        """
+        self.param_handler._call_method(params.INIT_POS_METHOD)
 
     def _set_save_params(self, save_state: int, last_scan: int,
                          store_old_vals: bool):
@@ -99,113 +158,110 @@ class AsylumTranslator(MicroscopeTranslator):
                 for resetting later.
         """
         if store_old_vals:
-            self._old_save_state = params.get_param(
-                self._client, params.AsylumParam.SAVE_IMAGE)
-            self._old_last_scan = params.get_param(
-                self._client, params.AsylumParam.LAST_SCAN)
+            self._old_save_state = self.param_handler.get_param(
+                params.AsylumParam.SAVE_IMAGE)
+            self._old_last_scan = self.param_handler.get_param(
+                params.AsylumParam.LAST_SCAN)
 
-        if not params.set_param(self._client,
-                                params.AsylumParam.SAVE_IMAGE,
-                                save_state):
+        try:
+            self.param_handler.set_param(params.AsylumParam.SAVE_IMAGE,
+                                         save_state)
+        except Exception:
             msg = f"Unable to set SaveImage to {save_state}."
             logger.error(msg)
             raise MicroscopeError(msg)
 
-        if not params.set_param(self._client,
-                                params.AsylumParam.LAST_SCAN,
-                                last_scan):
+        try:
+            self.param_handler.set_param(params.AsylumParam.LAST_SCAN,
+                                         last_scan)
+        except Exception:
             msg = f"Unable to set LastScan to {last_scan}."
             logger.error(msg)
             raise MicroscopeError(msg)
 
-    def on_start_scan(self):
-        """Override starting of scan."""
-        success, __ = self._client.send_request(
-            params.AsylumMethod.SCAN_FUNC,
-            (params.AsylumMethod.START_SCAN_PARAM,))
-        return (control_pb2.ControlResponse.REP_NO_RESPONSE if not success
-                else control_pb2.ControlResponse.REP_SUCCESS)
-
-    def on_stop_scan(self):
-        """Override stopping of scan."""
-        success, __ = self._client.send_request(
-            params.AsylumMethod.SCAN_FUNC,
-            (params.AsylumMethod.STOP_SCAN_PARAM,))
-        return (control_pb2.ControlResponse.REP_NO_RESPONSE if not success
-                else control_pb2.ControlResponse.REP_SUCCESS)
-
     def on_set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
                            ) -> control_pb2.ControlResponse:
-        """Override setting of scan params."""
-        scan_size = scan_params.spatial.roi.size.y
-        scan_y_ratio = 1.0
-        scan_x_ratio = scan_params.spatial.roi.size.x / scan_size
+        """Override setting of scan params.
 
-        attrs = self.SCAN_PARAMS
-        vals = (scan_params.spatial.roi.top_left.x,
+        We must set the scan params in a different order from default.
+        """
+        vals = [scan_params.spatial.roi.top_left.x,
                 scan_params.spatial.roi.top_left.y,
-                scan_size, scan_x_ratio, scan_y_ratio,
-                scan_params.data.shape.x, scan_params.data.shape.y,
-                scan_params.spatial.roi.angle)
-        attr_units = (scan_params.spatial.length_units, scan_params.spatial.length_units,
-                      scan_params.spatial.length_units, None, None, None, None,
-                      scan_params.spatial.length_units)
-        asylum_units = (params.PHYS_UNITS, params.PHYS_UNITS,
-                        params.PHYS_UNITS, None, None, None, None,
-                        params.PHYS_UNITS)
+                scan_params.spatial.roi.size.y,
+                scan_params.spatial.roi.size.x,
+                scan_params.data.shape.x,
+                scan_params.data.shape.y,
+                scan_params.spatial.roi.angle]
+        attr_units = [scan_params.spatial.length_units,
+                      scan_params.spatial.length_units,
+                      scan_params.spatial.length_units,
+                      scan_params.spatial.length_units,
+                      scan_params.data.units,
+                      scan_params.data.units,
+                      scan_params.spatial.angular_units]
 
-        if params.set_param_list(self._client, attrs, vals, attr_units,
-                                 asylum_units):
-            return control_pb2.ControlResponse.REP_SUCCESS
-        return control_pb2.ControlResponse.REP_PARAM_ERROR
+        try:
+            self.param_handler.set_param_list(params.SCAN_PARAMS, vals, attr_units)
+        except params.ParameterNotSupportedError:
+            return control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED
+        except params.ParameterError:
+            return control_pb2.ControlResponse.REP_PARAM_ERROR
+        return control_pb2.ControlResponse.REP_SUCCESS
 
-    def on_set_zctrl_params(self, zctrl_params: feedback_pb2.ZCtrlParameters
-                            ) -> control_pb2.ControlResponse:
-        """Override setting zctrl."""
-        desired_units = (None, None)
-        attrs = self.ZCTRL_PARAMS
-        vals = (zctrl_params.proportionalGain, zctrl_params.integralGain)
-        if params.set_param_list(self._client, attrs, vals, desired_units,
-                                 desired_units):
-            return control_pb2.ControlResponse.REP_SUCCESS
-        return control_pb2.ControlResponse.REP_PARAM_ERROR
+    def on_set_probe_pos(self, probe_pos: spec_pb2.ProbePosition
+                         ) -> control_pb2.ControlResponse:
+        """Override setting probe pos.
+
+        We must:
+        - change coordinate systems (CS), as Asylum stores their
+        probe position in the 'scan CS' (i.e. with the top-left as the origin).
+        - tell the microscope to move to its location after setting (as this is
+        what we expect).
+        """
+        scan_params = self.poll_scan_params()
+        scan_param_units = self.param_handler.get_unit(params.SCAN_PARAMS[0])
+        tl = [scan_params.spatial.roi.top_left.x,
+              scan_params.spatial.roi.top_left.y]
+        ranges = [[0, scan_params.spatial.roi.size.x],
+                  [0, scan_params.spatial.roi.size.y]]
+
+        # Convert from global CS to scan CS (subtract top-left)
+        vals = [probe_pos.point.x,
+                probe_pos.point.y]
+        vals = [units.convert(val, probe_pos.units, scan_param_units)
+                for val in vals]
+        vals = vals - tl
+
+        # Cap val in range.
+        vals[0] = _cap_val_in_range(vals[0], ranges[0],
+                                    generic_uuid='probe-pos-x')
+        vals[1] = _cap_val_in_range(vals[1], ranges[1],
+                                    generic_uuid='probe-pos-y')
+
+        # Set probe pos
+        try:
+            self.param_handler._call_method(params.SET_POS_METHOD,
+                                            (vals[0], vals[1]))
+            # Tell the controller to move to this position
+            self.action_handler.request_action(actions.MOVE_PROBE_UUID)
+        except ParameterError:
+            return control_pb2.ControlResponse.REP_PARAM_ERROR
+        except ActionError:
+            return control_pb2.ControlResponse.REP_ACTION_ERROR
 
     def poll_scope_state(self) -> scan_pb2.ScopeState:
         """Override scope state polling."""
-        scan_status = params.get_param(self._client,
-                                       params.AsylumParam.SCAN_STATUS)
-
-        if scan_status > 0:  # If 0, not scanning
+        val = self.param_handler._call_method(params.GET_STATUS_METHOD)
+        if params.ScopeState.SCANNING in val:
             return scan_pb2.ScopeState.SS_SCANNING
-        else:
-            return scan_pb2.ScopeState.SS_FREE
-
-    def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
-        """Override polling of scan params."""
-        vals = params.get_param_list(self._client, self.SCAN_PARAMS)
-        scan_params = scan_pb2.ScanParameters2d()
-        scan_params.spatial.roi.top_left.x = vals[0]
-        scan_params.spatial.roi.top_left.y = vals[1]
-        scan_params.spatial.roi.angle = vals[7]
-
-        scan_size = vals[2]
-        scan_ratio_w = vals[3]
-        scan_ratio_h = vals[4]
-
-        scan_params.spatial.roi.size.x = scan_size * scan_ratio_w
-        scan_params.spatial.roi.size.y = scan_size * scan_ratio_h
-        scan_params.spatial.length_units = params.PHYS_UNITS
-
-        # Asylum values returned as float, must convert to int?
-        scan_params.data.shape.x = int(vals[5])
-        scan_params.data.shape.y = int(vals[6])
-        # Note setting data units, as these are linked to scan channel
-
-        return scan_params
+        elif params.ScopeState.SPEC in val:
+            return scan_pb2.ScopeState.SS_SPEC
+        elif params.ScopeState.MOVING in val:
+            return scan_pb2.ScopeState.SS_MOVING
 
     def poll_scans(self) -> [scan_pb2.Scan2d]:
         """Override polling of scans."""
-        val = params.get_param(self._client, params.AsylumParam.IMG_PATH)
+        val = params.get_param(params.AsylumParam.IMG_PATH)
         img_path = convert_igor_path_to_python_path(val)
         images = sorted(glob.glob(img_path + os.sep + "*" + self.IMG_EXT),
                         key=os.path.getmtime)  # Sorted by access time
@@ -239,11 +295,62 @@ class AsylumTranslator(MicroscopeTranslator):
                 self._old_scans = scans
         return self._old_scans
 
-    def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
-        """Override polling of zctrl."""
-        vals = params.get_param_list(self._client, self.ZCTRL_PARAMS)
-        zctrl_params = feedback_pb2.ZCtrlParameters()
-        zctrl_params.feedbackOn = False  # TODO: how to read this!?!?!
-        zctrl_params.proportionalGain = vals[0]
-        zctrl_params.integralGain = vals[1]
-        return zctrl_params
+    # TODO: Missing poll_spec!!!
+
+    def poll_probe_pos(self) -> spec_pb2.ProbePosition | None:
+        """Override probe position polling.
+
+        The Asylum controller stores these in the scan coordinate system
+        (CS). We need to convert back to the global CS when sending out.
+        """
+        vals = []
+        vals.append(self.param_handler._call_method(params.GET_POS_X_METHOD))
+        vals.append(self.param_handler._call_method(params.GET_POS_Y_METHOD))
+
+        scan_params = self.poll_scan_params()
+        units = self.param_handler.get_unit(params.SCAN_PARAMS[0])
+
+        # We obtained both of these from the controller, so they should be in
+        # the same units.
+        vals[0] = vals[0] + scan_params.spatial.roi.top_left.x
+        vals[1] = vals[1] + scan_params.spatial.roi.top_left.y
+
+        probe_pos_params = spec_pb2.ProbePosition()
+        probe_pos_params.point.x = vals[0]
+        probe_pos_params.point.y = vals[1]
+        probe_pos_params.units = units
+
+        return probe_pos_params
+
+    def on_action_request(self, action: control_pb2.ActionMsg
+                          ) -> control_pb2.ControlResponse:
+        """Override action request.
+
+        We need to switch the 'base name' of our save files before calling
+        scans and specs. This is because these are, by default, saved with
+        the same basename. That will get easily very confusing.
+
+        We change the base name on these cases, but otherwise call the
+        parent method.
+        """
+        if action.action == MicroscopeAction.START_SCAN:
+            self.param_handler._call_method(params.SET_BASENAME_METHOD,
+                                            (self.SCAN_PREFIX,))
+        elif action.action == MicroscopeAction.START_SPEC:
+            self.param_handler._call_method(params.SET_BASENAME_METHOD,
+                                            (self.SPEC_PREFIX,))
+        return super().on_action_request(action)
+
+
+def _init_action_handler(client: XopClient) -> ActionHandler:
+    """Initialize Asylum action handler pointing to defulat config."""
+    actions_config_path = os.path.join(os.path.dirname(__file__),
+                                       ACTIONS_FILENAME)
+    return ActionHandler(client, actions_config_path)
+
+
+def _init_param_handler(client: XopClient) -> params.GxsmParameterHandler:
+    """Initialize Asylum action handler pointing to defulat config."""
+    params_config_path = os.path.join(os.path.dirname(__file__),
+                                      PARAMS_FILENAME)
+    return params.AsylumParameterHandler(client, params_config_path)

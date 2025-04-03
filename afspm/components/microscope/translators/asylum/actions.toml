@@ -1,0 +1,36 @@
+# This file holds the Asylum actions.
+
+[start-scan]
+method = 'afspm.components.microscope.translators.asylum.actions.request_action'
+method_name = 'DoScanFunc'
+arg = 'StopScan_0'
+type = 'PASS_ARGS'
+pass_self = true
+
+[stop-scan]
+method = 'afspm.components.microscope.translators.asylum.actions.request_action'
+method_name = 'DoScanFunc'
+arg = 'DoScan_0'
+type = 'PASS_ARGS'
+pass_self = true
+
+[start-spec]
+method = 'afspm.components.microscope.translators.asylum.actions.request_action'
+method_name = 'DoForceFunc'
+arg = 'Single'
+type = 'PASS_ARGS'
+pass_self = true
+
+[stop-spec]
+method = 'afspm.components.microscope.translators.asylum.actions.request_action'
+method_name = 'DoForceFunc'
+arg = 'Stop'
+type = 'PASS_ARGS'
+pass_self = true
+
+[move-spec]
+method = 'afspm.components.microscope.translators.asylum.actions.request_action'
+method_name = 'DoForceFunc'
+arg = 'Go'
+type = 'PASS_ARGS'
+pass_self = true

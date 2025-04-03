@@ -1,99 +1,146 @@
 """Holds asylum controller parameters (and other extra logic)."""
 
-import logging
+from math import isclose
 import enum
-from typing import Optional, Any
-from types import MappingProxyType  # Immutable dict
+import logging
+from typing import Any
 
 from afspm.components.microscope import params
-from afspm.components.microscope.translator import MicroscopeTranslator
-from afspm.components.microscope.translators.asylum.client import XopClient
-from afspm.utils import units
+from afspm.components.microscope.translators.asylum.client import (
+    XopClient, XopMessageError)
 
-from afspm.io.protos.generated import control_pb2
+from afspm.io.protos.generated import scan_pb2
 
 
 logger = logging.getLogger(__name__)
 
-
-# All physical  units over the API are stored in meters.
-PHYS_UNITS = 'm'
-
-ASYLUM_TRUE = 2  # Hard-coded value for SaveImage/SaveForce
+# For some things, 'true' is a 2 rather than 1. Strange.
+ASYLUM_TRUE = 2
 
 
-class AsylumMethod(str, enum.Enum):
-    """Asylum method names."""
+# ----- ScopeState things ----- #
+class ScopeState(enum.Flag):
+    """Asylum definition of scope states (linked to GET_STATUS_METHOD)."""
 
-    SCAN_FUNC = 'DoScanFunc'
-    START_SCAN_PARAM = 'DoScan_0'  # Param for DoScanFunc
-    STOP_SCAN_PARAM = 'StopScan_0'  # Param for DoScanFunc
+    FREE = 0
+    SCANNING = 0x1
+    ENGAGED = 0x2
+    SINGLE_SPEC = 0x10
+    SPEC_1 = 0x20  # TODO: Remove me?
+    SPEC_2 = 0x40
+    SPEC_3 = 0x80
+    MOVING = 0x100000
 
+
+# TODO: Remove me?
+ANY_SPEC = (ScopeState.SINGLE_SPEC | ScopeState.SPEC_1 |
+            ScopeState.SPEC_2 | ScopeState.SPEC_3)
+
+# ----- Special method names ----- #
+GET_STATUS_METHOD = 'ARGetStatus'
+GET_BASENAME_METHOD = 'GetBaseName'
+SET_BASENAME_METHOD = 'SetBaseName'
+INIT_POS_METHOD = 'InitProbePos'
+GET_POS_X_METHOD = 'GetProbePosX'
+GET_POS_Y_METHOD = 'GetProbePosY'
+SET_POS_METHOD = 'SetProbePos'
+
+
+class AsylumParameterHandler(params.ParameterHandler):
+    """Implements asylum-specific getter/setter for parameter handling.
+
+    Attributes:
+        client: XopClient, used to communicate with the Asylum controller
+            (via the IGOR software).
+        spm_uuid_type_map: a map relating spm uuids to their types. Used for
+            convenience, to figure out if we need to call GetString or
+            GetValue to query the parameter.
+    pass
+    """
+
+    # Getter/setter method strs
     GET_VALUE = 'GV'
     SET_VALUE = 'PV'
 
     GET_STRING = 'GS'
     SET_STRING = 'PS'
 
+    def __init__(self, params_config_path: str, client: XopClient):
+        """Init our Asylum handler, feeding the Xop Client."""
+        if client is None:
+            msg = "No xop client provided, cannot continue!"
+            logger.critical(msg)
+            raise AttributeError(msg)
 
-class AsylumParam(enum.Enum):
-    """Asylum internal parameters.
+        self.client = client
+        self.spm_uuid_type_map = {}
+        super().__init__(params_config_path)
 
-    Stored as integers, because StrEnums will merge duplicates, and we are
-    dealing with a number of duplicate strings here. Thus, we use the below
-    param_map to map a parameter enum to its associated string.
-    """
+    def _populate_spm_uuid_type_map(self):
+        for param_info in self.param_infos.values():
+            self.spm_uuid_type_map[param_info.uuid] = param_info.type
 
-    TL_X = enum.auto()  # x-coordinate top-left of scan region (offset).
-    TL_Y = enum.auto()  # y-coordinate top-left of scan region (offset).
+    def _obtain_get_set_method(self, spm_uuid: str, request_get: bool) -> str:
+        assert spm_uuid in self.spm_uuid_type_map
+        if isinstance(self.spm_uuid_type_map[spm_uuid], str):
+            return self.GET_STRING if request_get else self.SET_STRING
+        else:
+            return self.GET_VALUE if request_get else self.SET_VALUE
 
-    SCAN_SIZE = enum.auto()  # major-axis size of scan region.
-    SCAN_X_RATIO = enum.auto()  # x-coordinate ratio of scan region.
-    SCAN_Y_RATIO = enum.auto()  # y-coordinate ratio of scan region.
+    def _call_method(self, method_str: str, attrs: tuple) -> (bool, Any | None):
+        """Call a method using client and return value (or None).
 
-    RES_X = enum.auto()  # x-coordinate size of scan array (data points).
-    RES_Y = enum.auto()  # y-coordinate size of scan array (data points).
+        This method will catch XOP exceptions and raise a ParameterError if
+        the method fails.
+        """
+        try:
+            received, val = self.client.send_request(method_str, attrs)
+            if received and not _is_variable_lookup_failure(val):
+                return val  # Everything went hunky doery!
+        # Exception / issue handling
+        except XopMessageError:
+            pass
 
-    SCAN_SPEED = enum.auto()  # scanning speed in XX units/s.
+        msg = f"Call method failed for {method_str} with attrs {attrs}."
+        logger.error(msg)
+        raise params.ParameterError(msg)
 
-    CP = enum.auto()  # proportional gain of main feedback loop.
-    CI = enum.auto()  # integral gain of main feedback loop.
+    def get_param_spm(self, spm_uuid: str) -> Any:
+        """Get the current value for the microscope parameter.
 
-    # Don't forget these are in 'igor path' format, use xop methods
-    # to convert back.
-    IMG_PATH = enum.auto()  # path to saved scans.
-    FORCE_PATH = enum.auto()  # path to saved spectroscopic data.
+        This method should only concern itself with requesting an
+        scope-specific param and returning the value.
 
-    # Note: diff with IMG_PATH is type: string vs. variable/bool
-    SAVE_IMAGE = enum.auto()  # whether or not to save images.
-    SAVE_FORCE = enum.auto()  # whether or not to save spectroscopic data.
+        Args:
+            spm_uuid: name of the param in scope-specific terminology.
 
-    SCAN_STATUS = enum.auto()  # scan status.
-    FORCE_STATUS = enum.auto()  # spectroscopic status.
+        Returns:
+            Current value.
 
-    LAST_SCAN = enum.auto()  # are we scanning one time or continuously?
+        Raises:
+            ParameterError if getting the parameter fails.
+        """
+        method_str = self._obtain_get_set_method(spm_uuid, request_get=True)
+        return self._call_method(method_str, (spm_uuid,))
 
-    ANGLE = enum.auto()  # Angle of physical scan region.
+    def set_param_spm(self, spm_uuid: str, spm_val: Any):
+        """Set the current value for the microscope parameter.
 
+        This method should only concern itself with setting an scope-specific
+        param and returning whether it succeeds or not. Conversion to
+        scope-expected units should have already been done, and the param
+        string should be the one expected by the specific microscope.
 
-# Creating a dict mapping equivalent to AsylumParameter, to map to necessary
-# str values. We need to get *compare* via this mapping, to ensure we
-# distinguish between duplicates (this is why we cannot use StrEnum).
-PARAM_STR_MAP = MappingProxyType({
-    AsylumParam.TL_X: 'XOffset', AsylumParam.TL_Y: 'YOffset',
-    AsylumParam.SCAN_SIZE: 'ScanSize', AsylumParam.SCAN_X_RATIO: 'FastRatio',
-    AsylumParam.SCAN_Y_RATIO: 'SlowRatio', AsylumParam.RES_X: 'ScanPoints',
-    AsylumParam.RES_Y: 'ScanLines', AsylumParam.SCAN_SPEED: 'ScanSpeed',
-    AsylumParam.CP: 'ProportionalGain', AsylumParam.CI: 'IntegralGain',
-    AsylumParam.IMG_PATH: 'SaveImage', AsylumParam.FORCE_PATH: 'SaveForce',
-    AsylumParam.SAVE_IMAGE: 'SaveImage', AsylumParam.SAVE_FORCE: 'SaveForce',
-    AsylumParam.SCAN_STATUS: 'ScanStatus', AsylumParam.FORCE_STATUS: 'FMapStatus',
-    AsylumParam.LAST_SCAN: 'LastScan', AsylumParam.ANGLE: 'Rotation'
-    })
+        Args:
+            spm_uuid: name of the param in scope-specific terminology.
+            spm_val: val to set the param to, in scope-specific units.
 
+        Raises:
+            - ParameterError if the parameter could not be set.
+        """
+        method_str = self._obtain_get_set_method(spm_uuid, request_get=False)
+        self._call_method(method_str, (spm_uuid, spm_val))
 
-# Holds which parameters are strings instead of variables
-PARAM_IS_STR_TUPLE = (AsylumParam.IMG_PATH, AsylumParam.FORCE_PATH)
 
 # Lookup return indicating a variable lookup failure.
 NAN_STR = 'nan'
@@ -106,186 +153,137 @@ def _is_variable_lookup_failure(val: float | str | None) -> bool:
     return False
 
 
-def get_param(client: XopClient, param: AsylumParam) -> float | str:
-    """Get asylum parameter.
+class AsylumParam(enum):
+    """Asylum-specific parameters, used as 'generic' names in config.
 
-    Uses the client to get the current value of the provided parameter.
+    We use the 'name' of these parameters as their generic uuid when
+    querying them from the params config. So, for example, for SCAN_SIZE,
+    we expect:
+        [SCAN_SIZE]
+        uuid = 'something'
+        [...]
+    In the config file.
 
-    Args:
-        client: XopClient, used to communicate with asylum controller.
-        param: AsylumParam to look up.
-
-    Returns:
-        Current value (float or str).
-
-    Raises:
-        ParameterError if getting the parameter fails.
+    Note that the type is crucial, as that allows us to know how to call
+    the appropriate get/set method (different between str and other types).
     """
-    # Note: need to do a value comparison
-    get_method = (AsylumMethod.GET_STRING if param in PARAM_IS_STR_TUPLE
-                  else AsylumMethod.GET_VALUE)
 
-    received, val = client.send_request(get_method,
-                                        (PARAM_STR_MAP[param],))
-    if received and not _is_variable_lookup_failure(val):
-        return val
-    msg = f"Get param failed for {param}"
-    logger.error(msg)
-    raise params.ParameterError(msg)
+    SCAN_SIZE = enum.auto()
+    X_RATIO = enum.auto()
+    Y_RATIO = enum.auto()
+    IMG_PATH = enum.auto()
+    SPEC_PATH = enum.auto()
+    SAVE_IMAGE = enum.auto()
+    SAVE_FORCE = enum.auto()
+    SCAN_STATUS = enum.auto()
+    SPEC_STATUS = enum.auto()
 
 
-def get_param_list(client: XopClient, params: tuple[AsylumParam],
-                   ) -> tuple[float | str]:
-    """Get list of asylum parameters.
+# Hardcoded Y ratio (for setting)
+EXPECTED_Y_RATIO = 1.0
 
-    Args:
-        client: XopClient, used to communicate with asylum controller.
-        params: list of AsylumParams.
 
-    Returns:
-        Tuple of received values (float or str for each). Note we return a
-        tuple because the type may change of the values. (This is not required,
-        but appears to be a good practice in Python, as developers expect
-        lists to be of a single type.)
+def get_scan_size_x(handler: params.ParameterHandler) -> Any:
+    """Get scan size (X-dim) for Asylum.
 
-    Raises:
-        ParameterError if getting any of the parameters fails. We explicitly
-        do this rather than provide a 'None' (or something similar), as we
-        do not expect that the user will be able to continue without one of
-        the requested parameters.
+    The scan size is decoupled in two parameters:
+    - ScanSize: 'general' scan size (dimensionless).
+    - FastRatio(X)/SlowRatio(Y): The ratio to multiply the scan size in order
+    to get that dimension's value.
+
+    This getter will handle that logic.
     """
-    return tuple([get_param(client, param) for param in params])
+    generic_uuids = [AsylumParam.SCAN_SIZE.name, AsylumParam.X_RATIO.name]
+    vals = handler.get_param_list(generic_uuids)
+    return vals[0] * vals[1]  # scan_size * x_ratio
 
 
-def set_param(client: XopClient, param: AsylumParam, val: str | float,
-              curr_unit: str = None, desired_unit: str = None) -> bool:
-    """Set asylum parameter.
+def get_scan_size_y(handler: params.ParameterHandler) -> Any:
+    """Get scan size (Y-dim) for Asylum.
 
-    Given a parameter name and value, attempts to set the asylum controller
-    with it. If the value is a float and a curr_unit are provided, we convert
-    it if necessary.
+    The scan size is decoupled in two parameters:
+    - ScanSize: 'general' scan size (dimensionless).
+    - FastRatio(X)/SlowRatio(Y): The ratio to multiply the scan size in order
+    to get that dimension's value.
 
-    Args:
-        client: XopClient, used to communicate with the asylum controller.
-        param: AsylumParam to set.
-        val: value to set it to.
-        curr_unit: units of provided value, as str. Default is None.
-        desired_unit: desired units of value, as str. Default is None.
-
-    Returns:
-        True if the set succeeds.
+    This getter will handle that logic.
     """
-    try:
-        val = units.convert(val, curr_unit, desired_unit)
-    except units.ConversionError:
-        return False
-
-    set_method = (AsylumMethod.SET_STRING if param in PARAM_IS_STR_TUPLE
-                  else AsylumMethod.SET_VALUE)
-
-    received, __ = client.send_request(set_method,
-                                       (PARAM_STR_MAP[param], val))
-    return received
+    generic_uuids = [AsylumParam.SCAN_SIZE.name, AsylumParam.Y_RATIO.name]
+    vals = handler.get_param_list(generic_uuids)
+    return vals[0] * vals[1]  # scan_size * y_ratio
 
 
-def set_param_list(client: XopClient, params: tuple[AsylumParam],
-                   vals: tuple[str | float], curr_units: tuple[str | None],
-                   desired_units: tuple[str | None]) -> bool:
-    """Convert a list of values to appropriate units and set them.
+def set_scan_size_x(handler: params.ParameterHandler,
+                    val: Any, unit: str):
+    """Set scan size (X-dim) for Asylum.
 
-    Note: different from set_param in that we validate all conversions can be
-    done *before* setting them.
+    The scan size is decoupled in two parameters:
+    - ScanSize: 'general' scan size (dimensionless).
+    - FastRatio(X)/SlowRatio(Y): The ratio to multiply the scan size in order
+    to get that dimension's value.
 
-    Args:
-        client: XopClient, used to communicate with the asylum controller.
-        params: list of params to set.
-        vals: tuple of values to set to.
-        curr_units: tuple of units the values are provided in.
-        desired_units: tuple of units the values should be in.
+    This setter will handle that logic.
 
-    Returns:
-        True if all can be set.
+    Note: set_scan_size_y needs to be called *before* a call to
+    set_scan_size_x, as the latter may change the x_ratio according to the
+    *current* scan_size. Since sset_scan_size_y is the one that actually
+    sets scan_size, it *must* be called first.
     """
-    try:
-        converted_vals = units.convert_list(vals, curr_units, desired_units)
-    except units.ConversionError:
-        return False
+    size_x_uuid = params.MicroscopeParameter.SCAN_SIZE_X
+    # Use generic param's info to convert/constrain value.
+    param_info = handler._get_param_info(size_x_uuid)
+    desired_val = handler._correct_val_for_sending(val, param_info,
+                                                   unit)
 
-    all_received = True
-    for val, param in zip(converted_vals, params):
-        set_method = (AsylumMethod.SET_STRING if param in PARAM_IS_STR_TUPLE
-                      else AsylumMethod.SET_VALUE)
-        received, __ = client.send_request(set_method,
-                                           (PARAM_STR_MAP[param], val))
-        all_received = all_received and received
+    # Now, must determine the x ratio for this.
+    scan_size = handler.get_param(AsylumParam.SCAN_SIZE.name)
+    x_ratio = scan_size / desired_val
 
-    if not all_received:
-        logger.error("We failed at setting one of the parameters!")
-    return all_received
+    # Use the actual Asylum param to set it.
+    param_info = handler._get_param_info(AsylumParam.X_RATIO.name)
+    handler.set_param_spm(param_info.uuid, x_ratio)
 
 
-# ----- Get/set handling for MicroscopeTranslator. Could be elsewhere ----- #
-def handle_get_set(ctrl: MicroscopeTranslator, attr: str,
-                   val: Optional[str] = None, curr_units: str = None,
-                   ) -> (control_pb2.ControlResponse, str, str):
-    """Get (and optionally, set) an asylum attribute.
+def set_scan_size_y(handler: params.ParameterHandler,
+                    val: Any, unit: str):
+    """Set scan size (Y-dim) for Asylum.
 
-    If curr_units is provided and the internal asylum units can be found,
-    units.convert is used to try and convert to desired units.
+    The scan size is decoupled in two parameters:
+    - ScanSize: 'general' scan size (dimensionless).
+    - FastRatio(X)/SlowRatio(Y): The ratio to multiply the scan size in order
+    to get that dimension's value.
 
-    Args:
-        attr: name of the attribute, in gxsm terminology.
-        val: optional value to set it to, as a str.
-        curr_units: units of provided value. optional.
+    This setter will handle that logic.
 
-    Returns:
-        Tuple (response, val, units), i.e. containing the control response,
-        the value gotten (as a str), and the units of said value (as a str).
+    Note: set_scan_size_y needs to be called *before* a call to
+    set_scan_size_x, as the latter may change the x_ratio according to the
+    *current* scan_size. Since sset_scan_size_y is the one that actually
+    sets scan_size, it *must* be called first.
     """
-    if attr not in PARAM_UNITS_MAP:
-        msg = f"Units for {attr} not found, cannot perform get/set."
-        logger.error(msg)
-        return (control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED,
-                "n/a")
-    asylum_units = PARAM_UNITS_MAP[attr]
+    size_y_uuid = params.MicroscopeParameter.SCAN_SIZE_Y
+    # Use generic param's info to convert/constrain value.
+    param_info = handler._get_param_info(size_y_uuid)
+    desired_val = handler._correct_val_for_sending(val, param_info,
+                                                   unit)
 
-    if attr not in GENERIC_TO_ASYLUM_PARAM_MAP:
-        msg = "Could not find mapping from generic param name to asylum one."
-        logger.error(msg)
-        return (control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED,
-                asylum_units)
-    asylum_param = GENERIC_TO_ASYLUM_PARAM_MAP[attr]
+    _ensure_y_ratio_is_1(handler)  # Our logic assumes this!
 
-    if val:
-        if not set_param(ctrl._client, asylum_param, val,
-                         curr_units, asylum_units):
-            logger.error(f"Unable to set val: {val} with units: {curr_units}")
-            return (control_pb2.ControlResponse.REP_PARAM_ERROR, None)
-    return (control_pb2.ControlResponse.REP_SUCCESS,
-            str(get_param(ctrl._client, asylum_param)), asylum_units)
+    # Use the actual Asylum param to set it.
+    param_info = handler._get_param_info(AsylumParam.SCAN_SIZE.name)
+    handler.set_param_spm(param_info.uuid, desired_val)
 
 
-def get_set_scan_speed(ctrlr: MicroscopeTranslator, val: Optional[str] = None,
-                       units: Optional[str] = None
-                       ) -> (control_pb2.ControlResponse, str, str):
-    """Get/set scan speed."""
-    return handle_get_set(ctrlr, params.MicroscopeParameter.SCAN_SPEED,
-                          val, units)
+def _ensure_y_ratio_is_1(handler: params.ParameterHandler):
+    """Ensure the scan size y-ratio is 1. If not, fix it and yell."""
+    y_ratio = handler.get_param(AsylumParam.Y_RATIO)
+
+    if not isclose(y_ratio, EXPECTED_Y_RATIO):
+        logger.warning(f'Scan size FastRatio is not {EXPECTED_Y_RATIO}!'
+                       'Going to set, but this is unexpected.')
+        handler.set_param(AsylumParam.Y_RATIO, EXPECTED_Y_RATIO,
+                          curr_unit=None)
 
 
-# Holds methods to call for each supported parameter.
-PARAM_METHOD_MAP = MappingProxyType({
-    params.MicroscopeParameter.SCAN_SPEED: get_set_scan_speed
-})
-
-
-# Holds internal asylum units for each supported parameter.
-PARAM_UNITS_MAP = MappingProxyType({
-    params.MicroscopeParameter.SCAN_SPEED: 'm/s'
-})
-
-
-# Maps a generic parameter to the asylum parameter name
-GENERIC_TO_ASYLUM_PARAM_MAP = MappingProxyType({
-    params.MicroscopeParameter.SCAN_SPEED: AsylumParam.SCAN_SPEED
-})
+# TODO: Should we have setter/getter methods for probe-pos-x/probe-pos-y in here?
+# Right now, we are doing it manually in poll_probe_pos/on_probe_pos...
+# But if a user wanted to just set pos_x or pos_y, they'd be in trouble...

@@ -1,0 +1,161 @@
+# This file holds the Asylum parameters. Feel free to modify the
+# parameter range if you want to constrain it further.
+
+# ----- Physical Scan Parameters ----- #
+[scan-top-left-x]
+uuid = 'XOffset'
+unit = 'm'
+type = 1.0
+range = [-11000.0, 11000.0]  # TODO: Update range!
+
+[scan-top-left-y]
+uuid = 'YOffset'
+unit = 'm'
+type = 1.0
+range = [-11000.0, 11000.0]  # TODO: Update range!
+
+[scan-angle]
+uuid = 'Rotation'
+unit = 'degrees'
+type = 1.0
+range = [-360.0, 360.0]  # TODO: Verify!
+
+[scan-size-x]
+setter = 'afspm.components.microscope.translators.asylum.params.set_scan_size_x'
+getter = 'afspm.components.microscope.translators.asylum.params.get_scan_size_x'
+unit = 'm'
+type = 1.0
+range = [-11000.0, 11000.0]  # TODO: Update range!
+
+[scan-size-y]
+setter = 'afspm.components.microscope.translators.asylum.params.set_scan_size_y'
+getter = 'afspm.components.microscope.translators.asylum.params.get_scan_size_y'
+unit = 'm'
+type = 1.0
+range = [-11000.0, 11000.0]  # TODO: Update range!
+
+
+# ----- Digital Scan Parameters ----- #
+[scan-resolution-x]  # Unitless, no range enforced.
+uuid = 'ScanPoints'
+type = 1
+range = [0, 32000]  # TODO: VERIFY/UPDATE
+
+[scan-resolution-y]  # Unitless, no range enforced.
+uuid = 'ScanLines'
+type = 1
+range = [0, 32000]  # TODO: VERIFY/UPDATE
+
+# ----- Feedback Parameters ----- #
+# NOTE: Update zctrl channel in AsylumTranslator constructor.
+[zctrl-setpoint]  # TODO: Update!
+uuid = 'dsp-fbs-mx0-current-set'
+type = 1.0
+range = [-100, 100]  # TODO: Validate
+
+[zctrl-egain] # TODO: Update!
+uuid = 'dsp-fbs-mx0-current-gain'
+type = 1.0
+range = [-0.5, 0.5]
+
+[zctrl-pgain]  # Unitless, no range enforced.
+uuid = 'ProportionalGain'
+type = 1.0
+range = [0, 200]  # TODO: Validate
+
+[zctrl-igain]  # Unitless, no range enforced.
+uuid = 'IntegralGain'
+type = 1.0
+range = [0, 200]  # TODO: Validate
+
+# ----- Sample Slope Correction ----- #
+[sample-slope-x]  # TODO: Update!!!
+uuid = 'dsp-adv-scan-slope-x'  # TODO: test 'dsp-mk2-hwi-slope-x'
+type = 1.0
+range = [-0.2, 0.2]
+
+[sample-slope-y]  # TODO: Update!!!
+uuid = 'dsp-adv-scan-slope-y'  # TODO: test 'dsp-mk2-hwi-slope-y'
+type = 1.0
+range = [-0.2, 0.2]
+
+# ----- Probe / Scan Parameters ----- #
+[scan-speed]
+uuid = 'ScanSpeed'
+unit = 'm/s'
+type = 1.0
+range = [0.1, 10000]  # TODO: Validate range!
+
+[move-speed]  # TODO: Update!
+uuid = 'MoveSpeed'
+unit = 'm/s'
+type = 1.0
+range = [0.1, 10000]  # TODO: Validate
+
+# ----- Probe Parameters ----- #
+[probe-pos-x]  # TODO: Validate this is correct!
+uuid = 'XOffset'
+unit = 'm'
+type = 1.0
+range = [-11000.0, 11000.0]  # TODO: Update
+
+[probe-pos-y]  # TODO: Validate this is correct!
+uuid = 'YOffset'
+unit = 'm'
+type = 1.0
+range = [-11000.0, 11000.0]  # TODO: update
+
+
+
+# ----- Other ----- #
+# [tip-bias-voltage]
+
+
+# ---- Asylum-Specific Parameters ----- #
+# NOTE: these keys match the enum in asylum's params.py.
+
+# (For scan size things)
+[SCAN_SIZE]
+uuid = 'ScanSize'
+unit = 'm'
+type = 1.0
+range = [0.0, 22131.0]  # TODO: Update range
+
+[X_RATIO]
+uuid = 'FastRatio'
+# No units
+type = 1.0
+
+[Y_RATIO]
+uuid = 'SlowRatio'
+# No units
+type = 1.0
+
+# NOTE: We have the same uuid for different functions. When calling with
+# a str we get the path.; with float, we get the scanning manner (continuously
+# vs one image at a time)..
+
+# Miscellaneous
+[IMG_PATH]
+uuid = 'SaveImage'
+type = ''
+
+[SPEC_PATH]
+uuid = 'SaveForce'
+type = ''
+
+[SAVE_IMAGE]
+uuid = 'SaveImage'
+type = 1.0
+
+[SAVE_FORCE]
+uuid = 'SaveForce'
+type = 1.0
+
+[SCAN_STATUS]
+uuid = 'ScanStatus'
+type = 1
+
+[SPEC_STATUS]
+uuid = 'FMapStatus'
+type = 1
