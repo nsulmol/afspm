@@ -108,22 +108,30 @@ class GxsmTranslator(ConfigTranslator):
         self.last_spec_fname = ''
         self.old_spec = None
 
-        # Default initialization of handlers and addition to kwargs
-        if not action_handler:
-            action_handler = _init_action_handler()
-            if spec_mode:
-                spec_enum = actions.GxsmSpecMode(spec_mode)
-                actions.update_spec_mode(action_handler, spec_enum)
-            kwargs['action_handler'] = action_handler
+        kwargs = self._init_handlers(param_handler, action_handler,
+                                     zctrl_channel, spec_mode, kwargs)
+        super().__init__(**kwargs)
+        self._setup_save_spectroscopies()
+
+    def _init_handlers(param_handler: ParameterHandler,
+                       action_handler: ActionHandler,
+                       zctrl_channel: str,
+                       spec_mode: str,
+                       **kwargs) -> dict:
+        """Init handlers and update kwargs."""
         if not param_handler:
             param_handler = _init_param_handler()
             if zctrl_channel:  # Update Z-Ctrl feedback channel
                 zctrl_enum = params.GxsmFeedbackChannel(zctrl_channel)
                 params.update_zctrl_channel(param_handler, zctrl_enum)
             kwargs['param_handler'] = param_handler
-        super().__init__(**kwargs)
-
-        self._setup_save_spectroscopies()
+        if not action_handler:
+            action_handler = _init_action_handler()
+            if spec_mode:
+                spec_enum = actions.GxsmSpecMode(spec_mode)
+                actions.update_spec_mode(action_handler, spec_enum)
+            kwargs['action_handler'] = action_handler
+        return kwargs
 
     def _setup_save_spectroscopies(self):
         """Tell GXSM to autosave all spectroscopies.
@@ -240,7 +248,7 @@ class GxsmTranslator(ConfigTranslator):
         logger.warning(f'files_list: {files_list}')
         if len(files_list) > 0:
             latest_spec_filename = max(files_list, key=os.path.getctime)
-            logger.warning(f'latest_spec: {latest_spec}')
+            logger.warning(f'latest_spec: {latest_spec_filename}')
             return latest_spec_filename
         return None
 
