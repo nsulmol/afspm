@@ -140,7 +140,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
 
         try:
             self.param_handler.set_param_list(params.PROBE_POS_PARAMS,
-                                            vals, attr_units)
+                                              vals, attr_units)
         except params.ParameterNotSupportedError:
             return control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED
         except params.ParameterError:

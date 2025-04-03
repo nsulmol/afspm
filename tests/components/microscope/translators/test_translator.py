@@ -442,7 +442,7 @@ def test_scan_params(client, default_control_state,
     last_params = assert_and_return_message(sub_scan_params)
 
     if (initial_params.spatial.roi.top_left.x != 0 or
-        initial_params.spatial.roi.top_left.y != 0):
+            initial_params.spatial.roi.top_left.y != 0):
         logger.info('Requested new position of top left point. Expect '
                     'scope state change too, because we are moving to it.')
         scope_state_msg = scan_pb2.ScopeStateMsg(

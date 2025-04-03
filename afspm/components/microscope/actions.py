@@ -85,7 +85,7 @@ class ActionCallable:
     method: Callable  # Extracted Callable (method).
     kwargs: dict  # Dictionary of kwargs we pass to Callable when calling.
     type: CallableType = CallableType.PASS_ARGS  # Calling logic.
-    pass_self: bool = True  # Whether or not to pass ActionHandler in.
+    pass_self: bool = False  # Whether or not to pass ActionHandler in.
 
 
 def set_up_callable(params_dict: dict) -> ActionCallable:
@@ -94,7 +94,7 @@ def set_up_callable(params_dict: dict) -> ActionCallable:
     The dict is expected to have the following keys:
     - METHOD_KEY: str of the Callable, including modules path (see
     parser._evaluate_values_recursively for more info).
-    - PASS_SELF_KEY: (optional) bool indicating whether or ont we pass
+    - PASS_SELF_KEY: (optional) bool indicating whether or not we pass
     ActionHandler as the first argument to the method.
     - TYPE_KEY: (optional) if PASS_KWARGS, we pass the additional key:vals
     as an unpacked dict. If PASS_ARGS, we pass them as an unpacked list.

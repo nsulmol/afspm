@@ -26,21 +26,21 @@ SET_VALS = {
 
 
 # -------------------- Methods -------------------- #
-def good_getter_x(param: params.MicroscopeParameter) -> Any:
+def good_getter_x(param: params.ParameterHandler) -> Any:
     return SET_VALS[params.MicroscopeParameter.SCAN_TOP_LEFT_X]
 
 
-def good_getter_y(param: params.MicroscopeParameter) -> Any:
+def good_getter_y(param: params.ParameterHandler) -> Any:
     return SET_VALS[params.MicroscopeParameter.SCAN_TOP_LEFT_Y]
 
 
-def good_setter_x(param: params.MicroscopeParameter,
+def good_setter_x(param: params.ParameterHandler,
                   val: Any, unit: str):
     global SET_VALS
     SET_VALS[params.MicroscopeParameter.SCAN_TOP_LEFT_X] = val
 
 
-def good_setter_y(param: params.MicroscopeParameter,
+def good_setter_y(param: params.ParameterHandler,
                   val: Any, unit: str):
     global SET_VALS
     SET_VALS[params.MicroscopeParameter.SCAN_TOP_LEFT_Y] = val
