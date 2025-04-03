@@ -5,6 +5,7 @@ import enum
 import logging
 from typing import Any
 
+from afspm.utils import units
 from afspm.components.microscope import params
 from afspm.components.microscope.translators.asylum.client import (
     XopClient, XopMessageError)
@@ -35,15 +36,6 @@ class ScopeState(enum.Flag):
 # TODO: Remove me?
 ANY_SPEC = (ScopeState.SINGLE_SPEC | ScopeState.SPEC_1 |
             ScopeState.SPEC_2 | ScopeState.SPEC_3)
-
-# ----- Special method names ----- #
-GET_STATUS_METHOD = 'ARGetStatus'
-GET_BASENAME_METHOD = 'GetBaseName'
-SET_BASENAME_METHOD = 'SetBaseName'
-INIT_POS_METHOD = 'InitProbePos'
-GET_POS_X_METHOD = 'GetProbePosX'
-GET_POS_Y_METHOD = 'GetProbePosY'
-SET_POS_METHOD = 'SetProbePos'
 
 
 class AsylumParameterHandler(params.ParameterHandler):
@@ -171,12 +163,8 @@ class AsylumParam(enum):
     SCAN_SIZE = enum.auto()
     X_RATIO = enum.auto()
     Y_RATIO = enum.auto()
-    IMG_PATH = enum.auto()
-    SPEC_PATH = enum.auto()
-    SAVE_IMAGE = enum.auto()
-    SAVE_FORCE = enum.auto()
-    SCAN_STATUS = enum.auto()
-    SPEC_STATUS = enum.auto()
+    IMG_PATH = enum.auto()  # Applies both for images and single-force files
+    SAVE_IMAGE = enum.auto()  # Applies both for images and single-force files
 
 
 # Hardcoded Y ratio (for setting)
@@ -239,9 +227,7 @@ def set_scan_size_x(handler: params.ParameterHandler,
     scan_size = handler.get_param(AsylumParam.SCAN_SIZE.name)
     x_ratio = scan_size / desired_val
 
-    # Use the actual Asylum param to set it.
-    param_info = handler._get_param_info(AsylumParam.X_RATIO.name)
-    handler.set_param_spm(param_info.uuid, x_ratio)
+    handler.set_param(AsylumParam.X_RATIO.name, x_ratio, curr_unit=None)
 
 
 def set_scan_size_y(handler: params.ParameterHandler,
@@ -267,10 +253,7 @@ def set_scan_size_y(handler: params.ParameterHandler,
                                                    unit)
 
     _ensure_y_ratio_is_1(handler)  # Our logic assumes this!
-
-    # Use the actual Asylum param to set it.
-    param_info = handler._get_param_info(AsylumParam.SCAN_SIZE.name)
-    handler.set_param_spm(param_info.uuid, desired_val)
+    handler.set_param(AsylumParam.SCAN_SIZE, desired_val, curr_unit=None)
 
 
 def _ensure_y_ratio_is_1(handler: params.ParameterHandler):
@@ -284,6 +267,103 @@ def _ensure_y_ratio_is_1(handler: params.ParameterHandler):
                           curr_unit=None)
 
 
-# TODO: Should we have setter/getter methods for probe-pos-x/probe-pos-y in here?
-# Right now, we are doing it manually in poll_probe_pos/on_probe_pos...
-# But if a user wanted to just set pos_x or pos_y, they'd be in trouble...
+# NOTE: We cannot use GET_VALUE/SET_VALUE with these methods, because they have
+# special methods. That is why we are not using handler.set_param_spm here...
+
+# ----- Special method names ----- #
+GET_STATUS_METHOD = 'ARGetStatus'
+GET_BASENAME_METHOD = 'GetBaseName'
+SET_BASENAME_METHOD = 'SetBaseName'
+INIT_POS_METHOD = 'InitProbePos'
+GET_POS_X_METHOD = 'GetProbePosX'
+GET_POS_Y_METHOD = 'GetProbePosY'
+SET_POS_X_METHOD = 'SetProbePosX'
+SET_POS_Y_METHOD = 'SetProbePosY'
+
+
+def get_probe_pos_x(handler: AsylumParameterHandler) -> Any:
+    """Get x-dimension of Probe Position.
+
+    The probe position is stored in the 'scan coordinate system' (CS), meaning
+    that the top-left position is treated as origin.
+
+    Thus, we need to add the top-left y-coordinate before returning.
+    """
+    uuid = params.MicroscopeParameter.SCAN_TOP_LEFT_X
+    tl = handler.get_param(uuid)
+
+    pos = handler._call_method(GET_POS_X_METHOD)
+    return pos + tl
+
+
+def get_probe_pos_y(handler: AsylumParameterHandler) -> Any:
+    """Get y-dimension of Probe Position.
+
+    The probe position is stored in the 'scan coordinate system' (CS), meaning
+    that the top-left position is treated as origin.
+
+    Thus, we need to add the top-left y-coordinate before returning.
+    """
+    uuid = params.MicroscopeParameter.SCAN_TOP_LEFT_Y
+    tl = handler.get_param(uuid)
+
+    pos = handler._call_method(GET_POS_Y_METHOD)
+    return pos + tl
+
+
+def set_probe_pos_x(handler: params.ParameterHandler,
+                    val: Any, unit: str):
+    """Set x-dimension of probe position.
+
+    The probe position is stored in the 'scan coordinate system' (CS), meaning
+    that the top-left position is treated as origin.
+
+    Thus, we need to subtract the top-left x-coordinate before setting.
+
+    NOTE: Assumes SCAN_TOP_LEFT_X and PROBE_POS_X have the same units, and
+    using PROBE_POS_X units to convert.
+    """
+    tl_uuid = params.MicroscopeParameter.SCAN_TOP_LEFT_X
+    tl = handler.get_param(tl_uuid)
+
+    uuid = params.MicroscopeParameter.PROBE_POS_X
+    param_info = handler._get_param_info(uuid)
+
+    # We need to convert to sending units. This logic *also* happens in
+    # _correct_val_for_sending(), but we need to do it here in order
+    # to subtract. (the latter method will bound the value using the
+    # param_info range)
+    val = units.convert(val, unit, param_info.unit)
+    val = val - tl
+
+    val = params._correct_val_for_sending(val, param_info, unit, uuid)
+    handler._call_method(SET_POS_X_METHOD, (val,))
+
+
+def set_probe_pos_y(handler: params.ParameterHandler,
+                    val: Any, unit: str):
+    """Set y-dimension of probe position.
+
+    The probe position is stored in the 'scan coordinate system' (CS), meaning
+    that the top-left position is treated as origin.
+
+    Thus, we need to subtract the top-left y-coordinate before setting.
+
+    NOTE: Assumes SCAN_TOP_LEFT_Y and PROBE_POS_Y have the same units, and
+    using PROBE_POS_Y units to convert.
+    """
+    tl_uuid = params.MicroscopeParameter.SCAN_TOP_LEFT_Y
+    tl = handler.get_param(tl_uuid)
+
+    uuid = params.MicroscopeParameter.PROBE_POS_Y
+    param_info = handler._get_param_info(uuid)
+
+    # We need to convert to sending units. This logic *also* happens in
+    # _correct_val_for_sending(), but we need to do it here in order
+    # to subtract. (the latter method will bound the value using the
+    # param_info range)
+    val = units.convert(val, unit, param_info.unit)
+    val = val - tl
+
+    val = params._correct_val_for_sending(val, param_info, unit, uuid)
+    handler._call_method(SET_POS_Y_METHOD, (val,))

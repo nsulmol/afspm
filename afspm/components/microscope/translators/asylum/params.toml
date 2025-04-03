@@ -88,33 +88,38 @@ type = 1.0
 range = [0.1, 10000]  # TODO: Validate
 
 # ----- Probe Parameters ----- #
-[probe-pos-x]  # TODO: Validate this is correct!
-uuid = 'XOffset'
+[probe-pos-x]
+getter = 'afspm.components.microscope.translators.asylum.params.get_probe_pos_x'
+setter = 'afspm.components.microscope.translators.asylum.params.set_probe_pos_x'
 unit = 'm'
 type = 1.0
 range = [-11000.0, 11000.0]  # TODO: Update
 
 [probe-pos-y]  # TODO: Validate this is correct!
-uuid = 'YOffset'
+getter = 'afspm.components.microscope.translators.asylum.params.get_probe_pos_y'
+setter = 'afspm.components.microscope.translators.asylum.params.set_probe_pos_y'
 unit = 'm'
 type = 1.0
 range = [-11000.0, 11000.0]  # TODO: update
-
-
 
 # ----- Other ----- #
 # [tip-bias-voltage]
 
 
-# ---- Asylum-Specific Parameters ----- #
-# NOTE: these keys match the enum in asylum's params.py.
+# ----- Asylum-Specific Parameters ----- #
+# The following parameters are Asylum-specific, used for some internal logic.
+# We use this rather than hard-coded values in params.py, because it is
+# *slightly* more convenient. Particularly, we can differentiate between
+# parameters with the same SPM-specific UUID, but different 'types' (the type
+# defines whether we call GV/SV for values or GS/PS for strings).
+#
+# The 'generic' uuids (dictionary keys) match the names of AsylumParam.
 
 # (For scan size things)
 [SCAN_SIZE]
 uuid = 'ScanSize'
-unit = 'm'
+# No units (uses SCAN_SIZE_X/SCAN_SIZE_Y)
 type = 1.0
-range = [0.0, 22131.0]  # TODO: Update range
 
 [X_RATIO]
 uuid = 'FastRatio'
@@ -125,10 +130,6 @@ type = 1.0
 uuid = 'SlowRatio'
 # No units
 type = 1.0
-
-# NOTE: We have the same uuid for different functions. When calling with
-# a str we get the path.; with float, we get the scanning manner (continuously
-# vs one image at a time)..
 
 # Miscellaneous
 [IMG_PATH]
@@ -146,11 +147,3 @@ type = 1.0
 [SAVE_FORCE]
 uuid = 'SaveForce'
 type = 1.0
-
-[SCAN_STATUS]
-uuid = 'ScanStatus'
-type = 1
-
-[SPEC_STATUS]
-uuid = 'FMapStatus'
-type = 1

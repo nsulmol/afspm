@@ -7,11 +7,9 @@ import glob
 import SciFiReaders as sr
 
 from afspm.components.microscope.params import (ParameterHandler,
-                                                ParameterError,
-                                                MicroscopeParameter,
-                                                _cap_val_in_range)
+                                                ParameterNotSupportedError,
+                                                ParameterError)
 from afspm.components.microscope.actions import (ActionHandler,
-                                                 ActionError,
                                                  MicroscopeAction)
 from afspm.components.microscope.translator import (
     get_file_modification_datetime, MicroscopeError)
@@ -22,11 +20,9 @@ from afspm.components.microscope.translators.asylum.xop import (
     convert_igor_path_to_python_path)
 
 from afspm.utils import array_converters as conv
-from afspm.utils import units
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import spec_pb2
 from afspm.io.protos.generated import control_pb2
-from afspm.io.protos.generated import feedback_pb2
 
 
 from . import params
@@ -71,7 +67,6 @@ class AsylumTranslator(ConfigTranslator):
     SCAN_PREFIX = 'Image'
     SPEC_PREFIX = 'Force'
 
-    # TODO: on startup, you need to call InitProbePos().
     def __init__(self, param_handler: ParameterHandler = None,
                  action_handler: ActionHandler = None,
                  xop_client: XopClient = None,
@@ -103,7 +98,6 @@ class AsylumTranslator(ConfigTranslator):
         self._set_save_params(save_state=params.ASYLUM_TRUE,
                               last_scan=params.ASYLUM_TRUE,
                               store_old_vals=True)
-
 
     def __del__(self):
         """Handle object destruction: reset what we changed on startup."""
@@ -202,52 +196,11 @@ class AsylumTranslator(ConfigTranslator):
 
         try:
             self.param_handler.set_param_list(params.SCAN_PARAMS, vals, attr_units)
-        except params.ParameterNotSupportedError:
+        except ParameterNotSupportedError:
             return control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED
-        except params.ParameterError:
-            return control_pb2.ControlResponse.REP_PARAM_ERROR
-        return control_pb2.ControlResponse.REP_SUCCESS
-
-    def on_set_probe_pos(self, probe_pos: spec_pb2.ProbePosition
-                         ) -> control_pb2.ControlResponse:
-        """Override setting probe pos.
-
-        We must:
-        - change coordinate systems (CS), as Asylum stores their
-        probe position in the 'scan CS' (i.e. with the top-left as the origin).
-        - tell the microscope to move to its location after setting (as this is
-        what we expect).
-        """
-        scan_params = self.poll_scan_params()
-        scan_param_units = self.param_handler.get_unit(params.SCAN_PARAMS[0])
-        tl = [scan_params.spatial.roi.top_left.x,
-              scan_params.spatial.roi.top_left.y]
-        ranges = [[0, scan_params.spatial.roi.size.x],
-                  [0, scan_params.spatial.roi.size.y]]
-
-        # Convert from global CS to scan CS (subtract top-left)
-        vals = [probe_pos.point.x,
-                probe_pos.point.y]
-        vals = [units.convert(val, probe_pos.units, scan_param_units)
-                for val in vals]
-        vals = vals - tl
-
-        # Cap val in range.
-        vals[0] = _cap_val_in_range(vals[0], ranges[0],
-                                    generic_uuid='probe-pos-x')
-        vals[1] = _cap_val_in_range(vals[1], ranges[1],
-                                    generic_uuid='probe-pos-y')
-
-        # Set probe pos
-        try:
-            self.param_handler._call_method(params.SET_POS_METHOD,
-                                            (vals[0], vals[1]))
-            # Tell the controller to move to this position
-            self.action_handler.request_action(actions.MOVE_PROBE_UUID)
         except ParameterError:
             return control_pb2.ControlResponse.REP_PARAM_ERROR
-        except ActionError:
-            return control_pb2.ControlResponse.REP_ACTION_ERROR
+        return control_pb2.ControlResponse.REP_SUCCESS
 
     def poll_scope_state(self) -> scan_pb2.ScopeState:
         """Override scope state polling."""
@@ -259,14 +212,17 @@ class AsylumTranslator(ConfigTranslator):
         elif params.ScopeState.MOVING in val:
             return scan_pb2.ScopeState.SS_MOVING
 
+    def _get_latest_file(self, prefix: str) -> str | None:
+        val = self.param_handler.get_param(params.AsylumParam.IMG_PATH)
+        img_path = convert_igor_path_to_python_path(val)
+        images = sorted(glob.glob(img_path + os.sep + prefix + "*"
+                                  + self.IMG_EXT),
+                        key=os.path.getmtime)  # Sorted by access time
+        return images[-1] if images else None  # Get latest
+
     def poll_scans(self) -> [scan_pb2.Scan2d]:
         """Override polling of scans."""
-        val = params.get_param(params.AsylumParam.IMG_PATH)
-        img_path = convert_igor_path_to_python_path(val)
-        images = sorted(glob.glob(img_path + os.sep + "*" + self.IMG_EXT),
-                        key=os.path.getmtime)  # Sorted by access time
-        scan_path = images[-1] if images else None  # Get latest
-
+        scan_path = self._get_latest_file(self.SCAN_PREFIX)
         if (scan_path and not self._old_scan_path or
                 scan_path != self._old_scan_path):
             self._old_scan_path = scan_path
@@ -295,32 +251,25 @@ class AsylumTranslator(ConfigTranslator):
                 self._old_scans = scans
         return self._old_scans
 
-    # TODO: Missing poll_spec!!!
+    def poll_spec(self) -> spec_pb2.Spec1d:
+        """Override spec polling."""
+        spec_path = self._get_latest_file(self.SPEC_PREFIX)
 
-    def poll_probe_pos(self) -> spec_pb2.ProbePosition | None:
-        """Override probe position polling.
+        if spec_path and spec_path != self.old_spec_path:
+            spec = self._load_spec(spec_path)
+            if spec:
+                self.old_spec_path = spec_path
+                self.old_spec = spec
+        return self.old_spec
 
-        The Asylum controller stores these in the scan coordinate system
-        (CS). We need to convert back to the global CS when sending out.
-        """
-        vals = []
-        vals.append(self.param_handler._call_method(params.GET_POS_X_METHOD))
-        vals.append(self.param_handler._call_method(params.GET_POS_Y_METHOD))
+    def _load_spec(self, fname: str) -> spec_pb2.Spec1d | None:
+        """Load Spec1d from provided filename (None on failure)."""
+        ts = get_file_modification_datetime(fname)
+        reader = sr.IgorIBWReader(fname)
+        datasets = reader.read(verbose=False)
 
-        scan_params = self.poll_scan_params()
-        units = self.param_handler.get_unit(params.SCAN_PARAMS[0])
-
-        # We obtained both of these from the controller, so they should be in
-        # the same units.
-        vals[0] = vals[0] + scan_params.spatial.roi.top_left.x
-        vals[1] = vals[1] + scan_params.spatial.roi.top_left.y
-
-        probe_pos_params = spec_pb2.ProbePosition()
-        probe_pos_params.point.x = vals[0]
-        probe_pos_params.point.y = vals[1]
-        probe_pos_params.units = units
-
-        return probe_pos_params
+        logger.warning('LOADED SPEC. WHAT NOW!?!?!')
+        return None
 
     def on_action_request(self, action: control_pb2.ActionMsg
                           ) -> control_pb2.ControlResponse:
