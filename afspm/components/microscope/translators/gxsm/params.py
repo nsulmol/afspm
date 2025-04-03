@@ -78,7 +78,6 @@ class GxsmFeedbackChannel(str, enum.Enum):
 # Combining a Feedback Channel with these strings creates the uuid
 # to query them.
 GXSM_SETPOINT_END = '-set'
-GXSM_EGAIN_END = '-gain'
 
 
 def update_zctrl_channel(param_handler: params.ParameterHandler,
@@ -91,10 +90,8 @@ def update_zctrl_channel(param_handler: params.ParameterHandler,
     """
     logger.debug(f'Trying to set ZCtrl feedback channel to {channel}.')
 
-    keys = [params.MicroscopeParameter.ZCTRL_SETPOINT,
-            params.MicroscopeParameter.ZCTRL_EGAIN]
-    spm_uuids = [channel + GXSM_SETPOINT_END,
-                 channel + GXSM_EGAIN_END]
+    keys = [params.MicroscopeParameter.ZCTRL_SETPOINT]
+    spm_uuids = [channel + GXSM_SETPOINT_END]
 
     for (key, spm_uuid) in zip(keys, spm_uuids):
         if key not in param_handler.param_infos:

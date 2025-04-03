@@ -50,11 +50,6 @@ uuid = 'dsp-fbs-mx0-current-set'
 type = 1.0
 range = [-100, 100]
 
-[zctrl-egain]
-uuid = 'dsp-fbs-mx0-current-gain'
-type = 1.0
-range = [-0.5, 0.5]
-
 [zctrl-pgain]  # Unitless, no range enforced.
 uuid = 'dsp-fbs-cp'
 type = 1.0

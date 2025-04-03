@@ -46,7 +46,6 @@ class MicroscopeParameter(str, Enum):
     ZCTRL_SETPOINT = 'zctrl-setpoint'
     ZCTRL_PGAIN = 'zctrl-pgain'
     ZCTRL_IGAIN = 'zctrl-igain'
-    ZCTRL_EGAIN = 'zctrl-egain'
 
     # Sample Slope Correction
     SAMPLE_SLOPE_X = 'sample-slope-x'
@@ -96,9 +95,6 @@ DESCRIPTIONS = {
     MicroscopeParameter.ZCTRL_IGAIN:
     "Desired gain for integral component of feedback loop controlling " +
     "z-height of probe.",
-    MicroscopeParameter.ZCTRL_EGAIN:
-    "Desired gain for error fed into feedback loop controlling " +
-    "z-height of probe.",
 
     # Sample Slope Correction
     MicroscopeParameter.SAMPLE_SLOPE_X:
@@ -133,13 +129,15 @@ SCAN_PARAMS = [MicroscopeParameter.SCAN_TOP_LEFT_X,
                MicroscopeParameter.SCAN_RESOLUTION_Y,
                MicroscopeParameter.SCAN_ANGLE]
 
+
 ZCTRL_PARAMS = [MicroscopeParameter.ZCTRL_SETPOINT,
                 MicroscopeParameter.ZCTRL_IGAIN,
-                MicroscopeParameter.ZCTRL_PGAIN,
-                MicroscopeParameter.ZCTRL_EGAIN]
+                MicroscopeParameter.ZCTRL_PGAIN]
+
+
 # Attrib names from feedback.proto
-ZCTRL_ATTRIB_STRS = ['setPoint', 'integralGain', 'proportionalGain',
-                     'errorGain']
+ZCTRL_ATTRIB_STRS = ['setPoint', 'integralGain', 'proportionalGain']
+
 
 PROBE_POS_PARAMS = [MicroscopeParameter.PROBE_POS_X,
                     MicroscopeParameter.PROBE_POS_Y]
