@@ -448,8 +448,8 @@ class ParameterHandler(metaclass=ABCMeta):
             return
 
         param_info = self._get_param_info(generic_param)
-        val = _correct_val_for_sending(val, param_info, generic_param,
-                                       curr_unit)
+        val = _correct_val_for_sending(val, param_info, curr_unit,
+                                       generic_param)
 
         logger.trace(f'Setting {val} to {curr_unit}.')
         self.set_param_spm(param_info.uuid, val)
@@ -484,8 +484,8 @@ class ParameterHandler(metaclass=ABCMeta):
         for generic_param, val, curr_unit in zip(generic_params, vals,
                                                  curr_units):
             param_info = self._get_param_info(generic_param)
-            val = _correct_val_for_sending(val, param_info, generic_param,
-                                           curr_unit)
+            val = _correct_val_for_sending(val, param_info, curr_unit,
+                                           generic_param)
             spm_params.append(param_info.uuid)
             spm_vals.append(val)
 
@@ -494,9 +494,12 @@ class ParameterHandler(metaclass=ABCMeta):
 
 
 def _correct_val_for_sending(val: str, param_info: ParameterInfo,
-                             generic_param: str, curr_unit: str
+                             curr_unit: str, generic_param: str = ''
                              ) -> Any:
-    """Typify, convert units, and cap val in range."""
+    """Typify, convert units, and cap val in range.
+
+    NOTE: generic_param is just for logging.
+    """
     val = _typify_val(val, param_info.type)
     val = units.convert(val, curr_unit, param_info.unit)
     val = _cap_val_in_range(val, param_info.range, generic_param)
@@ -504,8 +507,11 @@ def _correct_val_for_sending(val: str, param_info: ParameterInfo,
 
 
 def _cap_val_in_range(val: Any, val_range: tuple[Any] | None,
-                      generic_uuid: str) -> Any:
-    """Cap value within range if range is provided."""
+                      generic_uuid: str = '') -> Any:
+    """Cap value within range if range is provided.
+
+    NOTE: generic_uuid is just for logging.
+    """
     if val_range and not val_range[0] <= val <= val_range[1]:
         old_val = val
         val = (val_range[0] if val < val_range[0] else val_range[1]

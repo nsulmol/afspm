@@ -231,7 +231,7 @@ class GxsmTranslator(ConfigTranslator):
             return None
 
     def poll_spec(self) -> spec_pb2.Spec1d:
-        """Override spec polling. For now, not supported."""
+        """Override spec polling."""
         spec_fname = self._get_latest_spec_filename()
         if spec_fname and spec_fname != self.last_spec_fname:
             spec = self._load_spec(spec_fname)
