@@ -47,6 +47,10 @@ class XOPUnsupportedTypeError(TypeError):
     """Provided IgorType that is not supported."""
 
 
+class XOPMessageError(Exception):
+    """The parsed response indicates an error."""
+
+
 class IgorType(str, Enum):
     """String defines the igor data type."""
 
@@ -64,7 +68,7 @@ def _create_message_id() -> str:
 
 
 def convert_igor_path_to_python_path(igor_path: str) -> str:
-    """Converts a path received from Igor into python format.
+    """Convert a path received from Igor into python format.
 
     Igor stores file paths with back- or forward- slashes all replaced
     by colons (e.g. "C:Users:nsulmol:Pictures" instead of
@@ -144,24 +148,28 @@ def parse_response_string(response: str) -> (int, int, Optional[float | str]):
     structure = json.loads(response)
 
     if ERROR_KEY not in structure or MSG_ID_KEY not in structure:
-        logger.error("ZMQ-XOP Response Received does not make sense!")
-        raise XOPSyntaxError
+        msg = "ZMQ-XOP Response Received does not make sense!"
+        logger.error(msg)
+        raise XOPSyntaxError(msg)
 
     error = structure[ERROR_KEY][VAL_KEY]
     message_id = structure[MSG_ID_KEY]
 
     if error != 0:
         error_msg = structure[ERROR_KEY][MSG_KEY]
-        logger.error(f"Error {error} for message id {message_id}: {error_msg}")
+        msg = f"Error {error} for message id {message_id}: {error_msg}"
+        logger.error(msg)
+        raise XOPMessageError(msg)
 
     if RES_KEY not in structure:
         return error, error_msg, message_id, None
 
     res_type = IgorType(structure[RES_KEY][TYPE_KEY])
     if res_type == IgorType.WAVE:
-        logger.error("ZMQ-XOP response included wave, which is not currently "
-                     "supported.")
-        raise XOPUnsupportedTypeError
+        msg = ("ZMQ-XOP response included wave, which is not currently "
+               "supported.")
+        logger.error(msg)
+        raise XOPUnsupportedTypeError(msg)
 
     value = structure[RES_KEY][VAL_KEY]
     return error, message_id, value

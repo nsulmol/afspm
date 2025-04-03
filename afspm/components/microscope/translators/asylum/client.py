@@ -12,6 +12,19 @@ from afspm.components.microscope.translators.asylum import xop
 logger = logging.getLogger(__name__)
 
 
+DEFAULT_XOP_URL = 'tcp://127.0.0.1:5555'
+
+
+class XopMessageError(Exception):
+    """The parsed response indicates a generic message error.
+
+    This is a duplicate of that in xop. I am catching that error and
+    funneling it up into an error at this level. This is questionable in
+    terms of coding quality: my goal was to encapsulate knowledge into xop
+    (the user of client should not need to import xop).
+    """
+
+
 class XopClient:
     """Holds zmq-xop client logic.
 
@@ -26,8 +39,10 @@ class XopClient:
         _client: zmq socket used to connect to server.
     """
 
-    def __init__(self, url: str, timeout_ms: int = REQUEST_TIMEOUT_MS,
+    def __init__(self, url: str = DEFAULT_XOP_URL,
+                 timeout_ms: int = REQUEST_TIMEOUT_MS,
                  ctx: zmq.Context = None):
+        """Init constructor."""
         if not ctx:
             ctx = zmq.Context.instance()
         self._url = url
@@ -54,7 +69,7 @@ class XopClient:
             params: tuple of parameters to feed the method. Optional. Default
                 is None. This could consist of, for example:
                 - (attrib), for something like GetValue(attrib)
-                -(attrib, val), for something like SetValue(attrib, val)
+                - (attrib, val), for something like SetValue(attrib, val)
 
         Returns:
             (msg_received, ret_val), where
@@ -79,7 +94,16 @@ class XopClient:
             if self._client.poll(POLL_TIMEOUT_MS, zmq.POLLIN):
                 msg = self._client.recv(zmq.NOBLOCK).decode()
                 logger.trace(f'Received response: {msg}')
-                err_code, rep_msg_id, ret_val = xop.parse_response_string(
-                    msg)
+                try:
+                    err_code, rep_msg_id, ret_val = xop.parse_response_string(
+                        msg)
+                except (xop.XOPMessageError, xop.XOPSyntaxError,
+                        xop.XOPUnsupportedTypeError) as e:
+                    # Catch major exceptions and funnel up to general.
+                    # (We log the specific errors, and the user of this
+                    # method should not have to concern themselves with
+                    # such particulars)
+                    raise XopMessageError(e.message)
+
                 msg_received = req_msg_id == rep_msg_id
         return msg_received, ret_val
