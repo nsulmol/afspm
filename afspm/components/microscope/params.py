@@ -271,13 +271,14 @@ class ParameterHandler(metaclass=ABCMeta):
 
     For example, a params config containing two simple params could be:
 
-        ['scan-top-left-x']
-        'uuid': 'TL_X'
-        'units' 'nm'
+        [scan-top-left-x]
+        uuid = 'TL_X'
+        type = 1.0
+        units = 'nm'
 
-        ['scan-angle']
-        'setter': 'my_file.get_scan_angle'
-        'getter': 'my_file.set_scan_angle'
+        [scan-angle]
+        setter = 'my_file.get_scan_angle'
+        getter = 'my_file.set_scan_angle'
 
     In this example, the 'scan-angle' parameter requires custom methods, which
     in this case are in a module my_file.py. The 'scan-top-left-x' parameter use
@@ -426,14 +427,13 @@ class ParameterHandler(metaclass=ABCMeta):
         val = self.get_param_spm(uuid)
         return val
 
-    def set_param(self, generic_param: MicroscopeParameter, val: str,
+    def set_param(self, generic_param: MicroscopeParameter, val: Any,
                   curr_unit: str = None):
         """Convert a value to appropriate units and set it.
 
         Args:
             generic_param: MicroscopeParameter we want to set.
-            val: value to set it to, in str format (as it is sent in
-                ParameterMsg).
+            val: value to set it to, in expected format.
             curr_unit: unit of provided value. optional.
 
         Raises:
