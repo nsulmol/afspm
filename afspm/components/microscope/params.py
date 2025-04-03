@@ -489,8 +489,7 @@ class ParameterHandler(metaclass=ABCMeta):
             val = _correct_val_for_sending(val, param_info, generic_param,
                                            curr_unit)
             spm_params.append(param_info.uuid)
-            spm_vals.append(_cap_val_in_range(val, param_info.range,
-                                              generic_param))
+            spm_vals.append(val)
 
         for spm_param, spm_val in zip(spm_params, spm_vals):
             self.set_param_spm(spm_param, spm_val)
