@@ -145,7 +145,7 @@ def _is_variable_lookup_failure(val: float | str | None) -> bool:
     return False
 
 
-class AsylumParam(enum):
+class AsylumParam(enum.Enum):
     """Asylum-specific parameters, used as 'generic' names in config.
 
     We use the 'name' of these parameters as their generic uuid when

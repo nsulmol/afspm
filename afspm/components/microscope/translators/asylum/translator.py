@@ -2,9 +2,11 @@
 
 import os
 import logging
-from typing import Any
 import glob
+import traceback
 import SciFiReaders as sr
+import sidpy
+import numpy as np
 
 from afspm.components.microscope.params import (ParameterHandler,
                                                 ParameterNotSupportedError,
@@ -61,6 +63,9 @@ class AsylumTranslator(ConfigTranslator):
             per request.
         _old_last_spec: the prior state of whether or not we were spec'ing 1x
             per request.
+        _save_spec_probe_pos: ProbePosition of XY position when last spec was
+            done. Needed in order to create Spec1d from saved file, as the
+            metadata (oddly) does not appear to store the XY position.
     """
 
     IMG_EXT = '.ibw'
@@ -84,6 +89,8 @@ class AsylumTranslator(ConfigTranslator):
         self._old_scans = []
         self._old_spec_path = None
         self._old_spec = None
+
+        self._save_spec_probe_pos = None
 
         self._old_save_state = None
         self._old_last_scan = None
@@ -231,7 +238,7 @@ class AsylumTranslator(ConfigTranslator):
                 logger.debug(f"Getting datasets from {scan_path} (each dataset"
                              " is a channel).")
                 reader = sr.IgorIBWReader(scan_path)
-                datasets = reader.read(verbose=False)
+                datasets = list(reader.read(verbose=False).values())
             except Exception as exc:
                 logger.error(f"Failure loading scan at {scan_path}: {exc}")
                 return self._old_scans
@@ -265,11 +272,19 @@ class AsylumTranslator(ConfigTranslator):
     def _load_spec(self, fname: str) -> spec_pb2.Spec1d | None:
         """Load Spec1d from provided filename (None on failure)."""
         ts = get_file_modification_datetime(fname)
-        reader = sr.IgorIBWReader(fname)
-        datasets = reader.read(verbose=False)
+        try:
+            reader = sr.IgorIBWReader(fname)
+            ds_dict = reader.read(verbose=False)
 
-        logger.warning('LOADED SPEC. WHAT NOW!?!?!')
-        return None
+            spec = convert_sidpy_to_spec_pb2(ds_dict, self._save_spec_probe_pos)
+            spec.timestamp.FromDatetime(ts)
+            spec.filename = fname
+            return spec
+        except Exception:
+            logger.error(f'Could not read spec fname {fname}.'
+                         'Got error.')
+            logger.error(traceback.format_exc())
+            return None
 
     def on_action_request(self, action: control_pb2.ActionMsg
                           ) -> control_pb2.ControlResponse:
@@ -288,18 +303,47 @@ class AsylumTranslator(ConfigTranslator):
         elif action.action == MicroscopeAction.START_SPEC:
             self.param_handler._call_method(params.SET_BASENAME_METHOD,
                                             (self.SPEC_PREFIX,))
+            self._save_spec_probe_pos = self.poll_probe_pos()
         return super().on_action_request(action)
 
 
-def _init_action_handler(client: XopClient) -> ActionHandler:
+def _init_action_handler(client: XopClient) -> actions.AsylumActionHandler:
     """Initialize Asylum action handler pointing to defulat config."""
     actions_config_path = os.path.join(os.path.dirname(__file__),
                                        ACTIONS_FILENAME)
-    return ActionHandler(client, actions_config_path)
+    return actions.AsylumActionHandler(actions_config_path, client)
 
 
-def _init_param_handler(client: XopClient) -> params.GxsmParameterHandler:
+def _init_param_handler(client: XopClient) -> params.AsylumParameterHandler:
     """Initialize Asylum action handler pointing to defulat config."""
     params_config_path = os.path.join(os.path.dirname(__file__),
                                       PARAMS_FILENAME)
-    return params.AsylumParameterHandler(client, params_config_path)
+    return params.AsylumParameterHandler(params_config_path, client)
+
+
+def convert_sidpy_to_spec_pb2(ds_dict: dict[str, sidpy.Dataset],
+                              probe_pos: spec_pb2.ProbePosition
+                              ) -> spec_pb2.Spec1d:
+    """Convert a dict of sidpy datasets to a single Spec1d.
+
+    Bizarrely, the XY position of the spectrum is *not* stored in the
+    metadata! So, we receive this as input (and store it in the translator
+    before the spec collection is called).
+    """
+    names = [ds.dim_0.name for ds in ds_dict.values()]
+    units = [ds.dim_0.units for ds in ds_dict.values()]
+    num_variables = len(ds_dict)
+    data_per_variable = list(ds_dict.values())[0].shape[0]
+
+    # Extract data (first as 2D list)
+    values = [ds.compute() for ds in ds_dict.values()]
+    # Now, unravel to 1D version (using numpy's ravel)
+    values = np.array(values).ravel().tolist()
+
+    spec_data = spec_pb2.SpecData(num_variables=num_variables,
+                                  data_per_variable=data_per_variable,
+                                  names=names, units=units,
+                                  values=values)
+    spec = spec_pb2.Spec1d(position=probe_pos,
+                           data=spec_data)
+    return spec
