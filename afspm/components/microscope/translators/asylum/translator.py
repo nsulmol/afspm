@@ -296,6 +296,10 @@ class AsylumTranslator(ConfigTranslator):
 
         We change the base name on these cases, but otherwise call the
         parent method.
+
+        Note: for spec, we also store the probe position before running.
+        This is because the metadata of the saved spec file does not contain
+        this data.
         """
         if action.action == MicroscopeAction.START_SCAN:
             self.param_handler._call_method(params.SET_BASENAME_METHOD,
