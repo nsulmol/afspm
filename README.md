@@ -60,7 +60,7 @@ We use Google protobuffers to serialize/deserialize data between the various sys
 Now, there is one aspect that could be construed as either a pro or con: *protobuf messages are not human readable*. While human readability is, in principle, a huge plus, it tends to go hand-in-hand with a lack of type safety/easy schema violations. What we mean by this: a user can easily unintentionally send a broken message when they are able to create it with a simple text editor. Thus, we will *accept* this 'con' given our perceived larger 'pro'.
 
 #### Set up Google Protobuf Compiler
-Download the protobuf compiler. The easiest way is to download the latest precompiled binaries from their releases: https://github.com/protocolbuffers/protobuf/releases. Note that you will need to grab the *appropriate* package for your operating system. E.g., ```protoc-25.2-win64.zip```for a 64-bit Windows environment, or ```protoc-25.2-linux-x86_64.zip```for a 64-bit x86-based Linux environment (where 25.2 was the latest stable build in this case).
+Download the protobuf compiler. The easiest way is to download the latest precompiled binaries from their releases: https://github.com/protocolbuffers/protobuf/releases. Note that you will need to grab the *appropriate* package for your operating system. E.g., ```protoc-29.3-win64.zip```for a 64-bit Windows environment, or ```protoc-29.3-linux-x86_64.zip```for a 64-bit x86-based Linux environment (where 29.3 was the latest stable build in this case).
 
 Once downloaded, you will need to copy the executable and included well-known types to appropriate locations (so they are automatically detected).
 
