@@ -209,6 +209,18 @@ class AsylumTranslator(ConfigTranslator):
             return control_pb2.ControlResponse.REP_PARAM_ERROR
         return control_pb2.ControlResponse.REP_SUCCESS
 
+    def on_set_probe_pos(self, probe_position: spec_pb2.ProbePosition
+                         ) -> control_pb2.ControlResponse:
+        """Override setting of probe pos.
+
+        We call the parent method, but *after* explicitly tell the
+        controller to mvoe the probe to that position. This is to match
+        our expected behavior, where the probe position setting causes
+        it to move too.
+        """
+        super().on_set_probe_pos(probe_position)
+        self.param_handler._call_method(params.MOVE_POS_METHOD)
+
     def poll_scope_state(self) -> scan_pb2.ScopeState:
         """Override scope state polling."""
         val = self.param_handler._call_method(params.GET_STATUS_METHOD)
