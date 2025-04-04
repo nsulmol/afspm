@@ -163,8 +163,8 @@ def convert_sidpy_to_scan_pb2(ds: Dataset) -> scan_pb2.Scan2d:
     size = {}
     for dim in [ds.x, ds.y]:
         key = 'x' if 'x' in dim.name else 'y'
-        tl[key] = dim.min().item()
-        size[key] = dim.max().item() - dim.min().item()
+        tl[key] = dim.values.min().item()
+        size[key] = dim.values.max().item() - dim.values.min().item()
     top_left = geometry_pb2.Point2d(**tl)
     size = geometry_pb2.Size2d(**size)
     roi = geometry_pb2.RotRect2d(top_left=top_left, size=size)
