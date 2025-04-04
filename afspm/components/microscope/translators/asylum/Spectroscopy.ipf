@@ -9,11 +9,16 @@
 Function InitProbePos()
     WAVE spotX = root:Packages:MFP3D:Force:SpotX
     WAVE spotY = root:Packages:MFP3D:Force:SpotY
+    WAVE spotNum = root:Packages:MFP3D:Force:SpotNum
 
     // Redimension the spots so they only are of size 2
     // (1st is default and always should be middle of scan).
     Redimension /N=2 spotX
     Redimension /N=2 spotY
+
+    // Indicate that 2nd value in array is what we should move
+    // to for spectroscopy.
+    spotNum = 1
 End Function
 
 Function SetProbePosX(posX)
@@ -22,9 +27,15 @@ Function SetProbePosX(posX)
     spotX[1] = posX
 End Function
 
+Function SetProbePosY(posY)
+    Variable posY
+    WAVE spotY = root:Packages:MFP3D:Force:SpotY
+    spotY[1] = posY
+End Function
+
 Function GetProbePosX()
     WAVE spotX = root:Packages:MFP3D:Force:SpotX
-    return spotX[1]  # TODO: Is this the way to return it?
+    return spotX[1]
 End Function
 
 Function GetProbePosY()
@@ -32,13 +43,18 @@ Function GetProbePosY()
     return spotY[1]
 End Function
 
-Function GetBaseName()
-    WAVE baseName = root:
+Function/S GetBaseName()
+    SVAR baseName = root:Packages:MFP3D:Main:Variables:BaseName
     return baseName
 End Function
 
 Function SetBaseName(newName)
-    Variable newName  # TODO: Should this be a string? Is that a thing?
-    WAVE baseName = root:
+    String newName
+    SVAR baseName = root:Packages:MFP3D:Main:Variables:BaseName
     baseName = newName
+
+    // Make Asylum update the suffix
+    PV("BaseSuffix", 0)
+    ARCheckSuffix()
+    ARCheckUserNote(0)  // I'm not sure what this does.
 End Function
