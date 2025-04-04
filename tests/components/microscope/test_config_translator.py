@@ -212,8 +212,7 @@ def test_zctrl_params(param_config_str, vals_dict, action_config_str):
     exp_zctrl_params = feedback_pb2.ZCtrlParameters(  # feedbackOn=True,
         setPoint=0.5,
         proportionalGain=1.0,
-        integralGain=1.0,
-        errorGain=1.0)
+        integralGain=1.0)
 
     curr_zctrl_params = config_translator.poll_zctrl_params()
     assert exp_zctrl_params == curr_zctrl_params
@@ -221,8 +220,7 @@ def test_zctrl_params(param_config_str, vals_dict, action_config_str):
     exp_zctrl_params = feedback_pb2.ZCtrlParameters(  # feedbackOn=False,
         setPoint=0.3,
         proportionalGain=0.3,
-        integralGain=0.5,
-        errorGain=0.1)
+        integralGain=0.5)
     config_translator.on_set_zctrl_params(exp_zctrl_params)
     curr_zctrl_params = config_translator.poll_zctrl_params()
     assert exp_zctrl_params == curr_zctrl_params

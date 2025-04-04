@@ -18,7 +18,6 @@ message ZCtrlParameters {
 
   float proportionalGain = 2;  // Proportional component
   float integralGain = 3;  // Integral component
-  float errorGain = 5;  // Diff. b/w measured and setpoint (before PI)
 
   // UUID attributes of associated scan.
   google.protobuf.Timestamp timestamp = 4; // Should match scan timestamp
