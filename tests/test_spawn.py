@@ -36,10 +36,16 @@ def key_to_expand_from():
 
 
 @pytest.fixture
+def original_url():
+   return 'inproc://banana'
+
+
+@pytest.fixture
 def good_config_dict(component1_name, component2_name,
-                     key_to_expand, key_to_expand_from):
+                     key_to_expand, key_to_expand_from,
+                     original_url):
     return {
-        key_to_expand_from: 'inproc://banana',
+        key_to_expand_from: original_url,
         component1_name: {
             spawn.IS_COMPONENT_KEY: True,
             'hello': 'world',
@@ -51,6 +57,16 @@ def good_config_dict(component1_name, component2_name,
             key_to_expand: key_to_expand_from
         }
     }
+
+
+@pytest.fixture
+def replacement_url():
+    return 'inproc://apple'
+
+
+@pytest.fixture
+def extra_config_dict(key_to_expand_from, replacement_url):
+    return {key_to_expand: replacement_url}
 
 
 def test_prepare_dict_for_spawning(good_config_dict, component1_name,
@@ -74,3 +90,20 @@ def test_prepare_dict_for_spawning(good_config_dict, component1_name,
         expanded_dict = expand_variables_in_dict(good_config_dict)
         res_dict = spawn._filter_requested_components(expanded_dict,
                                                       [component1_name])
+
+
+def test_extra_config(good_config_dict, extra_config_dict,
+                      original_url, replacement_url,
+                      component1_name, component2_name, key_to_expand):
+    """Validate extra config works as expected."""
+
+    # Test without extra config
+    expanded_dict = expand_variables_in_dict(good_config_dict)
+    assert expanded_dict[component1_name][key_to_expand] == original_url
+    assert expanded_dict[component2_name][key_to_expand] == original_url
+
+    # Test with extra config
+    merged_dict = extra_config_dict | good_config_dict
+    expanded_dict = expand_variables_in_dict(merged_dict)
+    assert expanded_dict[component1_name][key_to_expand] == original_url
+    assert expanded_dict[component2_name][key_to_expand] == original_url

@@ -24,6 +24,7 @@ LOGGER_KEY = 'afspm_logger'
 def spawn_components(config_file: str,
                      components_to_spawn: list[str] = None,
                      components_not_to_spawn: list[str] = None,
+                     extra_config_file: str = None,
                      log_file: str = 'log.txt',
                      log_to_stdout: bool = True,
                      log_level: str = "INFO"):
@@ -82,10 +83,16 @@ def spawn_components(config_file: str,
     - $COMPONENT_CLASS$ must be: the module_path + class name:
     'path.to.module.class' (e.g.
     'afspm.components.microscope.translator.MicroscopeTranslator').
-    - We  expect you to have a *single* experiment config file that contains
+    - We  expect you to have a single experiment config file that contains
     all the components you want to run in your experiment. You may instantiate
     these components on multiple different PCs (using different
     components_to_spawn for each device), but there should be one config.
+    - Because some variables may change when running an experiment on different
+    microscopes (e.g. the scan range you are examining), we allow a secondary
+    config file (extra_config_file), to hold these microscope-specific
+    variables. These will get appended to the config_file's dict before
+    spawning anything. Note that we merge config_file with extra_config_file,
+    with any key conflicts falling back to config_file.
 
     Args:
         config_file: path to TOML config file.
@@ -96,6 +103,9 @@ def spawn_components(config_file: str,
         components_not_to_spawn: opposite of components_to_spawn. Any component
             in this list will not be spawned. Note: only one of the two can be
             used per call.
+        extra_config_file: additional TOML config file with SPM-specific
+            key:val pairs. These key:val pairs get appended to the config_file
+            one on loading. Default is None.
         log_file: a file path to save the process log. Default is 'log.txt'.
             To not log to file, set to None.
         log_to_stdout: whether or not we print to std out as well. Default is
@@ -107,6 +117,8 @@ def spawn_components(config_file: str,
     log_init_method(*log_args)
 
     consider_config_path(config_file)
+    if extra_config_file:
+        consider_config_path(extra_config_file)
 
     monitor = None
     ctx = None
@@ -117,6 +129,12 @@ def spawn_components(config_file: str,
     if config_dict is None:
         logger.error("Config file not found or loading failed, exiting.")
         return
+
+    # Handle extra config case, merging the two dicts
+    if extra_config_file:
+        with open(extra_config_file, 'rb') as file:
+            extra_config_dict = tomli.load(file)
+            config_dict = config_dict | extra_config_dict
 
     expanded_dict = expand_variables_in_dict(config_dict)
     filtered_dict = _filter_requested_components(expanded_dict,
@@ -147,6 +165,7 @@ def spawn_components(config_file: str,
 
 def spawn_monitorless_component(config_file: str,
                                 component_to_spawn: str,
+                                extra_config_file: str = None,
                                 log_file: str = 'log.txt',
                                 log_to_stdout: bool = True,
                                 log_level: str = "INFO"):
@@ -160,11 +179,29 @@ def spawn_monitorless_component(config_file: str,
     not be spawned into a separate process. The main con is that a crashed/
     frozen component will not be revived.
 
+    Notes:
+    - $COMPONENT_CLASS$ must be: the module_path + class name:
+    'path.to.module.class' (e.g.
+    'afspm.components.microscope.translator.MicroscopeTranslator').
+    - We  expect you to have a single experiment config file that contains
+    all the components you want to run in your experiment. You may instantiate
+    these components on multiple different PCs (using different
+    components_to_spawn for each device), but there should be one config.
+    - Because some variables may change when running an experiment on different
+    microscopes (e.g. the scan range you are examining), we allow a secondary
+    config file (extra_config_file), to hold these microscope-specific
+    variables. These will get appended to the config_file's dict before
+    spawning anything. Note that we merge config_file with extra_config_file,
+    with any key conflicts falling back to config_file.
+
     Args:
         config_file: path to TOML config file.
         component_to_spawn: string corresponding to a $COMPONENT_NAME$ in the
             config file. Note: any 'component' requires a key:val of
             'component': True for us to parse it properly!
+        extra_config_file: additional TOML config file with SPM-specific
+            key:val pairs. These key:val pairs get appended to the config_file
+            one on loading. Default is None.
         log_file: a file path to save the process log. Default is 'log.txt'.
             To not log to file, set to None.
         log_to_stdout: whether or not we print to std out as well. Default is
@@ -174,24 +211,38 @@ def spawn_monitorless_component(config_file: str,
     set_up_logging(log_file, log_to_stdout, log_level)
     consider_config_path(config_file)
 
+    if extra_config_file:
+        consider_config_path(extra_config_file)
+
+    config_dict = None
     with open(config_file, 'rb') as file:
         config_dict = tomli.load(file)
 
-        expanded_dict = expand_variables_in_dict(config_dict)
-        filtered_dict = _filter_requested_components(expanded_dict,
-                                                     [component_to_spawn])
+    if config_dict is None:
+        logger.error("Config file not found or loading failed, exiting.")
+        return
 
-        keys = list(filtered_dict.keys())
-        if len(keys) == 0:
-            logger.error(f"Component {component_to_spawn} not found, exiting.")
-            return
-        if len(keys) > 1:
-            logger.error("More than 1 component with name "
-                         f"{component_to_spawn} found, exiting.")
-            return
+    # Handle extra config case, merging the two dicts
+    if extra_config_file:
+        with open(extra_config_file, 'rb') as file:
+            extra_config_dict = tomli.load(file)
+            config_dict = config_dict | extra_config_dict
 
-        logger.info(f"Creating process for component {component_to_spawn}")
-        construct_and_run_component(filtered_dict[keys[0]])
+    expanded_dict = expand_variables_in_dict(config_dict)
+    filtered_dict = _filter_requested_components(expanded_dict,
+                                                 [component_to_spawn])
+
+    keys = list(filtered_dict.keys())
+    if len(keys) == 0:
+        logger.error(f"Component {component_to_spawn} not found, exiting.")
+        return
+    if len(keys) > 1:
+        logger.error("More than 1 component with name "
+                     f"{component_to_spawn} found, exiting.")
+        return
+
+    logger.info(f"Creating process for component {component_to_spawn}")
+    construct_and_run_component(filtered_dict[keys[0]])
 
 
 def _filter_requested_components(config_dict: dict,
