@@ -6,86 +6,75 @@
 uuid = 'XOffset'
 unit = 'm'
 type = 1.0
-range = [-11000.0, 11000.0]  # TODO: Update range!
+range = [-3.5e-5, 3.5e-5]  # [-3.5um, 3.5um]
+# But really, the scan size + offset must be less than 90 um.
 
 [scan-top-left-y]
 uuid = 'YOffset'
 unit = 'm'
 type = 1.0
-range = [-11000.0, 11000.0]  # TODO: Update range!
+range = [-3.5e-5, 3.5e-5]  # TODO: Update range!
 
 [scan-angle]
-uuid = 'Rotation'
+uuid = 'ScanAngle'
 unit = 'degrees'
 type = 1.0
-range = [-360.0, 360.0]  # TODO: Verify!
+range = [-360.0, 360.0]  # Will return in range [0, 360]
 
 [scan-size-x]
 setter = 'afspm.components.microscope.translators.asylum.params.set_scan_size_x'
 getter = 'afspm.components.microscope.translators.asylum.params.get_scan_size_x'
 unit = 'm'
 type = 1.0
-range = [-11000.0, 11000.0]  # TODO: Update range!
+range = [0, 9e-5]  # [0 nm, 90 um]
 
 [scan-size-y]
 setter = 'afspm.components.microscope.translators.asylum.params.set_scan_size_y'
 getter = 'afspm.components.microscope.translators.asylum.params.get_scan_size_y'
 unit = 'm'
 type = 1.0
-range = [-11000.0, 11000.0]  # TODO: Update range!
+range = [0, 9e-5]  # [0 nm, 90 um]
 
 
 # ----- Digital Scan Parameters ----- #
 [scan-resolution-x]  # Unitless, no range enforced.
 uuid = 'ScanPoints'
 type = 1
-range = [0, 32000]  # TODO: VERIFY/UPDATE
+range = [32, 1536]  # > 2000 may not save
 
 [scan-resolution-y]  # Unitless, no range enforced.
 uuid = 'ScanLines'
 type = 1
-range = [0, 32000]  # TODO: VERIFY/UPDATE
+range = [32, 1536]  # > 2000 may not save, real max is 4096.
+# Note: the supported values is some strange set. Keep in mind, your
+# chosen resolution will be converted to a supported value.
 
 # ----- Feedback Parameters ----- #
-# NOTE: Update zctrl channel in AsylumTranslator constructor.
-[zctrl-setpoint]  # TODO: Update!
-uuid = 'dsp-fbs-mx0-current-set'
+[zctrl-setpoint]
+uuid = 'SetPoint'
+unit = 'V'  # Note: units are V, but it may make sense to consider unitless?
 type = 1.0
-range = [-100, 100]  # TODO: Validate
+range = [0, 10]  # TODO: Validate. This is allowed but probably crazy!
 
 [zctrl-pgain]  # Unitless, no range enforced.
 uuid = 'ProportionalGain'
 type = 1.0
-range = [0, 200]  # TODO: Validate
+range = [0, 4096]
 
 [zctrl-igain]  # Unitless, no range enforced.
 uuid = 'IntegralGain'
 type = 1.0
-range = [0, 200]  # TODO: Validate
+range = [0, 4096]
 
 # ----- Sample Slope Correction ----- #
-[sample-slope-x]  # TODO: Update!!!
-uuid = 'dsp-adv-scan-slope-x'  # TODO: test 'dsp-mk2-hwi-slope-x'
-type = 1.0
-range = [-0.2, 0.2]
-
-[sample-slope-y]  # TODO: Update!!!
-uuid = 'dsp-adv-scan-slope-y'  # TODO: test 'dsp-mk2-hwi-slope-y'
-type = 1.0
-range = [-0.2, 0.2]
+# (There is no sample slope correction on Asylum, apparently).
 
 # ----- Probe / Scan Parameters ----- #
 [scan-speed]
 uuid = 'ScanSpeed'
 unit = 'm/s'
 type = 1.0
-range = [0.1, 10000]  # TODO: Validate range!
-
-[move-speed]  # TODO: Update!
-uuid = 'MoveSpeed'
-unit = 'm/s'
-type = 1.0
-range = [0.1, 10000]  # TODO: Validate
+range = [0, 5e-4]  # [0 m/s, 500 um / s].  Actual max is 1 m/s!
 
 # ----- Probe Parameters ----- #
 [probe-pos-x]
@@ -93,17 +82,19 @@ getter = 'afspm.components.microscope.translators.asylum.params.get_probe_pos_x'
 setter = 'afspm.components.microscope.translators.asylum.params.set_probe_pos_x'
 unit = 'm'
 type = 1.0
-range = [-11000.0, 11000.0]  # TODO: Update
+range = [0, 9e-5]  # [0 nm, 90 um]
+# Really: within the size of your scan (this is in scan CS).
 
-[probe-pos-y]  # TODO: Validate this is correct!
+[probe-pos-y]
 getter = 'afspm.components.microscope.translators.asylum.params.get_probe_pos_y'
 setter = 'afspm.components.microscope.translators.asylum.params.set_probe_pos_y'
 unit = 'm'
 type = 1.0
-range = [-11000.0, 11000.0]  # TODO: update
+range = [0, 9e-5]  # [0 nm, 90 um]
+# Really: within the size of your scan (this is in scan CS).
 
 # ----- Other ----- #
-# [tip-bias-voltage]
+# (There is no bias voltage, apparently).
 
 
 # ----- Asylum-Specific Parameters ----- #
