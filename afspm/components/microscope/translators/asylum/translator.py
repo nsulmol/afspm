@@ -158,9 +158,9 @@ class AsylumTranslator(ConfigTranslator):
         """
         if store_old_vals:
             self._old_saving_mode = self.param_handler.get_param(
-                params.AsylumParam.SAVING_MODE.name)
+                params.AsylumParam.SAVING_MODE)
             self._old_scanning_mode = self.param_handler.get_param(
-                params.AsylumParam.SCANNING_MODE.name)
+                params.AsylumParam.SCANNING_MODE)
 
         try:
             self.param_handler.set_param(params.AsylumParam.SAVING_MODE,
@@ -231,7 +231,7 @@ class AsylumTranslator(ConfigTranslator):
             return scan_pb2.ScopeState.SS_MOVING
 
     def _get_latest_file(self, prefix: str) -> str | None:
-        val = self.param_handler.get_param(params.AsylumParam.IMG_PATH.name)
+        val = self.param_handler.get_param(params.AsylumParam.IMG_PATH)
         img_path = convert_igor_path_to_python_path(val)
         images = sorted(glob.glob(img_path + os.sep + prefix + "*"
                                   + self.IMG_EXT),

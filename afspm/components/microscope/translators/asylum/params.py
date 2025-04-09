@@ -147,7 +147,8 @@ def _is_variable_lookup_failure(val: float | str | None) -> bool:
 class SavingMode(enum.Enum):
     """Whether or not we are saving scans on finish.
 
-    Linked to AsylumParam.SAVING_MODE."""
+    Linked to AsylumParam.SAVING_MODE.
+    """
 
     DO_NOT_SAVE = 0
     SAVE = 2
@@ -156,13 +157,14 @@ class SavingMode(enum.Enum):
 class ScanningMode(enum.Enum):
     """The mode we are scanning: one frame per request or continuously.
 
-    Linked to AsylumParam.SCANNING_MODE."""
+    Linked to AsylumParam.SCANNING_MODE.
+    """
 
     CONTINUOUS = 0
     ONE_FRAME = 2
 
 
-class AsylumParam(enum.Enum):
+class AsylumParam(enum.Enum, str):
     """Asylum-specific parameters, used as 'generic' names in config.
 
     We use the 'name' of these parameters as their generic uuid when
@@ -177,12 +179,12 @@ class AsylumParam(enum.Enum):
     the appropriate get/set method (different between str and other types).
     """
 
-    SCAN_SIZE = enum.auto()
-    X_RATIO = enum.auto()
-    Y_RATIO = enum.auto()
-    IMG_PATH = enum.auto()
-    SAVING_MODE = enum.auto()  # See SavingMode above.
-    SCANNING_MODE = enum.auto()  # See ScanningMode above.
+    SCAN_SIZE = 'SCAN_SIZE'
+    X_RATIO = 'X_RATIO'
+    Y_RATIO = 'Y_RATIO'
+    IMG_PATH = 'IMG_PATH'
+    SAVING_MODE = 'SAVING_MODE'  # See SavingMode above.
+    SCANNING_MODE = 'SCANNING_MODE'  # See ScanningMode above.
 
 
 # Hardcoded Y ratio (for setting)
@@ -199,7 +201,7 @@ def get_scan_size_x(handler: params.ParameterHandler) -> Any:
 
     This getter will handle that logic.
     """
-    generic_uuids = [AsylumParam.SCAN_SIZE.name, AsylumParam.X_RATIO.name]
+    generic_uuids = [AsylumParam.SCAN_SIZE, AsylumParam.X_RATIO]
     vals = handler.get_param_list(generic_uuids)
     return vals[0] * vals[1]  # scan_size * x_ratio
 
@@ -214,7 +216,7 @@ def get_scan_size_y(handler: params.ParameterHandler) -> Any:
 
     This getter will handle that logic.
     """
-    generic_uuids = [AsylumParam.SCAN_SIZE.name, AsylumParam.Y_RATIO.name]
+    generic_uuids = [AsylumParam.SCAN_SIZE, AsylumParam.Y_RATIO]
     vals = handler.get_param_list(generic_uuids)
     return vals[0] * vals[1]  # scan_size * y_ratio
 
@@ -242,10 +244,10 @@ def set_scan_size_x(handler: params.ParameterHandler,
                                                    unit)
 
     # Now, must determine the x ratio for this.
-    scan_size = handler.get_param(AsylumParam.SCAN_SIZE.name)
+    scan_size = handler.get_param(AsylumParam.SCAN_SIZE)
     x_ratio = scan_size / desired_val
 
-    handler.set_param(AsylumParam.X_RATIO.name, x_ratio, curr_unit=None)
+    handler.set_param(AsylumParam.X_RATIO, x_ratio, curr_unit=None)
 
 
 def set_scan_size_y(handler: params.ParameterHandler,
