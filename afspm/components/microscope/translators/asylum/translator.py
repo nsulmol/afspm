@@ -96,9 +96,8 @@ class AsylumTranslator(ConfigTranslator):
         self._old_last_scan = None
         # Default initialization of handler
         kwargs = self._init_handlers(xop_client, param_handler, action_handler,
-                                     kwargs)
+                                     **kwargs)
         super().__init__(**kwargs)
-        self.param_method_map = params.PARAM_METHOD_MAP
 
         # Do some setup
         self._setup_probe_pos()
@@ -108,11 +107,12 @@ class AsylumTranslator(ConfigTranslator):
 
     def __del__(self):
         """Handle object destruction: reset what we changed on startup."""
-        self._set_save_params(save_state=self._old_save_state,
-                              last_scan=self._old_last_scan,
-                              store_old_vals=False)
+        if self._old_save_state and self.old_last_scan:
+            self._set_save_params(save_state=self._old_save_state,
+                                  last_scan=self._old_last_scan,
+                                  store_old_vals=False)
 
-    def _init_handlers(client: XopClient,
+    def _init_handlers(self, client: XopClient,
                        param_handler: ParameterHandler,
                        action_handler: ActionHandler,
                        **kwargs) -> dict:

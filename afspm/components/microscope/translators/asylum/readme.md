@@ -23,8 +23,7 @@ zeromq_handler_start() // Prepare to handle incoming messages
 (Note that the zmq address provided in 'bind' must match that of the AsylumTranslator XOPClient's address, so they can connect).
 5. Start your experiment via your config file in afspm:
 ```shell
-poetry shell  # Open shell in virtual environment
-spawn /path/to/config/config.toml
+poetry run spawn /path/to/config/config.toml
 ```
 
 ## Testing
@@ -35,7 +34,7 @@ To validate that the interface is working:
 For (1), you want to call the example script with an expected function, to validate the return is what you expect. For example, to call a 'Get Value' on the parameter 'ScanSize', you would do:
 
 ```
-zmq_xop_client.exe "tcp://127.0.0.1:5555" "{ \"version\" : 1, \"CallFunction\" : { \"name\" : \"GV\", \"params\" : [ \"ScanSize\"] } }"
+zmq_xop_client.exe "tcp://127.0.0.1:5555" '{ \"version\" : 1, \"CallFunction\" : { \"name\" : \"GV\", \"params\" : [ \"ScanSize\"] } }'
 ```
 
 (assuming the zmq node is 'tcp://127.0.0.1:5555').

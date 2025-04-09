@@ -79,7 +79,8 @@ class AsylumParameterHandler(params.ParameterHandler):
         else:
             return self.GET_VALUE if request_get else self.SET_VALUE
 
-    def _call_method(self, method_str: str, attrs: tuple) -> (bool, Any | None):
+    def _call_method(self, method_str: str, attrs: tuple = None
+                     ) -> (bool, Any | None):
         """Call a method using client and return value (or None).
 
         This method will catch XOP exceptions and raise a ParameterError if

@@ -361,7 +361,7 @@ class ParameterHandler(metaclass=ABCMeta):
                 # Check if we have needed parameter info
                 param_info = create_parameter_info(val)
 
-                if param_info.uuid and param_info.type:
+                if param_info.uuid is not None and param_info.type is not None:
                     self.param_infos[key] = param_info
 
                 if (key not in self.param_methods and

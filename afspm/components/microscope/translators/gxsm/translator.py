@@ -112,11 +112,11 @@ class GxsmTranslator(ConfigTranslator):
         self.old_spec = None
 
         kwargs = self._init_handlers(param_handler, action_handler,
-                                     zctrl_channel, spec_mode, kwargs)
+                                     zctrl_channel, spec_mode, **kwargs)
         super().__init__(**kwargs)
         self._setup_save_spectroscopies()
 
-    def _init_handlers(param_handler: ParameterHandler,
+    def _init_handlers(self, param_handler: ParameterHandler,
                        action_handler: ActionHandler,
                        zctrl_channel: str,
                        spec_mode: str,
