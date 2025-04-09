@@ -34,8 +34,8 @@ from . import actions
 logger = logging.getLogger(__name__)
 
 
-# Attributes from the read scan file (differs from params.AsylumParameter, which
-# contains UUIDs for getting/setting parameters).
+# Attributes from the read scan file (differs from params.AsylumParameter,
+# which contains UUIDs for getting/setting parameters).
 SCAN_ATTRIB_ANGLE = 'ScanAngle'
 
 
@@ -58,8 +58,8 @@ class AsylumTranslator(ConfigTranslator):
         _old_spec_path: the prior spec filepath. We use this to avoid loading
             the same spectroscopies multiple times.
         _old_saving_mode: the prior SavingMode state.
-        _old_scanning_mode: the prior state of whether or not we were scanning 1x
-            per request.
+        _old_scanning_mode: the prior state of whether or not we were scanning
+            1x per request.
         _save_spec_probe_pos: ProbePosition of XY position when last spec was
             done. Needed in order to create Spec1d from saved file, as the
             metadata (oddly) does not appear to store the XY position.
@@ -158,12 +158,12 @@ class AsylumTranslator(ConfigTranslator):
         """
         if store_old_vals:
             self._old_saving_mode = self.param_handler.get_param(
-                params.AsylumParam.SAVING_MODE)
+                params.AsylumParam.SAVING_MODE.name)
             self._old_scanning_mode = self.param_handler.get_param(
-                params.AsylumParam.SCANNING_MODE)
+                params.AsylumParam.SCANNING_MODE.name)
 
         try:
-            self.param_handler.set_param(params.AsylumParam.SAVING_MODE,
+            self.param_handler.set_param(params.AsylumParam.SAVING_MODE.name,
                                          saving_mode)
         except Exception:
             msg = f"Unable to set SavingMode to {saving_mode}."
@@ -171,7 +171,7 @@ class AsylumTranslator(ConfigTranslator):
             raise MicroscopeError(msg)
 
         try:
-            self.param_handler.set_param(params.AsylumParam.SCANNING_MODE,
+            self.param_handler.set_param(params.AsylumParam.SCANNING_MODE.name,
                                          scanning_mode)
         except Exception:
             msg = f"Unable to set ScanningMode to {scanning_mode}."
@@ -231,7 +231,7 @@ class AsylumTranslator(ConfigTranslator):
             return scan_pb2.ScopeState.SS_MOVING
 
     def _get_latest_file(self, prefix: str) -> str | None:
-        val = self.param_handler.get_param(params.AsylumParam.IMG_PATH)
+        val = self.param_handler.get_param(params.AsylumParam.IMG_PATH.name)
         img_path = convert_igor_path_to_python_path(val)
         images = sorted(glob.glob(img_path + os.sep + prefix + "*"
                                   + self.IMG_EXT),

@@ -164,7 +164,7 @@ class ScanningMode(enum.Enum):
     ONE_FRAME = 2
 
 
-class AsylumParam(str, enum.Enum):
+class AsylumParam(enum.Enum):
     """Asylum-specific parameters, used as 'generic' names in config.
 
     We use the 'name' of these parameters as their generic uuid when
@@ -179,12 +179,12 @@ class AsylumParam(str, enum.Enum):
     the appropriate get/set method (different between str and other types).
     """
 
-    SCAN_SIZE = 'SCAN_SIZE'
-    X_RATIO = 'X_RATIO'
-    Y_RATIO = 'Y_RATIO'
-    IMG_PATH = 'IMG_PATH'
-    SAVING_MODE = 'SAVING_MODE'  # See SavingMode above.
-    SCANNING_MODE = 'SCANNING_MODE'  # See ScanningMode above.
+    SCAN_SIZE = enum.auto()
+    X_RATIO = enum.auto()
+    Y_RATIO = enum.auto()
+    IMG_PATH = enum.auto()
+    SAVING_MODE = enum.auto()  # See SavingMode above.
+    SCANNING_MODE = enum.auto()  # See ScanningMode above.
 
 
 # Hardcoded Y ratio (for setting)
@@ -201,7 +201,7 @@ def get_scan_size_x(handler: params.ParameterHandler) -> Any:
 
     This getter will handle that logic.
     """
-    generic_uuids = [AsylumParam.SCAN_SIZE, AsylumParam.X_RATIO]
+    generic_uuids = [AsylumParam.SCAN_SIZE.name, AsylumParam.X_RATIO.name]
     vals = handler.get_param_list(generic_uuids)
     return vals[0] * vals[1]  # scan_size * x_ratio
 
@@ -216,7 +216,7 @@ def get_scan_size_y(handler: params.ParameterHandler) -> Any:
 
     This getter will handle that logic.
     """
-    generic_uuids = [AsylumParam.SCAN_SIZE, AsylumParam.Y_RATIO]
+    generic_uuids = [AsylumParam.SCAN_SIZE.name, AsylumParam.Y_RATIO.name]
     vals = handler.get_param_list(generic_uuids)
     return vals[0] * vals[1]  # scan_size * y_ratio
 
@@ -244,10 +244,10 @@ def set_scan_size_x(handler: params.ParameterHandler,
                                                    unit)
 
     # Now, must determine the x ratio for this.
-    scan_size = handler.get_param(AsylumParam.SCAN_SIZE)
+    scan_size = handler.get_param(AsylumParam.SCAN_SIZE.name)
     x_ratio = scan_size / desired_val
 
-    handler.set_param(AsylumParam.X_RATIO, x_ratio, curr_unit=None)
+    handler.set_param(AsylumParam.X_RATIO.name, x_ratio, curr_unit=None)
 
 
 def set_scan_size_y(handler: params.ParameterHandler,
@@ -273,17 +273,17 @@ def set_scan_size_y(handler: params.ParameterHandler,
                                                    unit)
 
     _ensure_y_ratio_is_1(handler)  # Our logic assumes this!
-    handler.set_param(AsylumParam.SCAN_SIZE, desired_val, curr_unit=None)
+    handler.set_param(AsylumParam.SCAN_SIZE.name, desired_val, curr_unit=None)
 
 
 def _ensure_y_ratio_is_1(handler: params.ParameterHandler):
     """Ensure the scan size y-ratio is 1. If not, fix it and yell."""
-    y_ratio = handler.get_param(AsylumParam.Y_RATIO)
+    y_ratio = handler.get_param(AsylumParam.Y_RATIO.name)
 
     if not isclose(y_ratio, EXPECTED_Y_RATIO):
         logger.warning(f'Scan size FastRatio is not {EXPECTED_Y_RATIO}!'
                        'Going to set, but this is unexpected.')
-        handler.set_param(AsylumParam.Y_RATIO, EXPECTED_Y_RATIO,
+        handler.set_param(AsylumParam.Y_RATIO.name, EXPECTED_Y_RATIO,
                           curr_unit=None)
 
 
