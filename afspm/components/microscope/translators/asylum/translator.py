@@ -98,8 +98,8 @@ class AsylumTranslator(ConfigTranslator):
 
         # Do some setup
         self._setup_probe_pos()
-        self._set_save_params(saving_mode=params.SavingMode.SAVE,
-                              scanning_mode=params.ScanningMode.ONE_FRAME,
+        self._set_save_params(saving_mode=params.SavingMode.SAVE.value,
+                              scanning_mode=params.ScanningMode.ONE_FRAME.value,
                               store_old_vals=True)
 
     def __del__(self):
