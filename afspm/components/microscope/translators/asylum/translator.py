@@ -224,11 +224,11 @@ class AsylumTranslator(ConfigTranslator):
         """Override scope state polling."""
         val = self.param_handler._call_method(params.GET_STATUS_METHOD)
         # Bit comparisons
-        if params.ScopeState.SCANNING & val:
+        if params.ScopeState.SCANNING.value & val:
             return scan_pb2.ScopeState.SS_SCANNING
-        elif params.ScopeState.SPEC & val:
+        elif params.ScopeState.SPEC.value & val:
             return scan_pb2.ScopeState.SS_SPEC
-        elif params.ScopeState.MOVING & val:
+        elif params.ScopeState.MOVING.value & val:
             return scan_pb2.ScopeState.SS_MOVING
 
     def _get_latest_file(self, prefix: str) -> str | None:
