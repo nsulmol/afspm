@@ -390,8 +390,8 @@ def test_set_scan_params(thread_microscope_translator,
 
 
 def test_start_spec(thread_microscope_translator, thread_microscope_scheduler,
-                      afspm_component, wait_count, spec_time_ms, no_problem,
-                      sub_spec, component_name, default_control_state):
+                    afspm_component, wait_count, spec_time_ms, no_problem,
+                    sub_spec, component_name, default_control_state):
     """Ensure we receive indication of a scan starting when we request it."""
     startup_and_req_ctrl(afspm_component, no_problem, default_control_state,
                          component_name, wait_count)
@@ -420,8 +420,8 @@ def test_start_spec(thread_microscope_translator, thread_microscope_scheduler,
 
 
 def test_stop_spec(thread_microscope_translator, thread_microscope_scheduler,
-                     afspm_component, wait_count, no_problem,
-                     sub_spec, default_control_state, component_name):
+                   afspm_component, wait_count, no_problem,
+                   sub_spec, default_control_state, component_name):
     """Ensure that we can cancel a scan and receive updates."""
     startup_and_req_ctrl(afspm_component, no_problem, default_control_state,
                          component_name, wait_count)
