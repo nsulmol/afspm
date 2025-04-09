@@ -104,7 +104,8 @@ class AfspmComponentBase:
             while self.stay_alive:
                 self.heartbeater.handle_beat()
                 self._handle_subscriber()
-                self.run_per_loop()
+                if self.stay_alive:
+                    self.run_per_loop()
                 time.sleep(self.loop_sleep_s)
         except (KeyboardInterrupt, SystemExit):
             logger.warning(f"{self.name}: Interrupt received. Stopping.")
