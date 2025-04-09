@@ -57,11 +57,8 @@ class AsylumTranslator(ConfigTranslator):
             the same scans multiple times.
         _old_spec_path: the prior spec filepath. We use this to avoid loading
             the same spectroscopies multiple times.
-        _old_save_state: the prior state of whether or not we were saving
-            scans.
-        _old_last_scan: the prior state of whether or not we were scanning 1x
-            per request.
-        _old_last_spec: the prior state of whether or not we were spec'ing 1x
+        _old_saving_mode: the prior SavingMode state.
+        _old_scanning_mode: the prior state of whether or not we were scanning 1x
             per request.
         _save_spec_probe_pos: ProbePosition of XY position when last spec was
             done. Needed in order to create Spec1d from saved file, as the
@@ -92,8 +89,8 @@ class AsylumTranslator(ConfigTranslator):
 
         self._save_spec_probe_pos = None
 
-        self._old_save_state = None
-        self._old_last_scan = None
+        self._old_saving_mode = None
+        self._old_scanning_mode = None
         # Default initialization of handler
         kwargs = self._init_handlers(xop_client, param_handler, action_handler,
                                      **kwargs)
@@ -101,15 +98,15 @@ class AsylumTranslator(ConfigTranslator):
 
         # Do some setup
         self._setup_probe_pos()
-        self._set_save_params(save_state=params.ASYLUM_TRUE,
-                              last_scan=params.ASYLUM_TRUE,
+        self._set_save_params(saving_mode=params.SavingMode.SAVE,
+                              scanning_mode=params.ScanningMode.ONE_FRAME,
                               store_old_vals=True)
 
     def __del__(self):
         """Handle object destruction: reset what we changed on startup."""
-        if self._old_save_state and self._old_last_scan:
-            self._set_save_params(save_state=self._old_save_state,
-                                  last_scan=self._old_last_scan,
+        if self._old_saving_mode and self._old_scanning_mode:
+            self._set_save_params(saving_mode=self._old_saving_mode,
+                                  scanning_mode=self._old_scanning_mode,
                                   store_old_vals=False)
 
     def _init_handlers(self, client: XopClient,
@@ -146,37 +143,38 @@ class AsylumTranslator(ConfigTranslator):
         """
         self.param_handler._call_method(params.INIT_POS_METHOD)
 
-    def _set_save_params(self, save_state: int, last_scan: int,
+    def _set_save_params(self, saving_mode: int, scanning_mode: int,
                          store_old_vals: bool):
-        """Set the save state and save 'mode' of the controller.
+        """Set the saving mdoe and scanning mode of the controller.
 
         Args:
-            save_state: whether or not to save images as we scan.
-            last_scan: whether or not we are scanning one image (2), or
-                running continuously (0).
+            saving_mode: whether or not to save images as we scan. See
+                params.SavingMode.
+            scanning_mode: whether or not we are scanning one image (2), or
+                running continuously (0). See params.ScanningMode.
             store_old_vals: whether or not to store the old vals in
-                self._old_save_state and _old_last_scan, respectively. useful
-                for resetting later.
+                self._old_saving_mode and _old_scanning_mode, respectively.
+                useful for resetting later.
         """
         if store_old_vals:
-            self._old_save_state = self.param_handler.get_param(
-                params.AsylumParam.SAVE_IMAGE.name)
-            self._old_last_scan = self.param_handler.get_param(
-                params.AsylumParam.LAST_SCAN.name)
+            self._old_saving_mode = self.param_handler.get_param(
+                params.AsylumParam.SAVING_MODE.name)
+            self._old_scanning_mode = self.param_handler.get_param(
+                params.AsylumParam.SCANNING_MODE.name)
 
         try:
-            self.param_handler.set_param(params.AsylumParam.SAVE_IMAGE,
-                                         save_state)
+            self.param_handler.set_param(params.AsylumParam.SAVING_MODE,
+                                         saving_mode)
         except Exception:
-            msg = f"Unable to set SaveImage to {save_state}."
+            msg = f"Unable to set SavingMode to {saving_mode}."
             logger.error(msg)
             raise MicroscopeError(msg)
 
         try:
-            self.param_handler.set_param(params.AsylumParam.LAST_SCAN,
-                                         last_scan)
+            self.param_handler.set_param(params.AsylumParam.SCANNING_MODE,
+                                         scanning_mode)
         except Exception:
-            msg = f"Unable to set LastScan to {last_scan}."
+            msg = f"Unable to set ScanningMode to {scanning_mode}."
             logger.error(msg)
             raise MicroscopeError(msg)
 

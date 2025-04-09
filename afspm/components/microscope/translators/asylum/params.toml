@@ -127,14 +127,10 @@ type = 1.0
 uuid = 'SaveImage'
 type = ''
 
-[SPEC_PATH]
-uuid = 'SaveForce'
-type = ''
-
-[SAVE_IMAGE]
+[SAVING_MODE]
 uuid = 'SaveImage'
 type = 1.0
 
-[SAVE_FORCE]
-uuid = 'SaveForce'
+[SCANNING_MODE]
+uuid = 'LastScan'
 type = 1.0

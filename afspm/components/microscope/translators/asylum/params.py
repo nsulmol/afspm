@@ -15,9 +15,6 @@ from afspm.io.protos.generated import scan_pb2
 
 logger = logging.getLogger(__name__)
 
-# For some things, 'true' is a 2 rather than 1. Strange.
-ASYLUM_TRUE = 2
-
 
 # ----- ScopeState things ----- #
 class ScopeState(enum.Flag):
@@ -147,6 +144,24 @@ def _is_variable_lookup_failure(val: float | str | None) -> bool:
     return False
 
 
+class SavingMode(enum.Enum):
+    """Whether or not we are saving scans on finish.
+
+    Linked to AsylumParam.SAVING_MODE."""
+
+    DO_NOT_SAVE = 0
+    SAVE = 2
+
+
+class ScanningMode(enum.Enum):
+    """The mode we are scanning: one frame per request or continuously.
+
+    Linked to AsylumParam.SCANNING_MODE."""
+
+    CONTINUOUS = 0
+    ONE_FRAME = 2
+
+
 class AsylumParam(enum.Enum):
     """Asylum-specific parameters, used as 'generic' names in config.
 
@@ -165,8 +180,9 @@ class AsylumParam(enum.Enum):
     SCAN_SIZE = enum.auto()
     X_RATIO = enum.auto()
     Y_RATIO = enum.auto()
-    IMG_PATH = enum.auto()  # Applies both for images and single-force files
-    SAVE_IMAGE = enum.auto()  # Applies both for images and single-force files
+    IMG_PATH = enum.auto()
+    SAVING_MODE = enum.auto()  # See SavingMode above.
+    SCANNING_MODE = enum.auto()  # See ScanningMode above.
 
 
 # Hardcoded Y ratio (for setting)
