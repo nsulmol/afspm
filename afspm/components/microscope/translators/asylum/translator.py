@@ -107,7 +107,7 @@ class AsylumTranslator(ConfigTranslator):
 
     def __del__(self):
         """Handle object destruction: reset what we changed on startup."""
-        if self._old_save_state and self.old_last_scan:
+        if self._old_save_state and self._old_last_scan:
             self._set_save_params(save_state=self._old_save_state,
                                   last_scan=self._old_last_scan,
                                   store_old_vals=False)
@@ -155,7 +155,7 @@ class AsylumTranslator(ConfigTranslator):
             last_scan: whether or not we are scanning one image (2), or
                 running continuously (0).
             store_old_vals: whether or not to store the old vals in
-                self.old_save_state and old_save_mode, respectively. useful
+                self._old_save_state and _old_last_scan, respectively. useful
                 for resetting later.
         """
         if store_old_vals:
@@ -275,12 +275,12 @@ class AsylumTranslator(ConfigTranslator):
         """Override spec polling."""
         spec_path = self._get_latest_file(self.SPEC_PREFIX)
 
-        if spec_path and spec_path != self.old_spec_path:
+        if spec_path and spec_path != self._old_spec_path:
             spec = self._load_spec(spec_path)
             if spec:
-                self.old_spec_path = spec_path
-                self.old_spec = spec
-        return self.old_spec
+                self._old_spec_path = spec_path
+                self._old_spec = spec
+        return self._old_spec
 
     def _load_spec(self, fname: str) -> spec_pb2.Spec1d | None:
         """Load Spec1d from provided filename (None on failure)."""
