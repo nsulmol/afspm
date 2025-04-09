@@ -230,6 +230,7 @@ class AsylumTranslator(ConfigTranslator):
             return scan_pb2.ScopeState.SS_SPEC
         elif params.ScopeState.MOVING.value & val:
             return scan_pb2.ScopeState.SS_MOVING
+        return scan_pb2.SS_FREE
 
     def _get_latest_file(self, prefix: str) -> str | None:
         val = self.param_handler.get_param(params.AsylumParam.IMG_PATH.name)
