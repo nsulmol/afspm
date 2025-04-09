@@ -119,9 +119,6 @@ def config_both():
     """
 
 
-# TODO: Remove uuid, remove type,, remove range, etc..
-
-
 # -------------------- Tests -------------------- #
 def test_param_not_in_configs(config_param_info):
     logger.info('Should throw error if param not in configs.')
