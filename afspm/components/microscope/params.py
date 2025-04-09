@@ -339,6 +339,20 @@ class ParameterHandler(metaclass=ABCMeta):
             self._build_param_infos_methods(params_config)
 
     def _build_param_infos_methods(self, params_config: dict):
+        """Populate param_methods and param_infos based on config.
+
+        For a given generic_param to be accepted, it must either:
+        a) Have a setter or getter method.
+        b) Have a uuid and type.
+
+        Without either of these, we have no way to query the translator
+        for it.
+
+        Note that we *always* populate self.param_infos, because this
+        may have other useful attributes:
+        - unit: what unit is this parameter stored in on the SPM?
+        - range: what is the supported range for this paramter on the SPM?
+        """
         for key, val in params_config.items():
             if isinstance(val, dict):
                 # Ceck if we have our own set/get methods
@@ -358,14 +372,15 @@ class ParameterHandler(metaclass=ABCMeta):
                                  f'parameter {key}. Using.')
                     self.param_methods[key] = param_methods
 
-                # Check if we have needed parameter info
+                # Load all the param info we can get.
                 param_info = create_parameter_info(val)
+                self.param_infos[key] = param_info
 
-                if param_info.uuid is not None and param_info.type is not None:
-                    self.param_infos[key] = param_info
-
-                if (key not in self.param_methods and
-                        key not in self.param_infos):
+                # Check that we have what is needed to set/get:
+                # either a uuid + type from param_info or a getter/setter.
+                no_uuid_or_type = (param_info.uuid is None or
+                                   param_info.type is None)
+                if key not in self.param_methods and no_uuid_or_type:
                     msg = (f"Parameter {key} provided without either set/" +
                            "get methods or both 'type' and 'uuid' attributes.")
                     logger.error(msg)
@@ -421,8 +436,13 @@ class ParameterHandler(metaclass=ABCMeta):
             val = methods.getter(self)
             return val
 
-        uuid = self._get_param_info(generic_param).uuid
-        val = self.get_param_spm(uuid)
+        param_info = self._get_param_info(generic_param)
+        if param_info.uuid is None:
+            msg = f'Parameter {generic_param} does not have SPM uuid.'
+            logger.error(msg)
+            raise ParameterNotSupportedError(msg)
+
+        val = self.get_param_spm(param_info.uuid)
         return val
 
     def set_param(self, generic_param: MicroscopeParameter, val: Any,
@@ -448,6 +468,11 @@ class ParameterHandler(metaclass=ABCMeta):
             return
 
         param_info = self._get_param_info(generic_param)
+        if param_info.uuid is None:
+            msg = f'Parameter {generic_param} does not have SPM uuid.'
+            logger.error(msg)
+            raise ParameterNotSupportedError(msg)
+
         val = _correct_val_for_sending(val, param_info, curr_unit,
                                        generic_param)
 
