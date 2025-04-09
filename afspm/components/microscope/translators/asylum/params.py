@@ -164,7 +164,7 @@ class ScanningMode(enum.Enum):
     ONE_FRAME = 2
 
 
-class AsylumParam(enum.Enum, str):
+class AsylumParam(str, enum.Enum):
     """Asylum-specific parameters, used as 'generic' names in config.
 
     We use the 'name' of these parameters as their generic uuid when
