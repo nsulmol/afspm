@@ -226,7 +226,7 @@ class AsylumTranslator(ConfigTranslator):
         # Bit comparisons
         if params.ScopeState.SCANNING.value & val:
             return scan_pb2.ScopeState.SS_SCANNING
-        elif params.ScopeState.SPEC.value & val:
+        elif params.ScopeState.SINGLE_SPEC.value & val:
             return scan_pb2.ScopeState.SS_SPEC
         elif params.ScopeState.MOVING.value & val:
             return scan_pb2.ScopeState.SS_MOVING
