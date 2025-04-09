@@ -129,8 +129,8 @@ type = ''
 
 [SAVING_MODE]
 uuid = 'SaveImage'
-type = 1.0
+type = 1
 
 [SCANNING_MODE]
 uuid = 'LastScan'
-type = 1.0
+type = 1
