@@ -1,3 +1,5 @@
+// NOTE: non-returning methods should return 0 on success, 1 on failure.
+
 #ifdef ARrtGlobals
 #pragma rtGlobals=1     // Use modern global access method
 #else
@@ -19,18 +21,21 @@ Function InitProbePos()
     // Indicate that 2nd value in array is what we should move
     // to for spectroscopy.
     spotNum = 1
+    return(0)
 End Function
 
 Function SetProbePosX(posX)
     Variable posX
     WAVE spotX = root:Packages:MFP3D:Force:SpotX
     spotX[1] = posX
+    return(0)
 End Function
 
 Function SetProbePosY(posY)
     Variable posY
     WAVE spotY = root:Packages:MFP3D:Force:SpotY
     spotY[1] = posY
+    return(0)
 End Function
 
 Function GetProbePosX()
@@ -57,4 +62,5 @@ Function SetBaseName(newName)
     PV("BaseSuffix", 0)
     ARCheckSuffix()
     ARCheckUserNote(0)  // I'm not sure what this does.
+    return(0)
 End Function
