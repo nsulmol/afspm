@@ -160,9 +160,9 @@ class AsylumTranslator(ConfigTranslator):
         """
         if store_old_vals:
             self._old_save_state = self.param_handler.get_param(
-                params.AsylumParam.SAVE_IMAGE)
+                params.AsylumParam.SAVE_IMAGE.name)
             self._old_last_scan = self.param_handler.get_param(
-                params.AsylumParam.LAST_SCAN)
+                params.AsylumParam.LAST_SCAN.name)
 
         try:
             self.param_handler.set_param(params.AsylumParam.SAVE_IMAGE,
@@ -220,6 +220,7 @@ class AsylumTranslator(ConfigTranslator):
         """
         super().on_set_probe_pos(probe_position)
         self.param_handler._call_method(params.MOVE_POS_METHOD)
+        # TODO: Try replacing with actions:MOVE_PROBE_UUID?
 
     def poll_scope_state(self) -> scan_pb2.ScopeState:
         """Override scope state polling."""
@@ -232,7 +233,7 @@ class AsylumTranslator(ConfigTranslator):
             return scan_pb2.ScopeState.SS_MOVING
 
     def _get_latest_file(self, prefix: str) -> str | None:
-        val = self.param_handler.get_param(params.AsylumParam.IMG_PATH)
+        val = self.param_handler.get_param(params.AsylumParam.IMG_PATH.name)
         img_path = convert_igor_path_to_python_path(val)
         images = sorted(glob.glob(img_path + os.sep + prefix + "*"
                                   + self.IMG_EXT),
