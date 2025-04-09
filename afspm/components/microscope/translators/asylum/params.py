@@ -67,6 +67,7 @@ class AsylumParameterHandler(params.ParameterHandler):
         self.client = client
         self.spm_uuid_type_map = {}
         super().__init__(params_config_path)
+        self._populate_spm_uuid_type_map()
 
     def _populate_spm_uuid_type_map(self):
         for param_info in self.param_infos.values():
