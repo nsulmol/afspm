@@ -488,9 +488,6 @@ class ParameterHandler(metaclass=ABCMeta):
                        vals: list[str], curr_units: tuple[str | None]):
         """Convert a list of values to microscope units and set them.
 
-        This differs from individual set_param calls in that we validate
-        all conversions can be done before trying any sets.
-
         Args:
             generic_param: MicroscopeParameters we wish to set.
             vals: values to set them to in str format (as they are sent in
@@ -504,18 +501,8 @@ class ParameterHandler(metaclass=ABCMeta):
                 found in the params_config dict.
             - ParameterError if one of the parameters could not be set.
         """
-        spm_params = []
-        spm_vals = []
-        for generic_param, val, curr_unit in zip(generic_params, vals,
-                                                 curr_units):
-            param_info = self._get_param_info(generic_param)
-            val = _correct_val_for_sending(val, param_info, curr_unit,
-                                           generic_param)
-            spm_params.append(param_info.uuid)
-            spm_vals.append(val)
-
-        for spm_param, spm_val in zip(spm_params, spm_vals):
-            self.set_param_spm(spm_param, spm_val)
+        for (param, val, unit) in zip(generic_params, vals, curr_units):
+            self.set_param(param, val, unit)
 
 
 def _correct_val_for_sending(val: str, param_info: ParameterInfo,
