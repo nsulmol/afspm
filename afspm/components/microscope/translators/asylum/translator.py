@@ -70,10 +70,6 @@ class AsylumTranslator(ConfigTranslator):
     SCAN_PREFIX = 'Image'
     SPEC_PREFIX = 'Force'
 
-    # Importing SciFiReaders is *slow*. We need to add a long default delay.
-    SPAWN_DELAY_KEY = 'spawn_delay_s'
-    DEFAULT_SPAWN_DELAY_S = 5.0
-
     def __init__(self, param_handler: ParameterHandler = None,
                  action_handler: ActionHandler = None,
                  xop_client: XopClient = None,
@@ -96,16 +92,9 @@ class AsylumTranslator(ConfigTranslator):
 
         self._old_saving_mode = None
         self._old_scanning_mode = None
-
         # Default initialization of handler
         kwargs = self._init_handlers(xop_client, param_handler, action_handler,
                                      **kwargs)
-
-        # Ensure we delay a decent pre-determined period (unless a special
-        # value was provided).
-        if self.SPAWN_DELAY_KEY not in kwargs:
-            kwargs[self.SPAWN_DELAY_KEY] = self.DEFAULT_SPAWN_DELAY_S
-
         super().__init__(**kwargs)
 
         # Do some setup
