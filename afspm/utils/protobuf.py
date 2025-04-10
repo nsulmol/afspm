@@ -31,9 +31,8 @@ def check_equal(msg1: Message, msg2: Message,
         if is_message:
             if not check_equal(val1, val2, rel_tol):
                 return False
-
-        if is_float and not math.isclose(val1, val2, rel_tol=rel_tol):
+        elif is_float and not math.isclose(val1, val2, rel_tol=rel_tol):
             return False
-        if not is_float and val1 != val2:  # Value comparison
+        elif not is_float and val1 != val2:  # Value comparison
             return False
     return True
