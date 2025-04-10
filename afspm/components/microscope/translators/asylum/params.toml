@@ -52,7 +52,8 @@ range = [32, 1536]  # > 2000 may not save, real max is 4096.
 # ----- Feedback Parameters ----- #
 [zctrl-setpoint]
 uuid = 'SetPoint'
-unit = 'V'  # Note: units are V, but it may make sense to consider unitless?
+# Note: units are V, but we consider it unitless, because in
+# ZCtrlParameters it is unitless.
 type = 1.0
 range = [0, 10]  # TODO: Validate. This is allowed but probably crazy!
 
