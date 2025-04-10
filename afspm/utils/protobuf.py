@@ -29,7 +29,7 @@ def check_equal(msg1: Message, msg2: Message,
         # Recurse if dealing with messages
         is_message = isinstance(val1, Message)
         if is_message:
-            if check_equal(val1, val2, rel_tol):
+            if not check_equal(val1, val2, rel_tol):
                 return False
 
         if is_float and not math.isclose(val1, val2, rel_tol=rel_tol):
