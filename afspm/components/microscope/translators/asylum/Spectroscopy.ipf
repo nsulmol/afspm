@@ -21,6 +21,11 @@ Function InitProbePos()
     // Indicate that 2nd value in array is what we should move
     // to for spectroscopy.
     spotNum = 1
+
+    // Set default initial position (not real).
+    Variable initPos = 1e-5  // 10 um
+    SetProbePosX(initPos)
+    SetProbePosY(initPos)
     return(0)
 End Function
 
