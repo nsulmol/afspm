@@ -430,8 +430,11 @@ def test_scan_params(client, default_control_state,
     modified_params.spatial.roi.size.x *= 0.9
     modified_params.spatial.roi.size.y *= 0.9
 
-    modified_params.data.shape.x -= 1
-    modified_params.data.shape.y -= 1
+    # Multiply data shape by 2. Some controllers can only deal in a subset
+    # of data shapes (usually powers of 2). This is a test that should pass
+    # for all controllers.
+    modified_params.data.shape.x *= 2
+    modified_params.data.shape.y *= 2
 
     logger.info("Next, set new scan params. We expect a success.")
     rep = client.set_scan_params(modified_params)
