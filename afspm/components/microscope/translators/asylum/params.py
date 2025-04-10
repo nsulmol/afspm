@@ -81,8 +81,9 @@ class AsylumParameterHandler(params.ParameterHandler):
             self.generic_uuid_type_map[generic_uuid] = param_info.type
 
     def _obtain_get_set_method(self, generic_uuid: str, request_get: bool
-                               ) -> str:
-        assert generic_uuid in self.generic_uuid_type_map
+                               ) -> str | None:
+        if generic_uuid not in self.generic_uuid_type_map:
+            return None  # Exception handling done by calling method.
         if isinstance(self.generic_uuid_type_map[generic_uuid], str):
             return self.GET_STRING if request_get else self.SET_STRING
         else:
