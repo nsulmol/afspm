@@ -77,7 +77,7 @@ class AsylumParameterHandler(params.ParameterHandler):
         self._populate_generic_uuid_type_map()
 
     def _populate_generic_uuid_type_map(self):
-        for generic_uuid, param_info in self.param_infos:
+        for generic_uuid, param_info in self.param_infos.items():
             self.generic_uuid_type_map[generic_uuid] = param_info.type
 
     def _obtain_get_set_method(self, generic_uuid: str, request_get: bool
