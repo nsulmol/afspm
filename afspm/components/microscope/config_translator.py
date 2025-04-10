@@ -100,7 +100,8 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
                       scan_params.spatial.angular_units]
 
         try:
-            self.param_handler.set_param_list(params.SCAN_PARAMS, vals, attr_units)
+            self.param_handler.set_param_list(params.SCAN_PARAMS, vals,
+                                              attr_units)
         except params.ParameterNotSupportedError:
             return control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED
         except params.ParameterError:
