@@ -10,7 +10,8 @@ import numpy as np
 
 from afspm.components.microscope.params import (ParameterHandler,
                                                 ParameterNotSupportedError,
-                                                ParameterError)
+                                                ParameterError,
+                                                SCAN_PARAMS)
 from afspm.components.microscope.actions import (ActionHandler,
                                                  MicroscopeAction)
 from afspm.components.microscope.translator import (
@@ -200,7 +201,8 @@ class AsylumTranslator(ConfigTranslator):
                       scan_params.spatial.angular_units]
 
         try:
-            self.param_handler.set_param_list(params.SCAN_PARAMS, vals, attr_units)
+            self.param_handler.set_param_list(SCAN_PARAMS, vals,
+                                              attr_units)
         except ParameterNotSupportedError:
             return control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED
         except ParameterError:
