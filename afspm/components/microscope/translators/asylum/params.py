@@ -111,8 +111,9 @@ class AsylumParameterHandler(params.ParameterHandler):
         """Override to store get-set method."""
         self.latest_get_set_method = self._obtain_get_set_method(
             generic_param, request_get=True)
-        super().get_param(generic_param)
+        val = super().get_param(generic_param)
         self.latest_get_set_method = None
+        return val
 
     def get_param_spm(self, spm_uuid: str) -> Any:
         """Get the current value for the microscope parameter.
