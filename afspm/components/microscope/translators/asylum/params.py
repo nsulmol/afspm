@@ -240,8 +240,8 @@ def set_scan_size_x(handler: params.ParameterHandler,
     size_x_uuid = params.MicroscopeParameter.SCAN_SIZE_X
     # Use generic param's info to convert/constrain value.
     param_info = handler._get_param_info(size_x_uuid)
-    desired_val = handler._correct_val_for_sending(val, param_info,
-                                                   unit)
+    desired_val = params._correct_val_for_sending(val, param_info,
+                                                  unit)
 
     # Now, must determine the x ratio for this.
     scan_size = handler.get_param(AsylumParam.SCAN_SIZE.name)
@@ -269,8 +269,8 @@ def set_scan_size_y(handler: params.ParameterHandler,
     size_y_uuid = params.MicroscopeParameter.SCAN_SIZE_Y
     # Use generic param's info to convert/constrain value.
     param_info = handler._get_param_info(size_y_uuid)
-    desired_val = handler._correct_val_for_sending(val, param_info,
-                                                   unit)
+    desired_val = params._correct_val_for_sending(val, param_info,
+                                                  unit)
 
     _ensure_y_ratio_is_1(handler)  # Our logic assumes this!
     handler.set_param(AsylumParam.SCAN_SIZE.name, desired_val, curr_unit=None)
