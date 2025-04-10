@@ -134,7 +134,8 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                  control_server: ctrl_srvr.ControlServer,
                  loop_sleep_s: int = common.LOOP_SLEEP_S,
                  beat_period_s: float = common.HEARTBEAT_PERIOD_S,
-                 ctx: zmq.Context = None, subscriber: sub.Subscriber = None):
+                 ctx: zmq.Context = None, subscriber: sub.Subscriber = None,
+                 **kwargs):
         """Initialize the translator.
 
         Args:
@@ -169,7 +170,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         # logic is handled by the control_server.
         super().__init__(name, subscriber=subscriber, control_client=None,
                          ctx=ctx, loop_sleep_s=loop_sleep_s,
-                         beat_period_s=beat_period_s)
+                         beat_period_s=beat_period_s, **kwargs)
 
     def create_req_handler_map(self) -> dict[control_pb2.ControlRequest,
                                              Callable]:
