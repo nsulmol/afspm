@@ -26,7 +26,7 @@ class XopMessageError(Exception):
 
 
 class XopClient:
-    """Holds zmq-xop client logic.
+    """Hold zmq-xop client logic.
 
     The XopClient will create a zmq connection with the asylum controller via
     a zmq interface. Afterward, any desired requests can be sent and responses
