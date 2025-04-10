@@ -11,7 +11,7 @@ import numpy as np
 from afspm.components.microscope.params import (ParameterHandler,
                                                 ParameterNotSupportedError,
                                                 ParameterError,
-                                                SCAN_PARAMS)
+                                                MicroscopeParameter)
 from afspm.components.microscope.actions import (ActionHandler,
                                                  MicroscopeAction)
 from afspm.components.microscope.translator import (
@@ -69,6 +69,16 @@ class AsylumTranslator(ConfigTranslator):
     IMG_EXT = '.ibw'
     SCAN_PREFIX = 'Image'
     SPEC_PREFIX = 'Force'
+
+    # NOTE: We need our own order of scan params, because we are calling it
+    # in a different order (we need to due to internals).
+    SCAN_PARAMS = [MicroscopeParameter.SCAN_TOP_LEFT_X,
+                   MicroscopeParameter.SCAN_TOP_LEFT_Y,
+                   MicroscopeParameter.SCAN_SIZE_Y,  # <-- this is different
+                   MicroscopeParameter.SCAN_SIZE_X,
+                   MicroscopeParameter.SCAN_RESOLUTION_X,
+                   MicroscopeParameter.SCAN_RESOLUTION_Y,
+                   MicroscopeParameter.SCAN_ANGLE]
 
     def __init__(self, param_handler: ParameterHandler = None,
                  action_handler: ActionHandler = None,
@@ -180,7 +190,7 @@ class AsylumTranslator(ConfigTranslator):
         """
         vals = [scan_params.spatial.roi.top_left.x,
                 scan_params.spatial.roi.top_left.y,
-                scan_params.spatial.roi.size.y,
+                scan_params.spatial.roi.size.y,  # <-- this is different
                 scan_params.spatial.roi.size.x,
                 scan_params.data.shape.x,
                 scan_params.data.shape.y,
@@ -194,7 +204,7 @@ class AsylumTranslator(ConfigTranslator):
                       scan_params.spatial.angular_units]
 
         try:
-            self.param_handler.set_param_list(SCAN_PARAMS, vals,
+            self.param_handler.set_param_list(self.SCAN_PARAMS, vals,
                                               attr_units)
         except ParameterNotSupportedError:
             return control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED
