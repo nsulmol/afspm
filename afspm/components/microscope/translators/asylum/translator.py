@@ -13,7 +13,8 @@ from afspm.components.microscope.params import (ParameterHandler,
                                                 ParameterError,
                                                 MicroscopeParameter)
 from afspm.components.microscope.actions import (ActionHandler,
-                                                 MicroscopeAction)
+                                                 MicroscopeAction,
+                                                 ActionError)
 from afspm.components.microscope.translator import (
     get_file_modification_datetime, MicroscopeError)
 from afspm.components.microscope.config_translator import ConfigTranslator
@@ -222,8 +223,11 @@ class AsylumTranslator(ConfigTranslator):
         it to move too.
         """
         super().on_set_probe_pos(probe_position)
-        self.param_handler._call_method(params.MOVE_POS_METHOD)
-        # TODO: Try replacing with actions:MOVE_PROBE_UUID?
+        try:
+            self.action_handler.request_action(actions.MOVE_PROBE_UUID)
+        except ActionError:
+            return control_pb2.ControlResponse.REP_ACTION_ERROR
+        return control_pb2.ControlResponse.REP_SUCCESS
 
     def poll_scope_state(self) -> scan_pb2.ScopeState:
         """Override scope state polling."""
