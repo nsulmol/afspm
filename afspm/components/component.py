@@ -112,9 +112,6 @@ class AfspmComponentBase:
         except Exception:
             logger.error(traceback.format_exc())
 
-        # Terminate (not so gracefully)
-        self.ctx.destroy()  # TODO: investigate ctx.term() instead.
-
     def _handle_subscriber(self):
         """Poll subscriber and check for a shutdown request.
 
