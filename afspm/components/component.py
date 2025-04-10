@@ -57,6 +57,8 @@ class AfspmComponentBase:
         control_client: client to ControlServer, to allow sending requests.
         stay_alive: boolean indicating whether we should continue looping in
             run(). In other words, if False, run() ends.
+        spawn_delay_s: time to delay component on startup, in seconds. Used
+            by components that talk to this component via get_spawn_delay_s().
     """
 
     def __init__(self, name: str,
@@ -65,6 +67,7 @@ class AfspmComponentBase:
                  loop_sleep_s: float = common.LOOP_SLEEP_S,
                  beat_period_s: float = common.HEARTBEAT_PERIOD_S,
                  override_client_uuid: bool = True,
+                 spawn_delay_s: float = None,
                  ctx: zmq.Context = None):
         """Initialize our AfspmComponent.
 
@@ -78,6 +81,8 @@ class AfspmComponentBase:
             override_client_uuid: boolean indicating whether we will restart
                 the provided ControlClient with the component's name as its
                 UUID. Default is true.
+            spawn_delay_s: time to delay component on startup, in seconds. Used
+                by components that talk to this component.
             ctx: zmq context.
         """
         logger.debug(f"Initializing component {name}")
@@ -91,6 +96,7 @@ class AfspmComponentBase:
         self.loop_sleep_s = loop_sleep_s
         self.subscriber = subscriber
         self.control_client = control_client
+        self.spawn_delay_s = spawn_delay_s
         self.stay_alive = True
 
         if self.control_client and override_client_uuid:
@@ -158,6 +164,21 @@ class AfspmComponentBase:
             proto: the protobuf.Message instance received.
         """
         pass
+
+    def get_spawn_delay_s(self) -> float | None:
+        """Return time to delay on spawning, in seconds.
+
+        This is used by external components (particulary, the components
+        monitor) in order to know how long to wait between starting it up
+        and spawning the listener. It is needed if your component's startup
+        takes a while, as the listener will wait a predetermined period for a
+        heartbeat. If no heartbeat is provided, it will consider that the
+        component failed to start up!
+
+        Returns:
+            Time to delay spawning, in seconds.
+        """
+        return self.spawn_delay_s
 
 
 class AfspmComponent(AfspmComponentBase):

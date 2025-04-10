@@ -16,14 +16,19 @@ logger = logging.getLogger(__name__)
 
 
 # The amount of time we sleep between starting a process and returning
-# from the spawning method. We do this because we are using the 'spawn'
-# process approach of multiprocessing, which is slower to start than
-# a simple 'fork' (we cannot 'fork' on Windows). This keeps the system
-# behaviour consistent acros OSses, at the cost of a slower startup time
-# (1s per component).
-# Note: in the future, we could consider an OS-specific constant, as it seems
-# Windows is the slowest to start up.
+# from the spawning method. After spawning, we create the associated heartbeat
+# listener. This component will determine that spawning 'failed' if it does not
+# receive a heartbeat in its 'check' time. Thus, components that are slow to
+# start must set a reasonable 'spawn_delay_s' in their constructors.
+#
+# It is *also* important because we are using the 'spawn' process approach of
+# multiprocessing, which is slower to start than a simple 'fork' (we cannot
+# 'fork' on Windows). Since spawning is slower, we need to introduce a default
+# delay of ~1s, to be safe.
+# Note that we use spawning to keep the system behaviour consistent acros
+# OSses, at the cost of a slower startup time.
 SPAWN_DELAY_S = 1.0
+SPAWN_DELAY_KEY = 'spawn_delay_s'
 
 
 class AfspmComponentsMonitor:
@@ -178,7 +183,14 @@ class AfspmComponentsMonitor:
                            kwargs=kwargs_dict,
                            daemon=True)  # Ensures we try to kill on main exit
         proc.start()
-        time.sleep(SPAWN_DELAY_S)
+
+        # Perform delay after spawning (some components are slow to start up).
+        spawn_delay_s = SPAWN_DELAY_S
+        # Add component-specific delay (if available).
+        if (SPAWN_DELAY_KEY in params_dict and
+                isinstance(params_dict[SPAWN_DELAY_KEY], float)):
+            spawn_delay_s += params_dict[SPAWN_DELAY_KEY]
+        time.sleep(spawn_delay_s)
         return proc
 
     @staticmethod
