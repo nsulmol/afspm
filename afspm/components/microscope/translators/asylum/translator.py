@@ -103,13 +103,6 @@ class AsylumTranslator(ConfigTranslator):
                               scanning_mode=params.ScanningMode.ONE_FRAME.value,
                               store_old_vals=True)
 
-    def __del__(self):
-        """Handle object destruction: reset what we changed on startup."""
-        if self._old_saving_mode and self._old_scanning_mode:
-            self._set_save_params(saving_mode=self._old_saving_mode,
-                                  scanning_mode=self._old_scanning_mode,
-                                  store_old_vals=False)
-
     def _init_handlers(self, client: XopClient,
                        param_handler: ParameterHandler,
                        action_handler: ActionHandler,
