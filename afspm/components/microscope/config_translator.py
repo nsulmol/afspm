@@ -46,18 +46,26 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
     MicroscopeTranslatorBase do nothing here (since they are already
     handled by the ActionHandler). Overriding them will not do anything.
 
+    If your controller does not detect probe moving events (SS_MOVING),
+    set self.detects_moving to False. We will automatically handle this
+    in on_set_scan_params() and on_set_probe_pos().
+
     Args:
         publisher: Publisher instance, for publishing data.
         control_server: ControlServer instance, for responding to control
             requests.
         param_handler: ParameterHandler class, for handling parameter requests.
         action_handler: ActionHandler class, for handling action requests.
+        detects_moving: whether or not the controller can detect SS_MOVING
+            events. If False, we will send 'fake' moving events whenever
+            the probe position or scan params top-left position change.
     """
 
     def __init__(self, name: str, publisher: pub.Publisher,
                  control_server: ctrl_srvr.ControlServer,
                  param_handler: params.ParameterHandler,
                  action_handler: actions.ActionHandler,
+                 detects_moving: bool = True,
                  **kwargs):
         """Init our configured translator.
 
@@ -69,9 +77,12 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
             param_handler: ParameterHandler class, for handling parameter
                 requests.
             action_handler: ActionHandler class, for handling action requests.
+            detects_moving: whether or not the controller can detect SS_MOVING
+                events.
         """
         self.param_handler = param_handler
         self.action_handler = action_handler
+        self.detects_moving = detects_moving
         super().__init__(name, publisher, control_server, **kwargs)
         self._validate_required_actions_exist()
 
@@ -102,6 +113,10 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         try:
             self.param_handler.set_param_list(params.SCAN_PARAMS, vals,
                                               attr_units)
+            if not self.detects_moving:  # Send fake SS_MOVING if needed
+                self._handle_sending_fake_move(
+                    self.scan_params.spatial.roi.top_left,
+                    scan_params.spatial.roi.top_left)
         except params.ParameterNotSupportedError:
             return control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED
         except params.ParameterError:
@@ -142,6 +157,9 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         try:
             self.param_handler.set_param_list(params.PROBE_POS_PARAMS,
                                               vals, attr_units)
+            if not self.detects_moving:  # Send fake SS_MOVING if needed
+                self._handle_sending_fake_move(
+                    self.probe_pos.point, probe_position.point)
         except params.ParameterNotSupportedError:
             return control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED
         except params.ParameterError:

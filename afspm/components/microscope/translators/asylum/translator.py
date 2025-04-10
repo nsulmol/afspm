@@ -36,6 +36,16 @@ from . import actions
 logger = logging.getLogger(__name__)
 
 
+# The Asylum controller does not appear to have a great float tolerance (at
+# least for probe position).
+FLOAT_TOLERANCE = 1e-05
+FLOAT_TOLERANCE_KEY = 'float_tolerance'
+
+# The Asylm controller does not detect moving, so we tell the parent class
+# that.
+DETECTS_MOVING_KEY = 'detects_moving'
+
+
 # Attributes from the read scan file (differs from params.AsylumParameter,
 # which contains UUIDs for getting/setting parameters).
 SCAN_ATTRIB_ANGLE = 'ScanAngle'
@@ -106,6 +116,14 @@ class AsylumTranslator(ConfigTranslator):
         # Default initialization of handler
         kwargs = self._init_handlers(xop_client, param_handler, action_handler,
                                      **kwargs)
+
+        # Set hard-coded float tolerance if not provided
+        if FLOAT_TOLERANCE_KEY not in kwargs:
+            kwargs[FLOAT_TOLERANCE_KEY] = FLOAT_TOLERANCE
+
+        # Tell parent class that Asylum *does not* detect moving
+        kwargs[DETECTS_MOVING_KEY] = False
+
         super().__init__(**kwargs)
 
         # Do some setup

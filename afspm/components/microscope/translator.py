@@ -26,10 +26,13 @@ from ...io.pubsub import publisher as pub
 from ...io.pubsub import subscriber as sub
 from ...io.control import server as ctrl_srvr
 
+from ...io.protos.generated import geometry_pb2
 from ...io.protos.generated import scan_pb2
 from ...io.protos.generated import control_pb2
 from ...io.protos.generated import feedback_pb2
 from ...io.protos.generated import spec_pb2
+
+from ...utils.protobuf import check_equal
 
 
 logger = logging.getLogger(__name__)
@@ -104,7 +107,9 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
     - we allow providing a subscriber to MicroscopeTranslator (it inherits
     from AspmComponent). If subscribed to the PubSubCache, it will receive
     kill specs and shutdown appropriately.
-
+    - if your controller does not detect probe moving events (SS_MOVING),
+    consider using self._handle_sending_fake_move() in your
+    on_set_scan_params() and on_set_probe_pos() methods.
 
     Attributes:
         publisher: Publisher instance, for publishing data.
@@ -117,6 +122,8 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         scan: device's most recent Scan2d.
         subscriber: optional subscriber, to hook into (and detect) kill
             signals.
+        float_tolerance: the float tolerance of this controller. Used for
+            some comparisons.
     """
 
     # TODO: Is this the best approach?
@@ -135,7 +142,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                  loop_sleep_s: int = common.LOOP_SLEEP_S,
                  beat_period_s: float = common.HEARTBEAT_PERIOD_S,
                  ctx: zmq.Context = None, subscriber: sub.Subscriber = None,
-                 **kwargs):
+                 float_tolerance: float = 1e-09, **kwargs):
         """Initialize the translator.
 
         Args:
@@ -148,12 +155,14 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             ctx: zmq Context; if not provided, we will create a new instance.
             subscriber: optional subscriber, to hook into (and detect) kill
                 signals.
+            float_tolerance: supported float tolerance of this controller.
         """
         if not ctx:
             ctx = zmq.Context.instance()
 
         self.publisher = publisher
         self.control_server = control_server
+        self.float_tolerance = float_tolerance
         self.req_handler_map = self.create_req_handler_map()
 
         # Init our current understanding of state / params
@@ -544,6 +553,37 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                     self.control_server.reply(rep[0], rep[1])
                 else:
                     self.control_server.reply(rep)
+
+    def _handle_sending_fake_move(self, orig_pt: geometry_pb2.Point2d,
+                                  new_pt: geometry_pb2.Point2d):
+        """Send a fake SS_MOVING event (if applicable).
+
+        This method should be used by translators for controllers that do not
+        detect the probe moving. To match our expected state machine, we still
+        must send an SS_MOVING event, even if the controller does not have a
+        way to indicate it.
+
+        To use this method, pass the original and new points (top-left position
+        for scan_param changes, position for probe_position changes). If the
+        positions are different, we assume a move is done and send out an
+        SS_MOVING event.
+
+        Args:
+            orig_pt: currently stored position. This is either
+                self.scan_params.spatial.roi.top_left (for scan params), or
+                self.probe_pos.point (for probe position).
+            new_pt: the point we are about to set. Same as above, but the
+                provided one (in either on_set_scan_params or
+                on_set_probe_pos).
+        """
+        if not check_equal(orig_pt, new_pt, self.float_tolerance):
+            self.scope_state = scan_pb2.ScopeState.SS_MOVING
+            scope_state_msg = scan_pb2.ScopeStateMsg(
+                scope_state=self.scope_state)
+            logger.info("New scope state %s, sending out.",
+                        common.get_enum_str(scan_pb2.ScopeState,
+                                            self.scope_state))
+            self.publisher.send_msg(scope_state_msg)
 
     def run_per_loop(self):
         """Where we monitor for requests and publish results."""
