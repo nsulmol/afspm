@@ -476,7 +476,7 @@ class ParameterHandler(metaclass=ABCMeta):
         val = _correct_val_for_sending(val, param_info, curr_unit,
                                        generic_param)
 
-        logger.trace(f'Setting {val} to {curr_unit}.')
+        logger.trace(f'Setting {generic_param} to {val} {curr_unit}.')
         self.set_param_spm(param_info.uuid, val)
 
     def get_param_list(self, generic_params: list[MicroscopeParameter]
