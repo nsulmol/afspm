@@ -450,14 +450,12 @@ def test_scan_params(client, default_control_state,
                     'scope state change too, because we are moving to it.')
         scope_state_msg = scan_pb2.ScopeStateMsg(
             scope_state=scan_pb2.ScopeState.SS_MOVING)
-        assert rep == control_pb2.ControlResponse.REP_SUCCESS
         assert_sub_received_proto(sub_scope_state,
                                   scope_state_msg)
 
         logger.info('Next, we should become free (stopped moving).')
         scope_state_msg = scan_pb2.ScopeStateMsg(
             scope_state=scan_pb2.ScopeState.SS_FREE)
-        assert rep == control_pb2.ControlResponse.REP_SUCCESS
         assert_sub_received_proto(sub_scope_state,
                                   scope_state_msg)
 
@@ -599,14 +597,12 @@ def test_probe_pos(client, default_control_state,
                     'scope state change too, because we are moving to it.')
         scope_state_msg = scan_pb2.ScopeStateMsg(
             scope_state=scan_pb2.ScopeState.SS_MOVING)
-        assert rep == control_pb2.ControlResponse.REP_SUCCESS
         assert_sub_received_proto(sub_scope_state,
                                   scope_state_msg)
 
         logger.info('Next, we should become free (stopped moving).')
         scope_state_msg = scan_pb2.ScopeStateMsg(
             scope_state=scan_pb2.ScopeState.SS_FREE)
-        assert rep == control_pb2.ControlResponse.REP_SUCCESS
         assert_sub_received_proto(sub_scope_state,
                                   scope_state_msg)
 
