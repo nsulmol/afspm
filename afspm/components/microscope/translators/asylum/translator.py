@@ -45,6 +45,9 @@ FLOAT_TOLERANCE_KEY = 'float_tolerance'
 # that.
 DETECTS_MOVING_KEY = 'detects_moving'
 
+# Keys for initializing param and action handleres.
+PARAM_HANDLER_KEY = 'param_handler'
+ACTION_HANDLER_KEY = 'action_handler'
 
 # Attributes from the read scan file (differs from params.AsylumParameter,
 # which contains UUIDs for getting/setting parameters).
@@ -141,10 +144,10 @@ class AsylumTranslator(ConfigTranslator):
             client = XopClient()
         if not param_handler:
             param_handler = _init_param_handler(client)
-            kwargs['param_handler'] = param_handler
+            kwargs[PARAM_HANDLER_KEY] = param_handler
         if not action_handler:
             action_handler = _init_action_handler(client)
-            kwargs['action_handler'] = action_handler
+            kwargs[ACTION_HANDLER_KEY] = action_handler
         return kwargs
 
     def _setup_probe_pos(self):

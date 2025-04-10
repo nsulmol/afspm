@@ -36,6 +36,9 @@ SCAN_ATTRIB_ANGLE = 'alpha'
 ACTIONS_FILENAME = 'actions.toml'
 PARAMS_FILENAME = 'params.toml'
 
+# Keys for initializing param and action handleres.
+PARAM_HANDLER_KEY = 'param_handler'
+ACTION_HANDLER_KEY = 'action_handler'
 
 SPEC_EXT_SEARCH = '*.vpdata'
 
@@ -127,13 +130,13 @@ class GxsmTranslator(ConfigTranslator):
             if zctrl_channel:  # Update Z-Ctrl feedback channel
                 zctrl_enum = params.GxsmFeedbackChannel(zctrl_channel)
                 params.update_zctrl_channel(param_handler, zctrl_enum)
-            kwargs['param_handler'] = param_handler
+            kwargs[PARAM_HANDLER_KEY] = param_handler
         if not action_handler:
             action_handler = _init_action_handler()
             if spec_mode:
                 spec_enum = actions.GxsmSpecMode(spec_mode)
                 actions.update_spec_mode(action_handler, spec_enum)
-            kwargs['action_handler'] = action_handler
+            kwargs[ACTION_HANDLER_KEY] = action_handler
         return kwargs
 
     def _setup_save_spectroscopies(self):
