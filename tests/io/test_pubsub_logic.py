@@ -31,12 +31,12 @@ def ctx():
 
 @pytest.fixture(scope="module")
 def pub_url():
-    return "tcp://127.0.0.1:5555"
+    return "tcp://127.0.0.1:1234"
 
 
 @pytest.fixture(scope="module")
 def psc_url():
-    return "tcp://127.0.0.1:5556"
+    return "tcp://127.0.0.1:2345"
 
 
 @pytest.fixture(scope="module")
