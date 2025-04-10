@@ -41,10 +41,19 @@ class AsylumParameterHandler(params.ParameterHandler):
     Attributes:
         client: XopClient, used to communicate with the Asylum controller
             (via the IGOR software).
-        spm_uuid_type_map: a map relating spm uuids to their types. Used for
-            convenience, to figure out if we need to call GetString or
-            GetValue to query the parameter.
-    pass
+        generic_uuid_type_map: a map relating generic uuids to their types.
+            Used for convenience, to figure out if we need to call GetString
+            or GetValue to query the parameter. We need to use generic uuids
+            because there are *duplicates* in terms of spm uuids (e.g.
+            SaveImage) is the uuid for both a string *and* a value. So we
+            cannot know which type we need based on the spm uuid; we need the
+            generic one.
+        latest_get_set_method: holds the latest method call. Whenever we are
+            about to make a call, we set this variable to it, based on
+            the generic uuid of the parameter we are interested in. We use this
+            to avoid completely re-writing get_param/set_param. Since the SPM-
+            specific methods get_param_spm/set_param_spm only receive the
+            *spm* uuid, we use this hack-ey approach.
     """
 
     # Getter/setter method strs
@@ -62,17 +71,19 @@ class AsylumParameterHandler(params.ParameterHandler):
             raise AttributeError(msg)
 
         self.client = client
-        self.spm_uuid_type_map = {}
+        self.latest_get_set_method = None
+        self.generic_uuid_type_map = {}
         super().__init__(params_config_path)
-        self._populate_spm_uuid_type_map()
+        self._populate_generic_uuid_type_map()
 
-    def _populate_spm_uuid_type_map(self):
-        for param_info in self.param_infos.values():
-            self.spm_uuid_type_map[param_info.uuid] = param_info.type
+    def _populate_generic_uuid_type_map(self):
+        for generic_uuid, param_info in self.param_infos:
+            self.generic_uuid_type_map[generic_uuid] = param_info.type
 
-    def _obtain_get_set_method(self, spm_uuid: str, request_get: bool) -> str:
-        assert spm_uuid in self.spm_uuid_type_map
-        if isinstance(self.spm_uuid_type_map[spm_uuid], str):
+    def _obtain_get_set_method(self, generic_uuid: str, request_get: bool
+                               ) -> str:
+        assert generic_uuid in self.generic_uuid_type_map
+        if isinstance(self.generic_uuid_type_map[generic_uuid], str):
             return self.GET_STRING if request_get else self.SET_STRING
         else:
             return self.GET_VALUE if request_get else self.SET_VALUE
@@ -96,6 +107,13 @@ class AsylumParameterHandler(params.ParameterHandler):
         logger.error(msg)
         raise params.ParameterError(msg)
 
+    def get_param(self, generic_param: params.MicroscopeParameter) -> Any:
+        """Override to store get-set method."""
+        self.latest_get_set_method = self._obtain_get_set_method(
+            generic_param, request_get=True)
+        super().get_param(generic_param)
+        self.latest_get_set_method = None
+
     def get_param_spm(self, spm_uuid: str) -> Any:
         """Get the current value for the microscope parameter.
 
@@ -111,8 +129,16 @@ class AsylumParameterHandler(params.ParameterHandler):
         Raises:
             ParameterError if getting the parameter fails.
         """
-        method_str = self._obtain_get_set_method(spm_uuid, request_get=True)
+        method_str = self.latest_get_set_method
         return self._call_method(method_str, (spm_uuid,))
+
+    def set_param(self, generic_param: params.MicroscopeParameter, val: Any,
+                  curr_unit: str = None):
+        """Override to store get-set method."""
+        self.latest_get_set_method = self._obtain_get_set_method(
+            generic_param, request_get=False)
+        super().set_param(generic_param, val, curr_unit)
+        self.latest_get_set_method = None
 
     def set_param_spm(self, spm_uuid: str, spm_val: Any):
         """Set the current value for the microscope parameter.
@@ -129,7 +155,7 @@ class AsylumParameterHandler(params.ParameterHandler):
         Raises:
             - ParameterError if the parameter could not be set.
         """
-        method_str = self._obtain_get_set_method(spm_uuid, request_get=False)
+        method_str = self.latest_get_set_method
         self._call_method(method_str, (spm_uuid, spm_val))
 
 
