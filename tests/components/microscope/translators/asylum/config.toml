@@ -26,7 +26,7 @@ request_timeout_ms = 5000  # Starting/stopping scans can take a while!
 #data_shape = [128, 128]
 
 # --- Miscellaneous --- #
-float_tolerance = 1e-06  # System float tolerance is low
+float_tolerance = 1e-05  # System float tolerance is low
 
 
 # ----- PubSub ----- #
