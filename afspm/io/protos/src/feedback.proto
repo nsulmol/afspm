@@ -4,8 +4,6 @@ This file holds logic for handling the Z-axis of the scanner.
 
 edition = "2023";
 
-import "google/protobuf/timestamp.proto";
-
 /* Parameters associated with the Z-Control feedback mechanism.
  *
  * This struct holds the various controls one may need to change relating to
@@ -18,10 +16,6 @@ message ZCtrlParameters {
 
   float proportionalGain = 2;  // Proportional component
   float integralGain = 3;  // Integral component
-
-  // UUID attributes of associated scan.
-  google.protobuf.Timestamp timestamp = 4; // Should match scan timestamp
-  // TODO: Ensure this gets set somehow?? Or remove?
 }
 
 
