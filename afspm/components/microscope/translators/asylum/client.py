@@ -5,7 +5,7 @@ import time
 import zmq
 from typing import Optional
 
-from afspm.io.common import POLL_TIMEOUT_MS, REQUEST_TIMEOUT_MS
+from afspm.io.common import POLL_TIMEOUT_MS
 from afspm.components.microscope.translators.asylum import xop
 
 
@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 DEFAULT_XOP_URL = 'tcp://127.0.0.1:5555'
+
+# Asylum takes a while to respond at times.
+DEFAULT_TIMEOUT_S = 5
 
 
 class XopMessageError(Exception):
@@ -35,18 +38,18 @@ class XopClient:
     Attributes:
         _url: address of server we are connecting to.
         _timeout_s: how long to wait before concluding a sent request has not
-            been responded to. Defaults to REQUEST_TIMEOUT_MS / 1000.
+            been responded to. Defaults to DEFAULT_TIMEOUT_S.
         _client: zmq socket used to connect to server.
     """
 
     def __init__(self, url: str = DEFAULT_XOP_URL,
-                 timeout_ms: int = REQUEST_TIMEOUT_MS,
+                 timeout_s: int = DEFAULT_TIMEOUT_S,
                  ctx: zmq.Context = None):
         """Init constructor."""
         if not ctx:
             ctx = zmq.Context.instance()
         self._url = url
-        self._timeout_s = timeout_ms / 1000
+        self._timeout_s = timeout_s
 
         self._client = ctx.socket(zmq.REQ)
         self._client.connect(self._url)
