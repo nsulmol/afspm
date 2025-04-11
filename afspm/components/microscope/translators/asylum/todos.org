@@ -1,5 +1,0 @@
-#+title: Todos
-
-Asylum's UI is built on top of Wavemetric' Igor Pro, via an Igor extension plugin called an XOR plugin. There is documentation of the system calls (set/get) to their controller using this plugin in a file called 'Arial Help.inf', which is also accessible from the Help menu in the software. Currently, these calls can be made directly in a "Call" UI withint he Igor software.
-
-I am looking at ways to call this remotely. I have found a neat Python module that uses zeromq to create communication sockets and passes data over JSON, in order to call these things remotely: https://github.com/AllenInstitute/ZeroMQ-XOP.
