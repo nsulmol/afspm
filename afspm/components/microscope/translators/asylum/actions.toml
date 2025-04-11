@@ -24,7 +24,7 @@ pass_self = true
 [stop-spec]
 method = 'afspm.components.microscope.translators.asylum.actions.request_action'
 method_name = 'DoForceFunc'
-params = ['Stop']
+params = ['Reset']
 type = 'PASS_KWARGS'
 pass_self = true
 
