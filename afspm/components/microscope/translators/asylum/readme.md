@@ -4,29 +4,63 @@ Asylum's UI is built on top of Wavemetrics' Igor Pro, via an Igor extension plug
 
 ## Installation
 
+### ZeroMQ-XOP Installation 
+
 Follow the instructions at https://github.com/AllenInstitute/ZeroMQ-XOP to install this special XOP module. Ensure you follow the special instructions for Igor Pro 6, as this is the version used by Asylum Research.
 
 In order for spectroscopy to work, we also need to copy a custom Igor Procedure file to the appropriate location. Specifically, copy Spectroscopy.ipf (located in afspm/components/microscope/translators/asylum) to "%HOMEPATH%\\Documents\\WaveMetrics\\Igor Pro 6 User Files\\Igor Procedures".
 
+### Spectroscopy Support Installation
+
+In order to send spectroscopy requests, we needed to implement our own top-level functions in Igor (in the Spectroscopy.ipf file). To allow the Igor program to read these, we need to copy them into the appropriate location:
+
+```text
+%USER_PROFILE%/Documents/WaveMetrics/Igor Pro 6 User Files/User Procedures
+```
+
 ## Usage
 
-Once installed, the Asylum controller can be interfaced with afspm via the following steps:
+On startup of an experiment, you will need to set up ZeroMQ-XOP, and load the Spectroscopy file.
+
+Before doing any of this, we assume you have:
 1. Start up the Asylum Research executable, AR.exe. This is based off of Igor Pro.
 2. Select your scan mode (e.g. Air Topography), to set up your controller.
-3. Ensure the Igor Command Window is open (either via Ctrl+J or selecting Windows->Command Window in the menu).
-4. To communicate with afspm, we must start up a ZeroMQ client for the Asylum controller. This is achieved via the following calls (in the command window):
+
+### ZeroMQ-XOP Setup
+
+Once installed, the Asylum controller can be interfaced with afspm via the following steps:
+1. Ensure the Igor Command Window is open (either via Ctrl+J or selecting Windows->Command Window in the menu).
+2. To communicate with afspm, we must start up a ZeroMQ client for the Asylum controller. This is achieved via the following calls (in the command window):
 ```
 zeromq_stop() // Stop any existing ZeroMQ operations
 zeromq_server_bind("tcp://127.0.0.1:5555") // Create a ZeroMQ server and begin listening
 zeromq_handler_start() // Prepare to handle incoming messages
 ```
 (Note that the zmq address provided in 'bind' must match that of the AsylumTranslator XOPClient's address, so they can connect).
-5. Start your experiment via your config file in afspm:
+
+### Load Spectroscopy File
+
+Next, we must tell Igor to include our methods from Spectroscopy.ipf. To do this, we:
+1. Open the Procedure window (either via Ctrl+M or selecting Windows->Procedure Windows->Procedure Window).
+2. In the opened window, place your cursor at the llast line of the Procedure file (i.e. after 'StartMeUp()').
+3. Type the following:
+
+```text
+#include "Spectroscopy"
+```
+
+4. Click on the 'Compile' button on the bottom left toolbar. If it succeeds, the 'Compile' button will disappear.
+
+### Starting Your Experiment
+
+Start your experiment via your config file in afspm:
 ```shell
 poetry run spawn /path/to/config/config.toml
 ```
 
 ## Testing
+
+### ZeroMQ-XOP Validation
 To validate that the interface is working:
 1. Run the example program in ZeroMQ-XOP to ensure the XOP is functioning.
 2. Run the MicroscopeTranslator unit tests in afspm to ensure the Asylum translator is communicating properly with the Igor Pro software (via the ZeroMQ-XOP interface).
@@ -39,8 +73,30 @@ zmq_xop_client.exe "tcp://127.0.0.1:5555" '{ \"version\" : 1, \"CallFunction\" :
 
 (assuming the zmq node is 'tcp://127.0.0.1:5555').
 
+### Spectroscopy Validation   
+
+You can verify that it has succeeded by querying for the probe position's x-coordinate in the command window (Ctrl+J):
+```text
+print(GetProbePosX())
+```
+
+Upon pressing enter, you should see a value. Note that if you have not yet started the Asylum controller, you will get a pop-up error stating:
+
+```text
+Function Execution Error: While executing a wave read, the following error occurred: Index out of range for wave "SpotX".
+```
+
+This is expected (the appropriate variable will be set up by the Asylum translator on startup).
+
 ## Notes
 
 The commands used to set variables here *do not* perform the same safety checking that the Asylum control panel does. Particularly, we use the lowest-level 'PV()' methods ('Put Value'), while the control panel uses an Asylum-created FMapSetVar(). The issue is linked to the fact that FMapSetVar() takes a STRUCT as input. Unfortunately, the library we use to communicate with the Asylum/Igor does not support STRUCT parameters sent as input, so we are forced to use the less-safe method instead.
 
 Please keep this limitation in mind when running experiments! It would be smart to test the sample settings you expect to set, to ensure they are within expected ranges.
+
+To ensure safe usage, the AsylumTranslator has built-in range checks. These use the parameter-specific ranges defined in the AsylumTranslator 'params.toml' file. If you did not modify/provide your own, it will be located at the following relative path:
+
+```text
+afspm/components/microscope/translators/asylum/params.toml
+```
+
