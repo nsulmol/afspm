@@ -297,7 +297,8 @@ class AsylumTranslator(ConfigTranslator):
         """Override spec polling."""
         spec_path = self._get_latest_file(self.SPEC_PREFIX)
 
-        if spec_path and spec_path != self._old_spec_path:
+        if (spec_path and not self._old_spec_path or
+                spec_path != self._old_spec_path):
             spec = self._load_spec(spec_path)
             if spec:
                 self._old_spec_path = spec_path
