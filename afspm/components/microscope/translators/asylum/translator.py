@@ -167,7 +167,13 @@ class AsylumTranslator(ConfigTranslator):
         This method makes these arrays have 2 values, with the 2nd value being
         where we want it to run scans.
         """
-        self.param_handler._call_method(params.INIT_POS_METHOD)
+        try:
+            self.param_handler._call_method(params.INIT_POS_METHOD)
+        except ParameterError as e:
+            logger.error('First call to ZeroMQ-XOP failed. Ensure you have '
+                         'followed the setup instructions!')
+            raise e
+
 
     def _set_save_params(self, saving_mode: int, scanning_mode: int,
                          store_old_vals: bool):
