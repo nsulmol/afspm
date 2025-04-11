@@ -142,7 +142,3 @@ For info on expected arguments, call:
 graphify --help  # Already in virtual environment
 poetry run graphify --help  # Outside of virtual environment
 ```
-
-## Limitations
-
-As of today, we are not handling spectroscopic data. This will likely come in a future update.
