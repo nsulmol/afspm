@@ -34,8 +34,8 @@ class XopClient:
 
     Attributes:
         _url: address of server we are connecting to.
-        _timeout_ms: how long to wait before concluding a sent request has not
-            been responded to. Defaults to REQUEST_TIMEOUT_MS.
+        _timeout_s: how long to wait before concluding a sent request has not
+            been responded to. Defaults to REQUEST_TIMEOUT_MS / 1000.
         _client: zmq socket used to connect to server.
     """
 
@@ -46,7 +46,7 @@ class XopClient:
         if not ctx:
             ctx = zmq.Context.instance()
         self._url = url
-        self._timeout_ms = timeout_ms
+        self._timeout_s = timeout_ms / 1000
 
         self._client = ctx.socket(zmq.REQ)
         self._client.connect(self._url)
@@ -90,7 +90,7 @@ class XopClient:
         err_code = None
         rep_msg_id = None
         ret_val = None
-        while not msg_received and time.time() - ts < self._timeout_ms:
+        while not msg_received and time.time() - ts < self._timeout_s:
             if self._client.poll(POLL_TIMEOUT_MS, zmq.POLLIN):
                 msg = self._client.recv(zmq.NOBLOCK).decode()
                 logger.trace(f'Received response: {msg}')
