@@ -31,6 +31,7 @@ if __name__ == '__main__':
     from afspm import spawn
     spawn.spawn_monitorless_component(CONFIG_FILE,
                                       GXSM_ID,
-                                      LOG_FILE,
-                                      LOG_TO_STDOUT,
-                                      LOG_LEVEL)
+                                      extra_config_file=None,
+                                      log_file=LOG_FILE,
+                                      log_to_stdout=LOG_TO_STDOUT,
+                                      log_level=LOG_LEVEL)
