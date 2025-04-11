@@ -34,7 +34,7 @@ poetry run spawn config.toml --components_to_spawn=['scheduler']
 cd /path/to/experiment/file
 poetry run gxsm3
 ```
-3. Select GxsmTranslator by selecting spawn_gxsm.py from the pyremote window's 'Open Python Script' option (top-right button in the window, select 'Open'). Start it up by clicking on the 'Execute Script' button (one left of 'Open' button, looks like a gear). You should see logging messages in the output windows, indicating it has started up successfully.
+3. Select GxsmTranslator by selecting spawn_gxsm.py from the pyremote window's 'Open Python Script' option (top-right button in the window, select 'Open'). Start it up by clicking on the 'Execute Script' button (one left of 'Open' button, looks like a gear). You should see logging messages in the output windows, indicating it has started up successfully. Note that ```spawn_gxsm.py``` will be located in ```afspm/components/microscope/translators/gxsm/```.
 4. Start the rest of your experiment by calling it in a separate terminal, excluding the microscope translator:
 ```bash
 cd /path/to/experiment/file
@@ -46,3 +46,10 @@ poetry run spawn config.toml --components_not_to_spawn=['translator']
 
 You can test this MicroscopeTranslator by running test_translator.py. Look at the description in that module for more info.
 
+## Notes
+
+### First Run Funkiness
+
+There appears to be some spurious issue tied to ScopeState when first running a scan and changing parameters. If your unit tests for ```test_run_scan``` and ```test_scan_params``` fail on the first try, run them again. If they work consistently afterward, you should be good to go.
+
+I will be investigating this further and providing a fix (if possible).
