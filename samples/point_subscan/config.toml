@@ -145,7 +145,7 @@ methods_kwargs = {'analysis_data' = 'roi_data'}
 
 # --- UI --- #
 [ui]
-#component = true
+#component = true  # currently broken :(
 class = 'afspm.components.control_ui.AfspmControlUI'
 
 subscriber = 'sub_spm'

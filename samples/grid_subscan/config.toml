@@ -102,7 +102,7 @@ subscriber = 'experiment_sub'
 control_client = 'experiment_client'
 
 [ui]
-component = true
+#component = true  # currently broken :(
 class = 'afspm.components.control_ui.AfspmControlUI'
 
 subscriber = 'experiment_sub'
