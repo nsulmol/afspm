@@ -73,7 +73,7 @@ zmq_xop_client.exe "tcp://127.0.0.1:5555" '{ \"version\" : 1, \"CallFunction\" :
 
 (assuming the zmq node is 'tcp://127.0.0.1:5555').
 
-### Spectroscopy Validation   
+### Spectroscopy Validation
 
 You can verify that it has succeeded by querying for the probe position's x-coordinate in the command window (Ctrl+J):
 ```text
@@ -90,6 +90,8 @@ This is expected (the appropriate variable will be set up by the Asylum translat
 
 ## Notes
 
+### Parameter Range Support
+
 The commands used to set variables here *do not* perform the same safety checking that the Asylum control panel does. Particularly, we use the lowest-level 'PV()' methods ('Put Value'), while the control panel uses an Asylum-created FMapSetVar(). The issue is linked to the fact that FMapSetVar() takes a STRUCT as input. Unfortunately, the library we use to communicate with the Asylum/Igor does not support STRUCT parameters sent as input, so we are forced to use the less-safe method instead.
 
 Please keep this limitation in mind when running experiments! It would be smart to test the sample settings you expect to set, to ensure they are within expected ranges.
@@ -100,3 +102,8 @@ To ensure safe usage, the AsylumTranslator has built-in range checks. These use 
 afspm/components/microscope/translators/asylum/params.toml
 ```
 
+### Random Crash Igor
+
+I have witnessed Igor/AR.exe crash while running an experiment. It send no error code, and simply closed. I suspect this *might* have something to do with polling parameters too frequently for Igor's expectations.
+
+I will look into this further and update once fixed.
