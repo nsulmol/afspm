@@ -24,10 +24,11 @@ class ScopeState(enum.Flag):
     SCANNING = 0x1
     ENGAGED = 0x2
     SINGLE_SPEC = 0x10
-    SPEC_1 = 0x20  # TODO: Remove me?
+    # Different spec modes that we do not use.
+    SPEC_1 = 0x20
     SPEC_2 = 0x40
     SPEC_3 = 0x80
-    MOVING = 0x100000
+    MOTOR_ENGAGED = 0x100000
 
 
 # TODO: Remove me?
