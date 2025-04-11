@@ -174,7 +174,6 @@ class AsylumTranslator(ConfigTranslator):
                          'followed the setup instructions!')
             raise e
 
-
     def _set_save_params(self, saving_mode: int, scanning_mode: int,
                          store_old_vals: bool):
         """Set the saving mdoe and scanning mode of the controller.
