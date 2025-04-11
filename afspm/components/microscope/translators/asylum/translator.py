@@ -188,21 +188,10 @@ class AsylumTranslator(ConfigTranslator):
             self._old_scanning_mode = self.param_handler.get_param(
                 params.AsylumParam.SCANNING_MODE.name)
 
-        try:
-            self.param_handler.set_param(params.AsylumParam.SAVING_MODE.name,
-                                         saving_mode)
-        except Exception:
-            msg = f"Unable to set SavingMode to {saving_mode}."
-            logger.error(msg)
-            raise MicroscopeError(msg)
-
-        try:
-            self.param_handler.set_param(params.AsylumParam.SCANNING_MODE.name,
-                                         scanning_mode)
-        except Exception:
-            msg = f"Unable to set ScanningMode to {scanning_mode}."
-            logger.error(msg)
-            raise MicroscopeError(msg)
+        self.param_handler.set_param(params.AsylumParam.SAVING_MODE.name,
+                                     saving_mode)
+        self.param_handler.set_param(params.AsylumParam.SCANNING_MODE.name,
+                                     scanning_mode)
 
     def on_set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
                            ) -> control_pb2.ControlResponse:
