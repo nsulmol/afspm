@@ -15,6 +15,8 @@ from afspm.io import common
 from afspm.components import feedback
 from afspm.utils import array_converters as ac
 
+import matplotlib.pyplot as plt
+
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +54,9 @@ def test_analyze_feedback(analysis_config, xarr, scan):
     assert fb_analysis.proportionUnderThreshold < 0.035
 
 
-def test_visualize_feedback(analysis_config, xarr):
+def test_visualize_feedback(analysis_config, xarr, monkeypatch):
+    monkeypatch.setattr(plt, 'show', lambda block: None)
+
     logger.info("Validate we can visualize our feedback analysis.")
     analysis_config.visualize_analysis = True
     analysis_config.viz_block_plot = False
