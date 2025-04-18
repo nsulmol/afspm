@@ -29,6 +29,7 @@ afspm relies on the following libraries:
 - fire, for argument parsing/handling when invoked from a terminal.
 - pint, for unit conversions.
 - graphviz, to visualize config files (for debugging/validation). (Note that this package expects graphviz to be installed locally and in your PATH. Follow it's documentation for how to do so if not already on your system.)
+- skimage: used for logic for drift estimation (or generic transformation between images).
 
 Additionally, we have the following 'hard' requirements (although they are only used by some components):
 

@@ -18,7 +18,7 @@ classifiers = [
   "Operating System :: OS Independent",
 ]
 
-requires-python = ">=3.9, <4"
+requires-python = ">=3.10, <4"
 dependencies = [
   "xarray (>=2023.7.0, <2024.0.0)",
   "pyzmq (>=25.1.0, <26.0.0) ; sys_platform != 'win32'",
@@ -34,6 +34,7 @@ dependencies = [
   "matplotlib (>=3.8.2, <4.0.0)",
   "colorlog (>=6.8.2, <7.0.0)",
   "graphviz (>=0.20.3,<0.21.0)",
+  "scikit-image (>=0.25.2,<0.26.0)",
 ]
 
 [project.optional-dependencies]
@@ -42,7 +43,7 @@ dev = [
   "pytest (>=7.4.0, <8.0.0)",
 ]
 gxsm = [
-  "gxsmread (>=0.2.3, <0.3.0)",
+  "gxsmread (>=0.2.2, <0.3.0)",
 ]
 asylum = [
   "igor2 (>=0.5.3, <0.6.0)",
