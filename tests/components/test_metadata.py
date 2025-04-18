@@ -3,7 +3,6 @@
 import logging
 import pytest
 import typing
-import contextlib
 
 from afspm.components.scan import metadata
 from afspm.io import common
