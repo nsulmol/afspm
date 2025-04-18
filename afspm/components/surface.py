@@ -64,6 +64,10 @@ class FittingMethod(str, Enum):
     QUANTILE = 'Quantile'  # Defaults to median regressor (i.e. MAE)
 
 
+# Quantile parameter
+LASSO_KEY = 'alpha'
+
+
 def _create_estimator(method: FittingMethod = FittingMethod.LEAST_SQUARES,
                       **kwargs) -> BaseEstimator:
     """Create simple estimator based on provided method and kwargs."""
@@ -77,6 +81,10 @@ def _create_estimator(method: FittingMethod = FittingMethod.LEAST_SQUARES,
         case FittingMethod.HUBER:
             return HuberRegressor(**kwargs)
         case FittingMethod.QUANTILE:
+            if LASSO_KEY not in kwargs:
+                # Default L1-regularization to 0 (not working without this
+                # during very basic tests).
+                kwargs[LASSO_KEY] = 0.0
             return QuantileRegressor(**kwargs)
 
 

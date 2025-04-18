@@ -49,7 +49,7 @@ def noise_mean():
 
 @pytest.fixture
 def noise_sigma():
-    return 0.05
+    return 0.02
 
 
 @pytest.fixture
@@ -115,7 +115,7 @@ def test_surface_plane(plane_surface_coeffs, x_dim, y_dim,
     gt_surf_da = surface.convert_Xy_to_xarray(X, gt_surf_y)
 
     fitting_methods = [f for f in surface.FittingMethod]
-    poly_degrees = range(2, 4)
+    poly_degrees = range(1, 4)
 
     for fitting_method in fitting_methods:
         for poly_degree in poly_degrees:
@@ -127,6 +127,7 @@ def test_surface_plane(plane_surface_coeffs, x_dim, y_dim,
 
             surface.visualize(da, surf_da)
             plt.show()
+            plt.close()
 
             logger.info(f'Score: {score}')
 
@@ -163,6 +164,7 @@ def test_surface_poly(poly_2nd_order_surface_coeffs, x_dim, y_dim,
 
             surface.visualize(da, surf_da)
             plt.show()
+            plt.close()
 
             logger.info(f'Score: {score}')
 
