@@ -42,7 +42,7 @@ from sklearn.linear_model import (
 )
 
 from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import PolynomialFeatures
+from sklearn.preprocessing import PolynomialFeatures, StandardScaler
 
 from afspm.io.protos.generated import scan_pb2
 
@@ -101,7 +101,8 @@ def create_surface_model(polynomial_degree: int = 1,
         The BaseEstimator to be used for fitting.
     """
     estimator = _create_estimator(method, **kwargs)
-    return make_pipeline(PolynomialFeatures(polynomial_degree), estimator)
+    return make_pipeline(StandardScaler(),
+                         PolynomialFeatures(polynomial_degree), estimator)
 
 
 def convert_scan_to_Xy(scan: scan_pb2.Scan2d) -> (np.array, np.array):
