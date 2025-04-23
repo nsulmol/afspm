@@ -83,7 +83,6 @@ def test_transform(sample1_fname, sample2_fname, dt1, dt2,
     transform_types = [t for t in drift.TransformType]
     fitting_methods = [f for f in drift.FittingMethod]
 
-#    for (d, t, f) in zip(descriptor_types, transform_types, fitting_methods):
     for descriptor in descriptor_types:
         for transform in transform_types:
             for fitting in fitting_methods:

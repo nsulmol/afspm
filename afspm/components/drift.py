@@ -299,17 +299,7 @@ def display_estimated_transform(da1: xr.DataArray, da2: xr.DataArray,
     pix_trans = mapping.translation
     mid_pt = np.array([int(da2.shape[0] / 2), int(da2.shape[1] / 2)])
 
-    # TODO: Delete me
-    # pts = np.array([mid_pt, mid_pt + pix_trans])
-    # logger.warning(f'pts: {pts}')
-    # logger.warning(f'pts[:, 0]: {pts[:, 0]}')
-    # ax[1, 1].scatter(pts[:, 0], pts[:, 1], color='r')
-
     ax[1, 1].quiver(mid_pt[0], mid_pt[1], pix_trans[0], pix_trans[1])
-
-    # TODO: Delete me
-#    trans, units = get_translation(da2, mapping)
-#    logger.warning(f'trans: {trans}, units: {units}')
 
 
 def get_translation(da: xr.DataArray,

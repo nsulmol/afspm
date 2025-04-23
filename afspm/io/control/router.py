@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class ControlRouter:
-    """Encapsulates logic tied to requests from multipl ControlClients.
+    """Encapsulates logic tied to requests from multiple ControlClients.
 
     The control router sits between a control server and multiple control
     clients, adding logic to decide between clients.
