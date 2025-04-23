@@ -135,7 +135,7 @@ While afspm uses its own abstraction for passing scan data between components, i
 
 ### Visualizing Config Files
 
-At times, it may be hard to validate that the components in your config file are properly interfaced (i.e. connected to the write urls). To help, we have provided a 'graphify' script. This script will convert your config file into a graphviz file and render it into an image. With it, you can do a quick check to ensure all components are talking to whom they should.
+At times, it may be hard to validate that the components in your config file are properly interfaced (i.e. connected to the right urls). To help, we have provided a 'graphify' script. This script will convert your config file into a graphviz file and render it into an image. With it, you can do a quick check to ensure all components are talking to whom they should.
 
 For info on expected arguments, call:
 
