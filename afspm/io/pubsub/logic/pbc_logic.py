@@ -135,8 +135,7 @@ class PBCScanLogic(ProtoBasedCacheLogic):
                     proto.type)
         return ProtoBasedCacheLogic.get_envelope_for_proto(proto)
 
-    def update_cache(self, proto: Message, cache: dict[str, Iterable]
-                     ):
+    def update_cache(self, proto: Message, cache: dict[str, Iterable]):
         """Override: if specific scan2d/spec not in maps, we use default."""
         try:
             super().update_cache(proto, cache)

@@ -222,7 +222,7 @@ class PubSubCache:
             logger.info(f"Subscription: cache for {env} being sent out.")
             for proto in self.cache[env]:
                 self._backend.send_multipart([env.encode(),
-                                                proto.SerializeToString()])
+                                              proto.SerializeToString()])
 
     def send_message(self, proto: Message):
         """Cache message and pass on to subscribers.
