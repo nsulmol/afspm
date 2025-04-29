@@ -6,6 +6,7 @@ import typing
 
 from afspm.components.scan import metadata
 from afspm.io import common
+from afspm.utils import csv
 
 from afspm.io.protos.generated import control_pb2
 from afspm.io.protos.generated import scan_pb2
@@ -15,14 +16,11 @@ logger = logging.getLogger(__name__)
 
 
 class FakeMetadataWriter(metadata.ScanMetadataWriter):
-    def __init__(self, control_state: control_pb2.ControlState,
-                 delimiter: str = None, quotechar: str = None,
-                 quoting: typing.Any = None, **kwargs):
+    def __init__(self, csv_attribs: csv.CSVAttributes,
+                 control_state: control_pb2.ControlState, **kwargs):
         """Initialize the writer. Same as parent, but no csv stuff."""
-        self.delimiter = delimiter
-        self.quotechar = quotechar
-        self.quoting = quoting
-        super().__init__(**kwargs)
+        self.csv_attribs = csv_attribs
+        super().__init__(csv_attribs, **kwargs)
         self.control_state = control_state
 
 
@@ -50,7 +48,9 @@ def control_state():
 
 @pytest.fixture
 def fake_metadata_writer(control_state):
-    return FakeMetadataWriter(control_state=control_state, name='fakewriter')
+    csv_attribs = csv.CSVAttributes(filepath='/tmp/fake_metadata_path.csv')
+    return FakeMetadataWriter(csv_attribs=csv_attribs,
+                              control_state=control_state, name='fakewriter')
 
 
 # ----- Tests ----- #

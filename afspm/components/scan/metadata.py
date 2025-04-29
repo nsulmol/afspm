@@ -1,10 +1,10 @@
 """Saves scan info into a metadata file, for later filtering."""
 
 import logging
-import csv
-from typing import Any
 
 from .. import component as afspmc
+from ...utils import csv
+from typing import Any
 
 from google.protobuf.message import Message
 
@@ -45,34 +45,23 @@ class ScanMetadataWriter(afspmc.AfspmComponentBase):
     It can be converted back into an array via ast.literal_eval().
 
     Attributes:
-        filepath: path + fname of the csv file to save. Default is
-            'scan_metadata.csv'.
+        csv_attribs: attributes associated with the csv file we will be saving
+            to.
         control_state: reference to latest control_state, for context in
             saving.
-        delimiter: csv delimiter to use. Defaults to csv module default.
-        quotechar: csv quotechar to use. Defaults to csv module default.
-        quoting: quoting generation determination. Defaults to csv default.
     """
 
     CSV_FIELDS = ['timestamp(s)', 'filename', 'channel/type', 'control_mode',
                   'client_id', 'problems_set']
 
-    def __init__(self, filepath: str = './scan_metadata.csv',
-                 delimiter: str = None, quotechar: str = None,
-                 quoting: Any = None, **kwargs):
-        """Initialize the writer."""
-        self.filepath = filepath
-        self.delimiter = delimiter
-        self.quotechar = quotechar
-        self.quoting = quoting
+    DEFAULT_CSV_ATTRIBS = csv.CSVAttributes('scan_metadata.csv')
 
+    def __init__(self, csv_attribs: csv.CSVAttributes, **kwargs):
+        """Initialize the writer."""
+        self.csv_attribs = csv_attribs
         self.control_state = None
 
-        logger.debug("Creating initial csv file, with header.")
-        with open(self.filepath, 'w', newline='') as csvfile:
-            writer = self._create_dict_writer(csvfile)
-            writer.writeheader()
-
+        csv.init_csv_file(self.csv_attribs, self.CSV_FIELDS)
         super().__init__(**kwargs)
 
     def on_message_received(self, envelope: str, proto: Message):
@@ -83,32 +72,12 @@ class ScanMetadataWriter(afspmc.AfspmComponentBase):
         if (isinstance(proto, scan_pb2.Scan2d) or
                 isinstance(proto, spec_pb2.Spec1d)):
             logger.debug("Collection received, saving context.")
+
+            row_vals = self._get_metadata_row(proto)
+            csv.save_csv_row(self.csv_attribs, self.CSV_FIELDS,
+                             self.control_state, row_vals)
+
             self._save_collection_context(proto)
-
-    def _create_dict_writer(self, csvfile: str) -> csv.DictWriter:
-        """Create dict writer from internal variables and provided csv file."""
-        kwargs_dict = {'f': csvfile, 'fieldnames': self.CSV_FIELDS}
-        if self.delimiter is not None:
-            kwargs_dict['delimiter'] = self.delimiter
-        if self.quotechar is not None:
-            kwargs_dict['quotechar'] = self.quotechar
-        if self.quoting is not None:
-            kwargs_dict['quoting'] = self.quoting
-
-        return csv.DictWriter(**kwargs_dict)
-
-    def _save_collection_context(self, collection: scan_pb2.Scan2d |
-                                 spec_pb2.Spec1d):
-        """Save the current scan context."""
-        if self.control_state is None:
-            logger.error("Cannot save metadata: we have not received context.")
-
-        row_vals = self._get_metadata_row(collection)
-        row_dict = dict(zip(self.CSV_FIELDS, row_vals))
-
-        with open(self.filepath, 'a', newline='') as csvfile:
-            writer = self._create_dict_writer(csvfile)
-            writer.writerow(row_dict)
 
     def _get_metadata_row(self, collection: scan_pb2.Scan2d |
                           spec_pb2.Spec1d) -> [str]:
