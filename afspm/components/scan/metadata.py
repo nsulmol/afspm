@@ -75,9 +75,7 @@ class ScanMetadataWriter(afspmc.AfspmComponentBase):
 
             row_vals = self._get_metadata_row(proto)
             csv.save_csv_row(self.csv_attribs, self.CSV_FIELDS,
-                             self.control_state, row_vals)
-
-            self._save_collection_context(proto)
+                             row_vals)
 
     def _get_metadata_row(self, collection: scan_pb2.Scan2d |
                           spec_pb2.Spec1d) -> [str]:
@@ -85,9 +83,15 @@ class ScanMetadataWriter(afspmc.AfspmComponentBase):
             row_vals = self._get_scan_metadata(collection)
         else:
             row_vals = self._get_spec_metadata(collection)
-        row_vals.extend([self.control_state.control_mode,
-                         self.control_state.client_in_control_id,
-                         str(self.control_state.problems_set)])
+
+        if self.control_state is None:
+            logger.warning("We have not received ControlMode. Setting "
+                           "associated values to None.")
+            row_vals.extend([None, None, None])
+        else:
+            row_vals.extend([self.control_state.control_mode,
+                            self.control_state.client_in_control_id,
+                            str(self.control_state.problems_set)])
         return row_vals
 
     @staticmethod

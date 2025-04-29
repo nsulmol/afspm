@@ -65,7 +65,6 @@ def init_csv_file(csv_attribs: CSVAttributes,
 
 def save_csv_row(csv_attribs: CSVAttributes,
                  csv_fields: list[str],
-                 control_state: control_pb2.ControlState,
                  row_vals: list[Any]):
     """Save a row of 'context' to a CSV file.
 
@@ -76,13 +75,8 @@ def save_csv_row(csv_attribs: CSVAttributes,
         csv_attribs: structure of attributes associated with a csv file
             (such as filepath).
         csv_fields: list of field names.
-        control_state: the current ControlState of the system, which determines
-            whether or not we have received context this pass.
         row_vals: list of values associated to a row.
     """
-    if control_state is None:
-        logger.error("Cannot save metadata: we have not received context.")
-
     row_dict = dict(zip(csv_fields, row_vals))
 
     with open(csv_attribs.filepath, 'a', newline='') as csv_file:
