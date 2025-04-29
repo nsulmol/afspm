@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 from pathlib import Path
 from os import sep
 
-from afspm.components import drift
+from afspm.components.drift import drift
 
 import SciFiReaders as sr
 from afspm.utils import array_converters as conv
@@ -24,12 +24,12 @@ BASE_PATH = str(Path(__file__).parent.parent.resolve())
 
 @pytest.fixture
 def sample1_fname():
-    return BASE_PATH + sep + 'data' + sep + 'Au_facetcontac0000.ibw'
+    return BASE_PATH + sep + '..' + sep + 'data' + sep + 'Au_facetcontac0000.ibw'
 
 
 @pytest.fixture
 def sample2_fname():
-    return BASE_PATH + sep + 'data' + sep + 'Au_facetcontac0003.ibw'
+    return BASE_PATH + sep + '..' + sep + 'data' + sep + 'Au_facetcontac0003.ibw'
 
 
 @pytest.fixture

@@ -304,7 +304,7 @@ def display_estimated_transform(da1: xr.DataArray, da2: xr.DataArray,
 
 def get_translation(da: xr.DataArray,
                     mapping: transform.ProjectiveTransform
-                    ) -> ([float], str):
+                    ) -> (list[float], str):
     """Get unit-based translation vector from a computed mapping.
 
     Args:
