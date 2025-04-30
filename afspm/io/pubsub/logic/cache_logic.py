@@ -46,7 +46,7 @@ class CacheLogic(metaclass=ABCMeta):
     @abstractmethod
     def update_cache(self, proto: Message, cache: Mapping[str, Iterable]
                      ):
-        """Update the provided cache with the provided envelope and proto.
+        """Update the provided cache with the provided proto.
 
         Args:
             proto: protobuf structure linked to the envelope.

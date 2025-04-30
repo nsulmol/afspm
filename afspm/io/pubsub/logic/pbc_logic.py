@@ -165,7 +165,7 @@ def create_roi_proto_hist_list(sizes_with_hist_list:
             (x, y).
 
     Returns:
-        A proto-history list, for instantiation of a PBCWithROi cache logic.
+        A proto-history list, for instantiation of a PBCScanLogic.
     """
     proto_with_hist_list = list(DEFAULT_PROTO_WITH_HIST_SEQ)
     for (size, hist) in sizes_with_hist_list:

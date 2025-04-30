@@ -52,8 +52,9 @@ class ControlRouter:
         _client_in_control_id: a uuid for the client currently under control.
         _poll_timeout_ms: delay to wait when polling for a request from the
            frontend.
-        _req_timeout_ms: delay to wait for a reply from a request we send to
+        _request_timeout_ms: delay to wait for a reply from a request we send to
             the backend.
+        shutdown_was_requested: whether or not a shutdown has been requested.
     """
 
     def __init__(self, server_url: str, router_url: str,
