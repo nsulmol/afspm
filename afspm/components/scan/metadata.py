@@ -56,7 +56,8 @@ class ScanMetadataWriter(afspmc.AfspmComponentBase):
 
     DEFAULT_CSV_ATTRIBS = csv.CSVAttributes('scan_metadata.csv')
 
-    def __init__(self, csv_attribs: csv.CSVAttributes, **kwargs):
+    def __init__(self, csv_attribs: csv.CSVAttributes = DEFAULT_CSV_ATTRIBS,
+                 **kwargs):
         """Initialize the writer."""
         self.csv_attribs = csv_attribs
         self.control_state = None
