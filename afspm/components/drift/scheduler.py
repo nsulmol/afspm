@@ -282,11 +282,8 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         intersection_ratio: minimum intersection area to scan ratio to state
             accept two scans as intersecting. The scan area in our numerator
             is that of the newer scan.
-#        last_condensed_dt: holds the timestamp before which we have already
-#            condensed our correction_infos. Used to avoid re-processing data.
     """
 
-    # TODO: Should this be CacheLogic or PBCLogic?
     SCAN_ID = cache_logic.CacheLogic.get_envelope_for_proto(scan_pb2.Scan2d())
     DEFAULT_INTERSECTION_RATIO = 0.8
     DEFAULT_HISTORY_LENGTH = 5
@@ -306,7 +303,6 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
                             else drift_model)
         self.csv_attribs = csv_attribs
         self.intersection_ratio = intersection_ratio
-#        self.last_condensed_dt = None
         self.correction_infos = deque(maxlen=correction_history_length)
         self.current_correction_vec = np.array([0.0, 0.0])
 
@@ -400,11 +396,6 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
 
         # TODO: What if the drift is too much? At what point do we take over and
         # redo the scan?
-
-        # # Condense existing correction infos
-        # self.correction_infos, self.last_condensed_dt = (
-        #     evaluate_and_condense_infos(
-        #         self.correction_infos, new_scan, self.last_condensed_dt))
 
         row_vals = self._get_metadata_row(new_scan, self.current_correction_vec,
                                           not scan_was_matched)
@@ -569,59 +560,3 @@ def estimate_correction_vec(correction_infos: list[CorrectionInfo],
     correction_vec = current_correction_vec + del_correction_vec
     logger.info(f'current_correction_vec: {current_correction_vec}')
     return correction_vec
-
-
-# TODO: To be removed.
-def evaluate_and_condense_infos(correction_infos: list[CorrectionInfo],
-                                new_scan: CorrectionInfo,
-                                last_condensed_dt: dt.datetime | None = None,
-                                ) -> (list[CorrectionInfo], dt.datetime):
-    """Evaluate which infos need to be condensed and condense those.
-
-    NOTE: This method is not used! And it is not finished. It's missing
-    a method condense_infos().
-    """
-    if last_condensed_dt is None:
-        last_condensed_dt = DEFAULT_EMPTY_DATETIME
-
-    # Filter to only get infos that happened before our current info
-    # and after the last condensing step
-    previously_condensed_infos = [info for info in correction_infos
-                                  if info.dt1 < last_condensed_dt]
-    currently_considered_infos = [info for info in correction_infos
-                                  if info.dt2 > new_scan.dt1]
-    condensable_infos = [info for info in correction_infos
-                         if info.dt2 <= new_scan.dt1 and
-                         info.dt1 >= last_condensed_dt]
-
-    condensed_infos = []
-    for idx, info in enumerate(condensable_infos):
-        # Should get indices instead?
-        intersected_infos = [info2 for info2 in condensable_infos[idx:]
-                             if time_intersection_delta(info, info2) > 0]
-
-        condensed_info = condense_infos(intersected_infos)
-        condensed_infos.append(condensed_info)
-        last_condensed_dt = condensed_infos.dt1
-
-    updated_infos = (previously_condensed_infos + condensed_infos +
-                     currently_considered_infos)
-    return updated_infos, last_condensed_dt
-
-
-def condense_infos(correction_infos: list[CorrectionInfo]
-                   ) -> CorrectionInfo:
-    """TODO: Unfinished and unused!"""
-    dt1 = min([info.dt1 for info in correction_infos])
-    dt2 = max([info.dt2 for info in correction_infos])
-
-    unit_dist = correction_infos[0].units
-    units_tot = unit_dist + '/s'
-    drift_rates = []
-    for info in correction_infos:
-        units = (info.units, info.units)
-        vec = convert_list(info.vec, units,
-                           (unit_dist, unit_dist))
-        vec = np.array(vec)
-        drift_rate = vec / (info.dt2 - info.dt1).total_seconds()
-        drift_rates.append(drift_rate)

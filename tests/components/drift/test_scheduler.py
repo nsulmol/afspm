@@ -147,7 +147,6 @@ def fake_update_scheduler(self, proto):
     self._update_io()
 
 
-#def test_update(my_scheduler, monkeypatch):
 def test_hooks_work(pub_url, psc_url, server_url, router_url, ctx, csv_attribs,
                     monkeypatch):
     logger.info("Validate that the hooks between scheduler, router, cache all "
@@ -157,8 +156,6 @@ def test_hooks_work(pub_url, psc_url, server_url, router_url, ctx, csv_attribs,
                         fake_update_scheduler)
     my_scheduler = create_scheduler_and_ios(pub_url, psc_url, server_url,
                                             router_url, ctx, csv_attribs)
-
-#    my_scheduler.correction_infos = correction_infos_cancel_out
 
     # Before running, there should be no 'scan_was_received' in cache
     assert not hasattr(my_scheduler.pubsubcache, 'scan_was_received')
@@ -177,12 +174,6 @@ def test_hooks_work(pub_url, psc_url, server_url, router_url, ctx, csv_attribs,
 
     # Kill context (needed due to funky lack of pytest fixture)
     ctx.destroy()
-
-# def fake_update_correction_infos(self, new_scan) -> bool:
-#     vec = np.array([1.0, 0.5])
-#     del_corr_info = scheduler.CorrectionInfo(dt1, dt2, vec, units)
-#     del_corr_info.vec += self.current_correction_vec
-#     self.correction_infos.append()
 
 
 def fake_get_latest_intersection(scans: list[scan_pb2.Scan2d],
@@ -219,7 +210,6 @@ def test_correction_vec_with_match(pub_url, psc_url, server_url, router_url,
 
     my_scheduler = create_scheduler_and_ios(pub_url, psc_url, server_url,
                                             router_url, ctx, csv_attribs)
-#    my_scheduler.correction_infos = correction_infos_cancel_out
 
     my_scheduler.run_per_loop()
 
@@ -229,6 +219,7 @@ def test_correction_vec_with_match(pub_url, psc_url, server_url, router_url,
 
     # Kill context (needed due to funky lack of pytest fixture)
     ctx.destroy()
+
 
 def test_correction_vec_no_match(pub_url, psc_url, server_url, router_url,
                                  ctx, csv_attribs,  monkeypatch,
