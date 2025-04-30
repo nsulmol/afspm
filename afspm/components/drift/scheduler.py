@@ -46,9 +46,6 @@ class CorrectionInfo:
     units: str  # Translation vector units
 
 
-# intersects
-# (t1start <= t2start <= t1end) or (t2start <= t1start <= t2end)
-
 # kwarg keys for Scheduler constructor
 CACHE_KEY = 'pubsubcache'
 ROUTER_KEY = 'router'
