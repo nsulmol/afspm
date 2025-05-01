@@ -56,7 +56,9 @@ def correct_spatial_aspects(proto: scan_pb2.SpatialAspects,
                             ) -> scan_pb2.SpatialAspects:
     """Correct spatial aspects given a correction vector."""
     # TODO: consider rotation angle?
-    # TODO: Should it be yx or xy?
+    # From skimage doc (where we get our trans vec),
+    # the keypoints we receive are (row, col), i.e. (y, x).
+    # So we follow that here.
     orig_tl = np.ndarray([proto.spatial.roi.top_left.y,
                           proto.spatial.roi.top_left.x])
     corrected_tl = orig_tl + correction_vec
@@ -72,7 +74,10 @@ def correct_probe_position(proto: spec_pb2.ProbePosition,
                            correction_vec: np.ndarray
                            ) -> spec_pb2.ProbePosition:
     """Correct probe position given a correction vector."""
-    # TODO: Should it be yx or xy?
+    # TODO: consider rotation angle?
+    # From skimage doc (where we get our trans vec),
+    # the keypoints we receive are (row, col), i.e. (y, x).
+    # So we follow that here.
     orig_pos = np.ndarray([proto.point.y, proto.point.x])
     corrected_pos = orig_pos + correction_vec
 
