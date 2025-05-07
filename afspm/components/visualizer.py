@@ -262,8 +262,6 @@ class Visualizer(AfspmComponent):
         cache_list = self.subscriber.cache[key]
         scan_phys_origin = self.scan_phys_origin_map[key]
         scan_phys_size = self.scan_phys_size_map[key]
-        data_units = cache_list[0].params.data.units
-        phys_units = cache_list[0].params.spatial.length_units
         # TODO: Consider angle!!
 
         # Determine res of 'full image'
@@ -281,20 +279,23 @@ class Visualizer(AfspmComponent):
                         full_res[0])
         y = np.linspace(scan_phys_origin[0], scan_phys_size[0],
                         full_res[1])
-        full_xarr = xr.DataArray(dims=['y', 'x'],
-                                 coords={'y': y, 'x': x},
-                                 attrs={'units': data_units})
-        full_xarr.x.attrs['units'] = phys_units
-        full_xarr.y.attrs['units'] = phys_units
 
         # Get all subscans as xarrays, and then interpolate them to have
         # the same dimensions as our full_xarr.
+        # Alternative: sub_xarr.interp_like(), but this is easier (no need
+        # to explicitly define full_xarr before).
         sub_xarrs = [ac.convert_scan_pb2_to_xarray(scan) for scan in cache_list]
-        sub_xarrs = [sub_xarr.interp_like(full_xarr) for sub_xarr in sub_xarrs]
+        sub_xarrs = [sub_xarr.interp(x=x, y=y) for sub_xarr in sub_xarrs]
 
         # Now that they are all represent the same data, we can concat them
         # into a 'new' dimension and than average them. This way, any overlaps
         # will be averaged, and null data is not considered.
+        #
+        # Alternatives that don't work:
+        #     full_xarr = xr.combine_by_coords(sub_xarrs) / xr.merge(sub_xarrs)
+        #     full_xarr = full_xarr[list(full_xarr.data_vars)[0]]
+        # This doesn't work because merge conflicts are not handled. What we
+        # have *does* work because we average conflicts.
         full_xarr = xr.concat(sub_xarrs, dim='new')
         full_xarr = full_xarr.mean(dim='new')
         return full_xarr
