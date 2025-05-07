@@ -174,10 +174,11 @@ def thread_microscope_translator(pub_url, server_url, psc_url, ctx,
 
 
 # -- Microscope Scheduler Stuff -- #
-@pytest.fixture
+@pytest.fixture(params=[sc.microscope_scheduler_routine,
+                        sc.cs_corrected_scheduler_routine])
 def thread_microscope_scheduler(psc_url, pub_url, server_url, router_url,
-                                cache_kwargs, ctx):
-    thread = threading.Thread(target=sc.microscope_scheduler_routine,
+                                cache_kwargs, ctx, request):
+    thread = threading.Thread(target=request.param,  # Get from params above
                               args=(psc_url, pub_url, server_url, router_url,
                                     cache_kwargs, ctx))
     thread.daemon = True
@@ -574,3 +575,6 @@ def test_set_get_params(thread_microscope_translator,
     param_msg.value = "33"
     rep, param_msg = afspm_component.control_client.request_parameter(param_msg)
     assert rep == control_pb2.ControlResponse.REP_PARAM_ERROR
+
+    end_and_wait_threads(afspm_component, thread_microscope_translator,
+                         thread_microscope_scheduler)

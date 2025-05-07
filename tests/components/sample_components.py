@@ -12,6 +12,7 @@ from afspm.components.microscope.params import (MicroscopeParameter,
                                                 ParameterError)
 from afspm.components.microscope.actions import MicroscopeAction
 from afspm.components.microscope.scheduler import MicroscopeScheduler
+from afspm.components.drift.scheduler import CSCorrectedScheduler
 
 from afspm.io import common
 from afspm.io.pubsub.subscriber import Subscriber
@@ -244,6 +245,26 @@ def microscope_scheduler_routine(psc_url, pub_url, server_url, router_url,
     router = ControlRouter(server_url, router_url, ctx)
 
     scheduler = MicroscopeScheduler('scheduler', psc, router, ctx=ctx)
+    scheduler.run()
+
+    # Forcing closure of bound sockets (for pytests)
+    psc._backend.close()
+    router._frontend.close()
+
+
+def cs_corrected_scheduler_routine(psc_url, pub_url, server_url, router_url,
+                                   cache_kwargs, ctx):
+    psc = PubSubCache(psc_url, pub_url,
+                      cl.extract_proto,
+                      cl.CacheLogic.get_envelope_for_proto,
+                      cl.update_cache, ctx,
+                      extract_proto_kwargs=cache_kwargs,
+                      update_cache_kwargs=cache_kwargs)
+    router = ControlRouter(server_url, router_url, ctx)
+
+    scheduler = CSCorrectedScheduler(name='scheduler',
+                                     pubsubcache=psc,
+                                     router=router, ctx=ctx)
     scheduler.run()
 
     # Forcing closure of bound sockets (for pytests)
