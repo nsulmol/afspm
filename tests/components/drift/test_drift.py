@@ -4,6 +4,7 @@ import logging
 import pytest
 import datetime as dt
 import numpy as np
+import xarray as xr
 
 from matplotlib import pyplot as plt
 
@@ -62,6 +63,15 @@ def min_unit_residual():
     return 1e-07
 
 
+def get_xarray_from_ibw(fname: str) -> xr.DataArray:
+    """Helper to get xarray from an ibw file."""
+    reader = sr.IgorIBWReader(fname)
+    ds1 = list(reader.read(verbose=False).values())
+    scan1 = conv.convert_sidpy_to_scan_pb2(ds1[0])
+    da1 = conv.convert_scan_pb2_to_xarray(scan1)
+    return da1
+
+
 def test_transform(sample1_fname, sample2_fname, dt1, dt2,
                    expected_trans_pix, expected_drift_vec,
                    min_pix_residual, min_unit_residual,
@@ -69,15 +79,8 @@ def test_transform(sample1_fname, sample2_fname, dt1, dt2,
     # Avoid plt.show() happening
     monkeypatch.setattr(plt, 'show', lambda: None)
 
-    reader = sr.IgorIBWReader(sample1_fname)
-    ds1 = list(reader.read(verbose=False).values())
-    scan1 = conv.convert_sidpy_to_scan_pb2(ds1[0])
-    da1 = conv.convert_scan_pb2_to_xarray(scan1)
-
-    reader = sr.IgorIBWReader(sample2_fname)
-    ds2 = list(reader.read(verbose=False).values())
-    scan2 = conv.convert_sidpy_to_scan_pb2(ds2[0])
-    da2 = conv.convert_scan_pb2_to_xarray(scan2)
+    da1 = get_xarray_from_ibw(sample1_fname)
+    da2 = get_xarray_from_ibw(sample2_fname)
 
     descriptor_types = [d for d in drift.DescriptorType]
     transform_types = [t for t in drift.TransformType]
