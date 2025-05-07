@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 DEFAULT_EMPTY_DATETIME = dt.datetime(1, 1, 1)
+ANGLE_FIELD = 'angle'  # Used to check if an angle is set in scan_params
 
 
 @dataclass
@@ -52,68 +53,83 @@ ROUTER_KEY = 'router'
 
 
 def correct_spatial_aspects(proto: scan_pb2.SpatialAspects,
-                            correction_vec: np.ndarray
+                            correction_vec: np.ndarray,
+                            correction_units: str,
                             ) -> scan_pb2.SpatialAspects:
     """Correct spatial aspects given a correction vector."""
-    # TODO: consider rotation angle?
+    # NOTE: Rotation angle should not affect this.
     # From skimage doc (where we get our trans vec),
     # the keypoints we receive are (row, col), i.e. (y, x).
     # So we follow that here.
     orig_tl = np.ndarray([proto.spatial.roi.top_left.y,
                           proto.spatial.roi.top_left.x])
+
+    # Update correction vec to proto units
+    roi_units = (proto.spatial.length_units,
+                 proto.spatial.length_units)
+    correction_units = (correction_units, correction_units)
+    correction_vec = np.array(convert_list(correction_vec.tolist(),
+                                           correction_units, roi_units))
+
     corrected_tl = orig_tl + correction_vec
-    logger.debug('Correcting top-left position from '
-                 f'{orig_tl} to {corrected_tl}, using '
-                 f'correction vector {correction_vec}.')
     proto.spatial.roi.top_left = geometry_pb2.Point2d(
         corrected_tl.x, corrected_tl.y)
     return proto
 
 
 def correct_probe_position(proto: spec_pb2.ProbePosition,
-                           correction_vec: np.ndarray
+                           correction_vec: np.ndarray,
+                           correction_units: str,
                            ) -> spec_pb2.ProbePosition:
     """Correct probe position given a correction vector."""
-    # TODO: consider rotation angle?
     # From skimage doc (where we get our trans vec),
     # the keypoints we receive are (row, col), i.e. (y, x).
     # So we follow that here.
     orig_pos = np.ndarray([proto.point.y, proto.point.x])
+
+    # Update correction vec to proto units
+    roi_units = (proto.units, proto.units)
+    correction_units = (correction_units, correction_units)
+    correction_vec = np.array(convert_list(correction_vec.tolist(),
+                                           correction_units, roi_units))
+
     corrected_pos = orig_pos + correction_vec
 
-    logger.debug('Correcting probe position from '
-                 f'{orig_pos} to {corrected_pos}, using '
-                 f'correction vector {correction_vec}.')
     proto.point = geometry_pb2.Point2d(
         corrected_pos.x, corrected_pos.y)
     return proto
 
 
-def cs_correct_proto(proto: Message, correction_vec: np.ndarray) -> Message:
+def cs_correct_proto(proto: Message, correction_vec: np.ndarray,
+                     correction_units: str,) -> Message:
     """Recursively go through a protobuf, correcting CS-based fields.
 
     When we find fields that should be corrected for an updated coordinate
     system, we fix them.
     """
+    logger.trace(f'Proto before correcting: {proto}')
     constructor = GetMessageClass(proto.DESCRIPTOR)
     vals_dict = {}
+    # NOTE: any new protos that have spatial fields should be added here!
     for field in proto.DESCRIPTOR.fields:
         val = getattr(proto, field.name)
+        new_val = None
         if isinstance(val, Message):
-            val = cs_correct_proto(val, correction_vec)
-#            setattr(proto, field.name, new_val)
+            new_val = cs_correct_proto(val, correction_vec, correction_units)
         elif isinstance(val, scan_pb2.SpatialAspects):
-            val = correct_spatial_aspects(val, correction_vec)
-#            setattr(proto, field.name, new_val)
+            new_val = correct_spatial_aspects(val, correction_vec,
+                                              correction_units)
         elif isinstance(val, spec_pb2.ProbePosition):
-            val = correct_probe_position(val, correction_vec)
-#            setattr(proto, field.name, new_val)
-#        else:
-#            new_val = val
-        vals_dict[field.name] = val
+            new_val = correct_probe_position(val, correction_vec,
+                                             correction_units)
 
-#    return proto
-    return constructor(**vals_dict)
+        if new_val:
+            vals_dict[field.name] = new_val
+
+    partial_proto = constructor(**vals_dict)
+    proto.MergeFrom(partial_proto)
+    logger.trace(f'Proto after correcting: {proto}')
+    return proto
 
 
 class CSCorrectedRouter(router.ControlRouter):
@@ -122,16 +138,18 @@ class CSCorrectedRouter(router.ControlRouter):
     def __init__(self):
         """Init - this class requires usage of from_parent."""
         self._correction_vec = np.zeros((2,))
+        self._correction_units = None
 
     def _handle_send_req(self, req: control_pb2.ControlRequest,
                          proto: Message) -> (control_pb2.ControlResponse,
                                              Message | int | None):
         """Override to correct CS data before sending out."""
         # Correct CS data of proto
-        proto = cs_correct_proto(proto, self._correction_vec)
+        proto = cs_correct_proto(proto, self._correction_vec,
+                                 self._correction_units)
 
         # Send out
-        super()._handle_send_req(req, proto)
+        return super()._handle_send_req(req, proto)
 
     @classmethod
     def from_parent(cls, parent):
@@ -149,7 +167,8 @@ class CSCorrectedRouter(router.ControlRouter):
         child.shutdown_was_requested = parent.shutdown_was_requested
         return child
 
-    def update_correction_vec(self, correction_vec: np.ndarray):
+    def update_correction_vec(self, correction_vec: np.ndarray,
+                              correction_units: str):
         """Update our correction vector.
 
         The correction vector is PCS -> SCS. The router is receiving
@@ -158,6 +177,7 @@ class CSCorrectedRouter(router.ControlRouter):
         translation vector.
         """
         self._correction_vec = -correction_vec
+        self._correction_units = correction_units
 
 
 class CSCorrectedCache(cache.PubSubCache):
@@ -166,6 +186,7 @@ class CSCorrectedCache(cache.PubSubCache):
     def __init__(self, **kwargs):
         """Init - this class requires usage of from_parent."""
         self._correction_vec = np.zeros((2,))
+        self._correction_units = None
         self._observers = []
 
     def bind_to(self, callback):
@@ -181,7 +202,8 @@ class CSCorrectedCache(cache.PubSubCache):
                 callback(proto)
 
         # Correct CS data of proto
-        proto = cs_correct_proto(proto, self._correction_vec)
+        proto = cs_correct_proto(proto, self._correction_vec,
+                                 self._correction_units)
 
         # Save in cache / send out
         super().send_message(proto)
@@ -203,7 +225,8 @@ class CSCorrectedCache(cache.PubSubCache):
         child._poller = parent._poller
         return child
 
-    def update_correction_vec(self, correction_vec: np.ndarray):
+    def update_correction_vec(self, correction_vec: np.ndarray,
+                              correction_units: str):
         """Update our correction vector.
 
         The correction vector is PCS -> SCS. The PubSubCache receives requests
@@ -212,6 +235,7 @@ class CSCorrectedCache(cache.PubSubCache):
         without modifications.
         """
         self._correction_vec = correction_vec
+        self._correction_units = correction_units
 
 
 class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
@@ -279,6 +303,8 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
             over time.
         current_correction_vec: currently estimated correction vector to go
             from PCS -> SCS.
+        current_correction_units: units associated with estimated correction
+            vector.
         filepath: path where we save our csv file containing all correction
             data associated to scans.
         intersection_ratio: minimum intersection area to scan ratio to state
@@ -292,7 +318,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
 
     DEFAULT_CSV_ATTRIBUTES = csv.CSVAttributes('./drift_correction.csv')
 
-    CSV_FIELDS = ['timestamp', 'filename', 'psc_to_scs_trans',
+    CSV_FIELDS = ['timestamp', 'filename', 'pcs_to_scs_trans',
                   'estimated_from_drift?']
 
     def __init__(self, drift_model: drift.DriftModel | None = None,
@@ -307,6 +333,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         self.intersection_ratio = intersection_ratio
         self.correction_infos = deque(maxlen=correction_history_length)
         self.current_correction_vec = np.array([0.0, 0.0])
+        self.current_correction_units = None
 
         # Create our wrapper router and cache
         kwargs[ROUTER_KEY] = CSCorrectedRouter.from_parent(
@@ -332,8 +359,15 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         return row_vals
 
     def _get_scans_from_cache(self):
-        return [val for key, val in self.pubsubcache.cache.items()
-                if self.SCAN_ID in key]
+        # The cache is a key:val map of deques of items.
+        # So we need to filter through each deque and concat the values
+        # if they are scans.
+        scan_deques = [val for key, val in self.pubsubcache.cache.items()
+                       if self.SCAN_ID in key]
+        # Go from list of lists to flattened single list (extending a new list)
+        concatenated_scans = []
+        map(concatenated_scans.extend, scan_deques)
+        return concatenated_scans
 
     def _update_correction_infos(self, new_scan: scan_pb2.Scan2d
                                  ) -> bool:
@@ -358,13 +392,25 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         match, we can simply grab the latest CorrectionInfo. If not, we
         estimate a correction vector based on the history.
         """
+        if len(self.correction_infos) == 0:
+            return  # Early return, there is nothing to correct!
+
         if scan_was_matched:
-            self.current_correction_vec = self.correction_infos[-1].vec
+            new_correction_vec = self.correction_infos[-1].vec
         else:
-            self.current_correction_vec = estimate_correction_vec(
+            new_correction_vec = estimate_correction_vec(
                 self.correction_infos, self.current_correction_vec,
                 new_scan.timestamp)
-        logger.warning(f'current correction vec: {self.current_correction_vec}')
+
+        # Notify logger if correciton vec has changed
+        if np.all(np.isclose(new_correction_vec, self.current_correction_vec)):
+            logger.info('The PCS-to-SCS correction vector has changed'
+                        f': {new_correction_vec}.')
+
+        # Update internal vec + units (assuming consistent units, grabbing
+        # latest)
+        self.current_correction_vec = new_correction_vec
+        self.current_correction_units = self.correction_infos[-1].units
 
     def _update_io(self):
         """Update IO nodes with latest correction vec.
@@ -372,8 +418,10 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         Inform our IO nodes of the latest correction vector, so they may use
         it to 'correct' the coordinate system accordingly.
         """
-        self.pubsubcache.update_correction_vec(self.current_correction_vec)
-        self.router.update_correction_vec(self.current_correction_vec)
+        self.pubsubcache.update_correction_vec(self.current_correction_vec,
+                                               self.current_correction_units)
+        self.router.update_correction_vec(self.current_correction_vec,
+                                          self.current_correction_units)
 
     def update(self, new_scan: scan_pb2.Scan2d):
         """Update correction infos given a new scan.
@@ -406,19 +454,24 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         self._update_io()
 
 
-# TODO: Do these support RotRect2d!?!?!
-def rect_intersection(a: geometry_pb2.Rect2d, b: geometry_pb2.Rect2d
-                      ) -> geometry_pb2.Rect2d:
+def rect_intersection(a: geometry_pb2.RotRect2d, b: geometry_pb2.RotRect2d
+                      ) -> geometry_pb2.RotRect2d:
     """Compute intersection of two Rect2ds."""
+    if a.HasField(ANGLE_FIELD) or b.HasField(ANGLE_FIELD):
+        msg = ('RotRect2d passed to rect_intersection with angle field. '
+               'This is not currently supported.')
+        logger.error(msg)
+        raise ValueError(msg)
+
     a_x1 = a.top_left.x
-    a_x2 = a.top_left.x + a.top_left.size.x
+    a_x2 = a.top_left.x + a.size.x
     a_y1 = a.top_left.y
-    a_y2 = a.top_left.y + a.top_left.size.y
+    a_y2 = a.top_left.y + a.size.y
 
     b_x1 = b.top_left.x
-    b_x2 = b.top_left.x + b.top_left.size.x
+    b_x2 = b.top_left.x + b.size.x
     b_y1 = b.top_left.y
-    b_y2 = b.top_left.y + b.top_left.size.y
+    b_y2 = b.top_left.y + b.size.y
 
     x1 = max(min(a_x1, a_x2), min(b_x1, b_x2))
     y1 = max(min(a_y1, a_y2), min(b_y1, b_y2))
@@ -426,11 +479,13 @@ def rect_intersection(a: geometry_pb2.Rect2d, b: geometry_pb2.Rect2d
     x2 = min(max(a_x1, a_x2), max(b_x1, b_x2))
     y2 = min(max(a_y1, a_y2), max(b_y1, b_y2))
 
+    logger.warning(f'x1: {x1}, x2: {x2}, y1: {y1}, y2: {y2}')
+
     if x2 < x1 or y2 < y1:
         return geometry_pb2.Rect2d()  # All 0s, no intersection!
 
-    tl = geometry_pb2.Point2d(x1, y1)
-    size = geometry_pb2.Size2d(x2 - x1, y2 - y1)
+    tl = geometry_pb2.Point2d(x=x1, y=y1)
+    size = geometry_pb2.Size2d(x=x2 - x1, y=y2 - y1)
     return geometry_pb2.Rect2d(top_left=tl, size=size)
 
 
@@ -461,9 +516,15 @@ def get_latest_intersection(scans: list[scan_pb2.Scan2d],
                             intersection_ratio: float
                             ) -> scan_pb2.Scan2d | None:
     """Get latest intersection between scans and a new_scan."""
-    intersect_scans = [scan for scan in scans if
-                       rect_area(rect_intersection(scan, new_scan)) /
-                       rect_area(new_scan) >= intersection_ratio]
+    intersect_scans = []
+    for scan in scans:
+        inter = rect_intersection(scan.params.spatial.roi,
+                                  new_scan.params.spatial.roi)
+        inter_ratio = rect_area(inter) / rect_area(new_scan.params.spatial.roi)
+        logger.warning(f'inter_ratio: {inter_ratio}')
+        if inter_ratio >= intersection_ratio:
+            intersect_scans.append(scan)
+
     if not intersect_scans:
         return None
 
@@ -538,8 +599,8 @@ def estimate_correction_vec(correction_infos: list[CorrectionInfo],
     dt1 = correction_infos[-1].dt2
     dt2 = time
 
-    logger.info(f'dt1: {dt1}')
-    logger.info(f'dt2: {dt2}')
+    logger.trace(f'dt1: {dt1}')
+    logger.trace(f'dt2: {dt2}')
 
     drift_rates = []
     for info in correction_infos:
@@ -549,16 +610,15 @@ def estimate_correction_vec(correction_infos: list[CorrectionInfo],
         vec = np.array(vec)
         drift_rate = vec / (info.dt2 - info.dt1).total_seconds()
         drift_rates.append(drift_rate)
-        logger.info(f'vec: {vec}')
-        logger.info(f'drift rate: {drift_rate}')
-        logger.info(f'units: {units}')
+        logger.trace(f'vec: {vec}')
+        logger.trace(f'drift rate: {drift_rate}')
+        logger.trace(f'units: {units}')
 
     avg_drift_rate = np.mean(np.array(drift_rates), axis=0)
-    logger.info(f'avg_drift_rate: {avg_drift_rate}')
+    logger.trace(f'avg_drift_rate: {avg_drift_rate}')
     del_correction_vec = avg_drift_rate * (dt2 - dt1).total_seconds()
-    logger.info(f'del_correction_vec: {del_correction_vec}')
+    logger.trace(f'del_correction_vec: {del_correction_vec}')
 
-    logger.info(f'current_correction_vec: {current_correction_vec}')
     correction_vec = current_correction_vec + del_correction_vec
-    logger.info(f'current_correction_vec: {current_correction_vec}')
+    logger.trace(f'current_correction_vec: {current_correction_vec}')
     return correction_vec

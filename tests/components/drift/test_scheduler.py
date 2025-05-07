@@ -10,9 +10,11 @@ from google.protobuf.timestamp_pb2 import Timestamp
 
 from afspm.components.drift import scheduler
 from afspm.components.drift import drift
+from afspm.io import common
 from afspm.io.pubsub import cache as pbc
 from afspm.io.control import router as ctrl_rtr
 from afspm.io.protos.generated import scan_pb2
+from afspm.io.protos.generated import geometry_pb2
 from afspm.utils import csv
 
 
@@ -210,9 +212,7 @@ def test_correction_vec_with_match(pub_url, psc_url, server_url, router_url,
 
     my_scheduler = create_scheduler_and_ios(pub_url, psc_url, server_url,
                                             router_url, ctx, csv_attribs)
-
     my_scheduler.run_per_loop()
-
     expected_correction_vec = np.array([1.0, 0.5])
     assert np.all(np.isclose(my_scheduler.current_correction_vec,
                              expected_correction_vec))
@@ -234,24 +234,92 @@ def test_correction_vec_no_match(pub_url, psc_url, server_url, router_url,
 
     my_scheduler = create_scheduler_and_ios(pub_url, psc_url, server_url,
                                             router_url, ctx, csv_attribs)
-    logger.debug("First, set correction_infos to vals that cancel out.")
-    my_scheduler.correction_infos = correction_infos_cancel_out
 
+    logger.debug("Validate it doesn't crash if we have no correction infos. ")
     my_scheduler.run_per_loop()
-
     expected_correction_vec = np.array([0.0, 0.0])
     assert np.all(np.isclose(my_scheduler.current_correction_vec,
                              expected_correction_vec))
 
-    logger.debug("Then, set correction_infos to vals that do not.")
-
-    my_scheduler.correction_infos = correction_infos_no_cancel
-
+    logger.debug("Set correction_infos to vals that cancel out.")
+    my_scheduler.correction_infos = correction_infos_cancel_out
     my_scheduler.run_per_loop()
+    expected_correction_vec = np.array([0.0, 0.0])
+    assert np.all(np.isclose(my_scheduler.current_correction_vec,
+                             expected_correction_vec))
 
+    logger.debug("Set correction_infos to vals that do not.")
+    my_scheduler.correction_infos = correction_infos_no_cancel
+    my_scheduler.run_per_loop()
     expected_correction_vec = np.array([0.75, 0.25])
     assert np.all(np.isclose(my_scheduler.current_correction_vec,
                              expected_correction_vec))
 
     # Kill context (needed due to funky lack of pytest fixture)
     ctx.destroy()
+
+
+# TODO: Uncomment these fixture parametrizations when rotation angles are
+# supported.
+#@pytest.fixture(params=[None, 30.0])
+@pytest.fixture
+def scan1(request):
+    scan_params = common.create_scan_params_2d(top_left=[5.0, 10.0],
+                                               size=[10, 20],)
+#                                               angle=request.param)
+    scan = scan_pb2.Scan2d(params=scan_params)
+    return scan
+
+
+#@pytest.fixture(params=[None, 30.0])
+@pytest.fixture
+def scan2(request):  # Should intersect with scan1
+    scan_params = common.create_scan_params_2d(top_left=[10.0, 20.0],
+                                               size=[10, 20],)
+#                                               angle=request.param)
+    scan = scan_pb2.Scan2d(params=scan_params)
+    return scan
+
+
+#@pytest.fixture(params=[None, 30.0])
+@pytest.fixture
+def scan3(request):  # Should not intersect with scan1
+    scan_params = common.create_scan_params_2d(top_left=[15.0, 30.0],
+                                               size=[10, 20],)
+#                                               angle=request.param)
+    scan = scan_pb2.Scan2d(params=scan_params)
+    return scan
+
+
+@pytest.fixture
+def intersection_ratio():
+    return 0.25
+
+
+def test_get_latest_intersection(scan1, scan2, scan3, intersection_ratio):
+    logger.info("Validate that our spatial intersection logic works.")
+
+    logger.debug("A case with intersection.")
+    inter_scan = scheduler.get_latest_intersection([scan1], scan2,
+                                                   intersection_ratio)
+    logger.warning(f'inter_scan: {inter_scan}')
+    assert inter_scan == scan1
+
+    logger.debug("A case without intersection.")
+    inter_scan = scheduler.get_latest_intersection([scan1], scan3,
+                                                   intersection_ratio)
+    assert inter_scan is None
+
+    logger.debug("A too-high intersection ratio should give no area.")
+    inter_scan = scheduler.get_latest_intersection([scan1], scan2,
+                                                   0.99)
+    assert inter_scan is None
+
+    logger.debug("Any rotation provided throws an exception (for now).")
+    scan2.params.spatial.roi.angle = 30.0
+    with pytest.raises(ValueError):
+        scheduler.get_latest_intersection([scan1], scan2,
+                                          0.99)
+
+# NOTE: not testing compute_correcdtion_info(), as it is basically a wrapper
+# for drift's methods.
