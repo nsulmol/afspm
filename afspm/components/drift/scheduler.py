@@ -12,6 +12,7 @@ from collections import deque
 import datetime as dt
 import logging
 import numpy as np
+import xarray as xr
 from google.protobuf.message import Message
 from google.protobuf.message_factory import GetMessageClass
 
@@ -307,13 +308,18 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
             vector.
         filepath: path where we save our csv file containing all correction
             data associated to scans.
-        intersection_ratio: minimum intersection area to scan ratio to state
-            accept two scans as intersecting. The scan area in our numerator
-            is that of the newer scan.
+        min_intersection_ratio: minimum intersection area to scan ratio to
+            accept two scans as intersecting. The scan area in our
+            numerator is that of the newer scan.
+        min_sptaial_res_ratio: minimum spatial rseolution ratio between two
+            scans to accept them as matching. If the two scans have vastly
+            different spatial resolutions, it is unlikely we will find
+            keypoint matches!
     """
 
     SCAN_ID = cache_logic.CacheLogic.get_envelope_for_proto(scan_pb2.Scan2d())
-    DEFAULT_INTERSECTION_RATIO = 0.8
+    DEFAULT_MIN_INTERSECTION_RATIO = 0.5
+    DEFAULT_MIN_SPATIAL_RES_RATIO = 0.5
     DEFAULT_HISTORY_LENGTH = 5
 
     DEFAULT_CSV_ATTRIBUTES = csv.CSVAttributes('./drift_correction.csv')
@@ -323,14 +329,16 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
 
     def __init__(self, drift_model: drift.DriftModel | None = None,
                  csv_attribs: csv.CSVAttributes = DEFAULT_CSV_ATTRIBUTES,
-                 intersection_ratio: float = DEFAULT_INTERSECTION_RATIO,
+                 min_intersection_ratio: float = DEFAULT_MIN_INTERSECTION_RATIO,
+                 min_spatial_res_ratio: float = DEFAULT_MIN_SPATIAL_RES_RATIO,
                  correction_history_length: int = DEFAULT_HISTORY_LENGTH,
                  **kwargs):
         """Initialize our correction scheduler."""
         self.drift_model = (drift.create_drift_model() if drift_model is None
                             else drift_model)
         self.csv_attribs = csv_attribs
-        self.intersection_ratio = intersection_ratio
+        self.min_intersection_ratio = min_intersection_ratio
+        self.min_spatial_res_ratio = min_spatial_res_ratio
         self.correction_infos = deque(maxlen=correction_history_length)
         self.current_correction_vec = np.array([0.0, 0.0])
         self.current_correction_units = None
@@ -373,7 +381,8 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
                                  ) -> bool:
         """Update CorrectionInfos history based on the new incoming scan."""
         matched_scan = get_latest_intersection(
-            self._get_scans_from_cache(), new_scan, self.intersection_ratio)
+            self._get_scans_from_cache(), new_scan,
+            self.min_intersection_ratio, self.min_spatial_res_ratio)
 
         scan_was_matched = matched_scan is not None
         if scan_was_matched:
@@ -454,11 +463,11 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         self._update_io()
 
 
-def rect_intersection(a: geometry_pb2.RotRect2d, b: geometry_pb2.RotRect2d
-                      ) -> geometry_pb2.RotRect2d:
+def rect_intersection(a: geometry_pb2.Rect2d, b: geometry_pb2.Rect2d
+                      ) -> geometry_pb2.Rect2d:
     """Compute intersection of two Rect2ds."""
     if a.HasField(ANGLE_FIELD) or b.HasField(ANGLE_FIELD):
-        msg = ('RotRect2d passed to rect_intersection with angle field. '
+        msg = ('Rect2d passed to rect_intersection with angle field. '
                'This is not currently supported.')
         logger.error(msg)
         raise ValueError(msg)
@@ -479,7 +488,7 @@ def rect_intersection(a: geometry_pb2.RotRect2d, b: geometry_pb2.RotRect2d
     x2 = min(max(a_x1, a_x2), max(b_x1, b_x2))
     y2 = min(max(a_y1, a_y2), max(b_y1, b_y2))
 
-    logger.warning(f'x1: {x1}, x2: {x2}, y1: {y1}, y2: {y2}')
+    logger.trace(f'x1: {x1}, x2: {x2}, y1: {y1}, y2: {y2}')
 
     if x2 < x1 or y2 < y1:
         return geometry_pb2.Rect2d()  # All 0s, no intersection!
@@ -511,18 +520,91 @@ def time_intersection_delta(a: CorrectionInfo, b: CorrectionInfo
     return dt2 - dt1
 
 
+def intersection_ratio(a: geometry_pb2.Rect2d,
+                       b: geometry_pb2.Rect2d) -> float:
+    """Compute the intersection ratio between two Rect2ds.
+
+    To do this, we first find the intersection rect between the two. To get a
+    reasonable ratio, we divide the area of this intersection by the *smaller*
+    of the two rectangles. We choose this because we are interested in the
+    intersection data only, so we do not really care if one of the rectangles
+    corresponds to a much larger region. Choosing the larger of the too would
+    make this ratio less useful (potentially), as the values may end up vary
+    small. Choosing based on the order the rectangles are given would cause
+    it to behave unexpectedly if the user chose the order wrong (for their
+    purposes).
+
+    Args:
+        a: first Rect2d.
+        b: second Rect2d.
+
+    Returns:
+        Ratio of the area of the intersection and the area of the smaller of
+        the two provided rects.
+    """
+    smallest_area = sorted([rect_area(a), rect_area(b)])[0]
+    inter_area = rect_area(rect_intersection(a, b))
+    return inter_area / smallest_area
+
+
+def spatial_resolution(a: scan_pb2.Scan2d) -> float:
+    """Compute the spatial resolution of a scan.
+
+    We grab the mean of the two spatial resolutions.
+    """
+    spatials = np.array([a.params.spatial.roi.size.x,
+                         a.params.spatial.roi.size.y])
+    resolutions = np.array([a.params.data.shape.x, a.params.data.shape.y])
+    spatial_resolutions = spatials / resolutions
+    return np.mean(spatial_resolutions)
+
+
+def spatial_resolution_ratio(a: scan_pb2.Scan2d,
+                             b: scan_pb2.Scan2d) -> float:
+    """Compute the ratio of the spatial resolutions of the two scans.
+
+    We define the ratio as the smaller over the larger.
+    This choice is arbitrary, but means the ratio is in the range [0, 1].
+    """
+    spatial_resolutions = [spatial_resolution(a), spatial_resolution(b)]
+    return min(spatial_resolutions) / max(spatial_resolutions)
+
+
 def get_latest_intersection(scans: list[scan_pb2.Scan2d],
                             new_scan: scan_pb2.Scan2d,
-                            intersection_ratio: float
+                            min_intersection_ratio: float,
+                            min_spatial_res_ratio: float,
                             ) -> scan_pb2.Scan2d | None:
-    """Get latest intersection between scans and a new_scan."""
+    """Get latest intersection between scans and a new_scan.
+
+    This method searches scans for a scan that has a 'sufficiently close'
+    intersection with new_scan. By 'sufficiently close' we mean:
+    1. The intersection ratio between the two is not too low; and
+    2. The spatial resolution ratio between two is not too low.
+
+    For (1): if the intersection between the two is too small, analyzing
+    the two scans for matching descriptors is not realistic.
+    For (2): if the spatial resolutions are too different, we simply won't find
+    matching features.
+
+    Args:
+        scans: list of scans to compare new_scan to.
+        new_scan: the scan we are matching.
+        min_intersection_ratio: the minimum ratio to be considered a
+            match.
+        min_spatial_res_ratio: the minimum spatial resolution ratio to
+            be considered a match.
+
+    Returns:
+        The most recent matching scan or None if none found.
+    """
     intersect_scans = []
     for scan in scans:
-        inter = rect_intersection(scan.params.spatial.roi,
-                                  new_scan.params.spatial.roi)
-        inter_ratio = rect_area(inter) / rect_area(new_scan.params.spatial.roi)
-        logger.warning(f'inter_ratio: {inter_ratio}')
-        if inter_ratio >= intersection_ratio:
+        inter_ratio = intersection_ratio(scan.params.spatial.roi,
+                                         new_scan.params.spatial.roi)
+        spatial_res_ratio = spatial_resolution_ratio(scan, new_scan)
+        if (inter_ratio >= min_intersection_ratio and
+                spatial_res_ratio >= min_spatial_res_ratio):
             intersect_scans.append(scan)
 
     if not intersect_scans:
@@ -530,6 +612,46 @@ def get_latest_intersection(scans: list[scan_pb2.Scan2d],
 
     intersect_scans.sort(key=lambda scan: scan.timestamp)
     return intersect_scans[-1]  # Last value is latest timestamp
+
+
+def extract_patch(da: xr.DataArray,
+                  rect: geometry_pb2.Rect2d,
+                  ) -> (xr.DataArray, xr.DataArray):
+    """Extract intersection patch from DataArray.
+
+    Args:
+        da: DataArray.
+        rect: intersection rectangle.
+
+    Returns:
+        Associated patch, as a DataArray.
+    """
+    xs = slice(rect.top_left.x, rect.top_left.x + rect.size.x)
+    ys = slice(rect.top_left.y, rect.top_left.y + rect.size.y)
+    return da.sel(x=xs, y=ys)
+
+
+def extract_and_scale_patches(da1: xr.DataArray,
+                              da2: xr.DataArray,
+                              rect: geometry_pb2.Rect2d,
+                              ) -> (xr.DataArray, xr.DataArray):
+    """Extract intersection patches from images, matching spatial res.
+
+    Extract patches from da1 and da2 corresponding to rect, and update
+    them so they have matching spatial resolutions. For the latter, we
+    update da1 so it is the same spatial resolution as da2.
+
+    Args:
+        da1: First DataArray.
+        da2: Second DataArray.
+        rect: intersection rectangle.
+
+    Returns:
+        Tuple of associated patches (patch_da1, patch_da2).
+    """
+    patches = [extract_patch(da1, rect), extract_patch(da2, rect)]
+    patches[0] = patches[0].interp_like(patches[1])
+    return tuple(patches)
 
 
 def compute_correction_info(scan1: scan_pb2.Scan2d,
@@ -555,6 +677,11 @@ def compute_correction_info(scan1: scan_pb2.Scan2d,
     """
     da1 = ac.convert_scan_pb2_to_xarray(scan1)
     da2 = ac.convert_scan_pb2_to_xarray(scan2)
+
+    # Get intersection patches (scaled to scan2, as the transform is
+    # for da2 to move to da1's position).
+    inter_rect = rect_intersection(scan1, scan2)
+    patch1, patch2 = extract_and_scale_patches(da1, da2, inter_rect)
 
     transform = drift.estimate_transform(drift_model, da1, da2)
     trans, units = drift.get_translation(da2, transform)

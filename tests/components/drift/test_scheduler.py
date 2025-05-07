@@ -1,9 +1,12 @@
 """Test DriftCorrectedScheduler logic."""
 
 import logging
+from pathlib import Path
+from os import sep
 import pytest
 import datetime as dt
 import numpy as np
+import xarray as xr
 from collections import deque
 import zmq
 from google.protobuf.timestamp_pb2 import Timestamp
@@ -16,6 +19,9 @@ from afspm.io.control import router as ctrl_rtr
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import geometry_pb2
 from afspm.utils import csv
+
+import SciFiReaders as sr
+from afspm.utils import array_converters as conv
 
 
 logger = logging.getLogger(__name__)
@@ -180,14 +186,16 @@ def test_hooks_work(pub_url, psc_url, server_url, router_url, ctx, csv_attribs,
 
 def fake_get_latest_intersection(scans: list[scan_pb2.Scan2d],
                                  new_scan: scan_pb2.Scan2d,
-                                 intersection_ratio: float
+                                 min_intersection_ratio: float,
+                                 min_spatial_res_ratio: float,
                                  ) -> scan_pb2.Scan2d | None:
     return scan_pb2.Scan2d()
 
 
 def fake_get_no_intersection(scans: list[scan_pb2.Scan2d],
                              new_scan: scan_pb2.Scan2d,
-                             intersection_ratio: float
+                             min_intersection_ratio: float,
+                             min_spatial_res_ratio: float,
                              ) -> scan_pb2.Scan2d | None:
     return None
 
@@ -265,7 +273,8 @@ def test_correction_vec_no_match(pub_url, psc_url, server_url, router_url,
 @pytest.fixture
 def scan1(request):
     scan_params = common.create_scan_params_2d(top_left=[5.0, 10.0],
-                                               size=[10, 20],)
+                                               size=[10, 20],
+                                               data_shape=[32, 32])
 #                                               angle=request.param)
     scan = scan_pb2.Scan2d(params=scan_params)
     return scan
@@ -275,7 +284,8 @@ def scan1(request):
 @pytest.fixture
 def scan2(request):  # Should intersect with scan1
     scan_params = common.create_scan_params_2d(top_left=[10.0, 20.0],
-                                               size=[10, 20],)
+                                               size=[10, 20],
+                                               data_shape=[48, 48])
 #                                               angle=request.param)
     scan = scan_pb2.Scan2d(params=scan_params)
     return scan
@@ -285,41 +295,132 @@ def scan2(request):  # Should intersect with scan1
 @pytest.fixture
 def scan3(request):  # Should not intersect with scan1
     scan_params = common.create_scan_params_2d(top_left=[15.0, 30.0],
-                                               size=[10, 20],)
+                                               size=[10, 20],
+                                               data_shape=[32, 32])
 #                                               angle=request.param)
     scan = scan_pb2.Scan2d(params=scan_params)
     return scan
 
 
 @pytest.fixture
-def intersection_ratio():
+def min_intersection_ratio():
     return 0.25
 
 
-def test_get_latest_intersection(scan1, scan2, scan3, intersection_ratio):
+@pytest.fixture
+def min_spatial_res_ratio():
+    return 0.25
+
+
+def test_get_latest_intersection(scan1, scan2, scan3, min_intersection_ratio,
+                                 min_spatial_res_ratio):
     logger.info("Validate that our spatial intersection logic works.")
 
     logger.debug("A case with intersection.")
     inter_scan = scheduler.get_latest_intersection([scan1], scan2,
-                                                   intersection_ratio)
+                                                   min_intersection_ratio,
+                                                   min_spatial_res_ratio)
     logger.warning(f'inter_scan: {inter_scan}')
     assert inter_scan == scan1
 
     logger.debug("A case without intersection.")
     inter_scan = scheduler.get_latest_intersection([scan1], scan3,
-                                                   intersection_ratio)
+                                                   min_intersection_ratio,
+                                                   min_spatial_res_ratio)
     assert inter_scan is None
 
-    logger.debug("A too-high intersection ratio should give no area.")
+    logger.debug("A too-high intersection ratio should give no intersection.")
     inter_scan = scheduler.get_latest_intersection([scan1], scan2,
-                                                   0.99)
+                                                   0.99,
+                                                   min_spatial_res_ratio)
+    assert inter_scan is None
+
+    logger.debug("A too-low spatial resolution ratio should give no "
+                 "intersection.")
+    inter_scan = scheduler.get_latest_intersection([scan1], scan2,
+                                                   min_intersection_ratio,
+                                                   0.75)
     assert inter_scan is None
 
     logger.debug("Any rotation provided throws an exception (for now).")
     scan2.params.spatial.roi.angle = 30.0
     with pytest.raises(ValueError):
         scheduler.get_latest_intersection([scan1], scan2,
-                                          0.99)
+                                          min_intersection_ratio,
+                                          min_spatial_res_ratio)
 
-# NOTE: not testing compute_correcdtion_info(), as it is basically a wrapper
+def get_xarray_from_ibw(fname: str) -> xr.DataArray:
+    """Helper to get xarray from an ibw file."""
+    reader = sr.IgorIBWReader(fname)
+    ds1 = list(reader.read(verbose=False).values())
+    scan1 = conv.convert_sidpy_to_scan_pb2(ds1[0])
+    da1 = conv.convert_scan_pb2_to_xarray(scan1)
+    return da1
+
+
+BASE_PATH = str(Path(__file__).parent.parent.resolve())
+
+
+@pytest.fixture
+def sample_fname():
+    return BASE_PATH + sep + '..' + sep + 'data' + sep + 'Au_facetcontac0000.ibw'
+
+
+def create_rect_for_da(da: xr.DataArray) -> geometry_pb2.Rect2d:
+    tl = geometry_pb2.Point2d(x=da.x[0], y=da.y[0])
+    size = geometry_pb2.Size2d(x=da.x[-1] - da.x[0],
+                               y=da.y[-1] - da.y[0])
+    rect = geometry_pb2.Rect2d(top_left=tl, size=size)
+    return rect
+
+
+def test_extract_patch(sample_fname):
+    da = get_xarray_from_ibw(sample_fname)
+    rect = create_rect_for_da(da)
+
+    # Create expanded array with NaN outside.
+    new_tl = [da.x[0] - (da.x[-1] - da.x[0]), da.y[0] - (da.y[-1] - da.y[0])]
+    x2 = np.linspace(new_tl[0], 2*da.x[-1], 4*da.x.shape[0])
+    y2 = np.linspace(new_tl[1], 2*da.y[-1], 4*da.y.shape[0])
+    da2 = da.interp(x=x2, y=y2)
+
+    logger.debug('We should get da if we extract its region from da2.')
+    extract_da = scheduler.extract_patch(da2, rect)
+    assert np.all(da == extract_da)
+
+    logger.debug('We should get all nan if we extract a region not from da.')
+    logger.warning(f'rect before: {rect}')
+    new_tl = geometry_pb2.Point2d(x=new_tl[0], y=new_tl[1])
+    # not including the last value, to ensure we have all nan.
+    size = geometry_pb2.Size2d(x=da.x[-2] - da.x[0],
+                               y=da.y[-2] - da.y[0])
+    rect = geometry_pb2.Rect2d(top_left=new_tl, size=size)
+
+    extract_da = scheduler.extract_patch(da2, rect)
+    assert np.isnan(extract_da).all()
+
+
+def test_extract_and_scale_patches(sample_fname):
+    da = get_xarray_from_ibw(sample_fname)
+    rect = create_rect_for_da(da)
+
+    # da2 is 2x the resolution in each dimension
+    x2 = np.linspace(da.x[0], da.x[-1], 2*da.x.shape[0])
+    y2 = np.linspace(da.y[0], da.y[-1], 2*da.y.shape[0])
+    da2 = da.interp(x=x2, y=y2)
+
+    logger.debug('If we try to extract and scale (da, da2) we expect '
+                 '(da2, da2).')
+    res_da1, res_da2 = scheduler.extract_and_scale_patches(da, da2, rect)
+    assert np.all(np.isclose(res_da1, da2))
+    assert np.all(np.isclose(res_da2, da2))
+
+    # If we try to extract and scale (da2, da), we expect (da, da)
+    logger.debug('If we try to extract and scale (da2, da) we expect '
+                 '(da, da).')
+    res_da1, res_da2 = scheduler.extract_and_scale_patches(da2, da, rect)
+    assert np.all(np.isclose(res_da1, da))
+    assert np.all(np.isclose(res_da2, da))
+
+# NOTE: not testing compute_correction_info(), as it is basically a wrapper
 # for drift's methods.
