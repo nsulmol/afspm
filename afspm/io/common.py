@@ -43,7 +43,7 @@ def create_scan_params_2d(top_left: tuple[float, float] = None,
                           angular_units: str = None,
                           data_shape: tuple[int, int] = None,
                           data_units: str = None,
-                          angle: int = 0,
+                          angle: int = None,
                           ) -> scan_pb2.ScanParameters2d:
     """Create ScanParameters2d object.
 

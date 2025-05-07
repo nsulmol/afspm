@@ -65,7 +65,7 @@ class ROIExperimenter(AfspmComponent):
                  sub_rois_per_dim: int,
                  sub_scan_res: list[int],
                  sub_scans_per_full_scan: int, rerun_wait_s: int,
-                 scan_angle: int = 0, **kwargs):
+                 scan_angle: int = None, **kwargs):
         """Initialize ROIExperimenter.
 
         Args:

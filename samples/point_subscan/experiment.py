@@ -28,7 +28,7 @@ class ExperimentData:
     sub_scans_per_full_scan: int
     points_id: str  # Envelope for detected scan points
 
-    scan_angle: int = 0  # Rotation angle of collected data.
+    scan_angle: int = None  # Rotation angle of collected data.
 
     scans_since_last_full_scan: int = 0
 
