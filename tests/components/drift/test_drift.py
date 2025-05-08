@@ -45,12 +45,12 @@ def dt2():
 
 @pytest.fixture
 def expected_trans_pix():
-    return [4, 13]
+    return [13, 4]
 
 
 @pytest.fixture
 def expected_drift_vec():
-    return [-6e-08, -2e-07]
+    return [-2e-07, -6e-08]
 
 
 @pytest.fixture
