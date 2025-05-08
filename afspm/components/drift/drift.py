@@ -216,7 +216,10 @@ def estimate_transform(model: DriftModel,
                                         **model.match_descriptor_kwargs)
     points_lr = []
     for (keypoints, idx) in zip(keypoints_lr, range(0, 2)):
-        points_lr.append(keypoints[matches[:, idx]])
+        matched_keypoints = keypoints[matches[:, idx]]
+        # keypoints and descriptors are (y, x), we need them in (x. y)!
+        matched_keypoints = np.fliplr(matched_keypoints)
+        points_lr.append(matched_keypoints)
 
     # Estimate transform from keypoint matches
     match model.fitting:
