@@ -270,36 +270,43 @@ def display_estimated_transform(da1: xr.DataArray, da2: xr.DataArray,
         cmap: str of colormap to be used to perform imshow() on da1 and the
             warped da2.
     """
-    fig, ax = plt.subplots(nrows=2, ncols=2)
+    mosaic = """CAAD
+                CBBD"""
+    fig = plt.figure(layout='constrained')
+    axd = fig.subplot_mosaic(mosaic)
 
     # Plot inliers (colored)
     feature.plot_matched_features(da1, da2,
                                   keypoints0=keypoints_lr[0],
                                   keypoints1=keypoints_lr[1],
                                   matches=inlier_matches,
-                                  ax=ax[0, 0], only_matches=True)
-    ax[0, 0].set_title('Matched Inliers (used to compute transform)')
+                                  ax=axd['A'], only_matches=True)
+    axd['A'].set_title('Matched Inliers (used to compute transform)')
 
     # Plot outliers (red)
     feature.plot_matched_features(da1, da2,
                                   keypoints0=keypoints_lr[0],
                                   keypoints1=keypoints_lr[1],
                                   matches=outlier_matches,
-                                  ax=ax[0, 1], only_matches=True,
+                                  ax=axd['B'], only_matches=True,
                                   matches_color='tab:red')
-    ax[0, 1].set_title('Matched Outliers (rejected)')
+    axd['B'].set_title('Matched Outliers (rejected)')
 
-    ax[1, 0].imshow(da1, cmap=cmap)
-    ax[1, 0].set_title('Image 1')
+    axd['C'].imshow(da1, cmap=cmap)
+    axd['C'].set_title('Image 1')
     da2_warped = transform.warp(da2, mapping)
-    ax[1, 1].imshow(da2_warped, cmap=cmap)
-    ax[1, 1].set_title('Image 2 - After Warp')
+    axd['D'].imshow(da2_warped, cmap=cmap)
+    axd['D'].set_title('Image 2 - After Warp')
 
     # Draw translation vector
-    pix_trans = mapping.translation
+    pix_trans = mapping.inverse.translation
+    logger.warning(f'pix_trans: {pix_trans}')
+    logger.warning(f'matrix: {mapping.inverse.params}')
     mid_pt = np.array([int(da2.shape[0] / 2), int(da2.shape[1] / 2)])
 
-    ax[1, 1].quiver(mid_pt[0], mid_pt[1], pix_trans[0], pix_trans[1])
+    # In this mode, we feed (x,y) and (u, v), for (x, x+u, y, y+v).
+    axd['D'].quiver(mid_pt[0], mid_pt[1], pix_trans[0], pix_trans[1],
+                    angles='xy', scale_units='xy', scale=1)
 
 
 def get_translation(da: xr.DataArray,
