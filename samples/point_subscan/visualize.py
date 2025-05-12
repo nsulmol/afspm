@@ -17,7 +17,10 @@ logger = logging.getLogger(LOGGER_ROOT + '.samples.point_subscan.' + __name__)
 # ----- Visualizer Methods ----- #
 @dataclass
 class VisualizerData:
+    """Data needed in history for reset_scans."""
+
     num_scans_before_reset: int
+    delete_sub_key: str
     scans_since_reset = 0
 
 
@@ -29,7 +32,8 @@ def reset_scans(component: Visualizer, envelope: str,
 
         if viz_data.scans_since_reset > viz_data.num_scans_before_reset:
             viz_data.scans_since_reset = 0
-            # Reset all cache keys that are scan related.
+
+            # Reset all cache keys linked to our delete sub key
             for key in list(component.subscriber.cache.keys()):
-                if component.scan_id in key:
+                if viz_data.delete_sub_key in key:
                     del component.subscriber.cache[key]

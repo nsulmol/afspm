@@ -172,6 +172,7 @@ methods_kwargs = {'tip_state'= 'tip_state_data'}
 [viz_data]
 class = 'visualize.VisualizerData'
 num_scans_before_reset = 'scans_per_reset'
+delete_sub_key = '40'  # Sub-scan size
 
 [visualizer]
 component = true
