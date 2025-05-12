@@ -21,6 +21,21 @@ from matplotlib import pyplot as plt
 logger = logging.getLogger(__name__)
 
 
+# (x, y) points
+DEFAULT_DIMENSIONALITY = 2  # I'm not sure when it would be anything else...
+
+
+# These defaults are certainly good for SIFT descriptors (it's what was
+# found experimentally in the original SIFT paper), and seems to do
+# pretty well for the other descriptors.
+DEFAULT_MATCHING_KWARGS = {'max_ratio': 0.8,
+                           'cross_check': True}
+DEFAULT_RESIDUAL_THRESH_PERCENT = 0.05
+DEFAULT_SCAN_RESOLUTION = [256, 256]
+RANSAC_RESIDUAL_THRESH_KEY = 'residual_threshold'
+RANSAC_MIN_SAMPLES_KEY = 'min_samples'
+
+
 class DescriptorType(str, Enum):
     """Descriptor type used to match keypoints between scans."""
 
@@ -80,16 +95,36 @@ def _create_descriptor_extractor(
 class TransformType(str, Enum):
     """Transform we are estimating when matching."""
 
+    TRANSLATION = 'TRANSLATION'  # t
     EUCLIDEAN = 'EUCLIDEAN'  # R, t
     SIMILARITY = 'SIMILARITY'  # R, t, scale
     AFFINE = 'AFFINE'  # R, t, scale, shear
 
 
+class TranslationTransform(transform.EuclideanTransform):
+    """Simplest transform, we just estimate a translation."""
+
+    def __init__(self, **kwargs):
+        """Init based on EuclideanTransform."""
+        super().__init__(**kwargs)
+
+    def estimate(self, src, dst):  # We don't allow weights!
+        """Estimate translation from src to dst.
+
+        We simply do a mean on our residuals.
+        """
+        trans = np.mean(dst - src, axis=0)  # TODO: Return to mean
+        self.params[0:2, 2] = trans
+        return True
+
+
 def _create_transform(transform_type: TransformType = TransformType.AFFINE,
-                      dimensionality: int = 2
+                      dimensionality: int = DEFAULT_DIMENSIONALITY
                       ) -> transform.ProjectiveTransform:
     """Create our Transform based on provided TransformType."""
     match transform_type:
+        case TransformType.TRANSLATION:
+            return TranslationTransform(dimensionality=dimensionality)
         case TransformType.EUCLIDEAN:
             return transform.EuclideanTransform(dimensionality=dimensionality)
         case TransformType.SIMILARITY:
@@ -107,7 +142,14 @@ class FittingMethod(str, Enum):
 
 @dataclass
 class DriftModel:
-    """Holds classes needed for drift estimation."""
+    """Holds classes needed for drift estimation.
+
+    NOTE:
+    If using FittingMethod.RANSAC, it is important to update the drift model
+    whenever the scan resolution changes. This is because some of the
+    parameters in the RANSAC kwargs are pixel-based! These can be
+    updated by calling update_fitting_kwargs() with the latest scan resolution.
+    """
 
     descriptor_extractor: DescriptorExtractor
     match_descriptor_kwargs: dict
@@ -115,30 +157,72 @@ class DriftModel:
     fitting: FittingMethod
     fitting_kwargs:  dict
 
+    scan_resolution: tuple[int, int]  # To determine if fitting needs updating
+    fill_nan: bool
 
-# These defaults are certainly good for SIFT descriptors (it's what was
-# found experimentally in the original SIFT paper), and seems to do
-# pretty well for the other descriptors.
-DEFAULT_MATCHING_KWARGS = {'max_ratio': 0.8,
-                           'cross_check': True}
+    def update_fitting_kwargs(self, new_scan_res: tuple[int, int]):
+        """Update fitting kwargs if scan resolution has changed."""
+        if new_scan_res != self.scan_resolution:
+            norm_scan_res = np.linalg.norm(np.array(self.scan_resolution))
+            residual_threshold_percent = (
+                self.fitting_kwargs[RANSAC_RESIDUAL_THRESH_KEY] /
+                norm_scan_res)
+            self.fitting_kwargs[RANSAC_RESIDUAL_THRESH_KEY] = (
+                _calculate_residual_threshold(
+                    new_scan_res, residual_threshold_percent))
 
-# Defaults for RANSAC. We choose these because:
-#     min_samples: is the minimum number of samples needed to fit our model.
-#         Since our model is a plane, we need at least 3 points.
-#     residual_threshold: the accepted residual between our computed points
-#     (f(x)) and the true points (y). Since our spatial XY data is indexed data
-#     here, we are simply allowing a reasonably large threshold of 5 pixels.
-DEFAULT_RANSAC_PLANE_KWARGS = {'min_samples': 3,
-                               'residual_threshold': 5.0}
+
+def _get_min_samples(transform_type: TransformType) -> int:
+    match transform_type:
+        case TransformType.TRANSLATION:
+            return 2
+        case _:
+            return 3  # All other ones are 3
+
+
+def _calculate_residual_threshold(scan_resolution: tuple[int, int],
+                                  residual_threshold_percent: float) -> float:
+    norm_scan_res = np.linalg.norm(np.array(scan_resolution))
+    return residual_threshold_percent * norm_scan_res
+
+
+def create_ransac_kwargs(transform_type: TransformType,
+                         scan_resolution: tuple[int, int],
+                         residual_threshold_percent: float =
+                         DEFAULT_RESIDUAL_THRESH_PERCENT) -> dict:
+    """Create RANSAC kwargs given transform type and residual threshold.
+
+    This method allows you to feed your transform type and desired residual
+    threshold (defining inliers vs. outliers) as a percentage of the scan
+    resolution.
+
+    Args:
+        transform_type: the TransformType being used for estimation. We use
+            this to determine minimum the number of points needed to fit.
+        scan_resolution: (x, y) scan resolution used to convert residual
+            threshold from percent to pixels.
+        residual_threshold_percent: the maximum residual allowable to define
+            a point as an inlier. It is provided in percent relative to the
+            scan resolution.
+
+    Returns:
+        A kwargs dict of arguments to feed to the ransac estimator.
+    """
+    kwargs = {}
+    kwargs[RANSAC_MIN_SAMPLES_KEY] = _get_min_samples(transform_type)
+    kwargs[RANSAC_RESIDUAL_THRESH_KEY] = _calculate_residual_threshold(
+        scan_resolution, residual_threshold_percent)
+    return kwargs
 
 
 def create_drift_model(descriptor_type: DescriptorType = DescriptorType.SIFT,
                        descriptor_kwargs: dict = dict(),
                        match_descriptor_kwargs: dict = DEFAULT_MATCHING_KWARGS,
-                       transform_type: TransformType = TransformType.EUCLIDEAN,
-                       dimensionality: int = 2,  # (x,y) points
+                       transform_type: TransformType = TransformType.TRANSLATION,
+                       dimensionality: int = DEFAULT_DIMENSIONALITY,
                        fitting: FittingMethod = FittingMethod.RANSAC,
-                       fitting_kwargs: dict = DEFAULT_RANSAC_PLANE_KWARGS
+                       fitting_kwargs: dict | None = None,
+                       scan_res: tuple[int, int] = DEFAULT_SCAN_RESOLUTION
                        ) -> DriftModel:
     """Create a drift model from provided params.
 
@@ -160,23 +244,37 @@ def create_drift_model(descriptor_type: DescriptorType = DescriptorType.SIFT,
         fitting_kwargs: the dict of keyword args to feed to the fitting method.
             Defaults to a good set of defaults for RANSAC. Note that these
             kwargs are only really used for the RANSAC approach.
+        scan_res: scan resolution of input scans. This must match the
+            scan resolution fed to fitting_kwargs (i.e. if you provide one
+            here, you should create fitting_kwargs using
+            create_fitting_kwargs()).
 
     Returns:
         The created DriftModel.
     """
+    if fitting_kwargs is None:
+        fitting_kwargs = create_ransac_kwargs(transform_type, scan_res)
+
     descriptor_extractor = _create_descriptor_extractor(descriptor_type,
                                                         **descriptor_kwargs)
+
+    # Force filling of NaN values for BRIEF extractor
+    fill_nan = descriptor_type == DescriptorType.BRIEF
+
     transform = _create_transform(transform_type, dimensionality)
     return DriftModel(descriptor_extractor=descriptor_extractor,
                       match_descriptor_kwargs=match_descriptor_kwargs,
                       transform=transform, fitting=fitting,
-                      fitting_kwargs=fitting_kwargs)
+                      fitting_kwargs=fitting_kwargs,
+                      scan_resolution=scan_res,
+                      fill_nan=fill_nan)
 
 
 def estimate_transform(model: DriftModel,
                        da1: xr.DataArray, da2: xr.DataArray,
-                       display_fit: bool = False, cmap: str | None = None
-                       ) -> transform.ProjectiveTransform:
+                       display_fit: bool = False, cmap: str | None = None,
+                       scale_factor: float = 1.0
+                       ) -> (transform.ProjectiveTransform, float):
     """Estimate transform between two DataArrays.
 
     Given a DriftModel, estimate the transform to be performed to da2 so that
@@ -195,19 +293,35 @@ def estimate_transform(model: DriftModel,
         cmap: the colormap to use when displaying da1 and da2 (after the
             transformation). Defaults to None (which means a suitable default
             will be chosen by matplotlib).
+        scale_factor: for scaling the arrays before fitting. Can be used to
+            speed up computation, at the potential cost of not matching.
 
     Returns:
-        ProjectiveTransform estimated.
+        (transform, score), where:
+        transform: ProjectiveTransform estimated.
+        score: mean-square error between points from on of the das and those
+            of the other *after* preforming the transform. If RANSAC is used,
+            only the inliers are considered for this estimate.
     """
+    # Handle need to fill NaN to 0
+    if model.fill_nan:
+        da1 = da1.fillna(0)
+        da2 = da2.fillna(0)
+
     # Scale intensity
-    arrs = [exposure.rescale_intensity(da.as_numpy()) for da in [da1, da2]]
+    arrs = [exposure.rescale_intensity(da)
+            for da in [da1, da2]]
+
+    # Scale resolution
+    arrs = [transform.rescale(arr, scale_factor) for arr in arrs]
 
     # Get keypoints and descriptors [da1 == l, da2 == r (in this logic)]
     keypoints_lr = []
     descriptors_lr = []
     for arr in arrs:
         model.descriptor_extractor.detect_and_extract(arr)
-        keypoints_lr.append(model.descriptor_extractor.keypoints)
+        keypoints_lr.append(model.descriptor_extractor.keypoints
+                            / scale_factor)
         descriptors_lr.append(model.descriptor_extractor.descriptors)
 
     # Get matches of keypoints on both images
@@ -229,14 +343,19 @@ def estimate_transform(model: DriftModel,
             def get_model():  # ugly method needed to run ransac
                 return model.transform
 
+            # Ensure proper resolution for RANSAC arguments
+            model.update_fitting_kwargs(da2.shape)
             model.transform, inliers = ransac(
                 (points_lr[0], points_lr[1]), get_model,
                 **model.fitting_kwargs)
+
+            matched_points_lr = [points_lr[0][inliers], points_lr[1][inliers]]
             inlier_matches = matches[inliers]
             outliers = inliers == False
             outlier_matches = matches[outliers]
         case FittingMethod.LEAST_SQUARES:
             model.transform.estimate(points_lr[0], points_lr[1])
+            matched_points_lr = points_lr
             inlier_matches = matches
             outlier_matches = np.array(())  # Empty array
         case _:
@@ -244,12 +363,16 @@ def estimate_transform(model: DriftModel,
             logger.error(msg)
             raise AttributeError(msg)
 
+    score = np.mean(np.sqrt(model.transform.residuals(matched_points_lr[0],
+                                                      matched_points_lr[1])**2))
+    logger.debug(f'Drift estimate fitting score: {score}')
+
     if display_fit:
         display_estimated_transform(da1, da2, keypoints_lr, model.transform,
                                     inlier_matches, outlier_matches,
-                                    cmap)
+                                    cmap, score)
 
-    return model.transform
+    return model.transform, score
 
 
 def display_estimated_transform(da1: xr.DataArray, da2: xr.DataArray,
@@ -257,7 +380,7 @@ def display_estimated_transform(da1: xr.DataArray, da2: xr.DataArray,
                                 mapping: transform.ProjectiveTransform,
                                 inlier_matches: np.ndarray,
                                 outlier_matches: np.ndarray,
-                                cmap: str):
+                                cmap: str, fit_score: float):
     """Visualize the estimated transform.
 
     Args:
@@ -272,6 +395,7 @@ def display_estimated_transform(da1: xr.DataArray, da2: xr.DataArray,
             empty np.ndarray.
         cmap: str of colormap to be used to perform imshow() on da1 and the
             warped da2.
+        fit_score: The fitting score.
     """
     mosaic = """CAAD
                 CBBD"""
@@ -299,17 +423,17 @@ def display_estimated_transform(da1: xr.DataArray, da2: xr.DataArray,
     axd['C'].set_title('Image 1')
     da2_warped = transform.warp(da2, mapping)
     axd['D'].imshow(da2_warped, cmap=cmap)
-    axd['D'].set_title('Image 2 - After Warp')
+    axd['D'].set_title(f'Image 2 - After Warp\nScore: {fit_score}')
 
     # Draw translation vector
     pix_trans = mapping.inverse.translation
-    logger.warning(f'pix_trans: {pix_trans}')
-    logger.warning(f'matrix: {mapping.inverse.params}')
-    mid_pt = np.array([int(da2.shape[0] / 2), int(da2.shape[1] / 2)])
+    mid_pt = np.array([int(da2.shape[1] / 2), int(da2.shape[0] / 2)])
 
     # In this mode, we feed (x,y) and (u, v), for (x, x+u, y, y+v).
     axd['D'].quiver(mid_pt[0], mid_pt[1], pix_trans[0], pix_trans[1],
                     angles='xy', scale_units='xy', scale=1)
+    # NOTE: scale=1 is suggested by docs, but it makes the scale 2x the
+    # actual translation.
 
 
 def get_translation(da: xr.DataArray,

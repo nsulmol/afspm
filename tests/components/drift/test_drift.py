@@ -6,14 +6,13 @@ import datetime as dt
 import numpy as np
 import xarray as xr
 
-from matplotlib import pyplot as plt
-
 from pathlib import Path
 from os import sep
+import SciFiReaders as sr
+
+from matplotlib import pyplot as plt
 
 from afspm.components.drift import drift
-
-import SciFiReaders as sr
 from afspm.utils import array_converters as conv
 
 
@@ -54,12 +53,12 @@ def expected_drift_vec():
 
 
 @pytest.fixture
-def min_pix_residual():
-    return 5.0
+def min_pix_trans_residual():
+    return 6.0
 
 
 @pytest.fixture
-def min_unit_residual():
+def min_unit_trans_residual():
     return 1e-07
 
 
@@ -72,10 +71,10 @@ def get_xarray_from_ibw(fname: str) -> xr.DataArray:
     return da1
 
 
-def test_transform(sample1_fname, sample2_fname, dt1, dt2,
-                   expected_trans_pix, expected_drift_vec,
-                   min_pix_residual, min_unit_residual,
-                   monkeypatch):
+def test_transform_real_data(sample1_fname, sample2_fname, dt1, dt2,
+                             expected_trans_pix, expected_drift_vec,
+                             min_pix_trans_residual, min_unit_trans_residual,
+                             monkeypatch):
     # Avoid plt.show() happening
     monkeypatch.setattr(plt, 'show', lambda: None)
 
@@ -86,34 +85,39 @@ def test_transform(sample1_fname, sample2_fname, dt1, dt2,
     transform_types = [t for t in drift.TransformType]
     fitting_methods = [f for f in drift.FittingMethod]
 
-    for descriptor in descriptor_types:
-        for transform in transform_types:
-            for fitting in fitting_methods:
-                logger.info(f'Estimating transform for {descriptor}, '
-                            f'{transform}, {fitting}')
-                model = drift.create_drift_model(descriptor_type=descriptor,
-                                                 transform_type=transform,
-                                                 fitting=fitting)
+    for descriptor_type in descriptor_types:
+        for transform_type in transform_types:
+            for fitting_type in fitting_methods:
+                logger.info(f'Estimating transform for {descriptor_type}, '
+                            f'{transform_type}, {fitting_type}')
+                model = drift.create_drift_model(
+                    descriptor_type=descriptor_type,
+                    transform_type=transform_type,
+                    fitting=fitting_type,
+                    scan_res=da2.shape)
 
-                mapping = drift.estimate_transform(model, da1, da2,
-                                                   display_fit=True)
+                mapping, score = drift.estimate_transform(model, da1, da2,
+                                                          display_fit=True,
+                                                          scale_factor=0.5)
                 plt.show()
+                plt.close()
 
                 logger.info(f'Mapping: R: {mapping.rotation}, '
                             f't: {mapping.translation}, ')
                 if hasattr(mapping, 'scale'):
                     logger.info(f's: {mapping.scale}')
 
-                residual = np.linalg.norm(
+                trans_residual = np.linalg.norm(
                     abs(mapping.translation - expected_trans_pix))
-                logger.info(f'Pix residual: {residual}')
+                logger.info(f'Pix trans_residual: {trans_residual}')
 
                 # Only validate for special cases
-                if (transform == drift.TransformType.EUCLIDEAN and
-                    fitting == drift.FittingMethod.RANSAC and
-                    descriptor in [drift.DescriptorType.SIFT,
-                                   drift.DescriptorType.BRIEF]):
-                    assert residual < min_pix_residual
+                if (transform_type == drift.TransformType.EUCLIDEAN and
+                    fitting_type == drift.FittingMethod.RANSAC and
+                    descriptor_type in [drift.DescriptorType.SIFT,
+                                        drift.DescriptorType.BRIEF]):
+                    assert score < min_pix_trans_residual
+                    assert trans_residual < min_pix_trans_residual
 
                 unit_trans, units = drift.get_translation(da2, mapping)
                 logger.info(f'Unit trans: {unit_trans} [{units}]')
@@ -121,12 +125,66 @@ def test_transform(sample1_fname, sample2_fname, dt1, dt2,
                 drift_vec, units = drift.get_drift_vec(da2, mapping, dt1, dt2)
                 logger.info(f'Drift Vec: {drift_vec} [{units}]')
 
-                residual = np.linalg.norm(abs(drift_vec - expected_drift_vec))
-                logger.info(f'Drift residual: {residual}')
+                trans_residual = np.linalg.norm(abs(drift_vec - expected_drift_vec))
+                logger.info(f'Drift trans_residual: {trans_residual}')
 
                 # Only validate for special cases
-                if (transform == drift.TransformType.EUCLIDEAN and
-                    fitting == drift.FittingMethod.RANSAC and
-                    descriptor in [drift.DescriptorType.SIFT,
-                                   drift.DescriptorType.BRIEF]):
-                    assert residual < min_unit_residual
+                if (transform_type == drift.TransformType.EUCLIDEAN and
+                    fitting_type == drift.FittingMethod.RANSAC and
+                    descriptor_type in [drift.DescriptorType.SIFT,
+                                        drift.DescriptorType.BRIEF]):
+                    assert trans_residual < min_unit_trans_residual
+
+    # Test big scale factor
+    model = drift.create_drift_model()
+    mapping, score = drift.estimate_transform(model, da1, da2,
+                                              display_fit=True,
+                                              scale_factor=0.25)
+    plt.show()
+    plt.close()
+
+    # In this case, we expect the score to be higher than our expectation
+    assert score < 2*min_pix_trans_residual
+
+
+@pytest.fixture
+def expected_score_simulated():
+    return 1.0
+
+
+def test_transform_simulated(sample1_fname, sample2_fname, dt1, dt2,
+                             expected_score_simulated,
+                             monkeypatch):
+    # Avoid plt.show() happening
+    monkeypatch.setattr(plt, 'show', lambda: None)
+
+    da1 = get_xarray_from_ibw(sample1_fname)
+
+    # Testing translation in x, translation in y, then translation in both.
+    tl_xs = [da1.x[0] - 0.5*(da1.x[-1] - da1.x[0]),
+             da1.x[0],
+             da1.x[0] - 0.5*(da1.x[-1] - da1.x[0])]
+    tl_ys = [da1.y[0],
+             da1.y[0] - 0.5*(da1.y[-1] - da1.y[0]),
+             da1.y[0] - 0.5*(da1.y[-1] - da1.y[0])]
+    x_ranges = [int(1.5*da1.x.shape[0]),
+                da1.x.shape[0],
+                int(1.5*da1.x.shape[0])]
+    y_ranges = [da1.y.shape[0],
+                int(1.5*da1.y.shape[0]),
+                int(1.5*da1.y.shape[0])]
+
+    for (tl_x, tl_y, x_range, y_range) in zip(tl_xs, tl_ys,
+                                              x_ranges, y_ranges):
+        x2 = np.linspace(tl_x, da1.x[-1], x_range)
+        y2 = np.linspace(tl_y, da1.y[-1], y_range)
+        da2 = da1.interp(x=x2, y=y2)
+
+        model = drift.create_drift_model()
+        mapping, score = drift.estimate_transform(model, da1, da2,
+                                                  display_fit=True,
+                                                  scale_factor=0.5)
+        plt.show()
+        plt.close()
+
+        assert score < expected_score_simulated
