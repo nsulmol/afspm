@@ -683,7 +683,7 @@ def compute_correction_info(scan1: scan_pb2.Scan2d,
     inter_rect = rect_intersection(scan1, scan2)
     patch1, patch2 = extract_and_scale_patches(da1, da2, inter_rect)
 
-    transform = drift.estimate_transform(drift_model, da1, da2)
+    transform, score = drift.estimate_transform(drift_model, da1, da2)
     trans, units = drift.get_translation(da2, transform)
 
     correction_info = CorrectionInfo(scan1.timestamp.ToDatetime(),
