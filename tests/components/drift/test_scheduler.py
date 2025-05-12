@@ -202,7 +202,8 @@ def fake_get_no_intersection(scans: list[scan_pb2.Scan2d],
 
 def fake_compute_correction_info(scan1: scan_pb2.Scan2d,
                                  scan2: scan_pb2.Scan2d,
-                                 drift_model: drift.DriftModel
+                                 drift_model: drift.DriftModel,
+                                 min_score: float,
                                  ) -> scheduler.CorrectionInfo:
     vec = np.array([1.0, 0.5])
     return scheduler.CorrectionInfo(dt1, dt2, vec, units)
@@ -265,6 +266,34 @@ def test_correction_vec_no_match(pub_url, psc_url, server_url, router_url,
 
     # Kill context (needed due to funky lack of pytest fixture)
     ctx.destroy()
+
+
+def no_compute_correction_info(scan1: scan_pb2.Scan2d,
+                               scan2: scan_pb2.Scan2d,
+                               drift_model: drift.DriftModel,
+                               min_score: float,
+                               ) -> scheduler.CorrectionInfo:
+    return None
+
+
+def test_compute_correction_info_none(pub_url, psc_url, server_url, router_url,
+                                      ctx, csv_attribs,  monkeypatch):
+    logger.info("Validate if compute_correction_info returns None all is good.")
+
+    monkeypatch.setattr(pbc.PubSubCache, 'poll', send_empty_scan)
+    monkeypatch.setattr(scheduler, 'get_latest_intersection',
+                        fake_get_no_intersection)
+    monkeypatch.setattr(scheduler, 'compute_correction_info',
+                        no_compute_correction_info)
+
+    my_scheduler = create_scheduler_and_ios(pub_url, psc_url, server_url,
+                                            router_url, ctx, csv_attribs)
+
+    logger.debug("Validate it doesn't crash if we have no correction infos. ")
+    my_scheduler.run_per_loop()
+    expected_correction_vec = np.array([0.0, 0.0])
+    assert np.all(np.isclose(my_scheduler.current_correction_vec,
+                             expected_correction_vec))
 
 
 # TODO: Uncomment these fixture parametrizations when rotation angles are

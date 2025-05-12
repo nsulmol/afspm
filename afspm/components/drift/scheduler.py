@@ -260,18 +260,12 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
 
     We use a DriftModel to estimate a correction vector between any two
     scans that *should* correspond to the same position in the SCS. The vector
-    tells us the translation needed to convert from PCS to SCS. We can then use
-    this correction vector to 'correct' published data from the Microscope into
-    the SCS. We can also use the inverse transform to 'correct' requests to the
-    Microscope (which are in the SCS) to the PCS.
+    tells us the translation drift that occurred between the two scans over
+    that time period. By holding a correction vector that is updated from
+    the start of the experiment, we can maintain an appropriate mapping from
+    SCS to PCS (and vice-versa).
 
-    Our DriftModel will only detect correction vectors between two
-    independent scans that are a certain time delta apart. In order to convert
-    to the true SCS, we need to add up the various drifts that have occurred
-    since the beginning of the experiment. To do so, we maintain a list of
-    CorrectionInfo over time. This vector will be 'condensed' over time, for
-    the cases where we have time intersections of various CorrectionInfo. For
-    post-experiment usage, we save a csv file containing the relative and
+    For post-experiment usage, we save a csv file containing the relative and
     absolute correction vectors computed over time at filepath.
 
     In order to determine correction vectors, the DriftModel needs to compare
@@ -280,22 +274,26 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     updating. Thus, it is important that the cache is set up such that we
     are likely to have a prior scan to compare to.
 
-    It is also possible that there are multiple CorrectionInfos corresponding
-    to a given time interval. For example, imagine an experiment alternates
-    between scanning a 'large' scan and then 2 'small' scans in sub-regions of
-    the larger scan. For each 'small' scan, we can estimate a correction vector
-    between the scan and the portion of that scan region in the larger scan.
-    Similarly, once we get to the second large scan, we can estimate a
-    correction vector between the previous large scan and the current one.
-    However, there are also now 2 correction vectors that intersect with the
-    time period between the first and second large scans.
+    For each given scan, there are two possible paths for estimating the
+    correction vector:
+    1. We find an 'matching' scan in the cache, *and* the drift estimation
+    algorithm is able to reliably determine a correction vector (i.e. its
+    fitting score is high enough). Here, we compute a new CorrectionInfo and
+    add it to our history (see compute_correction_info and
+    _update_correction_infos).
+    2. We do not find a 'matching' scan in the cache (or the fit was not
+    good enough). In this case, we estimate a correction vector based on our
+    history of CorrectionInfos (see estimate_correction_vec).
 
-    Because of this, we:
-    - estimate a correction vector from all CorrectionInfos in a given time
-    subset.
-    - condense CorrectionInfos in our history with intersecting time, to
-    minimize the amount of data we are storing.
-
+    We should also clarify what 'matching' means when we find a match between
+    the latest scan and those in the cache. A scan pair is considered 'matched'
+    if:
+    - The intersection area of the scan's physical scan regions is sufficiently
+    large (we use min_intersection_ratio for this).
+    - The two scans are close enough in their spatial resolutions (we use
+    min_spatial_res_ratio for this). If the spatial resolutions are too
+    distinct, it is unlikely we will find matching keypoints between them
+    (due to too-different signals).
 
     Attributes:
         drift_model: the DriftModel used to estimate a correction vector
@@ -311,16 +309,21 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         min_intersection_ratio: minimum intersection area to scan ratio to
             accept two scans as intersecting. The scan area in our
             numerator is that of the newer scan.
-        min_sptaial_res_ratio: minimum spatial rseolution ratio between two
+        min_spatial_res_ratio: minimum spatial resolution ratio between two
             scans to accept them as matching. If the two scans have vastly
             different spatial resolutions, it is unlikely we will find
             keypoint matches!
+        min_fitting_score: minimum fitting score for a 'matched' scan to be
+            considered fit properly. The default assumes a RANSAC FittingMethod
+            (so we yell at you if it's not the case).
     """
 
     SCAN_ID = cache_logic.CacheLogic.get_envelope_for_proto(scan_pb2.Scan2d())
     DEFAULT_MIN_INTERSECTION_RATIO = 0.5
     DEFAULT_MIN_SPATIAL_RES_RATIO = 0.5
     DEFAULT_HISTORY_LENGTH = 5
+    # This default fitting score is linked to RANSAC minimum residual threshold
+    DEFAULT_MIN_FITTING_SCORE = drift.DEFAULT_RESIDUAL_THRESH_PERCENT
 
     DEFAULT_CSV_ATTRIBUTES = csv.CSVAttributes('./drift_correction.csv')
 
@@ -331,6 +334,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
                  csv_attribs: csv.CSVAttributes = DEFAULT_CSV_ATTRIBUTES,
                  min_intersection_ratio: float = DEFAULT_MIN_INTERSECTION_RATIO,
                  min_spatial_res_ratio: float = DEFAULT_MIN_SPATIAL_RES_RATIO,
+                 min_fitting_score: float = DEFAULT_MIN_FITTING_SCORE,
                  correction_history_length: int = DEFAULT_HISTORY_LENGTH,
                  **kwargs):
         """Initialize our correction scheduler."""
@@ -339,9 +343,17 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         self.csv_attribs = csv_attribs
         self.min_intersection_ratio = min_intersection_ratio
         self.min_spatial_res_ratio = min_spatial_res_ratio
+        self.min_fitting_score = min_fitting_score
         self.correction_infos = deque(maxlen=correction_history_length)
         self.current_correction_vec = np.array([0.0, 0.0])
         self.current_correction_units = None
+
+        # Warn user if using default fitting score and not RANSAC fitting
+        if (self.min_fitting_score == self.DEFAULT_MIN_FITTING_SCORE and
+                self.drift_model.fitting != drift.FittingMethod.RANSAC):
+            logger.warning('Using default fitting score for fitting method '
+                           f'{drift_model.fitting} (i.e. not RANSAC). This '
+                           'is probably too low!')
 
         # Create our wrapper router and cache
         kwargs[ROUTER_KEY] = CSCorrectedRouter.from_parent(
@@ -387,9 +399,12 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         scan_was_matched = matched_scan is not None
         if scan_was_matched:
             del_corr_info = compute_correction_info(
-                matched_scan, new_scan, self.drift_model)
-            del_corr_info.vec += self.current_correction_vec
-            self.correction_infos.append(del_corr_info)
+                matched_scan, new_scan, self.drift_model,
+                self.min_fitting_score)
+            scan_was_matched = del_corr_info is not None
+            if scan_was_matched:
+                del_corr_info.vec += self.current_correction_vec
+                self.correction_infos.append(del_corr_info)
         return scan_was_matched
 
     def _update_correction_vec(self, new_scan: scan_pb2.Scan2d,
@@ -656,8 +671,9 @@ def extract_and_scale_patches(da1: xr.DataArray,
 
 def compute_correction_info(scan1: scan_pb2.Scan2d,
                             scan2: scan_pb2.Scan2d,
-                            drift_model: drift.DriftModel
-                            ) -> CorrectionInfo:
+                            drift_model: drift.DriftModel,
+                            min_score: float,
+                            ) -> CorrectionInfo | None:
     """Compute CorrectionInfo between two scans.
 
     Given two scans, estimate a transform for scan2 to be transformed to be in
@@ -671,9 +687,11 @@ def compute_correction_info(scan1: scan_pb2.Scan2d,
         scan2: second scan_pb2.Scan2d.
         drift_model: DriftModel used to estimate the transform between scan2
             and scan1.
+        min_score: minimum fitting score to be considered a successful match.
 
     Returns:
-        Computed CorrectionInfo.
+        Computed CorrectionInfo, or None on failure to fit (e.g. the fitting
+        score is too low).
     """
     da1 = ac.convert_scan_pb2_to_xarray(scan1)
     da2 = ac.convert_scan_pb2_to_xarray(scan2)
@@ -686,11 +704,13 @@ def compute_correction_info(scan1: scan_pb2.Scan2d,
     transform, score = drift.estimate_transform(drift_model, da1, da2)
     trans, units = drift.get_translation(da2, transform)
 
-    correction_info = CorrectionInfo(scan1.timestamp.ToDatetime(),
-                                     scan2.timetsamp.ToDatetime(),
-                                     np.ndarray(trans),
-                                     units)
-    return correction_info
+    if score >= min_score:
+        correction_info = CorrectionInfo(scan1.timestamp.ToDatetime(),
+                                         scan2.timetsamp.ToDatetime(),
+                                         np.ndarray(trans),
+                                         units)
+        return correction_info
+    return None
 
 
 def estimate_correction_vec(correction_infos: list[CorrectionInfo],
