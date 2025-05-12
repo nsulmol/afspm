@@ -81,6 +81,10 @@ def test_transform_real_data(sample1_fname, sample2_fname, dt1, dt2,
     da1 = get_xarray_from_ibw(sample1_fname)
     da2 = get_xarray_from_ibw(sample2_fname)
 
+    # Get normalized pix trans residual (for score comparison)
+    norm_min_pix_trans_residual = (min_pix_trans_residual /
+                                   np.linalg.norm(da2.shape))
+
     descriptor_types = [d for d in drift.DescriptorType]
     transform_types = [t for t in drift.TransformType]
     fitting_methods = [f for f in drift.FittingMethod]
@@ -116,7 +120,7 @@ def test_transform_real_data(sample1_fname, sample2_fname, dt1, dt2,
                     fitting_type == drift.FittingMethod.RANSAC and
                     descriptor_type in [drift.DescriptorType.SIFT,
                                         drift.DescriptorType.BRIEF]):
-                    assert score < min_pix_trans_residual
+                    assert score < norm_min_pix_trans_residual
                     assert trans_residual < min_pix_trans_residual
 
                 unit_trans, units = drift.get_translation(da2, mapping)
@@ -144,7 +148,7 @@ def test_transform_real_data(sample1_fname, sample2_fname, dt1, dt2,
     plt.close()
 
     # In this case, we expect the score to be higher than our expectation
-    assert score < 2*min_pix_trans_residual
+    assert score < 2 * norm_min_pix_trans_residual
 
 
 @pytest.fixture
@@ -187,4 +191,8 @@ def test_transform_simulated(sample1_fname, sample2_fname, dt1, dt2,
         plt.show()
         plt.close()
 
-        assert score < expected_score_simulated
+        # Get normalized expected score (for score comparison)
+        norm_expected_score = (expected_score_simulated /
+                               np.linalg.norm(da2.shape))
+
+        assert score < norm_expected_score

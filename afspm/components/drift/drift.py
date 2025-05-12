@@ -158,7 +158,6 @@ class DriftModel:
     fitting_kwargs:  dict
 
     scan_resolution: tuple[int, int]  # To determine if fitting needs updating
-    fill_nan: bool
 
     def update_fitting_kwargs(self, new_scan_res: tuple[int, int]):
         """Update fitting kwargs if scan resolution has changed."""
@@ -258,16 +257,12 @@ def create_drift_model(descriptor_type: DescriptorType = DescriptorType.SIFT,
     descriptor_extractor = _create_descriptor_extractor(descriptor_type,
                                                         **descriptor_kwargs)
 
-    # Force filling of NaN values for BRIEF extractor
-    fill_nan = descriptor_type == DescriptorType.BRIEF
-
     transform = _create_transform(transform_type, dimensionality)
     return DriftModel(descriptor_extractor=descriptor_extractor,
                       match_descriptor_kwargs=match_descriptor_kwargs,
                       transform=transform, fitting=fitting,
                       fitting_kwargs=fitting_kwargs,
-                      scan_resolution=scan_res,
-                      fill_nan=fill_nan)
+                      scan_resolution=scan_res)
 
 
 def estimate_transform(model: DriftModel,
@@ -299,14 +294,14 @@ def estimate_transform(model: DriftModel,
     Returns:
         (transform, score), where:
         transform: ProjectiveTransform estimated.
-        score: mean-square error between points from on of the das and those
-            of the other *after* preforming the transform. If RANSAC is used,
-            only the inliers are considered for this estimate.
+        score: normalized mean-square error between points from one of the das
+            and those of the other *after* preforming the transform. If RANSAC
+            is used, only the inliers are considered for this estimate. The
+            normalization is done relative to the resolution of da2.
     """
-    # Handle need to fill NaN to 0
-    if model.fill_nan:
-        da1 = da1.fillna(0)
-        da2 = da2.fillna(0)
+    # For computation purposes, need to change all NaN to 0
+    da1 = da1.fillna(0)
+    da2 = da2.fillna(0)
 
     # Scale intensity
     arrs = [exposure.rescale_intensity(da)
@@ -365,14 +360,17 @@ def estimate_transform(model: DriftModel,
 
     score = np.mean(np.sqrt(model.transform.residuals(matched_points_lr[0],
                                                       matched_points_lr[1])**2))
-    logger.debug(f'Drift estimate fitting score: {score}')
+    # Normalize score relative to image size
+    norm_scan_res = np.linalg.norm(np.array(da2.shape))
+    norm_score = score / norm_scan_res
+    logger.debug(f'Drift estimate fitting score (normalized): {norm_score}')
 
     if display_fit:
         display_estimated_transform(da1, da2, keypoints_lr, model.transform,
                                     inlier_matches, outlier_matches,
-                                    cmap, score)
+                                    cmap, norm_score)
 
-    return model.transform, score
+    return model.transform, norm_score
 
 
 def display_estimated_transform(da1: xr.DataArray, da2: xr.DataArray,
