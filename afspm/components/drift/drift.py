@@ -331,6 +331,7 @@ def estimate_transform(model: DriftModel,
         points_lr.append(matched_keypoints)
 
     # Estimate transform from keypoint matches
+    success = True  # Assume model fitting succeeded
     match model.fitting:
         case FittingMethod.RANSAC:
             assert isinstance(model.fitting_kwargs, dict)
@@ -344,13 +345,13 @@ def estimate_transform(model: DriftModel,
                 (points_lr[0], points_lr[1]), get_model,
                 **model.fitting_kwargs)
 
-            matched_points_lr = [points_lr[0][inliers], points_lr[1][inliers]]
+            inlier_points_lr = [points_lr[0][inliers], points_lr[1][inliers]]
             inlier_matches = matches[inliers]
             outliers = inliers == False
             outlier_matches = matches[outliers]
         case FittingMethod.LEAST_SQUARES:
-            model.transform.estimate(points_lr[0], points_lr[1])
-            matched_points_lr = points_lr
+            success = model.transform.estimate(points_lr[0], points_lr[1])
+            inlier_points_lr = points_lr
             inlier_matches = matches
             outlier_matches = np.array(())  # Empty array
         case _:
@@ -358,11 +359,19 @@ def estimate_transform(model: DriftModel,
             logger.error(msg)
             raise AttributeError(msg)
 
-    score = np.mean(np.sqrt(model.transform.residuals(matched_points_lr[0],
-                                                      matched_points_lr[1])**2))
-    # Normalize score relative to image size
-    norm_scan_res = np.linalg.norm(np.array(da2.shape))
-    norm_score = score / norm_scan_res
+    if success:
+        # Score is error between estimated points after transforming one da
+        # to the other, and the actual points.
+        score = np.mean(np.sqrt(model.transform.residuals(
+            inlier_points_lr[0], inlier_points_lr[1])**2))
+        # Normalize score relative to image size
+        norm_scan_res = np.linalg.norm(np.array(da2.shape))
+        norm_score = score / norm_scan_res
+    else:  # Fitting failed, set score to max possible (full scan error).
+        logger.warning('Drift estimation failed, setting fitting score to '
+                       'max possible.')
+        norm_score = 1.0
+
     logger.debug(f'Drift estimate fitting score (normalized): {norm_score}')
 
     if display_fit:
