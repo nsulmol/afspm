@@ -384,9 +384,11 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         # if they are scans.
         scan_deques = [val for key, val in self.pubsubcache.cache.items()
                        if self.SCAN_ID in key]
+
         # Go from list of lists to flattened single list (extending a new list)
         concatenated_scans = []
-        map(concatenated_scans.extend, scan_deques)
+        for scan_deque in scan_deques:
+            concatenated_scans.extend(scan_deque)
         return concatenated_scans
 
     def _update_correction_infos(self, new_scan: scan_pb2.Scan2d
