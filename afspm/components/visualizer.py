@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 NONE_VAL = ''  # For providing None in TOML config.
+PLT_LAYOUT = 'constrained'
 
 
 class CacheMeaning(Enum):
@@ -172,7 +173,7 @@ class Visualizer(AfspmComponent):
                 logger.error(msg)
                 raise KeyError(msg)
 
-            self.plt_figures_map[key] = plt.figure()
+            self.plt_figures_map[key] = plt.figure(layout=PLT_LAYOUT)
         plt.show(block=False)
 
     def run(self):
@@ -301,7 +302,7 @@ class Visualizer(AfspmComponent):
         return full_xarr
 
     def _add_to_plt_maps(self, key: str):
-        self.plt_figures_map[key] = plt.figure()
+        self.plt_figures_map[key] = plt.figure(layout=PLT_LAYOUT)
         plt.show(block=False)
 
     def _add_to_visualizations(self, key: str):
