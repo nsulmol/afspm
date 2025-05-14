@@ -186,15 +186,14 @@ def estimate_correction_vec(drift_rate: np.ndarray,
     """
     if dt1 is None or dt2 is None:
         return NO_VEC
-    logger.info(f'dt1: {dt1}')
-    logger.info(f'dt2: {dt2}')
-    logger.info(f'dt2-dt1 seconds: {(dt2 - dt1).total_seconds()}')
-    logger.info(f'drift_rate: {drift_rate}')
+    if dt1 > dt2:  # Only add drift if our second timestamp is after our first.
+        return NO_VEC
+
     return drift_rate * (dt2 - dt1).total_seconds()
 
 
-def estimate_correction(drift_snapshots: list[DriftSnapshot],
-                        time: dt.datetime) -> CorrectionInfo:
+def estimate_correction_from_history(drift_snapshots: list[DriftSnapshot],
+                                     time: dt.datetime) -> CorrectionInfo:
     """Estimate a CorrectionInfo when no scan match was found.
 
     This method estimates a new CorrectionInfo from the prior history of
