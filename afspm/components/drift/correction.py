@@ -218,26 +218,47 @@ def estimate_correction_from_history(drift_snapshots: list[DriftSnapshot],
     """
     dt1 = drift_snapshots[-1].dt2
     dt2 = time
+
     avg_drift_rate = get_average_drift_rate(drift_snapshots)
+
     vec = estimate_correction_vec(avg_drift_rate, dt1, dt2)
     return CorrectionInfo(dt2, vec, avg_drift_rate)
 
 
-def correction_from_drift(drift_snapshot: DriftSnapshot) -> CorrectionInfo:
+def estimate_correction_from_snapshot(drift_snapshot: DriftSnapshot,
+                                      corr_info: CorrectionInfo) -> CorrectionInfo:
     """Estimate CorrectionInfo from a provided DriftSnapshot.
 
-    Given a DriftSnapshot, we estimate the parameters for CorrectionInfo. The
-    drift rate is estimated from the correction vector and the two timestamps.
+    Given a DriftSnapshot, we estimate the parameters for CorrectionInfo.
+    - First, we estimate the drift rate based on the correction vector and the
+    two timestamps.
+    - Then, we need to account for a time overlap between our snapshot and
+    the provided CorrectionInfo. Basically, we need to subtract the vector
+    contribution from the time intersection. Otherwise, we will have doubled
+    the drift contribution over that time overlap!
+    - We provide the correction vector associated with the snapshot minus the
+    overlap vector.
 
     Args:
         drift_snapshot: DriftSnapshot we are suing to create a CorrectionInfo.
+        corr_info: the latest CorrectionInfo we have, which might have a time
+            overlap with our snapshot.
 
     Returns:
         CorrectionInfo.
     """
-    drift_rate = get_drift_rate(drift_snapshot.vec, drift_snapshot.dt1,
-                                drift_snapshot.dt2)
-    return CorrectionInfo(drift_snapshot.dt2, drift_snapshot.vec, drift_rate,
+    vec = drift_snapshot.vec
+    drift_rate = get_drift_rate(vec, drift_snapshot.dt1, drift_snapshot.dt2)
+
+    # Account for temporal overlap (if applicable)
+    if corr_info.curr_dt is not None and drift_snapshot.dt2 is not None:
+        overlap_time_delta_s = (corr_info.curr_dt - drift_snapshot.dt2
+                                ).total_seconds()
+        if overlap_time_delta_s > 0:  # There was overlap
+            overlap_vec = drift_rate * overlap_time_delta_s
+            vec -= overlap_vec
+
+    return CorrectionInfo(drift_snapshot.dt2, vec, drift_rate,
                           drift_snapshot.unit)
 
 

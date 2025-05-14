@@ -502,10 +502,10 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
             return  # Early return, there is nothing to correct!
 
         if scan_was_matched:
-            corr_info = correction.correction_from_drift(
-                self.drift_snapshots[-1])
+            corr_info = correction.estimate_correction_from_snapshot(
+                self.drift_snapshots[-1], self.total_corr_info)
         else:
-            corr_info = correction.estimate_correction(
+            corr_info = correction.estimate_correction_from_history(
                 self.drift_snapshots, new_scan.timestamp.ToDatetime(
                     dt.timezone.utc))
 
