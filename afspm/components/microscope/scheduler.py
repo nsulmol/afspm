@@ -42,7 +42,7 @@ class MicroscopeScheduler(afspmc.AfspmComponentBase):
                  router: ctrl_rtr.ControlRouter,
                  loop_sleep_s: float = common.LOOP_SLEEP_S,
                  beat_period_s: float = common.HEARTBEAT_PERIOD_S,
-                 ctx: zmq.Context = None):
+                 ctx: zmq.Context = None, **kwargs):
         """Initialize MicroscopeScheduler instance.
 
         Args:
