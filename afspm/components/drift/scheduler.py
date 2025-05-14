@@ -256,27 +256,21 @@ class CSCorrectedCache(cache.PubSubCache):
             for callback in self._observers:
                 callback(proto)
 
-        # Get curr_dt for Scans and Specs, so we ensure their locations account
-        # for drift rate.
-        # TODO: Should we have an option to determine whether or not we
-        # correct for drift rate? What if our estimate is poop?
-        curr_dt = None
-        if isinstance(proto, scan_pb2.Scan2d):
-            curr_dt = proto.timestamp.ToDatetime(dt.timezone.utc)
-        elif isinstance(proto, spec_pb2.Spec1d):
-            curr_dt = proto.timestamp.ToDateTime(dt.timezone.utc)
-
-        # HAXORS
-        logger.info(f'scan datetime: {curr_dt}')
-        if self._corr_info is not None:
-            logger.info(f'correction info datetime: {self._corr_info.curr_dt}')
-        # END HAXORS
-
         # Correct CS data of proto
         if self._corr_info is not None:
+            # Get curr_dt for Scans and Specs, so we ensure their locations account
+            # for drift rate.
+            # TODO: Should we have an option to determine whether or not we
+            # correct for drift rate? What if our estimate is poop?
+            curr_dt = None
+            if isinstance(proto, scan_pb2.Scan2d):
+                curr_dt = proto.timestamp.ToDatetime(dt.timezone.utc)
+            elif isinstance(proto, spec_pb2.Spec1d):
+                curr_dt = proto.timestamp.ToDateTime(dt.timezone.utc)
+
             proto = cs_correct_proto(proto, self._corr_info, curr_dt)
 
-        # Save in cache / send out
+        # Save *corrected* proto in cache / send out
         super().send_message(proto)
 
     @classmethod
