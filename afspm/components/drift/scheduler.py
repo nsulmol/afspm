@@ -2,24 +2,23 @@
 
 The scheduler in here will use logic from drift.py in order to automatically
 convert from the piezo coordinate system (PCS) to the 'true' sample coordinate
-system (SCS).  The idea is to track drift and from it determine the correction
+system (SCS). The idea is to track drift and from it determine the correction
 vector needed to perform on any incoming request or outgoing message such that
 it is always in the estimated SCS.
 """
 
-from dataclasses import dataclass
 from collections import deque
-import datetime as dt
 import logging
 import numpy as np
-import xarray as xr
+import datetime as dt
+import matplotlib.pyplot as plt
 from google.protobuf.message import Message
 from google.protobuf.message_factory import GetMessageClass
 
-from . import drift
+from . import drift, correction
 from ..microscope import scheduler
 from ...utils import csv
-from ...utils import array_converters as ac
+from ...utils import proto_geo
 from ...utils.units import convert_list
 from ...io.control import router
 from ...io.pubsub import cache
@@ -34,18 +33,8 @@ from ...io.protos.generated import geometry_pb2
 logger = logging.getLogger(__name__)
 
 
-DEFAULT_EMPTY_DATETIME = dt.datetime(1, 1, 1)
 ANGLE_FIELD = 'angle'  # Used to check if an angle is set in scan_params
-
-
-@dataclass
-class CorrectionInfo:
-    """Holds correction vector and timing information between two scans."""
-
-    dt1: dt.datetime  # Time of first scan.
-    dt2: dt.datetime  # Time of second scan.
-    vec: np.ndarray  # Translation vector to correct second to first scan CS.
-    units: str  # Translation vector units
+PLT_LAYOUT = 'constrained'
 
 
 # kwarg keys for Scheduler constructor
@@ -53,83 +42,146 @@ CACHE_KEY = 'pubsubcache'
 ROUTER_KEY = 'router'
 
 
+def get_converted_and_updated_vec(corr_info: correction.CorrectionInfo,
+                                  unit: str,
+                                  curr_dt: dt.datetime | None
+                                  ) -> np.ndarray:
+    """Get correction vector, converted to proto units and drift corrected.
+
+    Given the current CorrectionInfo, compute the associated correction vector
+    in the provided spatial unit. If a DateTime is provided, additionally
+    update the vector considering the drift rate.
+
+    Args:
+        corr_info: CorrectionInfo associated with current drifting.
+        unit: spatial unit we want the correction vector in.
+        curr_dt: the current DateTime, used to update the vector for drift. If
+            None, we do not update for drift.
+
+    Returns:
+        the correction vector after (optionally) correcting for drift and
+            converting to desired spatial units.
+
+    """
+    # TODO: We should only do this for requests, not published things?
+    # - Published things have *happened*. So dt2 should come from its
+    # timestamp.
+    #
+    # - Requests
+    #
+    # Account for drift since correction vector last updated!
+    drift_vec = correction.estimate_correction_vec(corr_info.drift_rate,
+                                                   corr_info.curr_dt, curr_dt)
+    logger.info(f'drift_vec: {drift_vec}')
+
+    corr_vec = corr_info.vec + drift_vec  # TODO: Should I use get_total_correction()?
+
+    desired_units = (unit, unit)
+    corr_units = (corr_info.unit, corr_info.unit)
+    corr_vec = np.array(convert_list(corr_vec.tolist(),
+                                     corr_units, desired_units))
+    return corr_vec
+
+
 def correct_spatial_aspects(proto: scan_pb2.SpatialAspects,
-                            correction_vec: np.ndarray,
-                            correction_units: str,
+                            corr_info: correction.CorrectionInfo,
+                            curr_dt: dt.datetime | None
                             ) -> scan_pb2.SpatialAspects:
-    """Correct spatial aspects given a correction vector."""
-    # NOTE: Rotation angle should not affect this.
-    # From skimage doc (where we get our trans vec),
-    # the keypoints we receive are (row, col), i.e. (y, x).
-    # So we follow that here.
-    orig_tl = np.ndarray([proto.spatial.roi.top_left.y,
-                          proto.spatial.roi.top_left.x])
+    """Correct SpatialAspects given CorrectionInfo and (optional) DateTime.
 
-    # Update correction vec to proto units
-    roi_units = (proto.spatial.length_units,
-                 proto.spatial.length_units)
-    correction_units = (correction_units, correction_units)
-    correction_vec = np.array(convert_list(correction_vec.tolist(),
-                                           correction_units, roi_units))
+    Correct SpatialAspects for drift by adding a correction vector to its
+    ROI position.
 
-    corrected_tl = orig_tl + correction_vec
-    proto.spatial.roi.top_left = geometry_pb2.Point2d(
-        corrected_tl.x, corrected_tl.y)
+    Args:
+        proto: SpatialAspects to update.
+        corr_info: CorrectionInfo associated with current drifting.
+        curr_dt: the current DateTime, used to update the vector for drift. If
+            None, we do not update for drift.
+
+    Returns:
+        updated proto of SpatialAspects.
+    """
+    logger.trace(f'Spatial Aspects before correcting: {proto}')
+    orig_tl = np.array([proto.roi.top_left.x, proto.roi.top_left.y])
+    corr_vec = get_converted_and_updated_vec(corr_info,
+                                             proto.length_units,
+                                             curr_dt)
+
+    corrected_tl = orig_tl + corr_vec
+    corrected_tl_pt2d = geometry_pb2.Point2d(x=corrected_tl[0],
+                                             y=corrected_tl[1])
+    proto.roi.top_left.CopyFrom(corrected_tl_pt2d)
+    logger.trace(f'Spatial Aspects after correcting: {proto}')
     return proto
 
 
 def correct_probe_position(proto: spec_pb2.ProbePosition,
-                           correction_vec: np.ndarray,
-                           correction_units: str,
+                           corr_info: correction.CorrectionInfo,
+                           curr_dt: dt.datetime | None
                            ) -> spec_pb2.ProbePosition:
-    """Correct probe position given a correction vector."""
-    # From skimage doc (where we get our trans vec),
-    # the keypoints we receive are (row, col), i.e. (y, x).
-    # So we follow that here.
-    orig_pos = np.ndarray([proto.point.y, proto.point.x])
+    """Correct ProbePosition given CorrectionInfo and (optional) DateTime.
 
-    # Update correction vec to proto units
-    roi_units = (proto.units, proto.units)
-    correction_units = (correction_units, correction_units)
-    correction_vec = np.array(convert_list(correction_vec.tolist(),
-                                           correction_units, roi_units))
+    Correct ProbePosition for drift by adding a correction vector to its
+    ROI position.
 
-    corrected_pos = orig_pos + correction_vec
+    Args:
+        proto: ProbePosition to update.
+        corr_info: CorrectionInfo associated with current drifting.
+        curr_dt: the current DateTime, used to update the vector for drift. If
+            None, we do not update for drift.
 
-    proto.point = geometry_pb2.Point2d(
-        corrected_pos.x, corrected_pos.y)
+    Returns:
+        updated proto of ProbePosition.
+    """
+    logger.trace(f'Probe Pos before correcting: {proto}')
+    orig_pos = np.array([proto.point.y, proto.point.x])
+    corr_vec = get_converted_and_updated_vec(corr_info,
+                                             proto.units, curr_dt)
+
+    corrected_pos = orig_pos + corr_vec
+    corrected_pos_pt2d = geometry_pb2.Point2d(x=corrected_pos[0],
+                                              y=corrected_pos[1])
+    proto.point.CopyFrom(corrected_pos_pt2d)
+    logger.trace(f'Probe Pos after correcting: {proto}')
     return proto
 
 
-def cs_correct_proto(proto: Message, correction_vec: np.ndarray,
-                     correction_units: str,) -> Message:
+# TODO: need to feed DateTime of latest event. if None, we do not
+# use drift rate to estimate
+def cs_correct_proto(proto: Message, corr_info: correction.CorrectionInfo,
+                     curr_dt: dt.datetime | None) -> Message:
     """Recursively go through a protobuf, correcting CS-based fields.
 
     When we find fields that should be corrected for an updated coordinate
     system, we fix them.
+
+    Args:
+        proto: Message to update.
+        corr_info: CorrectionInfo associated with current drifting.
+        curr_dt: the current DateTime, used to update the vector for drift. If
+            None, we do not update for drift.
+
+    Returns:
+        updated Message.
     """
-    logger.trace(f'Proto before correcting: {proto}')
     constructor = GetMessageClass(proto.DESCRIPTOR)
     vals_dict = {}
     # NOTE: any new protos that have spatial fields should be added here!
     for field in proto.DESCRIPTOR.fields:
         val = getattr(proto, field.name)
         new_val = None
-        if isinstance(val, Message):
-            new_val = cs_correct_proto(val, correction_vec, correction_units)
-        elif isinstance(val, scan_pb2.SpatialAspects):
-            new_val = correct_spatial_aspects(val, correction_vec,
-                                              correction_units)
+        if isinstance(val, scan_pb2.SpatialAspects):
+            new_val = correct_spatial_aspects(val, corr_info, curr_dt)
         elif isinstance(val, spec_pb2.ProbePosition):
-            new_val = correct_probe_position(val, correction_vec,
-                                             correction_units)
+            new_val = correct_probe_position(val, corr_info, curr_dt)
+        elif isinstance(val, Message):
+            new_val = cs_correct_proto(val, corr_info, curr_dt)
 
         if new_val:
             vals_dict[field.name] = new_val
 
     partial_proto = constructor(**vals_dict)
     proto.MergeFrom(partial_proto)
-    logger.trace(f'Proto after correcting: {proto}')
     return proto
 
 
@@ -138,16 +190,17 @@ class CSCorrectedRouter(router.ControlRouter):
 
     def __init__(self):
         """Init - this class requires usage of from_parent."""
-        self._correction_vec = np.zeros((2,))
-        self._correction_units = None
+        self._corr_info = None
 
     def _handle_send_req(self, req: control_pb2.ControlRequest,
                          proto: Message) -> (control_pb2.ControlResponse,
                                              Message | int | None):
         """Override to correct CS data before sending out."""
-        # Correct CS data of proto
-        proto = cs_correct_proto(proto, self._correction_vec,
-                                 self._correction_units)
+        if self._corr_info is not None:
+            # TODO: Should we have an option to determine whether or not we
+            # correct for drift rate? What if our estimate is poop?
+            curr_dt = dt.datetime.now(dt.timezone.utc)
+            proto = cs_correct_proto(proto, self._corr_info, curr_dt)
 
         # Send out
         return super()._handle_send_req(req, proto)
@@ -168,26 +221,26 @@ class CSCorrectedRouter(router.ControlRouter):
         child.shutdown_was_requested = parent.shutdown_was_requested
         return child
 
-    def update_correction_vec(self, correction_vec: np.ndarray,
-                              correction_units: str):
+    def update_correction_info(self, corr_info: correction.CorrectionInfo):
         """Update our correction vector.
 
         The correction vector is PCS -> SCS. The router is receiving
         requests from components in the SCS, to be sent to the Microscope.
         Thus, we want to go SCS -> PCS, which means we must invert our
-        translation vector.
+        translation vector. TODO flipped?
         """
-        self._correction_vec = -correction_vec
-        self._correction_units = correction_units
+        self._corr_info = corr_info
+        self._corr_info.vec = -self._corr_info.vec  # We want SCS -> PCS
 
 
 class CSCorrectedCache(cache.PubSubCache):
     """Corrects CS data before it is sent out to subscribers."""
 
+    SCAN_ID = cache_logic.CacheLogic.get_envelope_for_proto(scan_pb2.Scan2d())
+
     def __init__(self, **kwargs):
         """Init - this class requires usage of from_parent."""
-        self._correction_vec = np.zeros((2,))
-        self._correction_units = None
+        self._corr_info = None
         self._observers = []
 
     def bind_to(self, callback):
@@ -202,9 +255,25 @@ class CSCorrectedCache(cache.PubSubCache):
             for callback in self._observers:
                 callback(proto)
 
+        # Get curr_dt for Scans and Specs, so we ensure their locations account
+        # for drift rate.
+        # TODO: Should we have an option to determine whether or not we
+        # correct for drift rate? What if our estimate is poop?
+        curr_dt = None
+        if isinstance(proto, scan_pb2.Scan2d):
+            curr_dt = proto.timestamp.ToDatetime(dt.timezone.utc)
+        elif isinstance(proto, spec_pb2.Spec1d):
+            curr_dt = proto.timestamp.ToDateTime(dt.timezone.utc)
+
+        # HAXORS
+        logger.info(f'scan datetime: {curr_dt}')
+        if self._corr_info is not None:
+            logger.info(f'correction info datetime: {self._corr_info.curr_dt}')
+        # END HAXORS
+
         # Correct CS data of proto
-        proto = cs_correct_proto(proto, self._correction_vec,
-                                 self._correction_units)
+        if self._corr_info is not None:
+            proto = cs_correct_proto(proto, self._corr_info, curr_dt)
 
         # Save in cache / send out
         super().send_message(proto)
@@ -226,8 +295,7 @@ class CSCorrectedCache(cache.PubSubCache):
         child._poller = parent._poller
         return child
 
-    def update_correction_vec(self, correction_vec: np.ndarray,
-                              correction_units: str):
+    def update_correction_info(self, corr_info: correction.CorrectionInfo):
         """Update our correction vector.
 
         The correction vector is PCS -> SCS. The PubSubCache receives requests
@@ -235,12 +303,24 @@ class CSCorrectedCache(cache.PubSubCache):
         expect). Thus, we use PCS -> SCS< which is the correction vector
         without modifications.
         """
-        self._correction_vec = correction_vec
-        self._correction_units = correction_units
+
+        # Update cache!!!
+        # del_correction_vec = correction_vec - self._correction_vec
+        # for key, queue in self.cache.items():
+        #     if self.SCAN_ID in key:
+        #         for idx, __ in enumerate(queue):
+        #             queue[idx] = cs_correct_proto(queue[idx],
+        #                                           del_correction_vec,
+        #                                           correction_units)
+        #         self.cache[key] = queue
+
+        self._corr_info = corr_info
 
 
 class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     """Corrects coordinate system data in addition to being a scheduler.
+
+    TODO: UPDATE ME!
 
     The CSCorrectedScheduler is a wrapper on top of a standard
     MicroscopeScheduler, where it additionally attempts to estimate drift
@@ -279,8 +359,8 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     1. We find an 'matching' scan in the cache, *and* the drift estimation
     algorithm is able to reliably determine a correction vector (i.e. its
     fitting score is high enough). Here, we compute a new CorrectionInfo and
-    add it to our history (see compute_correction_info and
-    _update_correction_infos).
+    add it to our history (see compute_drift_snapshot and
+    _update_drift_snapshots).
     2. We do not find a 'matching' scan in the cache (or the fit was not
     good enough). In this case, we estimate a correction vector based on our
     history of CorrectionInfos (see estimate_correction_vec).
@@ -298,12 +378,10 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     Attributes:
         drift_model: the DriftModel used to estimate a correction vector
             between two scans.
-        correction_infos: a deque of CorrectionInfo that has been collected
+        drift_snapshots: a deque of DriftSnapshots that has been collected
             over time.
-        current_correction_vec: currently estimated correction vector to go
-            from PCS -> SCS.
-        current_correction_units: units associated with estimated correction
-            vector.
+        total_corr_info: total CorrectionInfo, fed to IO nodes so they can
+            correct for the PCS-SCS transform.
         filepath: path where we save our csv file containing all correction
             data associated to scans.
         min_intersection_ratio: minimum intersection area to scan ratio to
@@ -313,19 +391,22 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
             scans to accept them as matching. If the two scans have vastly
             different spatial resolutions, it is unlikely we will find
             keypoint matches!
-        min_fitting_score: minimum fitting score for a 'matched' scan to be
+        max_fitting_score: maximum fitting score for a 'matched' scan to be
             considered fit properly. The default assumes a RANSAC FittingMethod
-            (so we yell at you if it's not the case).
+            (so we yell at you if it's not the case). Note that a score of 0
+            is ideal here, so the lower the better.
+        display_fit: visualize the fitting while it runs.
+        figure: figure used to visualize (if applicable).
     """
 
     SCAN_ID = cache_logic.CacheLogic.get_envelope_for_proto(scan_pb2.Scan2d())
-    DEFAULT_MIN_INTERSECTION_RATIO = 0.5
-    DEFAULT_MIN_SPATIAL_RES_RATIO = 0.5
+    DEFAULT_CSV_ATTRIBUTES = csv.CSVAttributes('./drift_correction.csv')
+    DEFAULT_MIN_INTERSECTION_RATIO = 0.25
+    DEFAULT_MIN_SPATIAL_RES_RATIO = 0.25
     DEFAULT_HISTORY_LENGTH = 5
     # This default fitting score is linked to RANSAC minimum residual threshold
-    DEFAULT_MIN_FITTING_SCORE = drift.DEFAULT_RESIDUAL_THRESH_PERCENT
-
-    DEFAULT_CSV_ATTRIBUTES = csv.CSVAttributes('./drift_correction.csv')
+    DEFAULT_MAX_FITTING_SCORE = drift.DEFAULT_RESIDUAL_THRESH_PERCENT
+    DEFAULT_DISPLAY_FIT = True
 
     CSV_FIELDS = ['timestamp', 'filename', 'pcs_to_scs_trans',
                   'estimated_from_drift?']
@@ -334,22 +415,27 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
                  csv_attribs: csv.CSVAttributes = DEFAULT_CSV_ATTRIBUTES,
                  min_intersection_ratio: float = DEFAULT_MIN_INTERSECTION_RATIO,
                  min_spatial_res_ratio: float = DEFAULT_MIN_SPATIAL_RES_RATIO,
-                 min_fitting_score: float = DEFAULT_MIN_FITTING_SCORE,
-                 correction_history_length: int = DEFAULT_HISTORY_LENGTH,
-                 **kwargs):
+                 max_fitting_score: float = DEFAULT_MAX_FITTING_SCORE,
+                 drift_snapshots_length: int = DEFAULT_HISTORY_LENGTH,
+                 display_fit: bool = DEFAULT_DISPLAY_FIT, **kwargs):
         """Initialize our correction scheduler."""
         self.drift_model = (drift.create_drift_model() if drift_model is None
                             else drift_model)
         self.csv_attribs = csv_attribs
         self.min_intersection_ratio = min_intersection_ratio
         self.min_spatial_res_ratio = min_spatial_res_ratio
-        self.min_fitting_score = min_fitting_score
-        self.correction_infos = deque(maxlen=correction_history_length)
-        self.current_correction_vec = np.array([0.0, 0.0])
-        self.current_correction_units = None
+        self.max_fitting_score = max_fitting_score
+
+        self.drift_snapshots = deque(maxlen=drift_snapshots_length)
+        # TODO: Should this be a default in constructor of dataclass!?
+        self.total_corr_info = correction.CorrectionInfo()
+
+        self.display_fit = display_fit
+        self.figure = plt.figure(layout=PLT_LAYOUT)
+        plt.show(block=False)  # TODO should this be elsewhere? At start?
 
         # Warn user if using default fitting score and not RANSAC fitting
-        if (self.min_fitting_score == self.DEFAULT_MIN_FITTING_SCORE and
+        if (self.max_fitting_score == self.DEFAULT_MAX_FITTING_SCORE and
                 self.drift_model.fitting != drift.FittingMethod.RANSAC):
             logger.warning('Using default fitting score for fitting method '
                            f'{drift_model.fitting} (i.e. not RANSAC). This '
@@ -362,6 +448,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
             kwargs[CACHE_KEY])
 
         super().__init__(**kwargs)
+
         # In order to update our logic, we bind update to the
         # cache receiving a scan (i.e. updates from the Microscope).
         self.pubsubcache.bind_to(self.update)
@@ -370,11 +457,12 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
 
     @staticmethod
     def _get_metadata_row(scan: scan_pb2.Scan2d,
-                          correction_vec: np.ndarray,
+                          corr_info: correction.CorrectionInfo,
                           estimated_from_vec: bool) -> [str]:
+        # TODO: update me! add drift rate???
         row_vals = [scan.timestamp.seconds,
                     scan.filename,
-                    correction_vec,
+                    corr_info.vec,
                     estimated_from_vec]
         return row_vals
 
@@ -391,63 +479,73 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
             concatenated_scans.extend(scan_deque)
         return concatenated_scans
 
-    def _update_correction_infos(self, new_scan: scan_pb2.Scan2d
-                                 ) -> bool:
-        """Update CorrectionInfos history based on the new incoming scan."""
-        matched_scan = get_latest_intersection(
+    def _update_drift_snapshots(self, new_scan: scan_pb2.Scan2d
+                                ) -> bool:
+        """Update DriftSnapshots based on the new incoming scan."""
+        matched_scan = proto_geo.get_latest_intersection(
             self._get_scans_from_cache(), new_scan,
             self.min_intersection_ratio, self.min_spatial_res_ratio)
 
         scan_was_matched = matched_scan is not None
         if scan_was_matched:
-            del_corr_info = compute_correction_info(
+            self.figure.clear()  # Clear figure before showing
+            logger.warning('Scan matched, trying to fit...')
+            del_drift = correction.compute_drift_snapshot(
                 matched_scan, new_scan, self.drift_model,
-                self.min_fitting_score)
-            scan_was_matched = del_corr_info is not None
+                self.max_fitting_score, self.display_fit,
+                self.figure)
+            plt.show(block=False)  # TODO should this be elsewhere? At start?
+            scan_was_matched = del_drift is not None
+            logger.warning(f'Did we match: {scan_was_matched}')
+
             if scan_was_matched:
-                del_corr_info.vec += self.current_correction_vec
-                self.correction_infos.append(del_corr_info)
+                logger.warning(f'del_corr_info vec: {del_drift.vec}')
+                del_drift.vec += self.total_corr_info.vec
+                logger.warning(f'ABS del_drift: {del_drift.vec}')
+                self.drift_snapshots.append(del_drift)
         return scan_was_matched
 
-    def _update_correction_vec(self, new_scan: scan_pb2.Scan2d,
+    def _update_curr_corr_info(self, new_scan: scan_pb2.Scan2d,
                                scan_was_matched: bool):
-        """Update the correction vector based on the new incoming scan.
+        """Update the current CorrectionInfo based on the new incoming scan.
 
         Given a new scan and knowledge of whether we matched a scan to it from
-        our history, we update the current correction vector. If there was a
-        match, we can simply grab the latest CorrectionInfo. If not, we
+        our history, we update the current CorrectionInfo. If there was a
+        match, we can simply grab the latest DriftSnapshot. If not, we
         estimate a correction vector based on the history.
         """
-        if len(self.correction_infos) == 0:
+        if len(self.drift_snapshots) == 0:
             return  # Early return, there is nothing to correct!
 
         if scan_was_matched:
-            new_correction_vec = self.correction_infos[-1].vec
+            corr_info = correction.correction_from_drift(
+                self.drift_snapshots[-1])
         else:
-            new_correction_vec = estimate_correction_vec(
-                self.correction_infos, self.current_correction_vec,
-                new_scan.timestamp)
+            corr_info = correction.estimate_correction(
+                self.drift_snapshots, new_scan.timestamp.ToDatetime(
+                    dt.timezone.utc))
 
-        # Notify logger if correciton vec has changed
-        if np.all(np.isclose(new_correction_vec, self.current_correction_vec)):
+        new_tot_corr_info = correction.get_total_correction(
+            self.total_corr_info, corr_info)
+        drift_has_changed = not np.all(np.isclose(
+            new_tot_corr_info.vec, self.total_corr_info.vec))
+        self.total_corr_info = new_tot_corr_info
+
+        # Notify logger if correction vec has changed
+        if drift_has_changed:
             logger.info('The PCS-to-SCS correction vector has changed'
-                        f': {new_correction_vec}.')
-
-        # Update internal vec + units (assuming consistent units, grabbing
-        # latest)
-        self.current_correction_vec = new_correction_vec
-        self.current_correction_units = self.correction_infos[-1].units
+                        f': {self.total_corr_info.vec} '
+                        f'{self.total_corr_info.unit}.')
+            # TODO: print drift rate too??? put in separate method?
 
     def _update_io(self):
-        """Update IO nodes with latest correction vec.
+        """Update IO nodes with latest CorrectionInfo.
 
-        Inform our IO nodes of the latest correction vector, so they may use
+        Inform our IO nodes of the latest CorrectionInfo, so they may use
         it to 'correct' the coordinate system accordingly.
         """
-        self.pubsubcache.update_correction_vec(self.current_correction_vec,
-                                               self.current_correction_units)
-        self.router.update_correction_vec(self.current_correction_vec,
-                                          self.current_correction_units)
+        self.pubsubcache.update_correction_info(self.total_corr_info)
+        self.router.update_correction_info(self.total_corr_info)
 
     def update(self, new_scan: scan_pb2.Scan2d):
         """Update correction infos given a new scan.
@@ -467,307 +565,31 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
             new_scan: the incoming scan, which we use to update our correction
                 estimates.
         """
-        scan_was_matched = self._update_correction_infos(new_scan)
-        self._update_correction_vec(new_scan, scan_was_matched)
+#        logger.warning('New scan. Checking if we find a match...')
+#        logger.warning(f'New scan position: {new_scan.params.spatial}')
+
+        # First things first: the received scan is in the PCS. Convert to our
+        # *current* SCS.
+        new_scan = cs_correct_proto(new_scan, self.total_corr_info,
+                                    new_scan.timestamp.ToDatetime(
+                                        dt.timezone.utc))
+        # TODO: Add time stamp of scan!
+
+        scan_was_matched = self._update_drift_snapshots(new_scan)
+#        logger.warning(f'Match: {scan_was_matched}')
+        self._update_curr_corr_info(new_scan, scan_was_matched)
 
         # TODO: What if the drift is too much? At what point do we take over and
         # redo the scan?
 
-        row_vals = self._get_metadata_row(new_scan, self.current_correction_vec,
+        row_vals = self._get_metadata_row(new_scan, self.total_corr_info,
                                           not scan_was_matched)
         csv.save_csv_row(self.csv_attribs, self.CSV_FIELDS,
                          row_vals)
         self._update_io()
 
-
-def rect_intersection(a: geometry_pb2.Rect2d, b: geometry_pb2.Rect2d
-                      ) -> geometry_pb2.Rect2d:
-    """Compute intersection of two Rect2ds."""
-    if a.HasField(ANGLE_FIELD) or b.HasField(ANGLE_FIELD):
-        msg = ('Rect2d passed to rect_intersection with angle field. '
-               'This is not currently supported.')
-        logger.error(msg)
-        raise ValueError(msg)
-
-    a_x1 = a.top_left.x
-    a_x2 = a.top_left.x + a.size.x
-    a_y1 = a.top_left.y
-    a_y2 = a.top_left.y + a.size.y
-
-    b_x1 = b.top_left.x
-    b_x2 = b.top_left.x + b.size.x
-    b_y1 = b.top_left.y
-    b_y2 = b.top_left.y + b.size.y
-
-    x1 = max(min(a_x1, a_x2), min(b_x1, b_x2))
-    y1 = max(min(a_y1, a_y2), min(b_y1, b_y2))
-
-    x2 = min(max(a_x1, a_x2), max(b_x1, b_x2))
-    y2 = min(max(a_y1, a_y2), max(b_y1, b_y2))
-
-    logger.trace(f'x1: {x1}, x2: {x2}, y1: {y1}, y2: {y2}')
-
-    if x2 < x1 or y2 < y1:
-        return geometry_pb2.Rect2d()  # All 0s, no intersection!
-
-    tl = geometry_pb2.Point2d(x=x1, y=y1)
-    size = geometry_pb2.Size2d(x=x2 - x1, y=y2 - y1)
-    return geometry_pb2.Rect2d(top_left=tl, size=size)
-
-
-def rect_area(rect: geometry_pb2.Rect2d) -> float:
-    """Compute area of a Rect2d."""
-    return rect.size.x * rect.size.y
-
-
-def time_intersection(a: CorrectionInfo, b: CorrectionInfo
-                      ) -> (dt.datetime, dt.datetime):
-    """Compute temporal intersection of two CorrectionInfos."""
-    dt1 = max(a.dt1, b.dt1)
-    dt2 = min(a.dt2, b.dt2)
-    if dt1 <= dt2:
-        return (dt1, dt2)
-    return (DEFAULT_EMPTY_DATETIME, DEFAULT_EMPTY_DATETIME)
-
-
-def time_intersection_delta(a: CorrectionInfo, b: CorrectionInfo
-                            ) -> dt.timedelta:
-    """Compute temporal intersection of two Correction infos, return delta."""
-    dt1, dt2 = time_intersection(a, b)
-    return dt2 - dt1
-
-
-def intersection_ratio(a: geometry_pb2.Rect2d,
-                       b: geometry_pb2.Rect2d) -> float:
-    """Compute the intersection ratio between two Rect2ds.
-
-    To do this, we first find the intersection rect between the two. To get a
-    reasonable ratio, we divide the area of this intersection by the *smaller*
-    of the two rectangles. We choose this because we are interested in the
-    intersection data only, so we do not really care if one of the rectangles
-    corresponds to a much larger region. Choosing the larger of the too would
-    make this ratio less useful (potentially), as the values may end up vary
-    small. Choosing based on the order the rectangles are given would cause
-    it to behave unexpectedly if the user chose the order wrong (for their
-    purposes).
-
-    Args:
-        a: first Rect2d.
-        b: second Rect2d.
-
-    Returns:
-        Ratio of the area of the intersection and the area of the smaller of
-        the two provided rects.
-    """
-    smallest_area = sorted([rect_area(a), rect_area(b)])[0]
-    inter_area = rect_area(rect_intersection(a, b))
-    return inter_area / smallest_area
-
-
-def spatial_resolution(a: scan_pb2.Scan2d) -> float:
-    """Compute the spatial resolution of a scan.
-
-    We grab the mean of the two spatial resolutions.
-    """
-    spatials = np.array([a.params.spatial.roi.size.x,
-                         a.params.spatial.roi.size.y])
-    resolutions = np.array([a.params.data.shape.x, a.params.data.shape.y])
-    spatial_resolutions = spatials / resolutions
-    return np.mean(spatial_resolutions)
-
-
-def spatial_resolution_ratio(a: scan_pb2.Scan2d,
-                             b: scan_pb2.Scan2d) -> float:
-    """Compute the ratio of the spatial resolutions of the two scans.
-
-    We define the ratio as the smaller over the larger.
-    This choice is arbitrary, but means the ratio is in the range [0, 1].
-    """
-    spatial_resolutions = [spatial_resolution(a), spatial_resolution(b)]
-    return min(spatial_resolutions) / max(spatial_resolutions)
-
-
-def get_latest_intersection(scans: list[scan_pb2.Scan2d],
-                            new_scan: scan_pb2.Scan2d,
-                            min_intersection_ratio: float,
-                            min_spatial_res_ratio: float,
-                            ) -> scan_pb2.Scan2d | None:
-    """Get latest intersection between scans and a new_scan.
-
-    This method searches scans for a scan that has a 'sufficiently close'
-    intersection with new_scan. By 'sufficiently close' we mean:
-    1. The intersection ratio between the two is not too low; and
-    2. The spatial resolution ratio between two is not too low.
-
-    For (1): if the intersection between the two is too small, analyzing
-    the two scans for matching descriptors is not realistic.
-    For (2): if the spatial resolutions are too different, we simply won't find
-    matching features.
-
-    Args:
-        scans: list of scans to compare new_scan to.
-        new_scan: the scan we are matching.
-        min_intersection_ratio: the minimum ratio to be considered a
-            match.
-        min_spatial_res_ratio: the minimum spatial resolution ratio to
-            be considered a match.
-
-    Returns:
-        The most recent matching scan or None if none found.
-    """
-    intersect_scans = []
-    for scan in scans:
-        inter_ratio = intersection_ratio(scan.params.spatial.roi,
-                                         new_scan.params.spatial.roi)
-        spatial_res_ratio = spatial_resolution_ratio(scan, new_scan)
-        if (inter_ratio >= min_intersection_ratio and
-                spatial_res_ratio >= min_spatial_res_ratio):
-            intersect_scans.append(scan)
-
-    if not intersect_scans:
-        return None
-
-    intersect_scans.sort(key=lambda scan: scan.timestamp)
-    return intersect_scans[-1]  # Last value is latest timestamp
-
-
-def extract_patch(da: xr.DataArray,
-                  rect: geometry_pb2.Rect2d,
-                  ) -> (xr.DataArray, xr.DataArray):
-    """Extract intersection patch from DataArray.
-
-    Args:
-        da: DataArray.
-        rect: intersection rectangle.
-
-    Returns:
-        Associated patch, as a DataArray.
-    """
-    xs = slice(rect.top_left.x, rect.top_left.x + rect.size.x)
-    ys = slice(rect.top_left.y, rect.top_left.y + rect.size.y)
-    return da.sel(x=xs, y=ys)
-
-
-def extract_and_scale_patches(da1: xr.DataArray,
-                              da2: xr.DataArray,
-                              rect: geometry_pb2.Rect2d,
-                              ) -> (xr.DataArray, xr.DataArray):
-    """Extract intersection patches from images, matching spatial res.
-
-    Extract patches from da1 and da2 corresponding to rect, and update
-    them so they have matching spatial resolutions. For the latter, we
-    update da1 so it is the same spatial resolution as da2.
-
-    Args:
-        da1: First DataArray.
-        da2: Second DataArray.
-        rect: intersection rectangle.
-
-    Returns:
-        Tuple of associated patches (patch_da1, patch_da2).
-    """
-    patches = [extract_patch(da1, rect), extract_patch(da2, rect)]
-    patches[0] = patches[0].interp_like(patches[1])
-    return tuple(patches)
-
-
-def compute_correction_info(scan1: scan_pb2.Scan2d,
-                            scan2: scan_pb2.Scan2d,
-                            drift_model: drift.DriftModel,
-                            min_score: float,
-                            ) -> CorrectionInfo | None:
-    """Compute CorrectionInfo between two scans.
-
-    Given two scans, estimate a transform for scan2 to be transformed to be in
-    the same coordinate system as scan1. We return a CorrectionInfo instance,
-    which holds the datetimes of the two scans and the correction vector
-    (translation) from scan2 to scan1. Note that this assumes we are only
-    interested in the translation component of the transform!
-
-    Args:
-        scan1: first scan_pb2.Scan2d.
-        scan2: second scan_pb2.Scan2d.
-        drift_model: DriftModel used to estimate the transform between scan2
-            and scan1.
-        min_score: minimum fitting score to be considered a successful match.
-
-    Returns:
-        Computed CorrectionInfo, or None on failure to fit (e.g. the fitting
-        score is too low).
-    """
-    da1 = ac.convert_scan_pb2_to_xarray(scan1)
-    da2 = ac.convert_scan_pb2_to_xarray(scan2)
-
-    # Get intersection patches (scaled to scan2, as the transform is
-    # for da2 to move to da1's position).
-    inter_rect = rect_intersection(scan1, scan2)
-    patch1, patch2 = extract_and_scale_patches(da1, da2, inter_rect)
-
-    transform, score = drift.estimate_transform(drift_model, da1, da2)
-    trans, units = drift.get_translation(da2, transform)
-
-    if score >= min_score:
-        correction_info = CorrectionInfo(scan1.timestamp.ToDatetime(),
-                                         scan2.timetsamp.ToDatetime(),
-                                         np.ndarray(trans),
-                                         units)
-        return correction_info
-    return None
-
-
-def estimate_correction_vec(correction_infos: list[CorrectionInfo],
-                            current_correction_vec: np.ndarray,
-                            time: dt.datetime) -> np.ndarray:
-    """Estimate a correction vector when no scan match was found.
-
-    This method updates the current correction vector considering the latest
-    history of CorrectionInfos. It uses the end time of the last CorrectionInfo
-    as the time for which current_correction_vec exists, meaning we still need
-    to estimate a delta correction vector to account for the time between then
-    and the latest scan (which occured at the input argument time).
-
-    It then calculates the drift rates (vec / time) of all of the
-    CorrectionInfos in our history and averages them to get a drift rate
-    estimate. Lastly, it computes the delta vector between the latest
-    correction vector and our current time and adds this to the correction vec,
-    which is returned.
-
-    Args:
-        correction_infos: the history of CorrectionInfos, to be used to
-            estimate the drift rate and determine the time of the current
-            correction vec.
-        current_correction_vec: the last used correction vector going from
-            PCS-SCS.
-        time: the time when the latest scan occurred (for which we could not
-            find a match).
-
-    Returns:
-        np.ndarray of the updated correction vector.
-    """
-    unit_dist = correction_infos[-1].units
-    dt1 = correction_infos[-1].dt2
-    dt2 = time
-
-    logger.trace(f'dt1: {dt1}')
-    logger.trace(f'dt2: {dt2}')
-
-    drift_rates = []
-    for info in correction_infos:
-        units = (info.units, info.units)
-        vec = convert_list(info.vec, units,
-                           (unit_dist, unit_dist))
-        vec = np.array(vec)
-        drift_rate = vec / (info.dt2 - info.dt1).total_seconds()
-        drift_rates.append(drift_rate)
-        logger.trace(f'vec: {vec}')
-        logger.trace(f'drift rate: {drift_rate}')
-        logger.trace(f'units: {units}')
-
-    avg_drift_rate = np.mean(np.array(drift_rates), axis=0)
-    logger.trace(f'avg_drift_rate: {avg_drift_rate}')
-    del_correction_vec = avg_drift_rate * (dt2 - dt1).total_seconds()
-    logger.trace(f'del_correction_vec: {del_correction_vec}')
-
-    correction_vec = current_correction_vec + del_correction_vec
-    logger.trace(f'current_correction_vec: {current_correction_vec}')
-    return correction_vec
+    def run_per_loop(self):
+        """Override to update figures every loop."""
+        super().run_per_loop()
+        self.figure.canvas.draw_idle()
+        self.figure.canvas.flush_events()

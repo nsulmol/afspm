@@ -34,6 +34,7 @@ DEFAULT_RESIDUAL_THRESH_PERCENT = 0.05
 DEFAULT_SCAN_RESOLUTION = [256, 256]
 RANSAC_RESIDUAL_THRESH_KEY = 'residual_threshold'
 RANSAC_MIN_SAMPLES_KEY = 'min_samples'
+WORST_FIT = 1.0
 
 
 class DescriptorType(str, Enum):
@@ -214,7 +215,7 @@ def create_ransac_kwargs(transform_type: TransformType,
     return kwargs
 
 
-def create_drift_model(descriptor_type: DescriptorType = DescriptorType.SIFT,
+def create_drift_model(descriptor_type: DescriptorType = DescriptorType.BRIEF,
                        descriptor_kwargs: dict = dict(),
                        match_descriptor_kwargs: dict = DEFAULT_MATCHING_KWARGS,
                        transform_type: TransformType = TransformType.TRANSLATION,
@@ -267,9 +268,11 @@ def create_drift_model(descriptor_type: DescriptorType = DescriptorType.SIFT,
 
 def estimate_transform(model: DriftModel,
                        da1: xr.DataArray, da2: xr.DataArray,
-                       display_fit: bool = False, cmap: str | None = None,
+                       display_fit: bool = False,
+                       figure: plt.figure = None,
+                       cmap: str | None = None,
                        scale_factor: float = 1.0
-                       ) -> (transform.ProjectiveTransform, float):
+                       ) -> (transform.ProjectiveTransform | None, float):
     """Estimate transform between two DataArrays.
 
     Given a DriftModel, estimate the transform to be performed to da2 so that
@@ -285,6 +288,8 @@ def estimate_transform(model: DriftModel,
         da2: Second DataArray.
         display_fit: whether or not to create a matplotlib fig displaying
             the calculations and fit. Defaults to False.
+        figure: matplotlib figure, for displaying. Used if available.
+            Defaults to None.
         cmap: the colormap to use when displaying da1 and da2 (after the
             transformation). Defaults to None (which means a suitable default
             will be chosen by matplotlib).
@@ -293,11 +298,13 @@ def estimate_transform(model: DriftModel,
 
     Returns:
         (transform, score), where:
-        transform: ProjectiveTransform estimated.
+        transform: ProjectiveTransform estimated. None if RANSAC is used and
+            fitting failed.
         score: normalized mean-square error between points from one of the das
             and those of the other *after* preforming the transform. If RANSAC
             is used, only the inliers are considered for this estimate. The
             normalization is done relative to the resolution of da2.
+            Note: this makes a score of 0 best, and a score of 1 worst!
     """
     # For computation purposes, need to change all NaN to 0
     da1 = da1.fillna(0)
@@ -310,76 +317,90 @@ def estimate_transform(model: DriftModel,
     # Scale resolution
     arrs = [transform.rescale(arr, scale_factor) for arr in arrs]
 
-    # Get keypoints and descriptors [da1 == l, da2 == r (in this logic)]
-    keypoints_lr = []
-    descriptors_lr = []
-    for arr in arrs:
-        model.descriptor_extractor.detect_and_extract(arr)
-        keypoints_lr.append(model.descriptor_extractor.keypoints
-                            / scale_factor)
-        descriptors_lr.append(model.descriptor_extractor.descriptors)
+    try:
+        # Get keypoints and descriptors [da1 == l, da2 == r (in this logic)]
+        keypoints_lr = []
+        descriptors_lr = []
+        for arr in arrs:
+            model.descriptor_extractor.detect_and_extract(arr)
+            keypoints_lr.append(model.descriptor_extractor.keypoints
+                                / scale_factor)
+            descriptors_lr.append(model.descriptor_extractor.descriptors)
 
-    # Get matches of keypoints on both images
-    matches = feature.match_descriptors(descriptors_lr[0],
-                                        descriptors_lr[1],
-                                        **model.match_descriptor_kwargs)
-    points_lr = []
-    for (keypoints, idx) in zip(keypoints_lr, range(0, 2)):
-        matched_keypoints = keypoints[matches[:, idx]]
-        # keypoints and descriptors are (y, x), we need them in (x. y)!
-        matched_keypoints = np.fliplr(matched_keypoints)
-        points_lr.append(matched_keypoints)
+        # Get matches of keypoints on both images
+        matches = feature.match_descriptors(descriptors_lr[0],
+                                            descriptors_lr[1],
+                                            **model.match_descriptor_kwargs)
+        points_lr = []
+        for (keypoints, idx) in zip(keypoints_lr, range(0, 2)):
+            matched_keypoints = keypoints[matches[:, idx]]
+            # keypoints and descriptors are (y, x), we need them in (x. y)!
+            matched_keypoints = np.fliplr(matched_keypoints)
+            points_lr.append(matched_keypoints)
 
-    # Estimate transform from keypoint matches
-    success = True  # Assume model fitting succeeded
-    match model.fitting:
-        case FittingMethod.RANSAC:
-            assert isinstance(model.fitting_kwargs, dict)
+        # Estimate transform from keypoint matches
+        success = True  # Assume model fitting succeeded
+        match model.fitting:
+            case FittingMethod.RANSAC:
+                assert isinstance(model.fitting_kwargs, dict)
 
-            def get_model():  # ugly method needed to run ransac
-                return model.transform
+                def get_model():  # ugly method needed to run ransac
+                    return model.transform
 
-            # Ensure proper resolution for RANSAC arguments
-            model.update_fitting_kwargs(da2.shape)
-            model.transform, inliers = ransac(
-                (points_lr[0], points_lr[1]), get_model,
-                **model.fitting_kwargs)
+                # Ensure proper resolution for RANSAC arguments
+                model.update_fitting_kwargs(da2.shape)
+                fit_transform, inliers = ransac(
+                    (points_lr[0], points_lr[1]), get_model,
+                    **model.fitting_kwargs)
 
-            inlier_points_lr = [points_lr[0][inliers], points_lr[1][inliers]]
-            inlier_matches = matches[inliers]
-            outliers = inliers == False
-            outlier_matches = matches[outliers]
-        case FittingMethod.LEAST_SQUARES:
-            success = model.transform.estimate(points_lr[0], points_lr[1])
-            inlier_points_lr = points_lr
-            inlier_matches = matches
-            outlier_matches = np.array(())  # Empty array
-        case _:
-            msg = 'An unsupported FittingMethod was chosen.'
-            logger.error(msg)
-            raise AttributeError(msg)
+                # If fitting fails, fit_transform is set to None
+                success = fit_transform is not None
 
-    if success:
-        # Score is error between estimated points after transforming one da
-        # to the other, and the actual points.
-        score = np.mean(np.sqrt(model.transform.residuals(
-            inlier_points_lr[0], inlier_points_lr[1])**2))
-        # Normalize score relative to image size
-        norm_scan_res = np.linalg.norm(np.array(da2.shape))
-        norm_score = score / norm_scan_res
-    else:  # Fitting failed, set score to max possible (full scan error).
-        logger.warning('Drift estimation failed, setting fitting score to '
-                       'max possible.')
-        norm_score = 1.0
+                inlier_points_lr = [points_lr[0][inliers], points_lr[1][inliers]]
+                inlier_matches = matches[inliers]
+                outliers = inliers == False
+                outlier_matches = matches[outliers]
+            case FittingMethod.LEAST_SQUARES:
+                success = model.transform.estimate(points_lr[0], points_lr[1])
+                fit_transform = model.transform
+                inlier_points_lr = points_lr
+                inlier_matches = matches
+                outlier_matches = np.array(())  # Empty array
+            case _:
+                msg = 'An unsupported FittingMethod was chosen.'
+                logger.error(msg)
+                raise AttributeError(msg)
 
-    logger.debug(f'Drift estimate fitting score (normalized): {norm_score}')
+        if success:
+            # Score is error between estimated points after transforming one da
+            # to the other, and the actual points.
+            score = np.mean(np.sqrt(fit_transform.residuals(
+                inlier_points_lr[0], inlier_points_lr[1])**2))
+            # Normalize score relative to image size, and flip so range is
+            # (0, 1) with 0 being bad, and 1 being good.
+            norm_scan_res = np.linalg.norm(np.array(da2.shape))
+            norm_score = score / norm_scan_res
+        else:  # Fitting failed, set score to max possible (full scan error).
+            logger.warning('Drift estimation failed, setting fitting score to '
+                           'worst possible.')
+            norm_score = WORST_FIT
 
-    if display_fit:
-        display_estimated_transform(da1, da2, keypoints_lr, model.transform,
-                                    inlier_matches, outlier_matches,
-                                    cmap, norm_score)
+        logger.debug(f'Drift estimate fitting score (normalized): {norm_score}')
 
-    return model.transform, norm_score
+        if display_fit and fit_transform:
+            # TODO: Make sure it updates to nothing if fit failed
+            display_estimated_transform(da1, da2, keypoints_lr, fit_transform,
+                                        inlier_matches, outlier_matches,
+                                        cmap, norm_score, figure)
+
+        return fit_transform, norm_score
+    except (RuntimeError, ValueError) as e:
+        # RuntimeError tends to occur if the feature extractor failed.
+        # ValueError tends to happen if there were less keypoints then the
+        # minimum number of samples needed (in RANSAC).
+        msg = f"Error estimating drift, skipping: {e}"
+        logger.warning(msg)
+        return None, WORST_FIT
 
 
 def display_estimated_transform(da1: xr.DataArray, da2: xr.DataArray,
@@ -387,7 +408,8 @@ def display_estimated_transform(da1: xr.DataArray, da2: xr.DataArray,
                                 mapping: transform.ProjectiveTransform,
                                 inlier_matches: np.ndarray,
                                 outlier_matches: np.ndarray,
-                                cmap: str, fit_score: float):
+                                cmap: str, fit_score: float,
+                                fig: plt.Figure = None):
     """Visualize the estimated transform.
 
     Args:
@@ -403,10 +425,13 @@ def display_estimated_transform(da1: xr.DataArray, da2: xr.DataArray,
         cmap: str of colormap to be used to perform imshow() on da1 and the
             warped da2.
         fit_score: The fitting score.
+        fig: matplotlib figure, for displaying. Used if available.
+            Defaults to None.
     """
     mosaic = """CAAD
                 CBBD"""
-    fig = plt.figure(layout='constrained')
+    if fig is None:
+        fig = plt.figure(layout='constrained')
     axd = fig.subplot_mosaic(mosaic)
 
     # Plot inliers (colored)
