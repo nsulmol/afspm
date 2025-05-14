@@ -10,6 +10,7 @@ it is always in the estimated SCS.
 from collections import deque
 import logging
 import numpy as np
+import copy
 import datetime as dt
 import matplotlib.pyplot as plt
 from google.protobuf.message import Message
@@ -227,9 +228,9 @@ class CSCorrectedRouter(router.ControlRouter):
         The correction vector is PCS -> SCS. The router is receiving
         requests from components in the SCS, to be sent to the Microscope.
         Thus, we want to go SCS -> PCS, which means we must invert our
-        translation vector. TODO flipped?
+        translation vector.
         """
-        self._corr_info = corr_info
+        self._corr_info = copy.deepcopy(corr_info)
         self._corr_info.vec = -self._corr_info.vec  # We want SCS -> PCS
 
 
@@ -303,18 +304,7 @@ class CSCorrectedCache(cache.PubSubCache):
         expect). Thus, we use PCS -> SCS< which is the correction vector
         without modifications.
         """
-
-        # Update cache!!!
-        # del_correction_vec = correction_vec - self._correction_vec
-        # for key, queue in self.cache.items():
-        #     if self.SCAN_ID in key:
-        #         for idx, __ in enumerate(queue):
-        #             queue[idx] = cs_correct_proto(queue[idx],
-        #                                           del_correction_vec,
-        #                                           correction_units)
-        #         self.cache[key] = queue
-
-        self._corr_info = corr_info
+        self._corr_info = copy.deepcopy(corr_info)
 
 
 class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
