@@ -557,7 +557,6 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         new_scan = cs_correct_proto(new_scan, self.total_corr_info,
                                     new_scan.timestamp.ToDatetime(
                                         dt.timezone.utc))
-        # TODO: Add time stamp of scan!
 
         scan_was_matched = self._update_drift_snapshots(new_scan)
 #        logger.warning(f'Match: {scan_was_matched}')

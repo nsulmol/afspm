@@ -155,6 +155,5 @@ def get_latest_intersection(scans: list[scan_pb2.Scan2d],
     if not intersect_scans:
         return None
 
-    # TODO: > not supported for timestamp! What to do
     intersect_scans.sort(key=lambda scan: scan.timestamp.ToDatetime())
     return intersect_scans[-1]  # Last value is latest timestamp
