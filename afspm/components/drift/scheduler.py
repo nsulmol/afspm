@@ -66,7 +66,6 @@ def get_converted_and_updated_vec(corr_info: correction.CorrectionInfo,
     """
     drift_vec = correction.estimate_correction_no_snapshot(corr_info, curr_dt)
     corr_info = correction.update_total_correction(corr_info, drift_vec)
-    # TODO: Should we still be using this?
 
     desired_units = (unit, unit)
     corr_units = (corr_info.unit, corr_info.unit)
@@ -138,8 +137,6 @@ def correct_probe_position(proto: spec_pb2.ProbePosition,
     return proto
 
 
-# TODO: need to feed DateTime of latest event. if None, we do not
-# use drift rate to estimate
 def cs_correct_proto(proto: Message, corr_info: correction.CorrectionInfo,
                      curr_dt: dt.datetime | None) -> Message:
     """Recursively go through a protobuf, correcting CS-based fields.
@@ -280,8 +277,6 @@ class CSCorrectedCache(cache.PubSubCache):
 class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     """Corrects coordinate system data in addition to being a scheduler.
 
-    TODO: UPDATE ME!
-
     The CSCorrectedScheduler is a wrapper on top of a standard
     MicroscopeScheduler, where it additionally attempts to estimate drift
     in the system and correct for it. Thus:
@@ -305,8 +300,8 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     the start of the experiment, we can maintain an appropriate mapping from
     SCS to PCS (and vice-versa).
 
-    For post-experiment usage, we save a csv file containing the relative and
-    absolute correction vectors computed over time at filepath.
+    For post-experiment usage, we save a csv file containing the correction
+    vector and drift rate computed over time at filepath.
 
     In order to determine correction vectors, the DriftModel needs to compare
     each current scan with a prior scan that intersects over the same PCS. To
@@ -316,14 +311,14 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
 
     For each given scan, there are two possible paths for estimating the
     correction vector:
-    1. We find an 'matching' scan in the cache, *and* the drift estimation
+    1. We find a 'matching' scan in the cache, *and* the drift estimation
     algorithm is able to reliably determine a correction vector (i.e. its
-    fitting score is high enough). Here, we compute a new CorrectionInfo and
-    add it to our history (see compute_drift_snapshot and
-    _update_drift_snapshots).
+    fitting score is high enough). Here, we compute a new CorrectionInfo
+    considering the drift we detected and the prior correction we had
+    already applied during that scan.
     2. We do not find a 'matching' scan in the cache (or the fit was not
     good enough). In this case, we estimate a correction vector based on our
-    history of CorrectionInfos (see estimate_correction_vec).
+    currently estimated drift rate and the time elapsed.
 
     We should also clarify what 'matching' means when we find a match between
     the latest scan and those in the cache. A scan pair is considered 'matched'
@@ -368,7 +363,8 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     DEFAULT_DISPLAY_FIT = True
 
     CSV_FIELDS = ['timestamp', 'filename', 'pcs_to_scs_trans',
-                  'estimated_from_drift?']
+                  'pcs_to_scs_units', 'pcs_to_scs_drift_rate',
+                  'scan_matched']
 
     def __init__(self, drift_model: drift.DriftModel | None = None,
                  csv_attribs: csv.CSVAttributes = DEFAULT_CSV_ATTRIBUTES,
@@ -416,10 +412,11 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     def _get_metadata_row(scan: scan_pb2.Scan2d,
                           corr_info: correction.CorrectionInfo,
                           estimated_from_vec: bool) -> [str]:
-        # TODO: update me! add drift rate???
         row_vals = [scan.timestamp.seconds,
                     scan.filename,
                     corr_info.vec,
+                    corr_info.unit,
+                    corr_info.drift_rate,
                     estimated_from_vec]
         return row_vals
 
@@ -466,20 +463,18 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         estimate a correction vector based on the history.
         """
         if snapshot is not None:
-            logger.warning('Scan matched.')
+            logger.debug('Scan matched.')
             corr_info = correction.estimate_correction_from_snapshot(
                 snapshot, self.total_corr_info)
-            logger.warning(f'delta corr_info: {corr_info}')
+            logger.trace(f'delta corr_info: {corr_info}')
         else:
-            logger.warning('No match. Estimating from prior info.')
+            logger.debug('No match. Estimating from prior info.')
             corr_info = correction.estimate_correction_no_snapshot(
                 self.total_corr_info, new_scan.timestamp.ToDatetime(
                     dt.timezone.utc))
-            logger.warning(f'delta corr_info: {corr_info}')
-
+            logger.trace(f'delta corr_info: {corr_info}')
         new_tot_corr_info = correction.update_total_correction(
             self.total_corr_info, corr_info)
-        logger.warning(f'total corr_info: {new_tot_corr_info}')
 
         drift_has_changed = not np.all(np.isclose(
             new_tot_corr_info.vec, self.total_corr_info.vec))
@@ -487,10 +482,11 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
 
         # Notify logger if correction vec has changed
         if drift_has_changed:
-            logger.info('The PCS-to-SCS correction vector has changed'
-                        f': {self.total_corr_info.vec} '
-                        f'{self.total_corr_info.unit}.')
-            # TODO: print drift rate too??? put in separate method?
+            logger.debug('The PCS-to-SCS correction vector has changed'
+                         f': {self.total_corr_info.vec} '
+                         f'{self.total_corr_info.unit}.')
+            logger.debug(f'With drift rate: {self.total_corr_info.drift_rate} '
+                         f'{self.total_corr_info.unit} / s.')
 
     def _update_io(self):
         """Update IO nodes with latest CorrectionInfo.
@@ -519,9 +515,6 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
             new_scan: the incoming scan, which we use to update our correction
                 estimates.
         """
-#        logger.warning('New scan. Checking if we find a match...')
-#        logger.warning(f'New scan position: {new_scan.params.spatial}')
-
         # First things first: the received scan is in the PCS. Convert to our
         # *current* SCS.
         new_scan = cs_correct_proto(new_scan, self.total_corr_info,
@@ -529,15 +522,14 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
                                         dt.timezone.utc))
 
         snapshot = self._get_drift_snapshot(new_scan)
-#        logger.warning(f'Match: {scan_was_matched}')
         self._update_curr_corr_info(new_scan, snapshot)
 
         # TODO: What if the drift is too much? At what point do we take over and
         # redo the scan?
 
-        estimated_from_vec = snapshot is None
+        scan_matched = snapshot is not None
         row_vals = self._get_metadata_row(new_scan, self.total_corr_info,
-                                          estimated_from_vec)
+                                          scan_matched)
         csv.save_csv_row(self.csv_attribs, self.CSV_FIELDS,
                          row_vals)
         self._update_io()
