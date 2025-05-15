@@ -64,22 +64,13 @@ def get_converted_and_updated_vec(corr_info: correction.CorrectionInfo,
             converting to desired spatial units.
 
     """
-    # TODO: We should only do this for requests, not published things?
-    # - Published things have *happened*. So dt2 should come from its
-    # timestamp.
-    #
-    # - Requests
-    #
-    # Account for drift since correction vector last updated!
-    drift_vec = correction.estimate_correction_vec(corr_info.drift_rate,
-                                                   corr_info.curr_dt, curr_dt)
-    logger.info(f'drift_vec: {drift_vec}')
-
-    corr_vec = corr_info.vec + drift_vec  # TODO: Should I use get_total_correction()?
+    drift_vec = correction.estimate_correction_no_snapshot(corr_info, curr_dt)
+    corr_info = correction.update_total_correction(corr_info, drift_vec)
+    # TODO: Should we still be using this?
 
     desired_units = (unit, unit)
     corr_units = (corr_info.unit, corr_info.unit)
-    corr_vec = np.array(convert_list(corr_vec.tolist(),
+    corr_vec = np.array(convert_list(corr_info.vec.tolist(),
                                      corr_units, desired_units))
     return corr_vec
 
@@ -256,21 +247,6 @@ class CSCorrectedCache(cache.PubSubCache):
             for callback in self._observers:
                 callback(proto)
 
-        # Correct CS data of proto
-        if self._corr_info is not None:
-            # Get curr_dt for Scans and Specs, so we ensure their locations account
-            # for drift rate.
-            # TODO: Should we have an option to determine whether or not we
-            # correct for drift rate? What if our estimate is poop?
-            curr_dt = None
-            if isinstance(proto, scan_pb2.Scan2d):
-                curr_dt = proto.timestamp.ToDatetime(dt.timezone.utc)
-            elif isinstance(proto, spec_pb2.Spec1d):
-                curr_dt = proto.timestamp.ToDateTime(dt.timezone.utc)
-
-            proto = cs_correct_proto(proto, self._corr_info, curr_dt)
-
-        # Save *corrected* proto in cache / send out
         super().send_message(proto)
 
     @classmethod
@@ -387,7 +363,6 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     DEFAULT_CSV_ATTRIBUTES = csv.CSVAttributes('./drift_correction.csv')
     DEFAULT_MIN_INTERSECTION_RATIO = 0.25
     DEFAULT_MIN_SPATIAL_RES_RATIO = 0.25
-    DEFAULT_HISTORY_LENGTH = 5
     # This default fitting score is linked to RANSAC minimum residual threshold
     DEFAULT_MAX_FITTING_SCORE = drift.DEFAULT_RESIDUAL_THRESH_PERCENT
     DEFAULT_DISPLAY_FIT = True
@@ -400,7 +375,6 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
                  min_intersection_ratio: float = DEFAULT_MIN_INTERSECTION_RATIO,
                  min_spatial_res_ratio: float = DEFAULT_MIN_SPATIAL_RES_RATIO,
                  max_fitting_score: float = DEFAULT_MAX_FITTING_SCORE,
-                 drift_snapshots_length: int = DEFAULT_HISTORY_LENGTH,
                  display_fit: bool = DEFAULT_DISPLAY_FIT, **kwargs):
         """Initialize our correction scheduler."""
         self.drift_model = (drift.create_drift_model() if drift_model is None
@@ -410,7 +384,6 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         self.min_spatial_res_ratio = min_spatial_res_ratio
         self.max_fitting_score = max_fitting_score
 
-        self.drift_snapshots = deque(maxlen=drift_snapshots_length)
         # TODO: Should this be a default in constructor of dataclass!?
         self.total_corr_info = correction.CorrectionInfo()
 
@@ -463,34 +436,28 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
             concatenated_scans.extend(scan_deque)
         return concatenated_scans
 
-    def _update_drift_snapshots(self, new_scan: scan_pb2.Scan2d
-                                ) -> bool:
-        """Update DriftSnapshots based on the new incoming scan."""
+    def _get_drift_snapshot(self, new_scan: scan_pb2.Scan2d
+                            ) -> correction.DriftSnapshot | None:
+        """Estimate drift for the new scan."""
+        self.figure.clear()  # Clear figure before showing
+
         matched_scan = proto_geo.get_latest_intersection(
             self._get_scans_from_cache(), new_scan,
             self.min_intersection_ratio, self.min_spatial_res_ratio)
 
         scan_was_matched = matched_scan is not None
+        snapshot = None
         if scan_was_matched:
-            self.figure.clear()  # Clear figure before showing
-            logger.warning('Scan matched, trying to fit...')
-            del_drift = correction.compute_drift_snapshot(
+            snapshot = correction.compute_drift_snapshot(
                 matched_scan, new_scan, self.drift_model,
                 self.max_fitting_score, self.display_fit,
                 self.figure)
-            plt.show(block=False)  # TODO should this be elsewhere? At start?
-            scan_was_matched = del_drift is not None
-            logger.warning(f'Did we match: {scan_was_matched}')
 
-            if scan_was_matched:
-                logger.warning(f'del_corr_info vec: {del_drift.vec}')
-                del_drift.vec += self.total_corr_info.vec
-                logger.warning(f'ABS del_drift: {del_drift.vec}')
-                self.drift_snapshots.append(del_drift)
-        return scan_was_matched
+        plt.show(block=False)  # TODO should this be elsewhere? At start?
+        return snapshot
 
     def _update_curr_corr_info(self, new_scan: scan_pb2.Scan2d,
-                               scan_was_matched: bool):
+                               snapshot: correction.DriftSnapshot | None):
         """Update the current CorrectionInfo based on the new incoming scan.
 
         Given a new scan and knowledge of whether we matched a scan to it from
@@ -498,19 +465,22 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         match, we can simply grab the latest DriftSnapshot. If not, we
         estimate a correction vector based on the history.
         """
-        if len(self.drift_snapshots) == 0:
-            return  # Early return, there is nothing to correct!
-
-        if scan_was_matched:
+        if snapshot is not None:
+            logger.warning('Scan matched.')
             corr_info = correction.estimate_correction_from_snapshot(
-                self.drift_snapshots[-1], self.total_corr_info)
+                snapshot, self.total_corr_info)
+            logger.warning(f'delta corr_info: {corr_info}')
         else:
-            corr_info = correction.estimate_correction_from_history(
-                self.drift_snapshots, new_scan.timestamp.ToDatetime(
+            logger.warning('No match. Estimating from prior info.')
+            corr_info = correction.estimate_correction_no_snapshot(
+                self.total_corr_info, new_scan.timestamp.ToDatetime(
                     dt.timezone.utc))
+            logger.warning(f'delta corr_info: {corr_info}')
 
-        new_tot_corr_info = correction.get_total_correction(
+        new_tot_corr_info = correction.update_total_correction(
             self.total_corr_info, corr_info)
+        logger.warning(f'total corr_info: {new_tot_corr_info}')
+
         drift_has_changed = not np.all(np.isclose(
             new_tot_corr_info.vec, self.total_corr_info.vec))
         self.total_corr_info = new_tot_corr_info
@@ -558,15 +528,16 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
                                     new_scan.timestamp.ToDatetime(
                                         dt.timezone.utc))
 
-        scan_was_matched = self._update_drift_snapshots(new_scan)
+        snapshot = self._get_drift_snapshot(new_scan)
 #        logger.warning(f'Match: {scan_was_matched}')
-        self._update_curr_corr_info(new_scan, scan_was_matched)
+        self._update_curr_corr_info(new_scan, snapshot)
 
         # TODO: What if the drift is too much? At what point do we take over and
         # redo the scan?
 
+        estimated_from_vec = snapshot is None
         row_vals = self._get_metadata_row(new_scan, self.total_corr_info,
-                                          not scan_was_matched)
+                                          estimated_from_vec)
         csv.save_csv_row(self.csv_attribs, self.CSV_FIELDS,
                          row_vals)
         self._update_io()

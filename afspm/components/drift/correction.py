@@ -47,24 +47,6 @@ class DriftSnapshot:
     unit: str = DEFAULT_UNIT  # Translation vector unit
 
 
-# TODO: Remove me?
-# def time_intersection(a: DriftSnapshot, b: DriftSnapshot
-#                       ) -> (dt.datetime, dt.datetime):
-#     """Compute temporal intersection of two DriftSnapshots."""
-#     dt1 = max(a.dt1, b.dt1)
-#     dt2 = min(a.dt2, b.dt2)
-#     if dt1 <= dt2:
-#         return (dt1, dt2)
-#     return (DEFAULT_EMPTY_DATETIME, DEFAULT_EMPTY_DATETIME)
-
-
-# def time_intersection_delta(a: DriftSnapshot, b: DriftSnapshot
-#                             ) -> dt.timedelta:
-#     """Compute temporal intersection of two Correction infos, return delta."""
-#     dt1, dt2 = time_intersection(a, b)
-#     return dt2 - dt1
-
-
 def compute_drift_snapshot(scan1: scan_pb2.Scan2d,
                            scan2: scan_pb2.Scan2d,
                            drift_model: drift.DriftModel,
@@ -192,52 +174,52 @@ def estimate_correction_vec(drift_rate: np.ndarray,
     return drift_rate * (dt2 - dt1).total_seconds()
 
 
-def estimate_correction_from_history(drift_snapshots: list[DriftSnapshot],
-                                     time: dt.datetime) -> CorrectionInfo:
-    """Estimate a CorrectionInfo when no scan match was found.
+def estimate_correction_no_snapshot(corr_info: CorrectionInfo,
+                                    curr_dt: dt.datetime,
+                                    ) -> CorrectionInfo:
+    """Estimate CorrectionInfo when no snapshot was detected.
 
-    This method estimates a new CorrectionInfo from the prior history of
-    DriftSnapshots. It is used for the cases where no scan matches were found.
-    Thus, we use the prior DriftSnapshots to estimate an average drift rate,
-    and use that drift rate to create a new CorrectionInfo.
-
-    It calculates the drift rates (vec / time) of all of the
-    DriftSnapshots in our history and averages them to get a drift rate
-    estimate. Then, it computes the 'current snapshot' correction vector that
-    we would expect given the drift rate and the time since the last scan.
+    We update the CorrectionInfo considering the drift rate and time of
+    the prior CorrectionInfo.
 
     Args:
-        drift_snapshots: the history of DriftSnapshots, to be used to
-            estimate the drift rate and determine the time of the current
-            correction vec.
-        time: the time when the latest scan occurred (for which we could not
+        corr_info: current CorrectionInfo.
+        curr_dt: datetime when the latest scan occurred (for which we could not
             find a match).
 
     Returns:
         np.ndarray of the updated correction vector.
     """
-    dt1 = drift_snapshots[-1].dt2
-    dt2 = time
-
-    avg_drift_rate = get_average_drift_rate(drift_snapshots)
-
-    vec = estimate_correction_vec(avg_drift_rate, dt1, dt2)
-    return CorrectionInfo(dt2, vec, avg_drift_rate)
+    drift_vec = estimate_correction_vec(corr_info.drift_rate,
+                                        corr_info.curr_dt, curr_dt)
+    return CorrectionInfo(curr_dt, drift_vec, corr_info.drift_rate,
+                          corr_info.unit)
 
 
 def estimate_correction_from_snapshot(drift_snapshot: DriftSnapshot,
-                                      corr_info: CorrectionInfo) -> CorrectionInfo:
+                                      corr_info: CorrectionInfo
+                                      ) -> CorrectionInfo:
     """Estimate CorrectionInfo from a provided DriftSnapshot.
 
-    Given a DriftSnapshot, we estimate the parameters for CorrectionInfo.
-    - First, we estimate the drift rate based on the correction vector and the
-    two timestamps.
-    - Then, we need to account for a time overlap between our snapshot and
-    the provided CorrectionInfo. Basically, we need to subtract the vector
-    contribution from the time intersection. Otherwise, we will have doubled
-    the drift contribution over that time overlap!
-    - We provide the correction vector associated with the snapshot minus the
-    overlap vector.
+    Given a DriftSnapshot, we estimate the parameters for CorrectionInfo. This
+    process is somewhat complicated:
+
+    1. We estimate the drift rate based on the correction vector and the
+    two timestamps. This is the detected drift rate due to this snapshot.
+    2. Then, we need to account for any time overlap between our snapshot and
+    the prior CorrectionInfo. It is possible that our snapshot's first scan
+    predates the time of our last CorrectionInfo. We need to subtract the
+    proportion of the vector associated with this time overlap. We accomplish
+    that by using the snapshot drift rate to estimate the overlap vector (and
+    then subtracting it).
+    3. This updated snapshot now represents the proper 'delta' vector on top
+    of the correction that has already been done. The true vector
+    is the snapshot vector + the 'assumed' vector. The assumed vector is the
+    correction vector we had already applied based on our prior
+    CorrectionInfo's drift rate and the time between the last scan and this
+    scan.
+    4. The actual drift rate is then calculated considering the 'actual'
+    vector and the dime delta.
 
     Args:
         drift_snapshot: DriftSnapshot we are suing to create a CorrectionInfo.
@@ -247,23 +229,35 @@ def estimate_correction_from_snapshot(drift_snapshot: DriftSnapshot,
     Returns:
         CorrectionInfo.
     """
-    vec = drift_snapshot.vec
-    drift_rate = get_drift_rate(vec, drift_snapshot.dt1, drift_snapshot.dt2)
+    snapshot_vec = drift_snapshot.vec
+    snapshot_drift_rate = get_drift_rate(snapshot_vec,
+                                         drift_snapshot.dt1,
+                                         drift_snapshot.dt2)
 
     # Account for temporal overlap (if applicable)
     if corr_info.curr_dt is not None and drift_snapshot.dt2 is not None:
         overlap_time_delta_s = (corr_info.curr_dt - drift_snapshot.dt2
                                 ).total_seconds()
         if overlap_time_delta_s > 0:  # There was overlap
-            overlap_vec = drift_rate * overlap_time_delta_s
-            vec -= overlap_vec
+            overlap_vec = snapshot_drift_rate * overlap_time_delta_s
+            snapshot_vec -= overlap_vec
 
-    return CorrectionInfo(drift_snapshot.dt2, vec, drift_rate,
+    # To calculate the proper correction info, we need to estimate the
+    # 'actual' vector, by adding the snapshot vector to the assumed vector,
+    # i.e. the translation we already did due to our assumed drift.
+    assumed_vec = estimate_correction_vec(corr_info.drift_rate,
+                                          corr_info.curr_dt,
+                                          drift_snapshot.dt2)
+    actual_vec = assumed_vec + snapshot_vec
+    actual_rate = get_drift_rate(actual_vec, corr_info.curr_dt,
+                                 drift_snapshot.dt2)
+    return CorrectionInfo(drift_snapshot.dt2, actual_vec, actual_rate,
                           drift_snapshot.unit)
 
 
-def get_total_correction(total_corr_info: CorrectionInfo,
-                         latest_corr_info: CorrectionInfo) -> CorrectionInfo:
+def update_total_correction(total_corr_info: CorrectionInfo,
+                            latest_corr_info: CorrectionInfo,
+                            ) -> CorrectionInfo:
     """Update the total correction based on a new estimate.
 
     Our created CorrectionInfos are based on DriftSnapshots, which are
@@ -284,8 +278,10 @@ def get_total_correction(total_corr_info: CorrectionInfo,
         CorrectionInfo where latest_corr_info's vec has been updated to
             contain that of total_corr_info (additive).
     """
-    latest_corr_info.vec += total_corr_info.vec
-    return latest_corr_info
+    vec = total_corr_info.vec + latest_corr_info.vec
+    return CorrectionInfo(latest_corr_info.curr_dt,
+                          vec,
+                          latest_corr_info.drift_rate)
 
 
 def extract_patch(da: xr.DataArray,
