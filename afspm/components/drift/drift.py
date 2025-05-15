@@ -318,89 +318,132 @@ def estimate_transform(model: DriftModel,
     arrs = [transform.rescale(arr, scale_factor) for arr in arrs]
 
     try:
-        # Get keypoints and descriptors [da1 == l, da2 == r (in this logic)]
-        keypoints_lr = []
-        descriptors_lr = []
-        for arr in arrs:
-            model.descriptor_extractor.detect_and_extract(arr)
-            keypoints_lr.append(model.descriptor_extractor.keypoints
-                                / scale_factor)
-            descriptors_lr.append(model.descriptor_extractor.descriptors)
-
-        # Get matches of keypoints on both images
-        matches = feature.match_descriptors(descriptors_lr[0],
-                                            descriptors_lr[1],
-                                            **model.match_descriptor_kwargs)
-        points_lr = []
-        for (keypoints, idx) in zip(keypoints_lr, range(0, 2)):
-            matched_keypoints = keypoints[matches[:, idx]]
-            # keypoints and descriptors are (y, x), we need them in (x. y)!
-            matched_keypoints = np.fliplr(matched_keypoints)
-            points_lr.append(matched_keypoints)
-
-        # Estimate transform from keypoint matches
-        success = True  # Assume model fitting succeeded
-        match model.fitting:
-            case FittingMethod.RANSAC:
-                assert isinstance(model.fitting_kwargs, dict)
-
-                def get_model():  # ugly method needed to run ransac
-                    return model.transform
-
-                # Ensure proper resolution for RANSAC arguments
-                model.update_fitting_kwargs(da2.shape)
-                fit_transform, inliers = ransac(
-                    (points_lr[0], points_lr[1]), get_model,
-                    **model.fitting_kwargs)
-
-                # If fitting fails, fit_transform is set to None
-                success = fit_transform is not None
-
-                inlier_points_lr = [points_lr[0][inliers], points_lr[1][inliers]]
-                inlier_matches = matches[inliers]
-                outliers = inliers == False
-                outlier_matches = matches[outliers]
-            case FittingMethod.LEAST_SQUARES:
-                success = model.transform.estimate(points_lr[0], points_lr[1])
-                fit_transform = model.transform
-                inlier_points_lr = points_lr
-                inlier_matches = matches
-                outlier_matches = np.array(())  # Empty array
-            case _:
-                msg = 'An unsupported FittingMethod was chosen.'
-                logger.error(msg)
-                raise AttributeError(msg)
-
-        if success:
-            # Score is error between estimated points after transforming one da
-            # to the other, and the actual points.
-            score = np.mean(np.sqrt(fit_transform.residuals(
-                inlier_points_lr[0], inlier_points_lr[1])**2))
-            # Normalize score relative to image size, and flip so range is
-            # (0, 1) with 0 being bad, and 1 being good.
-            norm_scan_res = np.linalg.norm(np.array(da2.shape))
-            norm_score = score / norm_scan_res
-        else:  # Fitting failed, set score to max possible (full scan error).
-            logger.warning('Drift estimation failed, setting fitting score to '
-                           'worst possible.')
-            norm_score = WORST_FIT
-
-        logger.debug(f'Drift estimate fitting score (normalized): {norm_score}')
-
-        if display_fit and fit_transform:
-            # TODO: Make sure it updates to nothing if fit failed
-            display_estimated_transform(da1, da2, keypoints_lr, fit_transform,
-                                        inlier_matches, outlier_matches,
-                                        cmap, norm_score, figure)
-
-        return fit_transform, norm_score
-    except (RuntimeError, ValueError) as e:
-        # RuntimeError tends to occur if the feature extractor failed.
-        # ValueError tends to happen if there were less keypoints then the
-        # minimum number of samples needed (in RANSAC).
-        msg = f"Error estimating drift, skipping: {e}"
+        keypoints_lr, descriptors_lr = _get_keypoints_and_descriptors(
+            model, arrs, scale_factor)
+    except (ValueError, RuntimeError) as e:
+        msg = ("Error getting keypoints and descriptors when estimating drift, "
+               f"skipping: {e}")
         logger.warning(msg)
         return None, WORST_FIT
+
+    try:
+        matches, points_lr = _match_descriptors(model, keypoints_lr,
+                                                descriptors_lr)
+    except (ValueError, RuntimeError) as e:
+        msg = ("Error matching descriptors when estimating drift, "
+               f"skipping: {e}")
+        logger.warning(msg)
+        return None, WORST_FIT
+
+    try:
+        fit_transform, norm_score = _estimate_transform(
+            da1, da2, model, matches, points_lr, keypoints_lr, display_fit,
+            figure, cmap)
+    except (ValueError, RuntimeError) as e:
+        # ValueError tends to happen if there were less keypoints then the
+        # minimum number of samples needed (in RANSAC).
+        msg = f"Error fitting transform when estimating drift, skipping: {e}"
+        logger.warning(msg)
+        return None, WORST_FIT
+
+    return fit_transform, norm_score
+
+
+def _get_keypoints_and_descriptors(model: DriftModel,
+                                   arrs: list[np.ndarray],
+                                   scale_factor: float
+                                   ) -> (list[np.ndarray], list[np.ndarray]):
+    """Get keypoints and descriptors for both images."""
+    keypoints_lr = []
+    descriptors_lr = []
+    for arr in arrs:
+        model.descriptor_extractor.detect_and_extract(arr)
+        keypoints_lr.append(model.descriptor_extractor.keypoints
+                            / scale_factor)
+        descriptors_lr.append(model.descriptor_extractor.descriptors)
+    return keypoints_lr, descriptors_lr
+
+
+def _match_descriptors(model: DriftModel,
+                       keypoints_lr: list[np.ndarray],
+                       descriptors_lr: list[np.ndarray]
+                       ) -> (np.ndarray, list[np.ndarray]):
+    """Get matches of keypoints on both images."""
+    matches = feature.match_descriptors(descriptors_lr[0],
+                                        descriptors_lr[1],
+                                        **model.match_descriptor_kwargs)
+    points_lr = []
+    for (keypoints, idx) in zip(keypoints_lr, range(0, 2)):
+        matched_keypoints = keypoints[matches[:, idx]]
+        # keypoints and descriptors are (y, x), we need them in (x. y)!
+        matched_keypoints = np.fliplr(matched_keypoints)
+        points_lr.append(matched_keypoints)
+    return matches, points_lr
+
+
+def _estimate_transform(da1: xr.Dataset, da2: xr.Dataset,
+                        model: DriftModel,
+                        matches: np.ndarray,
+                        points_lr: list[np.ndarray],
+                        keypoints_lr: list[np.ndarray],
+                        display_fit: bool,
+                        figure: plt.figure,
+                        cmap: str | None,
+                        ) -> (transform.ProjectiveTransform, float):
+    """Estimate transform from keypoint matches."""
+    success = True  # Assume model fitting succeeded
+    match model.fitting:
+        case FittingMethod.RANSAC:
+            assert isinstance(model.fitting_kwargs, dict)
+
+            def get_model():  # ugly method needed to run ransac
+                return model.transform
+
+            # Ensure proper resolution for RANSAC arguments
+            model.update_fitting_kwargs(da2.shape)
+            fit_transform, inliers = ransac(
+                (points_lr[0], points_lr[1]), get_model,
+                **model.fitting_kwargs)
+
+            # If fitting fails, fit_transform is set to None
+            success = fit_transform is not None
+
+            inlier_points_lr = [points_lr[0][inliers], points_lr[1][inliers]]
+            inlier_matches = matches[inliers]
+            outliers = inliers == False
+            outlier_matches = matches[outliers]
+        case FittingMethod.LEAST_SQUARES:
+            success = model.transform.estimate(points_lr[0], points_lr[1])
+            fit_transform = model.transform
+            inlier_points_lr = points_lr
+            inlier_matches = matches
+            outlier_matches = np.array(())  # Empty array
+        case _:
+            msg = 'An unsupported FittingMethod was chosen.'
+            logger.error(msg)
+            raise AttributeError(msg)
+
+    if success:
+        # Score is error between estimated points after transforming one da
+        # to the other, and the actual points.
+        score = np.mean(np.sqrt(fit_transform.residuals(
+            inlier_points_lr[0], inlier_points_lr[1])**2))
+        # Normalize score relative to image size, and flip so range is
+        # (0, 1) with 0 being bad, and 1 being good.
+        norm_scan_res = np.linalg.norm(np.array(da2.shape))
+        norm_score = score / norm_scan_res
+    else:  # Fitting failed, set score to max possible (full scan error).
+        logger.warning('Drift estimation failed, setting fitting score to '
+                       'worst possible.')
+        norm_score = WORST_FIT
+
+    logger.debug(f'Drift estimate fitting score (normalized): {norm_score}')
+
+    if display_fit and fit_transform:
+        display_estimated_transform(da1, da2, keypoints_lr, fit_transform,
+                                    inlier_matches, outlier_matches,
+                                    cmap, norm_score, figure)
+    return fit_transform, norm_score
 
 
 def display_estimated_transform(da1: xr.DataArray, da2: xr.DataArray,
