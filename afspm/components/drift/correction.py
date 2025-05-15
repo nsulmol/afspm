@@ -79,29 +79,6 @@ def compute_drift_snapshot(scan1: scan_pb2.Scan2d,
     da1 = ac.convert_scan_pb2_to_xarray(scan1)
     da2 = ac.convert_scan_pb2_to_xarray(scan2)
 
-    # # TODO: swap with matching spatial resolutions!
-    # spatial_resolutions = [proto_geo.spatial_resolution(scan)
-    #                        for scan in [scan1, scan2]]
-    # min_idx = spatial_resolutions.index(min(spatial_resolutions))
-    # max_idx = min_idx + 1 % 2
-    # required_scaling = spatial_resolutions[max_idx] / spatial_resolutions[min_idx]
-
-    # new_das = []
-    # for idx, da in enumerate([da1, da2]):
-    #     new_das.append(da if idx == max_idx else scale_da(da, required_scaling))
-
-    # transform, score = drift.estimate_transform(drift_model,
-    #                                             new_das[0], new_das[1],
-    #                                             display_fit,
-    #                                             figure=figure)
-
-
-    # required_scaling = proto_geo.spatial_resolution_ratio_b_a(scan1, scan2)
-    # new_da1 = scale_da(da1, required_scaling)
-    # transform, score = drift.estimate_transform(drift_model, new_da1, da2,
-    #                                             display_fit,
-    #                                             figure=figure)
-
     # Get intersection patches (scaled to scan2, as the transform is
     # for da2 to move to da1's position).
     inter_rect = proto_geo.rect_intersection(scan1.params.spatial.roi,
@@ -121,7 +98,7 @@ def compute_drift_snapshot(scan1: scan_pb2.Scan2d,
         drift_snapshot = DriftSnapshot(
             scan1.timestamp.ToDatetime(dt.timezone.utc),
             scan2.timestamp.ToDatetime(dt.timezone.utc),
-            -trans,  # TODO: was np.array()
+            -trans,
             units)  # also was trans!
         return drift_snapshot
     return None
@@ -129,6 +106,7 @@ def compute_drift_snapshot(scan1: scan_pb2.Scan2d,
 
 def get_drift_rate(vec: np.ndarray, dt1: dt.datetime, dt2: dt.datetime
                    ) -> np.ndarray:
+    """Estimate drift rate from vector and timestamps."""
     if dt2 is None or dt1 is None:
         return NO_VEC
 
@@ -136,26 +114,6 @@ def get_drift_rate(vec: np.ndarray, dt1: dt.datetime, dt2: dt.datetime
         return vec / (dt2 - dt1).total_seconds()
     except ZeroDivisionError:
         return NO_VEC
-
-
-def get_average_drift_rate(drift_snapshots: list[DriftSnapshot]
-                           ) -> np.ndarray:
-    spatial_unit = drift_snapshots[-1].unit
-
-    drift_rates = []
-    for snapshot in drift_snapshots:
-        units = (snapshot.unit, snapshot.unit)
-        vec = convert_list(snapshot.vec, units,
-                           (spatial_unit, spatial_unit))
-        vec = np.array(vec)
-        drift_rate = get_drift_rate(vec, snapshot.dt1, snapshot.dt2)
-        drift_rates.append(drift_rate)
-        logger.trace(f'vec: {vec}')
-        logger.trace(f'drift rate: {drift_rate}')
-        logger.trace(f'units: {units}')
-
-    avg_drift_rate = np.mean(np.array(drift_rates), axis=0)
-    return avg_drift_rate
 
 
 def estimate_correction_vec(drift_rate: np.ndarray,
