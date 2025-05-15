@@ -3,9 +3,8 @@
 import logging
 from dataclasses import dataclass
 import csv
-from typing import Any, TextIO
 
-from ..io.protos.generated import control_pb2
+from typing import Any, TextIO
 
 
 logger = logging.getLogger(__name__)
@@ -50,7 +49,9 @@ def init_csv_file(csv_attribs: CSVAttributes,
                   csv_fields: list[str]):
     """Initialize a csv file with header fields.
 
-    Opens a CSV file and writes the header fields to it.
+    Opens a CSV file and writes the header fields to it. If the file exists,
+    we append to it (including the header, so it is easy to tell when a new
+    run began).
 
     Args:
         csv_attribs: structure of attributes associated with a csv file
@@ -58,7 +59,7 @@ def init_csv_file(csv_attribs: CSVAttributes,
         csv_fields: list of field names.
     """
     logger.debug("Creating initial csv file, with header.")
-    with open(csv_attribs.filepath, 'w', newline='') as csv_file:
+    with open(csv_attribs.filepath, 'a', newline='') as csv_file:
         writer = create_dict_writer(csv_file, csv_attribs, csv_fields)
         writer.writeheader()
 
