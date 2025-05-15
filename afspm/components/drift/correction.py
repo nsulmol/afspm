@@ -89,11 +89,9 @@ def compute_drift_snapshot(scan1: scan_pb2.Scan2d,
                                                 display_fit,
                                                 figure=figure)
 
-    # TODO: Having to check if transform is not None is ugly as all heck...
-    # Why isn't the score just too low?
     # NOTE: We are doing -trans because we want to *correct* for the drift
-    # detected. Maybe that should be elsewhere???  # TODO
-    if score <= max_score and transform is not None:
+    # detected.
+    if score <= max_score:
         trans, units = drift.get_translation(da2, transform)
         drift_snapshot = DriftSnapshot(
             scan1.timestamp.ToDatetime(dt.timezone.utc),
