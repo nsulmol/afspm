@@ -82,7 +82,9 @@ def compute_drift_snapshot(scan1: scan_pb2.Scan2d,
     # for da2 to move to da1's position).
     inter_rect = proto_geo.rect_intersection(scan1.params.spatial.roi,
                                              scan2.params.spatial.roi)
-    patch1, patch2 = extract_and_scale_patches(da1, da2, inter_rect)
+
+    patch1, patch2, scale = extract_and_scale_patches(da1, da2,
+                                                      inter_rect)
 
     transform, score = drift.estimate_transform(drift_model, patch1, patch2,
                                                 display_fit,
@@ -92,6 +94,7 @@ def compute_drift_snapshot(scan1: scan_pb2.Scan2d,
     # detected.
     if score <= max_score:
         trans, units = drift.get_translation(da2, transform)
+        trans *= 1 / scale  # Update the transform given the scaling
         drift_snapshot = DriftSnapshot(
             scan1.timestamp.ToDatetime(dt.timezone.utc),
             scan2.timestamp.ToDatetime(dt.timezone.utc),
@@ -259,12 +262,15 @@ def extract_patch(da: xr.DataArray,
 def extract_and_scale_patches(da1: xr.DataArray,
                               da2: xr.DataArray,
                               rect: geometry_pb2.Rect2d,
-                              ) -> (xr.DataArray, xr.DataArray):
+                              ) -> (xr.DataArray, xr.DataArray, float):
     """Extract intersection patches from images, matching spatial res.
 
     Extract patches from da1 and da2 corresponding to rect, and update
-    them so they have matching spatial resolutions. For the latter, we
-    update da1 so it is the same spatial resolution as da2.
+    them so they have matching spatial resolutions. We choose the higher
+    resolution of the two patches as the resolution to scale to. For
+    use later, we also return the resolution ratio between patch2 and
+    the chosen one (so we can counter it later and ensure our data is
+    in the proper scaling).
 
     Args:
         da1: First DataArray.
@@ -272,11 +278,17 @@ def extract_and_scale_patches(da1: xr.DataArray,
         rect: intersection rectangle.
 
     Returns:
-        Tuple of associated patches (patch_da1, patch_da2).
+        Tuple of associated patches (patch_da1, patch_da2, scale),
+        where scale is the resolution ratio between patch2 and the
+        chosen resolution.
     """
     patches = [extract_patch(da1, rect), extract_patch(da2, rect)]
-    patches[0] = patches[0].interp_like(patches[1])
-    return tuple(patches)
+    high_res_patch = (patches[0] if patches[0].shape > patches[1].shape
+                      else patches[1])
+    scale_da2 = np.array(high_res_patch.shape) / np.array(patches[1].shape)
+
+    patches = [patch.interp_like(high_res_patch) for patch in patches]
+    return tuple(patches) + (scale_da2,)
 
 
 def scale_da(da: xr.DataArray, scale: float) -> xr.DataArray:
