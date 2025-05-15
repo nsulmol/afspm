@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 
 from . import drift
 from ...utils import array_converters as ac
-from ...utils.units import convert_list
 from ...utils import proto_geo
 
 from ...io.protos.generated import scan_pb2
@@ -97,7 +96,7 @@ def compute_drift_snapshot(scan1: scan_pb2.Scan2d,
             scan1.timestamp.ToDatetime(dt.timezone.utc),
             scan2.timestamp.ToDatetime(dt.timezone.utc),
             -trans,
-            units)  # also was trans!
+            units)
         return drift_snapshot
     return None
 
