@@ -244,14 +244,10 @@ class CSCorrectedRouter(router.ControlRouter):
 class CSCorrectedCache(cache.PubSubCache):
     """Corrects CS data before it is sent out to subscribers."""
 
-    # TODO: Remove update here? We don't use _corr_info in the cache, right?
-
     SCAN_ID = cache_logic.CacheLogic.get_envelope_for_proto(scan_pb2.Scan2d())
 
     def __init__(self, **kwargs):
         """Init - this class requires usage of from_parent."""
-        self._corr_info = None
-        self._update_weight = DEFAULT_UPDATE_WEIGHT
         self._observers = []
 
     def bind_to(self, callback):
@@ -284,18 +280,6 @@ class CSCorrectedCache(cache.PubSubCache):
         child._backend = parent._backend
         child._poller = parent._poller
         return child
-
-    def update_correction_info(self, corr_info: correction.CorrectionInfo,
-                               update_weight):
-        """Update our correction vector.
-
-        The correction vector is PCS -> SCS. The PubSubCache receives requests
-        from the Microscope in PCS, and must convert it to SCS (what components
-        expect). Thus, we use PCS -> SCS< which is the correction vector
-        without modifications.
-        """
-        self._corr_info = copy.deepcopy(corr_info)
-        self._update_weight = update_weight
 
 
 class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
@@ -510,10 +494,10 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
 
         # Notify logger if correction vec has changed
         if drift_has_changed:
-            logger.debug('The PCS-to-SCS correction vector has changed'
+            logger.warning('The PCS-to-SCS correction vector has changed'
                          f': {self.total_corr_info.vec} '
                          f'{self.total_corr_info.unit}.')
-            logger.debug(f'With drift rate: {self.total_corr_info.drift_rate} '
+            logger.warning(f'With drift rate: {self.total_corr_info.drift_rate} '
                          f'{self.total_corr_info.unit} / s.')
 
     def _update_io(self):
@@ -522,8 +506,6 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         Inform our IO nodes of the latest CorrectionInfo, so they may use
         it to 'correct' the coordinate system accordingly.
         """
-        self.pubsubcache.update_correction_info(self.total_corr_info,
-                                                self.update_weight)
         self.router.update_correction_info(self.total_corr_info,
                                            self.update_weight)
 
