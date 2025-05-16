@@ -382,7 +382,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
 
     SCAN_ID = cache_logic.CacheLogic.get_envelope_for_proto(scan_pb2.Scan2d())
     DEFAULT_CSV_ATTRIBUTES = csv.CSVAttributes('./drift_correction.csv')
-    DEFAULT_MIN_INTERSECTION_RATIO = 0.25
+    DEFAULT_MIN_INTERSECTION_RATIO = 0.5
     DEFAULT_MIN_SPATIAL_RES_RATIO = 0.25
     # This default fitting score is linked to RANSAC minimum residual threshold
     DEFAULT_MAX_FITTING_SCORE = drift.DEFAULT_RESIDUAL_THRESH_PERCENT
