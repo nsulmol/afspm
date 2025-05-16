@@ -42,10 +42,13 @@ PLT_LAYOUT = 'constrained'
 CACHE_KEY = 'pubsubcache'
 ROUTER_KEY = 'router'
 
+DEFAULT_UPDATE_WEIGHT = 0.9  # Update weight for averaging new data
+
 
 def get_converted_and_updated_vec(corr_info: correction.CorrectionInfo,
+                                  update_weight: float,
                                   unit: str,
-                                  curr_dt: dt.datetime | None
+                                  curr_dt: dt.datetime | None,
                                   ) -> np.ndarray:
     """Get correction vector, converted to proto units and drift corrected.
 
@@ -55,6 +58,7 @@ def get_converted_and_updated_vec(corr_info: correction.CorrectionInfo,
 
     Args:
         corr_info: CorrectionInfo associated with current drifting.
+        update_weight: weight applied for updating corr_info.
         unit: spatial unit we want the correction vector in.
         curr_dt: the current DateTime, used to update the vector for drift. If
             None, we do not update for drift.
@@ -65,7 +69,8 @@ def get_converted_and_updated_vec(corr_info: correction.CorrectionInfo,
 
     """
     drift_vec = correction.estimate_correction_no_snapshot(corr_info, curr_dt)
-    corr_info = correction.update_total_correction(corr_info, drift_vec)
+    corr_info = correction.update_total_correction(corr_info, drift_vec,
+                                                   update_weight)
 
     desired_units = (unit, unit)
     corr_units = (corr_info.unit, corr_info.unit)
@@ -76,6 +81,7 @@ def get_converted_and_updated_vec(corr_info: correction.CorrectionInfo,
 
 def correct_spatial_aspects(proto: scan_pb2.SpatialAspects,
                             corr_info: correction.CorrectionInfo,
+                            update_weight: float,
                             curr_dt: dt.datetime | None
                             ) -> scan_pb2.SpatialAspects:
     """Correct SpatialAspects given CorrectionInfo and (optional) DateTime.
@@ -86,6 +92,7 @@ def correct_spatial_aspects(proto: scan_pb2.SpatialAspects,
     Args:
         proto: SpatialAspects to update.
         corr_info: CorrectionInfo associated with current drifting.
+        update_weight: weight applied for updating corr_info.
         curr_dt: the current DateTime, used to update the vector for drift. If
             None, we do not update for drift.
 
@@ -94,7 +101,7 @@ def correct_spatial_aspects(proto: scan_pb2.SpatialAspects,
     """
     logger.trace(f'Spatial Aspects before correcting: {proto}')
     orig_tl = np.array([proto.roi.top_left.x, proto.roi.top_left.y])
-    corr_vec = get_converted_and_updated_vec(corr_info,
+    corr_vec = get_converted_and_updated_vec(corr_info, update_weight,
                                              proto.length_units,
                                              curr_dt)
 
@@ -108,6 +115,7 @@ def correct_spatial_aspects(proto: scan_pb2.SpatialAspects,
 
 def correct_probe_position(proto: spec_pb2.ProbePosition,
                            corr_info: correction.CorrectionInfo,
+                           update_weight: float,
                            curr_dt: dt.datetime | None
                            ) -> spec_pb2.ProbePosition:
     """Correct ProbePosition given CorrectionInfo and (optional) DateTime.
@@ -118,6 +126,7 @@ def correct_probe_position(proto: spec_pb2.ProbePosition,
     Args:
         proto: ProbePosition to update.
         corr_info: CorrectionInfo associated with current drifting.
+        update_weight: weight applied for updating corr_info.
         curr_dt: the current DateTime, used to update the vector for drift. If
             None, we do not update for drift.
 
@@ -138,7 +147,8 @@ def correct_probe_position(proto: spec_pb2.ProbePosition,
 
 
 def cs_correct_proto(proto: Message, corr_info: correction.CorrectionInfo,
-                     curr_dt: dt.datetime | None) -> Message:
+                     update_weight: float, curr_dt: dt.datetime | None
+                     ) -> Message:
     """Recursively go through a protobuf, correcting CS-based fields.
 
     When we find fields that should be corrected for an updated coordinate
@@ -147,6 +157,7 @@ def cs_correct_proto(proto: Message, corr_info: correction.CorrectionInfo,
     Args:
         proto: Message to update.
         corr_info: CorrectionInfo associated with current drifting.
+        update_weight: weight applied for updating corr_info.
         curr_dt: the current DateTime, used to update the vector for drift. If
             None, we do not update for drift.
 
@@ -160,11 +171,14 @@ def cs_correct_proto(proto: Message, corr_info: correction.CorrectionInfo,
         val = getattr(proto, field.name)
         new_val = None
         if isinstance(val, scan_pb2.SpatialAspects):
-            new_val = correct_spatial_aspects(val, corr_info, curr_dt)
+            new_val = correct_spatial_aspects(val, corr_info, update_weight,
+                                              curr_dt)
         elif isinstance(val, spec_pb2.ProbePosition):
-            new_val = correct_probe_position(val, corr_info, curr_dt)
+            new_val = correct_probe_position(val, corr_info, update_weight,
+                                             curr_dt)
         elif isinstance(val, Message):
-            new_val = cs_correct_proto(val, corr_info, curr_dt)
+            new_val = cs_correct_proto(val, corr_info, update_weight,
+                                       curr_dt)
 
         if new_val:
             vals_dict[field.name] = new_val
@@ -180,6 +194,7 @@ class CSCorrectedRouter(router.ControlRouter):
     def __init__(self):
         """Init - this class requires usage of from_parent."""
         self._corr_info = None
+        self._update_weight = DEFAULT_UPDATE_WEIGHT
 
     def _handle_send_req(self, req: control_pb2.ControlRequest,
                          proto: Message) -> (control_pb2.ControlResponse,
@@ -189,7 +204,8 @@ class CSCorrectedRouter(router.ControlRouter):
             # TODO: Should we have an option to determine whether or not we
             # correct for drift rate? What if our estimate is poop?
             curr_dt = dt.datetime.now(dt.timezone.utc)
-            proto = cs_correct_proto(proto, self._corr_info, curr_dt)
+            proto = cs_correct_proto(proto, self._corr_info,
+                                     self._update_weight, curr_dt)
 
         # Send out
         return super()._handle_send_req(req, proto)
@@ -210,7 +226,8 @@ class CSCorrectedRouter(router.ControlRouter):
         child.shutdown_was_requested = parent.shutdown_was_requested
         return child
 
-    def update_correction_info(self, corr_info: correction.CorrectionInfo):
+    def update_correction_info(self, corr_info: correction.CorrectionInfo,
+                               update_weight: float):
         """Update our correction vector.
 
         The correction vector is PCS -> SCS. The router is receiving
@@ -221,15 +238,20 @@ class CSCorrectedRouter(router.ControlRouter):
         self._corr_info = copy.deepcopy(corr_info)
         self._corr_info.vec = -self._corr_info.vec  # We want SCS -> PCS
 
+        self._update_weight = update_weight
+
 
 class CSCorrectedCache(cache.PubSubCache):
     """Corrects CS data before it is sent out to subscribers."""
+
+    # TODO: Remove update here? We don't use _corr_info in the cache, right?
 
     SCAN_ID = cache_logic.CacheLogic.get_envelope_for_proto(scan_pb2.Scan2d())
 
     def __init__(self, **kwargs):
         """Init - this class requires usage of from_parent."""
         self._corr_info = None
+        self._update_weight = DEFAULT_UPDATE_WEIGHT
         self._observers = []
 
     def bind_to(self, callback):
@@ -263,7 +285,8 @@ class CSCorrectedCache(cache.PubSubCache):
         child._poller = parent._poller
         return child
 
-    def update_correction_info(self, corr_info: correction.CorrectionInfo):
+    def update_correction_info(self, corr_info: correction.CorrectionInfo,
+                               update_weight):
         """Update our correction vector.
 
         The correction vector is PCS -> SCS. The PubSubCache receives requests
@@ -272,6 +295,7 @@ class CSCorrectedCache(cache.PubSubCache):
         without modifications.
         """
         self._corr_info = copy.deepcopy(corr_info)
+        self._update_weight = update_weight
 
 
 class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
@@ -337,6 +361,8 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
             over time.
         total_corr_info: total CorrectionInfo, fed to IO nodes so they can
             correct for the PCS-SCS transform.
+        update_weight: weight used to update total_corr_info with a new
+            estimate.
         filepath: path where we save our csv file containing all correction
             data associated to scans.
         min_intersection_ratio: minimum intersection area to scan ratio to
@@ -371,6 +397,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
                  min_intersection_ratio: float = DEFAULT_MIN_INTERSECTION_RATIO,
                  min_spatial_res_ratio: float = DEFAULT_MIN_SPATIAL_RES_RATIO,
                  max_fitting_score: float = DEFAULT_MAX_FITTING_SCORE,
+                 update_weight: float = DEFAULT_UPDATE_WEIGHT,
                  display_fit: bool = DEFAULT_DISPLAY_FIT, **kwargs):
         """Initialize our correction scheduler."""
         self.drift_model = (drift.create_drift_model() if drift_model is None
@@ -379,6 +406,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         self.min_intersection_ratio = min_intersection_ratio
         self.min_spatial_res_ratio = min_spatial_res_ratio
         self.max_fitting_score = max_fitting_score
+        self.update_weight = update_weight
 
         # TODO: Should this be a default in constructor of dataclass!?
         self.total_corr_info = correction.CorrectionInfo()
@@ -463,18 +491,18 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         estimate a correction vector based on the history.
         """
         if snapshot is not None:
-            logger.debug('Scan matched.')
+            logger.warning('Scan matched.')
             corr_info = correction.estimate_correction_from_snapshot(
                 snapshot, self.total_corr_info)
-            logger.trace(f'delta corr_info: {corr_info}')
+            logger.warning(f'delta corr_info: {corr_info}')
         else:
-            logger.debug('No match. Estimating from prior info.')
+            logger.warning('No match. Estimating from prior info.')
             corr_info = correction.estimate_correction_no_snapshot(
                 self.total_corr_info, new_scan.timestamp.ToDatetime(
                     dt.timezone.utc))
-            logger.trace(f'delta corr_info: {corr_info}')
+            logger.warning(f'delta corr_info: {corr_info}')
         new_tot_corr_info = correction.update_total_correction(
-            self.total_corr_info, corr_info)
+            self.total_corr_info, corr_info, self.update_weight)
 
         drift_has_changed = not np.all(np.isclose(
             new_tot_corr_info.vec, self.total_corr_info.vec))
@@ -494,8 +522,10 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         Inform our IO nodes of the latest CorrectionInfo, so they may use
         it to 'correct' the coordinate system accordingly.
         """
-        self.pubsubcache.update_correction_info(self.total_corr_info)
-        self.router.update_correction_info(self.total_corr_info)
+        self.pubsubcache.update_correction_info(self.total_corr_info,
+                                                self.update_weight)
+        self.router.update_correction_info(self.total_corr_info,
+                                           self.update_weight)
 
     def update(self, new_scan: scan_pb2.Scan2d):
         """Update correction infos given a new scan.
@@ -518,6 +548,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         # First things first: the received scan is in the PCS. Convert to our
         # *current* SCS.
         new_scan = cs_correct_proto(new_scan, self.total_corr_info,
+                                    self.update_weight,
                                     new_scan.timestamp.ToDatetime(
                                         dt.timezone.utc))
 

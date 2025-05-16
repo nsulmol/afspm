@@ -215,6 +215,7 @@ def estimate_correction_from_snapshot(drift_snapshot: DriftSnapshot,
 
 def update_total_correction(total_corr_info: CorrectionInfo,
                             latest_corr_info: CorrectionInfo,
+                            update_weight: float,
                             ) -> CorrectionInfo:
     """Update the total correction based on a new estimate.
 
@@ -223,23 +224,42 @@ def update_total_correction(total_corr_info: CorrectionInfo,
     since the experiment began. For that, we need to continually add a kept
     total_corr_info's correction vector to it.
 
-    Note that we *only* update the correction vector. The drift rate should be
-    based on the latest_corr_info, as should the DateTime.
+    For the updating, we also consider a 'weight' applied to the new data vs.
+    the old data. The operation is essentially:
+        updated_val = (1 - weight) * old_val + weight * new_val
+    and is applied both to the drift rate and the update vector. A value of 1.0
+    would mean we completely disregard prior drift rates in our calculations. A
+    value of 0.5 would mean we average them with equal weights.
+
+    For the vector, our update val considers the prior 'assumed' vector
+    (considering the time delta and old drift rate) and the latest vector.
+    The weighted result is added to the current 'total' vector (which contains
+    the total drift vector over the experiment).
 
     Args:
         total_corr_info: total CorrectionInfo from the beginning of the
             experiment.
         latest_corr_info: 'local' CorrectionInfo created from the latest
             estimation.
+        update_weight: how much to weight the new drift rate and vector vs.
+            the prior one.
 
     Returns:
         CorrectionInfo where latest_corr_info's vec has been updated to
             contain that of total_corr_info (additive).
     """
-    vec = total_corr_info.vec + latest_corr_info.vec
+    assumed_vec = estimate_correction_vec(total_corr_info.drift_rate,
+                                          total_corr_info.curr_dt,
+                                          latest_corr_info.curr_dt)
+    update_vec = ((1 - update_weight) * assumed_vec +
+                  update_weight * latest_corr_info.vec)
+    vec = total_corr_info.vec + update_vec
+
+    drift_rate = ((1 - update_weight) * total_corr_info.drift_rate +
+                  update_weight * latest_corr_info.drift_rate)
+
     return CorrectionInfo(latest_corr_info.curr_dt,
-                          vec,
-                          latest_corr_info.drift_rate)
+                          vec, drift_rate)
 
 
 def extract_patch(da: xr.DataArray,
