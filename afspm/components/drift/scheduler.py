@@ -186,7 +186,7 @@ def cs_correct_proto(proto: Message, corr_info: correction.CorrectionInfo,
 class CSCorrectedRouter(router.ControlRouter):
     """Corrects CS data before it is sent out via the router."""
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         """Init - this class requires usage of from_parent."""
         self._corr_info = None
         self._update_weight = DEFAULT_UPDATE_WEIGHT
@@ -244,6 +244,8 @@ class CSCorrectedCache(cache.PubSubCache):
     def __init__(self, **kwargs):
         """Init - this class requires usage of from_parent."""
         self._observers = []
+        self._corr_info = None
+        self._update_weight = DEFAULT_UPDATE_WEIGHT
 
     def bind_to(self, callback):
         """Bind callback to scan having been received."""
@@ -251,12 +253,23 @@ class CSCorrectedCache(cache.PubSubCache):
 
     def send_message(self, proto: Message):
         """Override to correct CS data before sending out."""
-        if isinstance(proto, scan_pb2.Scan2d):
-            # Call observers so they can update their logic on a new scan
-            # change.
-            for callback in self._observers:
-                callback(proto)
+        for callback in self._observers:
+            callback(proto)
 
+        # Correct CS data of proto
+        if self._corr_info is not None:
+            # Get curr_dt for Scans and Specs, so we ensure their locations account
+            # for drift rate.
+            # TODO: Should we have an option to determine whether or not we
+            # correct for drift rate? What if our estimate is poop?
+            curr_dt = dt.datetime.now(dt.timezone.utc)
+            if isinstance(proto, scan_pb2.Scan2d):
+                curr_dt = proto.timestamp.ToDatetime(dt.timezone.utc)
+            elif isinstance(proto, spec_pb2.Spec1d):
+                curr_dt = proto.timestamp.ToDateTime(dt.timezone.utc)
+
+            proto = cs_correct_proto(proto, self._corr_info,
+                                     self._update_weight, curr_dt)
         super().send_message(proto)
 
     @classmethod
@@ -275,6 +288,12 @@ class CSCorrectedCache(cache.PubSubCache):
         child._backend = parent._backend
         child._poller = parent._poller
         return child
+
+    def update_correction_info(self, corr_info: correction.CorrectionInfo,
+                               update_weight: float):
+        """Update our correction vector."""
+        self._corr_info = copy.deepcopy(corr_info)
+        self._update_weight = update_weight
 
 
 class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
@@ -408,11 +427,12 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         super().__init__(**kwargs)
 
         # In order to update our logic, we bind update to the
-        # cache receiving a scan (i.e. updates from the Microscope).
-        self.pubsubcache.bind_to(self.update)
+        # cache receiving a message (i.e. updates from the Microscope).
+        self.pubsubcache.bind_to(self.cache_received_message)
 
         csv.init_csv_file(self.csv_attribs, self.CSV_FIELDS)
 
+    # ----- CSV things ----- #
     @staticmethod
     def _get_metadata_row(scan: scan_pb2.Scan2d,
                           corr_info: correction.CorrectionInfo,
@@ -424,19 +444,6 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
                     corr_info.drift_rate,
                     estimated_from_vec]
         return row_vals
-
-    def _get_scans_from_cache(self):
-        # The cache is a key:val map of deques of items.
-        # So we need to filter through each deque and concat the values
-        # if they are scans.
-        scan_deques = [val for key, val in self.pubsubcache.cache.items()
-                       if self.SCAN_ID in key]
-
-        # Go from list of lists to flattened single list (extending a new list)
-        concatenated_scans = []
-        for scan_deque in scan_deques:
-            concatenated_scans.extend(scan_deque)
-        return concatenated_scans
 
     def _get_drift_snapshot(self, new_scan: scan_pb2.Scan2d
                             ) -> correction.DriftSnapshot | None:
@@ -457,6 +464,66 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
 
         plt.show(block=False)  # TODO should this be elsewhere? At start?
         return snapshot
+
+    def _get_scans_from_cache(self):
+        # The cache is a key:val map of deques of items.
+        # So we need to filter through each deque and concat the values
+        # if they are scans.
+        scan_deques = [val for key, val in self.pubsubcache.cache.items()
+                       if self.SCAN_ID in key]
+
+        # Go from list of lists to flattened single list (extending a new list)
+        concatenated_scans = []
+        for scan_deque in scan_deques:
+            concatenated_scans.extend(scan_deque)
+        return concatenated_scans
+
+    # ----- Drift mapping stuff ----- #
+    def cache_received_message(self, proto: Message):
+        """Analyze scans whenever the cache receives them."""
+        if isinstance(proto, scan_pb2.Scan2d):
+            self.update(proto)
+
+    def update(self, new_scan: scan_pb2.Scan2d):
+        """Update correction infos given a new scan.
+
+        This method updates internal logic for our CS Correction given that
+        a new scan has been received. We do the following:
+        - Update CorrectionInfos: try to match the new scan to a scan in our
+        cache. If we find a match, we have a new CorrectionInfo (containing the
+        translation vector beween the scans) to add to our history.
+        - Update the correction vec: if we found a match between the new scan
+        and history, we can use the latest CorrectionInfo to get our correction
+        vector estimate. If we did not, we can estimate this vector from our
+        history.
+        - Save this update in our historical csv file.
+
+        Args:
+            new_scan: the incoming scan, which we use to update our correction
+                estimates.
+        """
+        # First things first: the received scan is in the PCS. Convert to our
+        # *current* SCS.
+        original_scan = copy.deepcopy(new_scan)
+        corrected_scan = cs_correct_proto(original_scan, self.total_corr_info,
+                                          self.update_weight,
+                                          new_scan.timestamp.ToDatetime(
+                                              dt.timezone.utc))
+
+        snapshot = self._get_drift_snapshot(corrected_scan)
+        self._update_curr_corr_info(corrected_scan, snapshot)
+
+        # Determine if the drift was too much and we must redo our scan.
+        # Note that we feed the original scan, as we will update it with
+        # the latest correction info.
+#        self._determine_redo_scan(original_scan, corrected_scan)
+
+        scan_matched = snapshot is not None
+        row_vals = self._get_metadata_row(corrected_scan, self.total_corr_info,
+                                          scan_matched)
+        csv.save_csv_row(self.csv_attribs, self.CSV_FIELDS,
+                         row_vals)
+        self._update_io()
 
     def _update_curr_corr_info(self, new_scan: scan_pb2.Scan2d,
                                snapshot: correction.DriftSnapshot | None):
@@ -501,47 +568,14 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         """
         self.router.update_correction_info(self.total_corr_info,
                                            self.update_weight)
-
-    def update(self, new_scan: scan_pb2.Scan2d):
-        """Update correction infos given a new scan.
-
-        This method updates internal logic for our CS Correction given that
-        a new scan has been received. We do the following:
-        - Update CorrectionInfos: try to match the new scan to a scan in our
-        cache. If we find a match, we have a new CorrectionInfo (containing the
-        translation vector beween the scans) to add to our history.
-        - Update the correction vec: if we found a match between the new scan
-        and history, we can use the latest CorrectionInfo to get our correction
-        vector estimate. If we did not, we can estimate this vector from our
-        history.
-        - Save this update in our historical csv file.
-
-        Args:
-            new_scan: the incoming scan, which we use to update our correction
-                estimates.
-        """
-        # First things first: the received scan is in the PCS. Convert to our
-        # *current* SCS.
-        new_scan = cs_correct_proto(new_scan, self.total_corr_info,
-                                    self.update_weight,
-                                    new_scan.timestamp.ToDatetime(
-                                        dt.timezone.utc))
-
-        snapshot = self._get_drift_snapshot(new_scan)
-        self._update_curr_corr_info(new_scan, snapshot)
-
-        # TODO: What if the drift is too much? At what point do we take over and
-        # redo the scan?
-
-        scan_matched = snapshot is not None
-        row_vals = self._get_metadata_row(new_scan, self.total_corr_info,
-                                          scan_matched)
-        csv.save_csv_row(self.csv_attribs, self.CSV_FIELDS,
-                         row_vals)
-        self._update_io()
+        self.pubsubcache.update_correction_info(self.total_corr_info,
+                                                self.update_weight)
 
     def run_per_loop(self):
-        """Override to update figures every loop."""
+        """Override to update figures."""
         super().run_per_loop()
+        self._update_ui()
+
+    def _update_ui(self):
         self.figure.canvas.draw_idle()
         self.figure.canvas.flush_events()
