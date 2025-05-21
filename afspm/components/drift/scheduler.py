@@ -7,7 +7,6 @@ vector needed to perform on any incoming request or outgoing message such that
 it is always in the estimated SCS.
 """
 
-from collections import deque
 import logging
 import numpy as np
 import copy
@@ -48,7 +47,7 @@ DEFAULT_UPDATE_WEIGHT = 0.9  # Update weight for averaging new data
 def get_converted_and_updated_vec(corr_info: correction.CorrectionInfo,
                                   update_weight: float,
                                   unit: str,
-                                  curr_dt: dt.datetime | None,
+                                  curr_dt: dt.datetime
                                   ) -> np.ndarray:
     """Get correction vector, converted to proto units and drift corrected.
 
@@ -60,8 +59,7 @@ def get_converted_and_updated_vec(corr_info: correction.CorrectionInfo,
         corr_info: CorrectionInfo associated with current drifting.
         update_weight: weight applied for updating corr_info.
         unit: spatial unit we want the correction vector in.
-        curr_dt: the current DateTime, used to update the vector for drift. If
-            None, we do not update for drift.
+        curr_dt: the current DateTime, used to update the vector for drift.
 
     Returns:
         the correction vector after (optionally) correcting for drift and
@@ -82,7 +80,7 @@ def get_converted_and_updated_vec(corr_info: correction.CorrectionInfo,
 def correct_spatial_aspects(proto: scan_pb2.SpatialAspects,
                             corr_info: correction.CorrectionInfo,
                             update_weight: float,
-                            curr_dt: dt.datetime | None
+                            curr_dt: dt.datetime
                             ) -> scan_pb2.SpatialAspects:
     """Correct SpatialAspects given CorrectionInfo and (optional) DateTime.
 
@@ -93,8 +91,7 @@ def correct_spatial_aspects(proto: scan_pb2.SpatialAspects,
         proto: SpatialAspects to update.
         corr_info: CorrectionInfo associated with current drifting.
         update_weight: weight applied for updating corr_info.
-        curr_dt: the current DateTime, used to update the vector for drift. If
-            None, we do not update for drift.
+        curr_dt: the current DateTime, used to update the vector for drift.
 
     Returns:
         updated proto of SpatialAspects.
@@ -116,7 +113,7 @@ def correct_spatial_aspects(proto: scan_pb2.SpatialAspects,
 def correct_probe_position(proto: spec_pb2.ProbePosition,
                            corr_info: correction.CorrectionInfo,
                            update_weight: float,
-                           curr_dt: dt.datetime | None
+                           curr_dt: dt.datetime
                            ) -> spec_pb2.ProbePosition:
     """Correct ProbePosition given CorrectionInfo and (optional) DateTime.
 
@@ -127,8 +124,7 @@ def correct_probe_position(proto: spec_pb2.ProbePosition,
         proto: ProbePosition to update.
         corr_info: CorrectionInfo associated with current drifting.
         update_weight: weight applied for updating corr_info.
-        curr_dt: the current DateTime, used to update the vector for drift. If
-            None, we do not update for drift.
+        curr_dt: the current DateTime, used to update the vector for drift.
 
     Returns:
         updated proto of ProbePosition.
@@ -147,7 +143,7 @@ def correct_probe_position(proto: spec_pb2.ProbePosition,
 
 
 def cs_correct_proto(proto: Message, corr_info: correction.CorrectionInfo,
-                     update_weight: float, curr_dt: dt.datetime | None
+                     update_weight: float, curr_dt: dt.datetime
                      ) -> Message:
     """Recursively go through a protobuf, correcting CS-based fields.
 
@@ -158,8 +154,7 @@ def cs_correct_proto(proto: Message, corr_info: correction.CorrectionInfo,
         proto: Message to update.
         corr_info: CorrectionInfo associated with current drifting.
         update_weight: weight applied for updating corr_info.
-        curr_dt: the current DateTime, used to update the vector for drift. If
-            None, we do not update for drift.
+        curr_dt: the current DateTime, used to update the vector for drift.
 
     Returns:
         updated Message.
@@ -341,8 +336,6 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     Attributes:
         drift_model: the DriftModel used to estimate a correction vector
             between two scans.
-        drift_snapshots: a deque of DriftSnapshots that has been collected
-            over time.
         total_corr_info: total CorrectionInfo, fed to IO nodes so they can
             correct for the PCS-SCS transform.
         update_weight: weight used to update total_corr_info with a new
