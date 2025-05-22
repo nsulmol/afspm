@@ -47,7 +47,7 @@ DEFAULT_UPDATE_WEIGHT = 0.9  # Update weight for averaging new data
 def get_converted_and_updated_vec(corr_info: correction.CorrectionInfo,
                                   update_weight: float,
                                   unit: str,
-                                  curr_dt: dt.datetime
+                                  curr_dt: dt.datetime | None
                                   ) -> np.ndarray:
     """Get correction vector, converted to proto units and drift corrected.
 
@@ -60,15 +60,18 @@ def get_converted_and_updated_vec(corr_info: correction.CorrectionInfo,
         update_weight: weight applied for updating corr_info.
         unit: spatial unit we want the correction vector in.
         curr_dt: the current DateTime, used to update the vector for drift.
+            If None, do not correct for temporal drift.
 
     Returns:
         the correction vector after (optionally) correcting for drift and
             converting to desired spatial units.
 
     """
-    drift_vec = correction.estimate_correction_no_snapshot(corr_info, curr_dt)
-    corr_info = correction.update_total_correction(corr_info, drift_vec,
-                                                   update_weight)
+    if curr_dt is not None:
+        drift_vec = correction.estimate_correction_no_snapshot(corr_info,
+                                                               curr_dt)
+        corr_info = correction.update_total_correction(corr_info, drift_vec,
+                                                       update_weight)
 
     desired_units = (unit, unit)
     corr_units = (corr_info.unit, corr_info.unit)
@@ -80,7 +83,7 @@ def get_converted_and_updated_vec(corr_info: correction.CorrectionInfo,
 def correct_spatial_aspects(proto: scan_pb2.SpatialAspects,
                             corr_info: correction.CorrectionInfo,
                             update_weight: float,
-                            curr_dt: dt.datetime
+                            curr_dt: dt.datetime | None
                             ) -> scan_pb2.SpatialAspects:
     """Correct SpatialAspects given CorrectionInfo and (optional) DateTime.
 
@@ -92,6 +95,7 @@ def correct_spatial_aspects(proto: scan_pb2.SpatialAspects,
         corr_info: CorrectionInfo associated with current drifting.
         update_weight: weight applied for updating corr_info.
         curr_dt: the current DateTime, used to update the vector for drift.
+            If None, do not correct for temporal drift.
 
     Returns:
         updated proto of SpatialAspects.
@@ -113,7 +117,7 @@ def correct_spatial_aspects(proto: scan_pb2.SpatialAspects,
 def correct_probe_position(proto: spec_pb2.ProbePosition,
                            corr_info: correction.CorrectionInfo,
                            update_weight: float,
-                           curr_dt: dt.datetime
+                           curr_dt: dt.datetime | None
                            ) -> spec_pb2.ProbePosition:
     """Correct ProbePosition given CorrectionInfo and (optional) DateTime.
 
@@ -125,6 +129,7 @@ def correct_probe_position(proto: spec_pb2.ProbePosition,
         corr_info: CorrectionInfo associated with current drifting.
         update_weight: weight applied for updating corr_info.
         curr_dt: the current DateTime, used to update the vector for drift.
+            If None, do not correct for temporal drift.
 
     Returns:
         updated proto of ProbePosition.
@@ -143,7 +148,7 @@ def correct_probe_position(proto: spec_pb2.ProbePosition,
 
 
 def cs_correct_proto(proto: Message, corr_info: correction.CorrectionInfo,
-                     update_weight: float, curr_dt: dt.datetime
+                     update_weight: float, curr_dt: dt.datetime | None
                      ) -> Message:
     """Recursively go through a protobuf, correcting CS-based fields.
 
@@ -155,6 +160,7 @@ def cs_correct_proto(proto: Message, corr_info: correction.CorrectionInfo,
         corr_info: CorrectionInfo associated with current drifting.
         update_weight: weight applied for updating corr_info.
         curr_dt: the current DateTime, used to update the vector for drift.
+            If None, do not correct for temporal drift.
 
     Returns:
         updated Message.
@@ -258,16 +264,13 @@ class CSCorrectedCache(cache.PubSubCache):
 
         # Correct CS data of proto
         if self._corr_info is not None:
-            # Get curr_dt for Scans and Specs, so we ensure their locations account
-            # for drift rate.
-            # TODO: Should we have an option to determine whether or not we
-            # correct for drift rate? What if our estimate is poop?
+            # Get curr_dt for Scans and Specs, so we ensure their locations
+            # account for drift rate.
             curr_dt = dt.datetime.now(dt.timezone.utc)
             if isinstance(proto, scan_pb2.Scan2d):
                 curr_dt = proto.timestamp.ToDatetime(dt.timezone.utc)
             elif isinstance(proto, spec_pb2.Spec1d):
                 curr_dt = proto.timestamp.ToDateTime(dt.timezone.utc)
-
             proto = cs_correct_proto(proto, self._corr_info,
                                      self._update_weight, curr_dt)
         super().send_message(proto)
