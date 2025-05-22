@@ -123,10 +123,10 @@ def estimate_correction_vec(drift_rate: np.ndarray,
     This is a correction vector *only* considering drift rate. Thus, it only
     gives the 'current snapshot' of drift, and should eventually be combined
     with a running count of the correction vector to get a total correction.
+
+    Note that this method can end up being negative if dt1 is after dt2.
     """
     if dt1 is None or dt2 is None:
-        return NO_VEC
-    if dt1 > dt2:  # Only add drift if our second timestamp is after our first.
         return NO_VEC
 
     return drift_rate * (dt2 - dt1).total_seconds()
