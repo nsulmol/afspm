@@ -15,7 +15,11 @@ from ...io.protos.generated import control_pb2
 logger = logging.getLogger(__name__)
 
 
-class MicroscopeScheduler(afspmc.AfspmComponentBase):
+CACHE_KEY = 'pubsubcache'
+ROUTER_KEY = 'router'
+
+
+class MicroscopeScheduler(afspmc.AfspmComponent):
     """Manages communication between MicroscopeTranslator and multiple clients.
 
     The MicroscopeScheduler serves as an intermediary between the
@@ -59,10 +63,16 @@ class MicroscopeScheduler(afspmc.AfspmComponentBase):
         self.pubsubcache = pubsubcache
         self.router = router
         self.control_state = control_pb2.ControlState()
-        # AfspmComponent constructor: no subscriber or control_client
-        # are provided, as they are not applicable here.
-        super().__init__(name, subscriber=None, control_client=None, ctx=ctx,
-                         loop_sleep_s=loop_sleep_s, beat_period_s=beat_period_s)
+
+        sub = (kwargs[afspmc.SUBSCRIBER_KEY] if afspmc.SUBSCRIBER_KEY in kwargs
+               else None)
+        client = (kwargs[afspmc.CLIENT_KEY] if afspmc.CLIENT_KEY in kwargs
+                  else None)
+        super().__init__(name=name,
+                         subscriber=sub, control_client=client,
+                         ctx=ctx,
+                         loop_sleep_s=loop_sleep_s,
+                         beat_period_s=beat_period_s, **kwargs)
 
     def run_per_loop(self):  # TODO: Change this to be private everywhere!?
         """Check internals to be done per loop in run().
