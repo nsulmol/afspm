@@ -327,6 +327,11 @@ def estimate_transform(model: DriftModel,
         return None, WORST_FIT
 
     try:
+        logger.debug(f'# keypoints L: {keypoints_lr[0].shape[0]}, '
+                     f'R: {keypoints_lr[1].shape[0]}')
+        logger.debug(f'# descriptors L: {descriptors_lr[0].shape[0]}, '
+                     f'R: {descriptors_lr[1].shape[0]}')
+
         matches, points_lr = _match_descriptors(model, keypoints_lr,
                                                 descriptors_lr)
     except (ValueError, RuntimeError) as e:
