@@ -76,6 +76,11 @@ def publisher(publisher_url, ctx):
     return Publisher(publisher_url, ctx=ctx)
 
 
+@pytest.fixture
+def handler_name():
+    return 'MyScanHandler'
+
+
 SCAN_PARAMS = common.create_scan_params_2d([0, 0], [200, 300],
                                            'nm')
 PROBE_POS = common.create_probe_pos([1, 2], 'nm')
@@ -92,11 +97,11 @@ def next_params_method_probe_pos() -> spec_pb2.ProbePosition:
 
 def scan_handler_routine(publisher_url, rerun_wait_s,
                          server_url, client_uuid, ctx,
-                         next_params_method):
+                         next_params_method, handler_name):
     logger.info("Startup scan_handler_routine")
     client = ControlClient(server_url, ctx, client_uuid)
     subscriber = Subscriber(publisher_url, ctx=ctx)
-    scan_handler = ScanHandler(rerun_wait_s, next_params_method)
+    scan_handler = ScanHandler(handler_name, rerun_wait_s, next_params_method)
 
     continue_running = True
     while continue_running:
@@ -111,11 +116,11 @@ def scan_handler_routine(publisher_url, rerun_wait_s,
 
 @pytest.fixture
 def thread_scan_handler(publisher_url, rerun_wait_s,
-                        server_url, client_uuid, ctx):
+                        server_url, client_uuid, handler_name, ctx):
     thread = threading.Thread(target=scan_handler_routine,
                               args=(publisher_url, rerun_wait_s,
                                     server_url, client_uuid, ctx,
-                                    next_params_method_scan))
+                                    next_params_method_scan, handler_name))
     thread.daemon = True
     thread.start()
     time.sleep(2*common.REQUEST_TIMEOUT_MS / 1000)

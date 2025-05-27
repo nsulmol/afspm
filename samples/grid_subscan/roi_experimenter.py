@@ -97,14 +97,13 @@ class ROIExperimenter(AfspmComponent):
 
         self.rng = np.random.default_rng()  # For non-replacement random choice
 
-        self.scan_handler = ScanHandler(self.rerun_wait_s,
-                                        self.get_scan_params_for_next_scan)
-
         self.sscan_origins = None
         self.sscan_phys_size = None
         self._set_up_sub_scans(sub_rois_per_dim)
 
         super().__init__(**kwargs)
+        self.scan_handler = ScanHandler(self.name, self.rerun_wait_s,
+                                        self.get_scan_params_for_next_scan)
 
     def _set_up_sub_scans(self, sub_rois_per_dim: int):
         """Initiailizes sscan_origins and sscan_phys_size."""

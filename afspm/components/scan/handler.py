@@ -36,7 +36,9 @@ class ScanHandler:
     the right location).
 
     If we do not have control, it will log this and continue requesting control
-    between sleeps of rerun_wait_s.
+    between sleeps of rerun_wait_s. Note that this assumes the experiment has
+    logged the ExperimentProblem that this ScanHandler supports
+    (self.problem_to_solve). If not, we do not request control.
 
     If the MicroscopeTranslator returns an unexpected error, it will log this
     and retry the full request (ensuring parameters are set) between sleeps of
@@ -59,8 +61,10 @@ class ScanHandler:
         problem_to_solve: ExperimentProblem the calling component solves (
             EP_NONE if generic). If the scheduler does not have this problem
             flagged, we do nothing until it does.
+        component_id: holds str to indicate the component using this handler.
+            Used when logging messages.
 
-        _problems_set: current problems set the scheduler has.
+        _control_state: current ControlState.
         _next_params: current ScanParameters2d or ProbePosition instance.
         _scope_state: current ScopeState.
         _desired_scope_state: desired ScopeState.
@@ -75,7 +79,7 @@ class ScanHandler:
     COLLECTING_STATES = [scan_pb2.ScopeState.SS_SCANNING,
                          scan_pb2.ScopeState.SS_SPEC]
 
-    def __init__(self, rerun_wait_s: int,
+    def __init__(self, component_id: str, rerun_wait_s: int,
                  get_next_params: Callable[[Any],
                                            scan_pb2.ScanParameters2d],
                  next_params_kwargs: dict = None,
@@ -87,8 +91,9 @@ class ScanHandler:
         self.next_params_kwargs = (next_params_kwargs if
                                    next_params_kwargs else {})
         self.problem_to_solve = problem
+        self.component_id = component_id
 
-        self._problems_set = {}
+        self._control_state = None
         self._next_params = None
         self._scope_state = scan_pb2.ScopeState.SS_UNDEFINED
         self._desired_scope_state = scan_pb2.ScopeState.SS_UNDEFINED
@@ -109,7 +114,7 @@ class ScanHandler:
             component: AfspmComponent instance.
         """
         if isinstance(proto, control_pb2.ControlState):
-            self._problems_set = proto.problems_set
+            self._control_state = proto
         if isinstance(proto, scan_pb2.ScopeStateMsg):
             self._handle_scope_state_receipt(proto)
             self._perform_scanning_logic(control_client)
@@ -132,8 +137,10 @@ class ScanHandler:
         Args:
             control_client: AfspmComponent's control_client.
         """
+        problems_set = (self._control_state.problems_set if
+                        self._control_state is not None else {})
         problem_in_problems_set = common.is_problem_in_problems_set(
-            self.problem_to_solve, self._problems_set)
+            self.problem_to_solve, problems_set)
         if problem_in_problems_set and self._rerun_sleep_ts is not None:
             enough_time_has_passed = (time.time() - self._rerun_sleep_ts >
                                       self.rerun_wait_s)
@@ -156,9 +163,13 @@ class ScanHandler:
         Args:
             proto: received ScopeStateMsg protobuf from the AfspmComponent.
         """
-        logger.debug("Received new scope state: %s",
+        logger.debug(f"{self.component_id}: Received new scope state: %s",
                      common.get_enum_str(scan_pb2.ScopeState,
                                          proto.scope_state))
+
+        if self._control_state is None:
+            return  # Early return, as we cannot be sure we are in control.
+
         last_state = copy.deepcopy(self._scope_state)
         self._scope_state = proto.scope_state
 
@@ -170,20 +181,26 @@ class ScanHandler:
                                self._scope_state == scan_pb2.ScopeState.SS_FREE)
         finished_moving = (last_state == scan_pb2.ScopeState.SS_MOVING and
                            self._scope_state == scan_pb2.ScopeState.SS_FREE)
+        not_in_control = (self._control_state.client_in_control_id !=
+                          self.component_id)
 
-        if interrupted:
-            logger.info("A scan was interrupted! Will restart what we were "
-                        "doing.")
+        if interrupted or not_in_control:
+            if interrupted:
+                logger.info(f"{self.component_id}: A scan was interrupted! "
+                            "Will restart what we were doing.")
             self._desired_scope_state = scan_pb2.ScopeState.SS_MOVING
         elif first_startup or finished_collecting:
             if first_startup:
-                logger.info("First startup, sending first scan params.")
+                logger.info(f"{self.component_id}: First startup, sending "
+                            "first scan params.")
             else:
-                logger.info("Finished scan, preparing next scan params.")
+                logger.info(f"{self.component_id}: Finished scan, preparing "
+                            "next scan params.")
             self._next_params = self.get_next_params(**self.next_params_kwargs)
             self._desired_scope_state = scan_pb2.ScopeState.SS_MOVING
         elif finished_moving:
-            logger.info("Finished moving, will request collection.")
+            logger.info(f"{self.component_id}: Finished moving, will request "
+                        "collection.")
             self._desired_scope_state = self._get_collection_scope_state(
                 self._next_params)
 
@@ -196,14 +213,17 @@ class ScanHandler:
         Args:
             control_client: AfspmComponent's ControlClient.
         """
+        problems_set = (self._control_state.problems_set if
+                        self._control_state is not None else {})
         problem_in_problems_set = common.is_problem_in_problems_set(
-            self.problem_to_solve, self._problems_set)
+            self.problem_to_solve, problems_set)
         scope_state_undefined = (scan_pb2.ScopeState.SS_UNDEFINED in
                                  (self._scope_state,
                                   self._desired_scope_state))
         if scope_state_undefined or not problem_in_problems_set:
-            logger.debug("Not performing scanning logic because ScopeState "
-                         "undefined or problem not in problems set.")
+            logger.debug(f"{self.component_id}: Not performing scanning logic "
+                         "because ScopeState undefined or problem not in "
+                         "problems set.")
             self._handle_rerun(True)
             return  # Early return, we're not ready yet.
 
@@ -211,16 +231,17 @@ class ScanHandler:
         req_to_call = None
         req_params = {}
         if self._scope_state != self._desired_scope_state:
-            logger.info("In state %s, wanting state %s; requesting.",
+            logger.info(f"{self.component_id}: In state %s, wanting "
+                        "state %s.",
                         common.get_enum_str(scan_pb2.ScopeState,
                                             self._scope_state),
                         common.get_enum_str(scan_pb2.ScopeState,
                                             self._desired_scope_state))
             if self._desired_scope_state == scan_pb2.ScopeState.SS_MOVING:
                 if not self._next_params:
-                    logger.info("Cannot send params, because "
-                                "get_next_params returned None."
-                                "Sleeping and retrying.")
+                    logger.debug(f"{self.component_id}: Cannot send params, "
+                                 "because get_next_params returned None."
+                                 "Sleeping and retrying.")
                     self._handle_rerun(True)
                     return
 
@@ -237,7 +258,8 @@ class ScanHandler:
             rep = send_req_handle_ctrl(control_client, req_to_call,
                                        req_params, self.problem_to_solve)
             if rep != control_pb2.ControlResponse.REP_SUCCESS:
-                logger.info("Sleeping and retrying later.")
+                logger.debug(f"{self.component_id}: Sleeping and retrying "
+                             "later.")
                 self._handle_rerun(True)
 
     @staticmethod
@@ -312,9 +334,10 @@ class ScanningComponent(AfspmComponent):
         """Init class."""
         # Pass self as 'component' to next params method.
         next_params_kwargs['component'] = self
-        self.scan_handler = ScanHandler(rerun_wait_s, get_next_params,
-                                        next_params_kwargs, problem)
         super().__init__(**kwargs)
+        self.scan_handler = ScanHandler(self.name, rerun_wait_s,
+                                        get_next_params,
+                                        next_params_kwargs, problem)
 
     def run_per_loop(self):
         """Override to update ScanHandler."""
