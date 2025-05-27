@@ -127,21 +127,21 @@ class ControlClient:
                 req, obj = cmd.parse_request(msg)
                 rep, obj = cmd.parse_response(req,
                                               self._client.recv_multipart())
-                logger.debug("Received reply: %s, %s",
+                logger.debug(f"{self._uuid}: Received reply: %s, %s",
                              common.get_enum_str(control_pb2.ControlResponse,
                                                  rep), obj)
                 return (rep, obj) if keep_obj else rep
             retries_left -= 1
-            logger.debug("No response from server")
+            logger.debug(f"{self._uuid}: No response from server")
             # Socket is confused. Close and remove it.
             self._close_client()
 
             if retries_left == 0:
-                logger.error("Server seems to be offline, cannot send" +
-                             " message.")
+                logger.error(f"{self._uuid}: Server seems to be offline, " +
+                             "cannot send message.")
                 return control_pb2.ControlResponse.REP_NO_RESPONSE
 
-            logger.debug("Reconnecting to server")
+            logger.debug(f"{self._uuid}: Reconnecting to server")
             self._init_client()
             self._client.send_multipart(msg)
 
