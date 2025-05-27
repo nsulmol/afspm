@@ -18,6 +18,10 @@ from ..io.control import client as ctrl_client
 logger = logging.getLogger(__name__)
 
 
+CLIENT_KEY = 'control_client'
+SUBSCRIBER_KEY = 'subscriber'
+
+
 class AfspmComponentBase:
     """Base class for afspm component.
 
