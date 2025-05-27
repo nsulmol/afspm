@@ -145,7 +145,7 @@ def correct_probe_position(proto: spec_pb2.ProbePosition,
     return proto
 
 
-def cs_correct_proto(proto: Message, corr_info: correction.CorrectionInfo,
+def cs_correct_proto(proto_in: Message, corr_info: correction.CorrectionInfo,
                      update_weight: float, curr_dt: dt.datetime | None
                      ) -> Message:
     """Recursively go through a protobuf, correcting CS-based fields.
@@ -154,7 +154,7 @@ def cs_correct_proto(proto: Message, corr_info: correction.CorrectionInfo,
     system, we fix them.
 
     Args:
-        proto: Message to update.
+        proto_in: Message to update.
         corr_info: CorrectionInfo associated with current drifting.
         update_weight: weight applied for updating corr_info.
         curr_dt: the current DateTime, used to update the vector for drift.
@@ -163,6 +163,7 @@ def cs_correct_proto(proto: Message, corr_info: correction.CorrectionInfo,
     Returns:
         updated Message.
     """
+    proto = copy.deepcopy(proto_in)
     constructor = GetMessageClass(proto.DESCRIPTOR)
     vals_dict = {}
     # NOTE: any new protos that have spatial fields should be added here!
@@ -235,7 +236,10 @@ class CSCorrectedRouter(router.ControlRouter):
         translation vector.
         """
         self._corr_info = copy.deepcopy(corr_info)
-        self._corr_info.vec = -self._corr_info.vec  # We want SCS -> PCS
+
+        # We want SCS -> PCS
+        self._corr_info.vec = -self._corr_info.vec
+        self._corr_info.drift_rate = -self._corr_info.drift_rate
 
         self._update_weight = update_weight
 
@@ -532,15 +536,10 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         """
         # First things first: the received scan is in the PCS. Convert to our
         # *current* SCS.
-        original_scan = copy.deepcopy(new_scan)
         corrected_scan = cs_correct_proto(new_scan, self.total_corr_info,
                                           self.update_weight,
                                           new_scan.timestamp.ToDatetime(
                                               dt.timezone.utc))
-
-        # Take copy of corrected scan, as it is modified somewhere in the code.
-        # TODO: Fix logic so you don't need this copy.
-        corrected_scan_og = copy.deepcopy(corrected_scan)
 
         snapshot = self._get_drift_snapshot(corrected_scan)
         self._update_curr_corr_info(corrected_scan, snapshot)
@@ -548,7 +547,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         # Determine if the drift was too much and we must redo our scan.
         # Note that we feed the original scan, as we will update it with
         # the latest correction info.
-        self._determine_redo_scan(original_scan, corrected_scan_og)
+        self._determine_redo_scan(new_scan, corrected_scan)
 
         scan_matched = snapshot is not None
         row_vals = self._get_metadata_row(corrected_scan, self.total_corr_info,
