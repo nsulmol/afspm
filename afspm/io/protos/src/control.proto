@@ -60,6 +60,7 @@ enum ExperimentProblem {
     EP_TIP_SHAPE_CHANGED = 1;
     EP_DEVICE_MALFUNCTION = 2;
     EP_FEEDBACK_NON_OPTIMAL = 3;
+    EP_THERMAL_DRIFT = 4;
 }
 
 /* Contains the current overall SPM status. */

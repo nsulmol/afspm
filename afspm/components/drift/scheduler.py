@@ -38,8 +38,6 @@ PLT_LAYOUT = 'constrained'
 
 
 # kwarg keys for Scheduler constructor
-CACHE_KEY = 'pubsubcache'
-ROUTER_KEY = 'router'
 
 DEFAULT_UPDATE_WEIGHT = 0.9  # Update weight for averaging new data
 
@@ -355,6 +353,18 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     distinct, it is unlikely we will find matching keypoints between them
     (due to too-different signals).
 
+    Additionally, this class in conjunction with DriftRescanner allows
+    rescanning when the resulting scan is found to have drifted too far
+    from the desired location. This is measured by the
+    rescan intersection ratio (intersection area / scan area). When this ratio
+    is above self.rescan_intersection_ratio, this CSCorrectedScheduler sends
+    out the desired ScanParameters2d via its publisher. If the DriftRescanner's
+    subscriber is listening to the same url as the publisher, it will receive
+    it, log an EP_THERMAL_DRIFT problem, take control, and rerun the scan. Once
+    the scan has run, it will release control and the experiment will continue.
+    Note that this CSCorrectedScheduler also publishes ControlState and
+    ScopeState messages, as these are necessary for DriftRescanner to function.
+
     Attributes:
         drift_model: the DriftModel used to estimate a correction vector
             between two scans.
@@ -375,6 +385,9 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
             considered fit properly. The default assumes a RANSAC FittingMethod
             (so we yell at you if it's not the case). Note that a score of 0
             is ideal here, so the lower the better.
+        rescan_intersection_ratio: if the intersection area to scan ratio is
+            below this value, we force a rescan. This thresohld allows us to
+            ensure our scans have 'enough' of the data we desire.
         display_fit: visualize the fitting while it runs.
         figure: figure used to visualize (if applicable).
     """
@@ -385,11 +398,14 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     DEFAULT_MIN_SPATIAL_RES_RATIO = 0.25
     # This default fitting score is linked to RANSAC minimum residual threshold
     DEFAULT_MAX_FITTING_SCORE = drift.DEFAULT_RESIDUAL_THRESH_PERCENT
+    DEFAULT_RESCAN_INTERSECTION_RATIO = 0.75
     DEFAULT_DISPLAY_FIT = True
 
     CSV_FIELDS = ['timestamp', 'filename', 'pcs_to_scs_trans',
                   'pcs_to_scs_units', 'pcs_to_scs_drift_rate',
                   'scan_matched']
+
+    RERUN_WAIT_S = 30
 
     def __init__(self, drift_model: drift.DriftModel | None = None,
                  csv_attribs: csv.CSVAttributes = DEFAULT_CSV_ATTRIBUTES,
@@ -397,6 +413,8 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
                  min_spatial_res_ratio: float = DEFAULT_MIN_SPATIAL_RES_RATIO,
                  max_fitting_score: float = DEFAULT_MAX_FITTING_SCORE,
                  update_weight: float = DEFAULT_UPDATE_WEIGHT,
+                 rescan_intersection_ratio: float =
+                 DEFAULT_RESCAN_INTERSECTION_RATIO,
                  display_fit: bool = DEFAULT_DISPLAY_FIT, **kwargs):
         """Initialize our correction scheduler."""
         self.drift_model = (drift.create_drift_model() if drift_model is None
@@ -406,6 +424,9 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         self.min_spatial_res_ratio = min_spatial_res_ratio
         self.max_fitting_score = max_fitting_score
         self.update_weight = update_weight
+        self.rescan_intersection_ratio = rescan_intersection_ratio
+        self.rerun_scan = False
+        self.rerun_scan_params = None
 
         # TODO: Should this be a default in constructor of dataclass!?
         self.total_corr_info = correction.CorrectionInfo()
@@ -422,10 +443,10 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
                            'is probably too low!')
 
         # Create our wrapper router and cache
-        kwargs[ROUTER_KEY] = CSCorrectedRouter.from_parent(
-            kwargs[ROUTER_KEY])
-        kwargs[CACHE_KEY] = CSCorrectedCache.from_parent(
-            kwargs[CACHE_KEY])
+        kwargs[scheduler.ROUTER_KEY] = CSCorrectedRouter.from_parent(
+            kwargs[scheduler.ROUTER_KEY])
+        kwargs[scheduler.CACHE_KEY] = CSCorrectedCache.from_parent(
+            kwargs[scheduler.CACHE_KEY])
 
         super().__init__(**kwargs)
 
@@ -487,6 +508,10 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         if isinstance(proto, scan_pb2.Scan2d):
             self.update(proto)
 
+        if (isinstance(proto, control_pb2.ControlState) or
+                isinstance(proto, scan_pb2.ScopeStateMsg)):
+            self.publisher.send_msg(proto)
+
     def update(self, new_scan: scan_pb2.Scan2d):
         """Update correction infos given a new scan.
 
@@ -508,10 +533,14 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         # First things first: the received scan is in the PCS. Convert to our
         # *current* SCS.
         original_scan = copy.deepcopy(new_scan)
-        corrected_scan = cs_correct_proto(original_scan, self.total_corr_info,
+        corrected_scan = cs_correct_proto(new_scan, self.total_corr_info,
                                           self.update_weight,
                                           new_scan.timestamp.ToDatetime(
                                               dt.timezone.utc))
+
+        # Take copy of corrected scan, as it is modified somewhere in the code.
+        # TODO: Fix logic so you don't need this copy.
+        corrected_scan_og = copy.deepcopy(corrected_scan)
 
         snapshot = self._get_drift_snapshot(corrected_scan)
         self._update_curr_corr_info(corrected_scan, snapshot)
@@ -519,7 +548,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         # Determine if the drift was too much and we must redo our scan.
         # Note that we feed the original scan, as we will update it with
         # the latest correction info.
-#        self._determine_redo_scan(original_scan, corrected_scan)
+        self._determine_redo_scan(original_scan, corrected_scan_og)
 
         scan_matched = snapshot is not None
         row_vals = self._get_metadata_row(corrected_scan, self.total_corr_info,
@@ -538,16 +567,16 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         estimate a correction vector based on the history.
         """
         if snapshot is not None:
-            logger.warning('Scan matched.')
+            logger.trace('Scan matched.')
             corr_info = correction.estimate_correction_from_snapshot(
                 snapshot, self.total_corr_info)
-            logger.warning(f'delta corr_info: {corr_info}')
+            logger.trace(f'delta corr_info: {corr_info}')
         else:
-            logger.warning('No match. Estimating from prior info.')
+            logger.trace('No match. Estimating from prior info.')
             corr_info = correction.estimate_correction_no_snapshot(
                 self.total_corr_info, new_scan.timestamp.ToDatetime(
                     dt.timezone.utc))
-            logger.warning(f'delta corr_info: {corr_info}')
+            logger.trace(f'delta corr_info: {corr_info}')
         new_tot_corr_info = correction.update_total_correction(
             self.total_corr_info, corr_info, self.update_weight)
 
@@ -557,10 +586,10 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
 
         # Notify logger if correction vec has changed
         if drift_has_changed:
-            logger.warning('The PCS-to-SCS correction vector has changed'
+            logger.debug('The PCS-to-SCS correction vector has changed'
                          f': {self.total_corr_info.vec} '
                          f'{self.total_corr_info.unit}.')
-            logger.warning(f'With drift rate: {self.total_corr_info.drift_rate} '
+            logger.debug(f'With drift rate: {self.total_corr_info.drift_rate} '
                          f'{self.total_corr_info.unit} / s.')
 
     def _update_io(self):
@@ -575,10 +604,35 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
                                                 self.update_weight)
 
     def run_per_loop(self):
-        """Override to update figures."""
+        """Override to update figures and handle scan rerunning."""
         super().run_per_loop()
         self._update_ui()
 
     def _update_ui(self):
         self.figure.canvas.draw_idle()
         self.figure.canvas.flush_events()
+
+    # ----- Scan rerunning logic ----- #
+    def _determine_redo_scan(self, uncorrected_scan: scan_pb2.Scan2d,
+                             prior_corrected_scan: scan_pb2.Scan2d):
+        """Determine if we need to redo the scan or not."""
+        if self.publisher is None:  # Cannot send params if no publisher!
+            logger.warning('Unable to send scan rerun info because we have no '
+                           'publisher.')
+            return
+
+        true_scan = cs_correct_proto(uncorrected_scan,
+                                     self.total_corr_info,
+                                     self.update_weight,
+                                     uncorrected_scan.timestamp.ToDatetime(
+                                         dt.timezone.utc))
+        true_rect = true_scan.params.spatial.roi
+        expected_rect = prior_corrected_scan.params.spatial.roi
+        area_ratio = proto_geo.intersection_ratio(true_rect, expected_rect)
+
+        if area_ratio < self.rescan_intersection_ratio:
+            # Tell our scan handler to rescan prior region.
+            logger.warning('True vs. expected scans are too far apart. '
+                           'Sending scan params out via our publisher.')
+            true_params = true_scan.params
+            self.publisher.send_msg(true_params)
