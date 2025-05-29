@@ -70,7 +70,7 @@ component = true
 subscriber = 'sub'
 control_client = 'client'
 
-rerun_wait_s = 5
+rerun_wait_s = 300  # 5 minutes
 get_next_params = 'experiment.get_next_scan_params'
 next_params_kwargs = {'exp_data'= 'exp_data'}
 
