@@ -21,6 +21,7 @@ from ..microscope import scheduler
 from ...utils import csv
 from ...utils import proto_geo
 from ...utils.units import convert_list
+from ...io import common
 from ...io.control import router
 from ...io.pubsub import cache
 from ...io.pubsub.logic import cache_logic
@@ -641,3 +642,9 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
                            'Sending scan params out via our publisher.')
             true_params = true_scan.params
             self.publisher.send_msg(true_params)
+
+    def _handle_shutdown(self):
+        """Override to send kill via publisher (if provided)."""
+        if self.router.shutdown_was_requested and self.publisher is not None:
+            self.publisher.send_kill_signal()
+        super()._handle_shutdown()
