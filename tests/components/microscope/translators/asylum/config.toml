@@ -67,4 +67,3 @@ class = 'afspm.components.microscope.translators.asylum.translator.AsylumTransla
 publisher = 'pub'
 control_server = 'server'
 xop_client = 'xopclient'
-spawn_delay_s = 5.0

@@ -8,27 +8,20 @@ import SciFiReaders as sr
 import sidpy
 import numpy as np
 
-from afspm.components.microscope.params import (ParameterHandler,
-                                                ParameterNotSupportedError,
-                                                ParameterError,
-                                                MicroscopeParameter)
-from afspm.components.microscope.actions import (ActionHandler,
-                                                 MicroscopeAction,
-                                                 ActionError)
-from afspm.components.microscope.translator import (
-    get_file_modification_datetime, MicroscopeError)
-from afspm.components.microscope.config_translator import ConfigTranslator
+from ...params import (ParameterHandler, ParameterNotSupportedError,
+                       ParameterError, MicroscopeParameter)
+from ...actions import (ActionHandler, MicroscopeAction, ActionError)
+from ...translator import get_file_modification_datetime
+from ...config_translator import ConfigTranslator
 
-from afspm.components.microscope.translators.asylum.client import XopClient
-from afspm.components.microscope.translators.asylum.xop import (
-    convert_igor_path_to_python_path)
+from .... import component as afspmc
+from .....utils import array_converters as conv
+from .....io.protos.generated import scan_pb2
+from .....io.protos.generated import spec_pb2
+from ......io.protos.generated import control_pb2
 
-from afspm.utils import array_converters as conv
-from afspm.io.protos.generated import scan_pb2
-from afspm.io.protos.generated import spec_pb2
-from afspm.io.protos.generated import control_pb2
-
-
+from .client import XopClient
+from .xop import convert_igor_path_to_python_path
 from . import params
 from . import actions
 
@@ -80,6 +73,8 @@ class AsylumTranslator(ConfigTranslator):
             metadata (oddly) does not appear to store the XY position.
     """
 
+    DEFAULT_SPAWN_DELAY_S = 5.0  # Slow startup.
+
     IMG_EXT = '.ibw'
     SCAN_PREFIX = 'Image'
     SPEC_PREFIX = 'Force'
@@ -126,6 +121,10 @@ class AsylumTranslator(ConfigTranslator):
 
         # Tell parent class that Asylum *does not* detect moving
         kwargs[DETECTS_MOVING_KEY] = False
+
+        # Override spawn delay if using default
+        if afspmc.SPAWN_DELAY_S_KEY not in kwargs:
+            kwargs[afspmc.SPAWN_DELAY_S_KEY] = self.DEFAULT_SPAWN_DELAY_S
 
         super().__init__(**kwargs)
 
