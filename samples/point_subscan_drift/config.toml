@@ -142,7 +142,7 @@ fscan_phys_size = 'full_scan_size'
 num_points_to_output = 1
 
 [roi_analysis]
-component = true # uncomment to enable
+component = true
 class = 'afspm.components.component.AfspmComponent'
 
 subscriber = 'sub_spm'
@@ -154,7 +154,7 @@ methods_kwargs = {'analysis_data' = 'roi_data'}
 
 # --- UI --- #
 [ui]
-#component = true  # currently broken :(
+#component = true
 class = 'afspm.components.control_ui.AfspmControlUI'
 
 subscriber = 'sub_spm'
@@ -199,7 +199,6 @@ scan_phys_origin_list = ['full_scan_origin', 'full_scan_origin']
 scan_phys_size_list = ['full_scan_size', 'full_scan_size']
 visualization_style_list = ['visualization_style', 'visualization_style']
 visualization_colormap_list = ['visualization_colormap', 'visualization_colormap']
-#visualization_colormap_list = []
 
 visualize_undeclared_scans = true
 scan_id = 'Scan2d'
@@ -208,15 +207,13 @@ scan_id = 'Scan2d'
 [scheduler]
 component = true
 class = 'afspm.components.drift.scheduler.CSCorrectedScheduler'
-#class = 'afspm.components.microscope.scheduler.MicroscopeScheduler'
 
 pubsubcache = 'scheduler_psc'
 router = 'scheduler_router'
 publisher = 'rescan_pub'
-spawn_delay_s = 5.0  # SLOW START TIME!?
 
 [rescanner]
-#component = true
+component = true
 class = 'afspm.components.drift.rescanner.DriftRescanner'
 
 rerun_wait_s = 5
@@ -225,7 +222,6 @@ control_client = 'client'
 
 [translator]
 component = true
-#class = 'afspm.components.microscope.translators.image.translator.ImageTranslator'
 class = 'translator.DriftImageTranslator'
 
 physical_origin = 'full_scan_origin'
@@ -234,9 +230,9 @@ physical_units = 'our_phys_units'
 data_units = 'data_units'
 
 scan_time_s = 2
-move_time_s = 3  # was 0.5
+move_time_s = 1
 
-drift_rate = [2, 0.0]  # was 2
+drift_rate = [0.5, 0.0]
 spatial_units = 'our_phys_units'
 temporal_units = 's'
 

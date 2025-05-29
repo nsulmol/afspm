@@ -145,7 +145,7 @@ methods_kwargs = {'analysis_data' = 'roi_data'}
 
 # --- UI --- #
 [ui]
-#component = true  # currently broken :(
+#component = true
 class = 'afspm.components.control_ui.AfspmControlUI'
 
 subscriber = 'sub_spm'
@@ -190,11 +190,9 @@ scan_phys_origin_list = ['full_scan_origin', 'full_scan_origin']
 scan_phys_size_list = ['full_scan_size', 'full_scan_size']
 visualization_style_list = ['visualization_style', 'visualization_style']
 visualization_colormap_list = ['visualization_colormap', 'visualization_colormap']
-#visualization_colormap_list = []
 
 visualize_undeclared_scans = true
 scan_id = 'Scan2d'
-
 
 [scheduler]
 component = true
@@ -220,6 +218,6 @@ control_server = 'translator_server'
 subscriber = 'sub_spm'
 
 [metadata]
-component = true
+#component = true
 class = 'afspm.components.scan.metadata.ScanMetadataWriter'
 subscriber = 'sub_spm'

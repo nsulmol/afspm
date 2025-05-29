@@ -102,14 +102,14 @@ subscriber = 'experiment_sub'
 control_client = 'experiment_client'
 
 [ui]
-#component = true  # currently broken :(
+#component = true
 class = 'afspm.components.control_ui.AfspmControlUI'
 
 subscriber = 'experiment_sub'
 control_client = 'ui_client'
 
 [tip_detector]
-#component = true  # uncomment to enable
+#component = true
 class = 'freq_trigger_tip_detector.FreqTriggerTipDetector'
 
 scan_period_raise_problem = 2
@@ -156,3 +156,8 @@ move_time_s = 1
 publisher = 'translator_pub'
 control_server = 'translator_server'
 subscriber = 'experiment_sub'
+
+[metadata]
+#component = true
+class = 'afspm.components.scan.metadata.ScanMetadataWriter'
+subscriber = 'sub_spm'
