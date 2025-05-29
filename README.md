@@ -35,7 +35,7 @@ Additionally, we have the following 'hard' requirements (although they are only 
 
 - xarray, as a general labeled data format we can convert to/from.
 - imageio, to read images for tests.
-- pysimplegui, for some simple UIs.
+- tk, for some simple UIs with tkinter.
 - scipy, for some data manipulation.
 - matplotlib, for visualizing some data (using xarray data structures).
 
@@ -47,6 +47,12 @@ This project is developed using poetry. To install, you should clone the reposit
 git clone https://github.com/nsulmol/afspm afspm  # Put in afspm subdirectory
 cd afspm
 poetry install
+```
+
+If you are running on linux, you will need to install tk via your package manager. For example, for a Debian-based system you would do:
+
+``` sh
+sudo apt install python3-tk
 ```
 
 Next, you should:
