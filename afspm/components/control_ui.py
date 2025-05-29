@@ -120,7 +120,7 @@ class AfspmControlUI(AfspmComponentUI):
             self.cm_frame.grid_columnconfigure(col, weight=1)
 
         # Set up 'state' rows
-        labels_and_text_to_make = {IN_CTRL_KEY: (IN_CTRL, ''),
+        labels_and_text_to_make = {IN_CTRL_KEY: (IN_CTRL, 'None'),
                                    SCOPE_STATE_KEY: (SCOPE_STATE, ''),
                                    PROBLEMS_SET_KEY: (PROBLEMS_SET, '')}
 
@@ -135,15 +135,6 @@ class AfspmControlUI(AfspmComponentUI):
             tk.Label(subframe, text=label_text).pack(side=tk.LEFT)
             self.labels[key] = tk.Label(subframe, text=default_state_text)
             self.labels[key].pack(side=tk.RIGHT)
-
-            # Using grid
-            # tk.Label(subframe, text=label_text).grid(row=0, column=0,
-            #                                          sticky=tk.NSEW)
-            # self.labels[key] = tk.Label(subframe, text=default_state_text)
-            # self.labels[key].grid(row=0, column=1, sticky=tk.NSEW)
-            # subframe.grid_rowconfigure(0, weight=1)
-            # subframe.grid_columnconfigure(0, weight=1)
-            # subframe.grid_columnconfigure(1, weight=1)
 
         # Set up buttons
         subframe = tk.Frame(self.frame)
@@ -200,7 +191,6 @@ class AfspmControlUI(AfspmComponentUI):
 
     def on_message_received(self, envelope: str, proto: Message):
         """Check what has changed and update UI accordingly."""
-        logger.warning(f"Message received, envelope: {envelope}")
         if isinstance(proto, control_pb2.ControlState):
             last_cs = copy.deepcopy(self.control_state)
             self.control_state = proto
