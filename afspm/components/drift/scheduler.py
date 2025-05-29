@@ -16,6 +16,7 @@ from google.protobuf.message import Message
 from google.protobuf.message_factory import GetMessageClass
 
 from . import drift, correction
+from .. import component as afspmc
 from ..microscope import scheduler
 from ...utils import csv
 from ...utils import proto_geo
@@ -408,6 +409,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     CSV_FIELDS = ['timestamp', 'filename', 'pcs_to_scs_trans',
                   'pcs_to_scs_units', 'pcs_to_scs_drift_rate',
                   'scan_matched']
+    DEFAULT_SPAWN_DELAY_S = 5.0  # Slow startup.
 
     RERUN_WAIT_S = 30
 
@@ -451,6 +453,10 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
             kwargs[scheduler.ROUTER_KEY])
         kwargs[scheduler.CACHE_KEY] = CSCorrectedCache.from_parent(
             kwargs[scheduler.CACHE_KEY])
+
+        # Override spawn delay if using default
+        if afspmc.SPAWN_DELAY_S_KEY not in kwargs:
+            kwargs[afspmc.SPAWN_DELAY_S_KEY] = self.DEFAULT_SPAWN_DELAY_S
 
         super().__init__(**kwargs)
 

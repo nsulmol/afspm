@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 CLIENT_KEY = 'control_client'
 SUBSCRIBER_KEY = 'subscriber'
+SPAWN_DELAY_S_KEY = 'spawn_delay_s'
 
 
 class AfspmComponentBase:

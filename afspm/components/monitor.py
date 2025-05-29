@@ -10,6 +10,7 @@ import zmq
 from ..io import common
 from ..io.heartbeat.heartbeat import HeartbeatListener, get_heartbeat_url
 from ..utils.parser import construct_and_run_component
+from . import component as afspmc
 
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,6 @@ logger = logging.getLogger(__name__)
 # Note that we use spawning to keep the system behaviour consistent acros
 # OSses, at the cost of a slower startup time.
 SPAWN_DELAY_S = 1.0
-SPAWN_DELAY_KEY = 'spawn_delay_s'
 
 
 class AfspmComponentsMonitor:
@@ -187,9 +187,9 @@ class AfspmComponentsMonitor:
         # Perform delay after spawning (some components are slow to start up).
         spawn_delay_s = SPAWN_DELAY_S
         # Add component-specific delay (if available).
-        if (SPAWN_DELAY_KEY in params_dict and
-                isinstance(params_dict[SPAWN_DELAY_KEY], float)):
-            spawn_delay_s += params_dict[SPAWN_DELAY_KEY]
+        if (afspmc.SPAWN_DELAY_S_KEY in params_dict and
+                isinstance(params_dict[afspmc.SPAWN_DELAY_S_KEY], float)):
+            spawn_delay_s += params_dict[afspmc.SPAWN_DELAY_S_KEY]
         time.sleep(spawn_delay_s)
         return proc
 
