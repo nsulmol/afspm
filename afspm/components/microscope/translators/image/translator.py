@@ -131,7 +131,7 @@ class ImageTranslator(MicroscopeTranslator):
         return spec_pb2.Spec1d()
 
     def run_per_loop(self):
-        """Main loop, where we indicate when scans and moves are done."""
+        """Indicate when scans and moves are done."""
         if self.start_ts:
             duration = None
             update_scan = False
@@ -153,7 +153,7 @@ class ImageTranslator(MicroscopeTranslator):
         super().run_per_loop()
 
     def update_scan(self):
-        """Updates the latest scan based on the latest scan params."""
+        """Update the latest scan based on the latest scan params."""
         tl = [self.dev_scan_params.spatial.roi.top_left.x,
               self.dev_scan_params.spatial.roi.top_left.y]
         size = [self.dev_scan_params.spatial.roi.size.x,
@@ -163,16 +163,7 @@ class ImageTranslator(MicroscopeTranslator):
 
         x = np.linspace(tl[0], tl[0] + size[0], data_shape[0])
         y = np.linspace(tl[1], tl[1] + size[1], data_shape[1])
-
-        # Wrapping in DataArray, to feed coordinates with units.
-        # Alternatively, could just feed interp(x=x, y=y)
-        units = self.dev_scan_params.spatial.length_units
-        da = xr.DataArray(data=None, dims=['y', 'x'],
-                          coords={'y': y, 'x': x})
-        da.x.attrs['units'] = units
-        da.y.attrs['units'] = units
-
-        img = self.dev_img.interp(x=da.x, y=da.y)
+        img = self.dev_img.interp(x=x, y=y)
         self.dev_scan = ac.convert_xarray_to_scan_pb2(img)
 
     def _simulate_filename(self) -> str:
