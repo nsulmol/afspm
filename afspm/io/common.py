@@ -16,11 +16,25 @@ ALL_ENVELOPE_LOG = "ALL"
 
 
 # --- Good defaults --- #
-REQUEST_TIMEOUT_MS = 250  # Linked to TCP delay
-POLL_TIMEOUT_MS = 25
+REQUEST_TIMEOUT_MS = 500  # Linked to TCP delay
+POLL_TIMEOUT_MS = 50
 LOOP_SLEEP_S = 0.1  # 100 ms
 HEARTBEAT_PERIOD_S = 1
 BEATS_BEFORE_DEAD = 3
+
+# The amount of time we sleep between starting a process and returning
+# from the spawning method. After spawning, we create the associated heartbeat
+# listener. This component will determine that spawning 'failed' if it does not
+# receive a heartbeat in its 'check' time. Thus, components that are slow to
+# start must set a reasonable 'spawn_delay_s' in their constructors.
+#
+# It is *also* important because we are using the 'spawn' process approach of
+# multiprocessing, which is slower to start than a simple 'fork' (we cannot
+# 'fork' on Windows). Since spawning is slower, we need to introduce a default
+# delay of ~1s, to be safe.
+# Note that we use spawning to keep the system behaviour consistent acros
+# OSses, at the cost of a slower startup time.
+SPAWN_DELAY_S = 0.25
 
 
 # We appear to need a small startup delay, to allow zmq sockets to properly

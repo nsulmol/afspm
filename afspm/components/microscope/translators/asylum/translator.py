@@ -121,11 +121,6 @@ class AsylumTranslator(ConfigTranslator):
 
         # Tell parent class that Asylum *does not* detect moving
         kwargs[DETECTS_MOVING_KEY] = False
-
-        # Override spawn delay if using default
-        if afspmc.SPAWN_DELAY_S_KEY not in kwargs:
-            kwargs[afspmc.SPAWN_DELAY_S_KEY] = self.DEFAULT_SPAWN_DELAY_S
-
         super().__init__(**kwargs)
 
         # Do some setup

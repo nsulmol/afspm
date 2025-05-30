@@ -50,6 +50,10 @@ class AfspmComponentBase:
     uuid for the duration of the experiment) and $TMP$ is a temporary directory
     defined by the OS.
 
+    If your component takes longer than usual to startup, override the
+    DEFAULT_SPAWN_DELAY_S parameter. This is read by the monitor when
+    starting it up.
+
     Attributes:
         ctx: ZMQ context, kept so we can force-close everything when ending.
         name: the chosen component 'name'.
@@ -67,13 +71,16 @@ class AfspmComponentBase:
             by components that talk to this component via get_spawn_delay_s().
     """
 
+    # See get_default_spawn_delay_s() below.
+    DEFAULT_SPAWN_DELAY_S = common.SPAWN_DELAY_S
+
     def __init__(self, name: str,
                  subscriber: sub.Subscriber = None,
                  control_client: ctrl_client.ControlClient = None,
                  loop_sleep_s: float = common.LOOP_SLEEP_S,
                  beat_period_s: float = common.HEARTBEAT_PERIOD_S,
                  override_client_uuid: bool = True,
-                 spawn_delay_s: float = None,
+                 spawn_delay_s: float = DEFAULT_SPAWN_DELAY_S,
                  ctx: zmq.Context = None):
         """Initialize our AfspmComponent.
 
@@ -174,8 +181,9 @@ class AfspmComponentBase:
         """
         pass
 
-    def get_spawn_delay_s(self) -> float | None:
-        """Return time to delay on spawning, in seconds.
+    @classmethod
+    def get_default_spawn_delay_s(cls) -> float | None:
+        """Return default time to delay on spawning, in seconds.
 
         This is used by external components (particulary, the components
         monitor) in order to know how long to wait between starting it up
@@ -187,7 +195,7 @@ class AfspmComponentBase:
         Returns:
             Time to delay spawning, in seconds.
         """
-        return self.spawn_delay_s
+        return cls.DEFAULT_SPAWN_DELAY_S
 
 
 class AfspmComponent(AfspmComponentBase):
@@ -286,3 +294,20 @@ class AfspmComponentUI(AfspmComponent):
     def _register_loop_step(self):
         """Call per-loop-step after a sleep period."""
         self.root.after(int(self.loop_sleep_s * 1000), self._per_loop_step)
+
+
+# def set_spawn_delay_s_kwargs(kwargs: dict, spawn_delay_s: float) -> dict:
+#     """Set the spawn delay for a component (if not already set).
+
+#     This setting is done on the kwargs dict, before passing to the constructor.
+
+#     Args:
+#         spawn_delay_s: desired spawn delay in seconds.
+#         kwargs: kwargs dict, used to initialize component.
+
+#     Returns:
+#         updated kwargs dict.
+#     """
+#     if SPAWN_DELAY_S_KEY not in kwargs:
+#         kwargs[SPAWN_DELAY_S_KEY] = spawn_delay_s
+#     return kwargs

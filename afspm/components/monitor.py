@@ -9,26 +9,11 @@ import zmq
 
 from ..io import common
 from ..io.heartbeat.heartbeat import HeartbeatListener, get_heartbeat_url
-from ..utils.parser import construct_and_run_component
+from ..utils import parser
 from . import component as afspmc
 
 
 logger = logging.getLogger(__name__)
-
-
-# The amount of time we sleep between starting a process and returning
-# from the spawning method. After spawning, we create the associated heartbeat
-# listener. This component will determine that spawning 'failed' if it does not
-# receive a heartbeat in its 'check' time. Thus, components that are slow to
-# start must set a reasonable 'spawn_delay_s' in their constructors.
-#
-# It is *also* important because we are using the 'spawn' process approach of
-# multiprocessing, which is slower to start than a simple 'fork' (we cannot
-# 'fork' on Windows). Since spawning is slower, we need to introduce a default
-# delay of ~1s, to be safe.
-# Note that we use spawning to keep the system behaviour consistent acros
-# OSses, at the cost of a slower startup time.
-SPAWN_DELAY_S = 1.0
 
 
 class AfspmComponentsMonitor:
@@ -179,17 +164,13 @@ class AfspmComponentsMonitor:
         if log_init_args is not None:
             kwargs_dict['log_init_args'] = log_init_args
 
-        proc = ctx.Process(target=construct_and_run_component,
+        proc = ctx.Process(target=parser.construct_and_run_component,
                            kwargs=kwargs_dict,
                            daemon=True)  # Ensures we try to kill on main exit
         proc.start()
 
         # Perform delay after spawning (some components are slow to start up).
-        spawn_delay_s = SPAWN_DELAY_S
-        # Add component-specific delay (if available).
-        if (afspmc.SPAWN_DELAY_S_KEY in params_dict and
-                isinstance(params_dict[afspmc.SPAWN_DELAY_S_KEY], float)):
-            spawn_delay_s += params_dict[afspmc.SPAWN_DELAY_S_KEY]
+        spawn_delay_s = get_component_spawn_delay_s(params_dict)
         time.sleep(spawn_delay_s)
         return proc
 
@@ -302,3 +283,25 @@ class AfspmComponentsMonitor:
         del self.component_processes[key]
         del self.component_params_dict[key]
         del self.listeners[key]
+
+
+def get_component_spawn_delay_s(kwargs: dict) -> float:
+    """Given a components input kwargs, determine its spawn delay time.
+
+    Either the component's kwargs has an explicit spawn delay time, or we
+    should use the default spawn delay time. In the latter case, we import
+    the class and query its get_default_spawn_delay_s() method (which is
+    static).
+
+    Args:
+        kwargs: input kwargs dict to be used to init the class.
+
+    Returns:
+        spawn delay time, in seconds.
+    """
+    if (afspmc.SPAWN_DELAY_S_KEY in kwargs and
+            isinstance(kwargs[afspmc.SPAWN_DELAY_S_KEY], float)):
+        return kwargs[afspmc.SPAWN_DELAY_S_KEY]
+    elif parser.CLASS_KEY in kwargs:
+        cls = parser.import_from_string(kwargs[parser.CLASS_KEY])
+        return cls.get_default_spawn_delay_s()

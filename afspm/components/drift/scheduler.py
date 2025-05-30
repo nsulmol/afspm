@@ -21,7 +21,6 @@ from ..microscope import scheduler
 from ...utils import csv
 from ...utils import proto_geo
 from ...utils.units import convert_list
-from ...io import common
 from ...io.control import router
 from ...io.pubsub import cache
 from ...io.pubsub.logic import cache_logic
@@ -454,11 +453,6 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
             kwargs[scheduler.ROUTER_KEY])
         kwargs[scheduler.CACHE_KEY] = CSCorrectedCache.from_parent(
             kwargs[scheduler.CACHE_KEY])
-
-        # Override spawn delay if using default
-        if afspmc.SPAWN_DELAY_S_KEY not in kwargs:
-            kwargs[afspmc.SPAWN_DELAY_S_KEY] = self.DEFAULT_SPAWN_DELAY_S
-
         super().__init__(**kwargs)
 
         # In order to update our logic, we bind update to the

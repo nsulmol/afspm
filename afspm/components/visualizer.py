@@ -8,7 +8,7 @@ import xarray as xr
 
 from google.protobuf.message import Message
 
-from .component import AfspmComponent
+from . import component as afspmc
 from ..io.protos.generated import scan_pb2
 from ..io.pubsub.defaults import SCAN_ID
 from ..utils import array_converters as ac
@@ -37,7 +37,7 @@ class VisualizationStyle(Enum):
     SURFACE = 5  # xarray.plot.surface()
 
 
-class Visualizer(AfspmComponent):
+class Visualizer(afspmc.AfspmComponent):
     """Base visualizer, to display scans from cache.
 
     This base component allows easy visualization of 2D data from the
@@ -92,6 +92,8 @@ class Visualizer(AfspmComponent):
         plt_figures_map: dictionary containing scan_envelope:pyplot_figure
             pairs. Part of matplotlib backend, used for visualization.
     """
+
+    DEFAULT_SPAWN_DELAY_S = 5.0  # Slow startup.
 
     def __init__(self, list_keys: list[str] = [],
                  cache_meaning_list: list[str] = [],
