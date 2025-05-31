@@ -358,6 +358,10 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     distinct, it is unlikely we will find matching keypoints between them
     (due to too-different signals).
 
+    Note that in order to ensure we are comparing the appropriate scans, you
+    must indicate the channel_id to consider. Only the channels that match
+    channel_id are considered and compared.
+
     Additionally, this class in conjunction with DriftRescanner allows
     rescanning when the resulting scan is found to have drifted too far
     from the desired location. This is measured by the
@@ -371,6 +375,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     ScopeState messages, as these are necessary for DriftRescanner to function.
 
     Attributes:
+        channel_id: str of the scan channel to consider when analyzing drift.
         drift_model: the DriftModel used to estimate a correction vector
             between two scans.
         total_corr_info: total CorrectionInfo, fed to IO nodes so they can
