@@ -42,7 +42,12 @@ class ScanHandler:
 
     If the MicroscopeTranslator returns an unexpected error, it will log this
     and retry the full request (ensuring parameters are set) between sleeps of
-    rerun_wait_s.
+    rerun_wait_s. If flush_params_on_failure is True, it will reset the params,
+    effectively calling get_next_params again. This could be useful if the
+    method is time-sensitive, as we cannot predict how long it will take to
+    between a failure to request and the next actual request. Since the most
+    likely cause is losing control, it may take a while (e.g. an experimental
+    problem is being fixed).
 
     If self.get_next_params() returns None (i.e. it is not ready to provide
     the next scan parameters), it will log this and retry requesting between
@@ -63,7 +68,8 @@ class ScanHandler:
             flagged, we do nothing until it does.
         component_id: holds str to indicate the component using this handler.
             Used when logging messages.
-
+        flush_params_on_failure: whether or not we reset our params to
+            None if we fail to start a scan/spec. Defaults to False.
         _control_state: current ControlState.
         _next_params: current ScanParameters2d or ProbePosition instance.
         _scope_state: current ScopeState.
@@ -78,13 +84,15 @@ class ScanHandler:
 
     COLLECTING_STATES = [scan_pb2.ScopeState.SS_SCANNING,
                          scan_pb2.ScopeState.SS_SPEC]
+    DEFAULT_FLUSH_PARAMS = False
 
     def __init__(self, component_id: str, rerun_wait_s: int,
                  get_next_params: Callable[[Any],
                                            scan_pb2.ScanParameters2d],
                  next_params_kwargs: dict = None,
                  problem: control_pb2.ExperimentProblem =
-                 control_pb2.ExperimentProblem.EP_NONE):
+                 control_pb2.ExperimentProblem.EP_NONE,
+                 flush_params_on_failure: bool = DEFAULT_FLUSH_PARAMS):
         """Init class."""
         self.rerun_wait_s = rerun_wait_s
         self.get_next_params = get_next_params
@@ -92,6 +100,7 @@ class ScanHandler:
                                    next_params_kwargs else {})
         self.problem_to_solve = problem
         self.component_id = component_id
+        self.flush_params_on_failure = flush_params_on_failure
 
         self._control_state = None
         self._next_params = None
@@ -141,17 +150,12 @@ class ScanHandler:
                         self._control_state is not None else {})
         problem_in_problems_set = common.is_problem_in_problems_set(
             self.problem_to_solve, problems_set)
+
         if problem_in_problems_set and self._rerun_sleep_ts is not None:
             enough_time_has_passed = (time.time() - self._rerun_sleep_ts >
                                       self.rerun_wait_s)
             if enough_time_has_passed:
                 self._rerun_sleep_ts = None
-
-                # If scan params were not available yet, re-request.
-                if not self._next_params:
-                    self._next_params = self.get_next_params(
-                        **self.next_params_kwargs)
-
                 self._perform_scanning_logic(control_client)
 
     def _handle_scope_state_receipt(self, proto: scan_pb2.ScopeStateMsg):
@@ -181,14 +185,11 @@ class ScanHandler:
                                self._scope_state == scan_pb2.ScopeState.SS_FREE)
         finished_moving = (last_state == scan_pb2.ScopeState.SS_MOVING and
                            self._scope_state == scan_pb2.ScopeState.SS_FREE)
-        not_in_control = (self._control_state.client_in_control_id !=
-                          self.component_id)
 
-        if interrupted or not_in_control:
-            if interrupted:
-                logger.info(f"{self.component_id}: A scan was interrupted! "
-                            "Will restart what we were doing.")
-            self._desired_scope_state = scan_pb2.ScopeState.SS_MOVING
+        if interrupted:
+            logger.info(f"{self.component_id}: A scan was interrupted! "
+                        "Will restart what we were doing.")
+            self._handle_rerun()
         elif first_startup or finished_collecting:
             if first_startup:
                 logger.info(f"{self.component_id}: First startup, sending "
@@ -196,7 +197,6 @@ class ScanHandler:
             else:
                 logger.info(f"{self.component_id}: Finished scan, preparing "
                             "next scan params.")
-            self._next_params = self.get_next_params(**self.next_params_kwargs)
             self._desired_scope_state = scan_pb2.ScopeState.SS_MOVING
         elif finished_moving:
             logger.info(f"{self.component_id}: Finished moving, will request "
@@ -224,7 +224,7 @@ class ScanHandler:
             logger.debug(f"{self.component_id}: Not performing scanning logic "
                          "because ScopeState undefined or problem not in "
                          "problems set.")
-            self._handle_rerun(True)
+            self._handle_rerun()
             return  # Early return, we're not ready yet.
 
         # Handle sending requests (not guaranteed it will work!)
@@ -238,11 +238,15 @@ class ScanHandler:
                         common.get_enum_str(scan_pb2.ScopeState,
                                             self._desired_scope_state))
             if self._desired_scope_state == scan_pb2.ScopeState.SS_MOVING:
-                if not self._next_params:
-                    logger.debug(f"{self.component_id}: Cannot send params, "
-                                 "because get_next_params returned None."
-                                 "Sleeping and retrying.")
-                    self._handle_rerun(True)
+                if not self._next_params:  # Get new params if needed
+                    self._next_params = self.get_next_params(
+                        **self.next_params_kwargs)
+
+                if not self._next_params:  # Handle our getter failing
+                    logger.warning(f"{self.component_id}: Cannot send params, "
+                                   "because get_next_params returned None."
+                                   "Sleeping and retrying.")
+                    self._handle_rerun()
                     return
 
                 req_to_call, req_params = self._get_set_call_for_next(
@@ -260,7 +264,7 @@ class ScanHandler:
             if rep != control_pb2.ControlResponse.REP_SUCCESS:
                 logger.debug(f"{self.component_id}: Sleeping and retrying "
                              "later.")
-                self._handle_rerun(True)
+                self._handle_rerun()
 
     @staticmethod
     def _get_set_call_for_next(params: scan_pb2.ScanParameters2d |
@@ -303,11 +307,15 @@ class ScanHandler:
             scope_state = scan_pb2.ScopeState.SS_SPEC
         return scope_state
 
-    def _handle_rerun(self, perform_rerun: bool):
-        if perform_rerun:
-            self._rerun_sleep_ts = time.time()
-        else:
-            self._rerun_sleep_ts = None
+    def _handle_rerun(self):
+        # On a rerun, restart to SS_MOVING (restart the scan)
+        self._desired_scope_state = scan_pb2.ScopeState.SS_MOVING
+
+        #  Flush params if we have chosen to do so on failure
+        if self.flush_params_on_failure:
+            self._next_params = None
+
+        self._rerun_sleep_ts = time.time()
 
 
 class ScanningComponent(AfspmComponent):

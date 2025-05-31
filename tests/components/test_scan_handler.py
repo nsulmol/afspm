@@ -83,6 +83,8 @@ def handler_name():
 
 SCAN_PARAMS = common.create_scan_params_2d([0, 0], [200, 300],
                                            'nm')
+SCAN_PARAMS_2 = common.create_scan_params_2d([50, 0], [200, 300],
+                                             'nm')
 PROBE_POS = common.create_probe_pos([1, 2], 'nm')
 
 
@@ -97,14 +99,18 @@ def next_params_method_probe_pos() -> spec_pb2.ProbePosition:
 
 def scan_handler_routine(publisher_url, rerun_wait_s,
                          server_url, client_uuid, ctx,
-                         next_params_method, handler_name):
+                         next_params_method, handler_name,
+                         flush_params_on_failure: bool = False):
     logger.info("Startup scan_handler_routine")
     client = ControlClient(server_url, ctx, client_uuid)
     subscriber = Subscriber(publisher_url, ctx=ctx)
-    scan_handler = ScanHandler(handler_name, rerun_wait_s, next_params_method)
+    scan_handler = ScanHandler(handler_name, rerun_wait_s,
+                               next_params_method,
+                               flush_params_on_failure=flush_params_on_failure)
 
     continue_running = True
     while continue_running:
+        scan_handler.handle_issues(client)
         messages = subscriber.poll_and_store()
         if messages:
             for msg in messages:
@@ -128,12 +134,13 @@ def thread_scan_handler(publisher_url, rerun_wait_s,
 
 
 @pytest.fixture
-def thread_signal_handler(publisher_url, rerun_wait_s,
-                          server_url, client_uuid, ctx):
+def thread_spec_handler(publisher_url, rerun_wait_s,
+                        server_url, client_uuid, handler_name, ctx):
     thread = threading.Thread(target=scan_handler_routine,
                               args=(publisher_url, rerun_wait_s,
                                     server_url, client_uuid, ctx,
-                                    next_params_method_probe_pos))
+                                    next_params_method_probe_pos,
+                                    handler_name))
     thread.daemon = True
     thread.start()
     time.sleep(2*common.REQUEST_TIMEOUT_MS / 1000)
@@ -199,8 +206,89 @@ def test_scanning(publisher, server, thread_scan_handler,
     time.sleep(4*common.REQUEST_TIMEOUT_MS / 1000)
 
 
-def test_spec(publisher, server, thread_signal_handler,
-                      control_state, scope_state_msg):
+# NOTE: Not testing spec for this, as it should be the same.
+def test_scan_lose_ctrl_after_move(publisher, server, thread_scan_handler,
+                                   control_state, scope_state_msg,
+                                   rerun_wait_s):
+    logger.info("Validate we restart a scan if we lose control after a move.")
+
+    publisher.send_msg(control_state)
+    publisher.send_msg(scope_state_msg)
+
+    req, obj = server.poll()
+    assert req == control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS
+    assert obj == SCAN_PARAMS
+    server.reply(control_pb2.ControlResponse.REP_SUCCESS)
+
+    scope_state_msg.scope_state = scan_pb2.ScopeState.SS_MOVING
+    publisher.send_msg(scope_state_msg)
+    scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
+    publisher.send_msg(scope_state_msg)
+
+    req, obj = server.poll()
+    assert req == control_pb2.ControlRequest.REQ_ACTION
+    assert obj == control_pb2.ActionMsg(action=MicroscopeAction.START_SCAN)
+
+    # Reply that it lost control
+    server.reply(control_pb2.ControlResponse.REP_NOT_IN_CONTROL)
+
+    req, obj = server.poll()
+    assert req == control_pb2.ControlRequest.REQ_REQUEST_CTRL
+    assert obj == control_pb2.ExperimentProblem.EP_NONE
+    server.reply(control_pb2.ControlResponse.REP_ALREADY_UNDER_CONTROL)
+
+    # Sleep for long enough
+    time.sleep(rerun_wait_s)
+
+    req, obj = server.poll()
+    assert req == control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS
+    assert obj == SCAN_PARAMS
+
+    logger.info("Sending kill signal")
+    publisher.send_kill_signal()
+    time.sleep(4*common.REQUEST_TIMEOUT_MS / 1000)
+
+
+# NOTE: Not testing spec for this, as it should be the same.
+def test_scan_interrupted(publisher, server, thread_scan_handler,
+                          control_state, scope_state_msg,
+                          rerun_wait_s):
+    logger.info("Validate we restart a scan if the scan is interrupted.")
+
+    publisher.send_msg(control_state)
+    publisher.send_msg(scope_state_msg)
+
+    req, obj = server.poll()
+    assert req == control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS
+    assert obj == SCAN_PARAMS
+    server.reply(control_pb2.ControlResponse.REP_SUCCESS)
+
+    scope_state_msg.scope_state = scan_pb2.ScopeState.SS_MOVING
+    publisher.send_msg(scope_state_msg)
+    scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
+    publisher.send_msg(scope_state_msg)
+
+    req, obj = server.poll()
+    assert req == control_pb2.ControlRequest.REQ_ACTION
+    assert obj == control_pb2.ActionMsg(action=MicroscopeAction.START_SCAN)
+    server.reply(control_pb2.ControlResponse.REP_SUCCESS)
+
+    scope_state_msg.scope_state = scan_pb2.ScopeState.SS_SCANNING
+    publisher.send_msg(scope_state_msg)
+    scope_state_msg.scope_state = scan_pb2.ScopeState.SS_INTERRUPTED
+    publisher.send_msg(scope_state_msg)
+
+    req, obj = server.poll()
+    assert req == control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS
+    assert obj == SCAN_PARAMS
+
+    logger.info("Sending kill signal")
+    publisher.send_kill_signal()
+    time.sleep(4*common.REQUEST_TIMEOUT_MS / 1000)
+
+
+def test_spec(publisher, server, thread_spec_handler,
+              control_state, scope_state_msg, handler_name):
     """Validate we can go through the spec process properly"""
     logger.info("Validate we can go through the spec process properly.")
 
@@ -256,3 +344,67 @@ def test_req_ctrl(publisher, server, thread_scan_handler, control_state,
     assert req == control_pb2.ControlRequest.REQ_REQUEST_CTRL
 
     publisher.send_kill_signal()
+    time.sleep(4*common.REQUEST_TIMEOUT_MS / 1000)
+
+
+CNT = 1
+
+
+def next_params_method_scan_alt() -> scan_pb2.ScanParameters2d:
+    global CNT
+    CNT += 1
+    if CNT % 2 == 0:
+        return SCAN_PARAMS
+    else:
+        return SCAN_PARAMS_2
+
+
+@pytest.fixture
+def thread_scan_handler_alt(publisher_url, rerun_wait_s,
+                            server_url, client_uuid, handler_name, ctx):
+    thread = threading.Thread(target=scan_handler_routine,
+                              args=(publisher_url, rerun_wait_s,
+                                    server_url, client_uuid, ctx,
+                                    next_params_method_scan_alt, handler_name,
+                                    True))  # flush_params_on_failure
+    thread.daemon = True
+    thread.start()
+    time.sleep(2*common.REQUEST_TIMEOUT_MS / 1000)
+    return thread
+
+
+def test_flush_params(publisher, server, thread_scan_handler_alt,
+                      control_state, scope_state_msg,
+                      rerun_wait_s):
+    logger.info("Make sure flush_params_on_failure works as expected.")
+
+    publisher.send_msg(control_state)
+    publisher.send_msg(scope_state_msg)
+
+    req, obj = server.poll()
+    assert req == control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS
+    assert obj == SCAN_PARAMS
+    server.reply(control_pb2.ControlResponse.REP_SUCCESS)
+
+    scope_state_msg.scope_state = scan_pb2.ScopeState.SS_MOVING
+    publisher.send_msg(scope_state_msg)
+    scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
+    publisher.send_msg(scope_state_msg)
+
+    req, obj = server.poll()
+    assert req == control_pb2.ControlRequest.REQ_ACTION
+    assert obj == control_pb2.ActionMsg(action=MicroscopeAction.START_SCAN)
+    server.reply(control_pb2.ControlResponse.REP_SUCCESS)
+
+    scope_state_msg.scope_state = scan_pb2.ScopeState.SS_SCANNING
+    publisher.send_msg(scope_state_msg)
+    scope_state_msg.scope_state = scan_pb2.ScopeState.SS_INTERRUPTED
+    publisher.send_msg(scope_state_msg)
+
+    req, obj = server.poll()
+    assert req == control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS
+    assert obj == SCAN_PARAMS_2
+
+    logger.info("Sending kill signal")
+    publisher.send_kill_signal()
+    time.sleep(4*common.REQUEST_TIMEOUT_MS / 1000)
