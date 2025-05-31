@@ -255,6 +255,9 @@ class ScanHandler:
             elif self._desired_scope_state in self.COLLECTING_STATES:
                 req_to_call = self._get_collection_call_for_next(
                     self._next_params, control_client)
+                # Flush params, so we get the next ones from get_next_params()
+                # once our scan is done.
+                self._next_params = None
 
             if not req_to_call:
                 return
