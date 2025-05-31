@@ -181,10 +181,11 @@ def convert_sidpy_to_scan_pb2(ds: Dataset) -> scan_pb2.Scan2d:
 
 
 def create_xarray_from_img_path(img_path: str,
-                                tl: tuple[float, float] = None,
-                                size: tuple[float, float] = None,
-                                physical_units: str = None,
-                                data_units: str = None):
+                                tl: tuple[float, float] | None = None,
+                                size: tuple[float, float] | None = None,
+                                physical_units: str | None = None,
+                                data_units: str | None = None,
+                                channel_id: str | None = None):
     """Create an xarray from the provided image and physical units data."""
     img = np.asarray(iio.imread(img_path))[:, :, 0]  # Grab single channel
 
@@ -203,5 +204,8 @@ def create_xarray_from_img_path(img_path: str,
     if physical_units:
         da.x.attrs['units'] = physical_units
         da.y.attrs['units'] = physical_units
+
+    if channel_id:
+        da.name = channel_id
 
     return da

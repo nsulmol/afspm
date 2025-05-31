@@ -413,7 +413,8 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
 
     RERUN_WAIT_S = 30
 
-    def __init__(self, drift_model: drift.DriftModel | None = None,
+    def __init__(self, channel_id: str,
+                 drift_model: drift.DriftModel | None = None,
                  csv_attribs: csv.CSVAttributes = DEFAULT_CSV_ATTRIBUTES,
                  min_intersection_ratio: float = DEFAULT_MIN_INTERSECTION_RATIO,
                  min_spatial_res_ratio: float = DEFAULT_MIN_SPATIAL_RES_RATIO,
@@ -423,6 +424,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
                  DEFAULT_RESCAN_INTERSECTION_RATIO,
                  display_fit: bool = DEFAULT_DISPLAY_FIT, **kwargs):
         """Initialize our correction scheduler."""
+        self.channel_id = channel_id.upper()
         self.drift_model = (drift.create_drift_model() if drift_model is None
                             else drift_model)
         self.csv_attribs = csv_attribs
@@ -510,7 +512,8 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     # ----- Drift mapping stuff ----- #
     def cache_received_message(self, proto: Message):
         """Analyze scans whenever the cache receives them."""
-        if isinstance(proto, scan_pb2.Scan2d):
+        if (isinstance(proto, scan_pb2.Scan2d) and
+                self.channel_id in proto.channel.upper()):
             self.update(proto)
 
         if (isinstance(proto, control_pb2.ControlState) or

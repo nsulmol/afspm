@@ -30,6 +30,7 @@ class ImageTranslator(MicroscopeTranslator):
         dev_scope_state: current scanning state.
         dev_scan_params: current scan parameters.
         dev_scan: latest scan.
+        channel_id: str channel id to apply to scans.
 
         scan_time_s: how long a scan should take, in seconds.
         move_time_s: how long changing scan paramters should take, in seconds.
@@ -44,11 +45,11 @@ class ImageTranslator(MicroscopeTranslator):
                  physical_size: tuple[float, float],
                  physical_units: str, data_units: str,
                  scan_time_s: float, move_time_s: float,
-                 img_path: str = _DEFAULT_IMG_PATH, **kwargs):
+                 img_path: str = _DEFAULT_IMG_PATH,
+                 channel_id: str | None = None, **kwargs):
         """Initialize translator.
 
         Args:
-            img_path: path to image to load.
             physical_origin: physical origin as top-left (x,y).
             physical_size: physical size as (width, height).
             physical_units: the units of the physical dimensions (i.e. x/y
@@ -57,6 +58,8 @@ class ImageTranslator(MicroscopeTranslator):
             scan_time_s: how long a scan should take, in seconds.
             move_time_s: how long changing scan paramters should take, in
                 seconds.
+            img_path: path to image to load.
+            channel_id: str channel id to apply to scans.
         """
         self.start_ts = None
         self.scan_time_s = scan_time_s
@@ -66,11 +69,13 @@ class ImageTranslator(MicroscopeTranslator):
                                                       physical_origin,
                                                       physical_size,
                                                       physical_units,
-                                                      data_units)
+                                                      data_units,
+                                                      channel_id)
         self.dev_scope_state = scan_pb2.ScopeState.SS_FREE
         self.dev_scan_params = scan_pb2.ScanParameters2d()
         self.dev_scan = None
         self.file_id = 0
+        self.channel_id = channel_id
         super().__init__(**kwargs)
 
     def on_start_scan(self):
