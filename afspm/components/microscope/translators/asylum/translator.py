@@ -14,11 +14,10 @@ from ...actions import (ActionHandler, MicroscopeAction, ActionError)
 from ...translator import get_file_modification_datetime
 from ...config_translator import ConfigTranslator
 
-from .... import component as afspmc
 from .....utils import array_converters as conv
 from .....io.protos.generated import scan_pb2
 from .....io.protos.generated import spec_pb2
-from ......io.protos.generated import control_pb2
+from .....io.protos.generated import control_pb2
 
 from .client import XopClient
 from .xop import convert_igor_path_to_python_path
