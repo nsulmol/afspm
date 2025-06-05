@@ -1,5 +1,6 @@
 """Test cache creation logic."""
 
+import logging
 import copy
 import pytest
 from collections import deque
@@ -7,6 +8,9 @@ from collections import deque
 from afspm.io.pubsub.logic import cache_logic as cl
 from afspm.io.pubsub.logic import pbc_logic as pbc
 from afspm.io.protos.generated import scan_pb2
+
+
+logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
@@ -27,6 +31,13 @@ def proto_10nm():
     proto = scan_pb2.Scan2d()
     proto.channel = 'hammock'
     proto.params.spatial.roi.size.x = 10
+    return proto
+
+
+@pytest.fixture
+def proto_5nm_general():
+    proto = scan_pb2.Scan2d()
+    proto.params.spatial.roi.size.x = 5
     return proto
 
 
@@ -92,7 +103,7 @@ def test_update_cache_longer_history(cache, proto_5nm, pbc_long_history_logic):
     # Test up to/before popping
     channels = ['a', 'b', 'c', 'd']
     expected_cache_channels = deque([proto_5nm.channel],
-                                 maxlen=max_len)
+                                    maxlen=max_len)
     for channel in channels:
         proto = copy.deepcopy(proto_5nm)
         proto.channel = channel
@@ -158,3 +169,73 @@ def test_pbc_with_roi_logic(cache, proto_5nm, proto_10nm,
         expected_hist.append(tmp)
         for idx, cache_val in enumerate(cache[envelope]):
             assert cache_val == expected_hist[idx]
+
+
+def test_pbc_with_roi_with_envelope_missing(cache, proto_5nm_general,
+                                            proto_5nm_hist,
+                                            pbc_with_roi_logic):
+    """Like above, but we are dealing with a proto which we did not specify.
+
+    We expect it to get_closest_match to proto_5nm.
+    """
+    proto = proto_5nm_general
+    hist = proto_5nm_hist
+
+    logic = pbc_with_roi_logic
+    envelope = logic.get_envelope_for_proto(proto)
+    logic.update_cache(proto, cache)
+    assert proto in cache[envelope]
+
+    # Because we are using ROI logic, the original proto should still be there!
+    envelope = logic.get_envelope_for_proto(proto)
+    assert proto in cache[envelope]
+
+    # Now, validate that our history is correct for each.
+    cache = {}
+    expected_hist = []
+    for cnt in range(0, hist):
+        tmp = copy.deepcopy(proto)
+        tmp.values.append(cnt)
+
+        logic.update_cache(tmp, cache)
+        expected_hist.append(tmp)
+
+    envelope = logic.get_envelope_for_proto(proto)
+
+    for idx, cache_val in enumerate(cache[envelope]):
+        assert cache_val == expected_hist[idx]
+
+    tmp = copy.deepcopy(proto)
+    tmp.values.append(200)  # Just differentiate from the end
+
+    logic.update_cache(tmp, cache)
+    # Append to end and remove first item (simulating deque)
+    expected_hist = expected_hist[1:]
+    expected_hist.append(tmp)
+    for idx, cache_val in enumerate(cache[envelope]):
+        assert cache_val == expected_hist[idx]
+
+
+@pytest.mark.parametrize(
+    "envelope, keys, expected",
+    [('ControlState', ['Scan2d', 'ScanParameters2d'], None),
+     ('ControlState', ['Scan2d', 'ScanParameters2d', 'ControlState'],
+      'ControlState'),
+     ('ControlState', ['Scan2d_20.0_'], None),
+     ('Scan2d__', ['ControlState'], None),
+     ('Scan2d__', ['Scan2d_20.0_Topo', 'Scan2d_20.0_'], 'Scan2d_20.0_Topo'),
+     ('Scan2d_20.0_', ['Scan2d__Topo', 'Scan2d_20.0_'], 'Scan2d_20.0_'),
+     ('Scan2d__Topo', ['Scan2d_20.0_Topo', 'Scan2d_20.0_'], 'Scan2d_20.0_Topo'),
+     ('Scan2d_20.0_', ['Scan2d__', 'ControlState'], 'Scan2d__'),
+     ('Scan2d_20.0_', ['Scan2d__', 'Scan2d_20.0_Topo'], 'Scan2d_20.0_Topo'),
+     ('Scan2d_20.0_Topo', ['Scan2d__', 'Scan2d_20.0_Topo'], 'Scan2d_20.0_Topo'),
+     ('Scan2d__Topo', ['Scan2d__', 'Scan2d_20.0_Topo'], 'Scan2d_20.0_Topo')
+     ])
+def test_get_closest_match(envelope, keys, expected):
+    """Ensure get_closest_match functions as expected (see pydoc).
+
+    The biggest source of confusion is: if the weights are the same (default),
+    we just grab the first in the list.
+    """
+    match_envelope = pbc.get_closest_match(envelope, keys)
+    assert match_envelope == expected
