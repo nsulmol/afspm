@@ -13,6 +13,8 @@ xop_url = 'tcp://127.0.0.1:5555'  # To be used on zmq-xop server startup in Igor
 
 rescan_url = "tcp://127.0.0.1:9005"
 
+channel_id = 'Topo'  # TODO: Update as needed.
+
 # ----- PubSub ----- #
 [pub]
 class = 'afspm.io.pubsub.publisher.Publisher'
@@ -94,6 +96,7 @@ class = 'afspm.components.drift.scheduler.CSCorrectedScheduler'
 pubsubcache = 'psc'
 router = 'router'
 publisher = 'rescan_pub'  # Publish rescan requests
+channel_id = 'channel_id'
 
 [rescanner]
 component = true

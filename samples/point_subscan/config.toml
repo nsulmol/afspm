@@ -26,17 +26,21 @@ scans_per_reset = 4  # 3 + 1
 visualization_style = 'imshow'  # 'surface'
 visualization_colormap = 'nipy_spectral'
 
+channel_id = 'Topo'
+
 
 # --- Cache Aspects --- #
-[full_scan_id]
+[full_scan_id]  # This should be specific to one channel
 class = 'afspm.io.pubsub.logic.pbc_logic.create_roi_scan_envelope'
 size = 'full_scan_size'
+channel = 'channel_id'
 
-[small_scan_id]
+[small_scan_id]  # This should be specific to one channel
 class = 'afspm.io.pubsub.logic.pbc_logic.create_roi_scan_envelope'
 size = 'small_scan_size'
+channel = 'channel_id'
 
-[proto_hist_list]
+[proto_hist_list]  # This *should* mean to make a cache of these for each channel
 class = 'afspm.io.pubsub.logic.pbc_logic.create_roi_proto_hist_list'
 sizes_with_hist_list = [['full_scan_size', 1], ['small_scan_size', 'sscans_per_fscan']]
 
@@ -209,6 +213,8 @@ physical_origin = 'full_scan_origin'
 physical_size = 'full_scan_size'
 physical_units = 'physical_units'
 data_units = 'data_units'
+
+channel_id = 'channel_id'
 
 scan_time_s = 2
 move_time_s = 0.5
