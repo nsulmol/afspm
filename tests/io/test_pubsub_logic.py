@@ -124,6 +124,7 @@ def sub_sca_psc(ctx, psc_url, topics_sca, cache_kwargs, wait_ms):
         update_cache_kwargs=cache_kwargs,
         poll_timeout_ms=wait_ms)
 
+
 @pytest.fixture
 def sub_control_state_psc(ctx, psc_url, topics_control_state, cache_kwargs,
                           wait_ms):

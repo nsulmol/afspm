@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from afspm.utils.log import LOGGER_ROOT
 from afspm.components.component import AfspmComponent
 
-from afspm.io import common
 from afspm.io.protos.generated import scan_pb2
 
 
