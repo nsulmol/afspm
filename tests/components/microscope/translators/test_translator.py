@@ -494,7 +494,7 @@ def test_run_scan(client, default_control_state,
         set_scan_params(client, orig_scan_params, desired_phys_size_nm,
                         desired_data_shape)
 
-    logger.info("Flush any scan we have in the cache, and validate"
+    logger.info("Flush any scan we have in the cache, and validate "
                 "that we have an initial scope state of SS_FREE.")
     scope_state_msg = scan_pb2.ScopeStateMsg(
         scope_state=scan_pb2.ScopeState.SS_FREE)
