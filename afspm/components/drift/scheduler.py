@@ -602,14 +602,14 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         new_tot_corr_info = correction.update_total_correction(
             self.total_corr_info, corr_info, self.update_weight)
 
-        # Drift has changed if one of our items is None and the other is
-        # not None, or if both exist and their vectors are different.
-        xor_exists = (new_tot_corr_info is not None !=
-                      self.total_corr_info is not None)
+        # Drift has changed if we received our first CorrectionInfo
+        # or if both exist and their vectors are different.
+        first_corr_info = (new_tot_corr_info is not None and
+                           self.total_corr_info is None)
         both_exist = (new_tot_corr_info is not None and
                       self.total_corr_info is not None)
         drift_has_changed = (
-            xor_exists or (both_exist and not np.all(np.isclose(
+            first_corr_info or (both_exist and not np.all(np.isclose(
                 new_tot_corr_info.vec, self.total_corr_info.vec))))
         self.total_corr_info = new_tot_corr_info
 
