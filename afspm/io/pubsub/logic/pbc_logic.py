@@ -3,7 +3,6 @@
 import numpy as np
 import logging
 from itertools import zip_longest
-# from typing import Any
 import copy
 from collections.abc import Iterable
 from collections import deque
@@ -147,7 +146,6 @@ class PBCScanLogic(ProtoBasedCacheLogic):
                 This allows us to store non-specific Scan2d information
                 easily (such as the cache size).
         """
-        # TODO: Change order, size before channel!
         if (type(proto).__name__ == PBCScanLogic.BASE_SCAN_ID and
                 not force_parent):
             envelope = PBCScanLogic.BASE_SCAN_ID
