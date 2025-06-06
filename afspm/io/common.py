@@ -34,7 +34,7 @@ BEATS_BEFORE_DEAD = 3
 # delay of ~1s, to be safe.
 # Note that we use spawning to keep the system behaviour consistent acros
 # OSses, at the cost of a slower startup time.
-SPAWN_DELAY_S = 0.25
+SPAWN_DELAY_S = 0.50
 
 
 # We appear to need a small startup delay, to allow zmq sockets to properly

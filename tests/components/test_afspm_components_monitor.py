@@ -7,7 +7,8 @@ import pytest
 import zmq
 
 from afspm.components.component import AfspmComponentBase
-from afspm.components.monitor import AfspmComponentsMonitor, SPAWN_DELAY_S
+from afspm.components.monitor import AfspmComponentsMonitor
+from afspm.io import common
 
 # log_cli_level *is* used, but it's a fixture. Your editor may not see this.
 from tests.log import log_cli_level, setup_and_get_logging_args
@@ -24,17 +25,18 @@ def comp_name():
 
 @pytest.fixture
 def poll_timeout_ms():
-    return 25
+    return common.POLL_TIMEOUT_MS
 
 
 @pytest.fixture
 def loop_sleep_s():
-    return 0.05
+    return common.LOOP_SLEEP_S
 
 
 @pytest.fixture
 def beat_period_s():
     return 0.1
+#    return common.HEARTBEAT_PERIOD_S
 
 
 @pytest.fixture
@@ -49,6 +51,7 @@ def kwargs(comp_name, loop_sleep_s, beat_period_s):
 @pytest.fixture
 def missed_beats_before_dead():
     return 5
+#    return common.BEATS_BEFORE_DEAD
 
 
 @pytest.fixture
@@ -65,7 +68,7 @@ def time_to_wait_s(beat_period_s, missed_beats_before_dead):
 class CrashingComponent(AfspmComponentBase):
     """A simple component that crashes after some time."""
     def __init__(self, time_to_crash_s: float, **kwargs):
-        self.time_to_crash_s = SPAWN_DELAY_S + time_to_crash_s
+        self.time_to_crash_s = common.SPAWN_DELAY_S + time_to_crash_s
         self.start_ts = time.time()
         super().__init__(**kwargs)
 
@@ -78,7 +81,7 @@ class CrashingComponent(AfspmComponentBase):
 class ExitingComponent(AfspmComponentBase):
     """A simple component that exits purposefully after some time."""
     def __init__(self, time_to_exit_s: float, **kwargs):
-        self.time_to_exit_s = SPAWN_DELAY_S + time_to_exit_s
+        self.time_to_exit_s = common.SPAWN_DELAY_S + time_to_exit_s
         self.start_ts = time.time()
         super().__init__(**kwargs)
 
@@ -105,7 +108,7 @@ def test_basic_component(ctx, kwargs, loop_sleep_s,
                          comp_name, missed_beats_before_dead,
                          time_to_wait_s, poll_timeout_ms, log_cli_level):
     """Ensure a standard component stays alive for the test lifetime."""
-    kwargs['class'] = 'afspm.components.component.AfspmComponent'
+    kwargs['class'] = 'afspm.components.component.AfspmComponentBase'
     components_params_dict = {comp_name: kwargs}
 
     log_init_method, log_init_args = setup_and_get_logging_args(log_cli_level)
