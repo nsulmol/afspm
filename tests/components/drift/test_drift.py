@@ -8,12 +8,10 @@ import xarray as xr
 
 from pathlib import Path
 from os import sep
-import SciFiReaders as sr
 
 from matplotlib import pyplot as plt
 
 from afspm.components.drift import drift
-from afspm.utils import array_converters as conv
 
 
 logger = logging.getLogger(__name__)
@@ -24,12 +22,12 @@ BASE_PATH = str(Path(__file__).parent.parent.resolve())
 
 @pytest.fixture
 def sample1_fname():
-    return BASE_PATH + sep + '..' + sep + 'data' + sep + 'Au_facetcontac0000.ibw'
+    return BASE_PATH + sep + '..' + sep + 'data' + sep + 'Au_facetcontac0000.nc'
 
 
 @pytest.fixture
 def sample2_fname():
-    return BASE_PATH + sep + '..' + sep + 'data' + sep + 'Au_facetcontac0003.ibw'
+    return BASE_PATH + sep + '..' + sep + 'data' + sep + 'Au_facetcontac0003.nc'
 
 
 @pytest.fixture
@@ -62,13 +60,15 @@ def min_unit_trans_residual():
     return 1e-07
 
 
-def get_xarray_from_ibw(fname: str) -> xr.DataArray:
-    """Helper to get xarray from an ibw file."""
-    reader = sr.IgorIBWReader(fname)
-    ds1 = list(reader.read(verbose=False).values())
-    scan1 = conv.convert_sidpy_to_scan_pb2(ds1[0])
-    da1 = conv.convert_scan_pb2_to_xarray(scan1)
-    return da1
+def get_data_array_from_dataset(fname: str) -> xr.DataArray:
+    """Helper to get xarray DataArray from an nc file.
+
+    The file contains a Dataset. We grab the first 'channel', i.e. the first
+    DataArray.
+    """
+    ds = xr.open_dataset(fname)
+    da = list(ds.values())[0]  # Grab first DataArray from Dataset
+    return da
 
 
 def test_transform_real_data(sample1_fname, sample2_fname, dt1, dt2,
@@ -78,8 +78,8 @@ def test_transform_real_data(sample1_fname, sample2_fname, dt1, dt2,
     # Avoid plt.show() happening
     monkeypatch.setattr(plt, 'show', lambda: None)
 
-    da1 = get_xarray_from_ibw(sample1_fname)
-    da2 = get_xarray_from_ibw(sample2_fname)
+    da1 = get_data_array_from_dataset(sample1_fname)
+    da2 = get_data_array_from_dataset(sample2_fname)
 
     # Get normalized pix trans residual (for score comparison)
     norm_min_pix_trans_residual = (min_pix_trans_residual /
@@ -162,7 +162,7 @@ def test_transform_simulated(sample1_fname, sample2_fname, dt1, dt2,
     # Avoid plt.show() happening
     monkeypatch.setattr(plt, 'show', lambda: None)
 
-    da1 = get_xarray_from_ibw(sample1_fname)
+    da1 = get_data_array_from_dataset(sample1_fname)
 
     # Testing translation in x, translation in y, then translation in both.
     tl_xs = [da1.x[0] - 0.5*(da1.x[-1] - da1.x[0]),
