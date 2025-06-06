@@ -42,9 +42,6 @@ class ProtoBasedCacheLogic(CacheLogic):
             # having different cache sizes for different versions of a
             # specific proto.
             envelope = self.get_envelope_for_proto(proto)
-
-            # The 'base' envelope proto and normal are the same, so just
-            # storing the base one.
             self.envelope_to_history_map[envelope] = history
             self.envelope_to_proto_map[envelope] = self.create_default_proto(proto)
 
