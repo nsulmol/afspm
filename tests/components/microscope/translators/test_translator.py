@@ -622,7 +622,7 @@ def test_cancel_spec(client, default_control_state,
     logger.info("Validate we can start and cancel a spec collection.")
     startup_grab_control(client, exp_problem)
 
-    logger.info("First, flush any spec we have in the cache, and validate"
+    logger.info("First, flush any spec we have in the cache, and validate "
                 "that we have an initial scope state of SS_FREE.")
     scope_state_msg = scan_pb2.ScopeStateMsg(
         scope_state=scan_pb2.ScopeState.SS_FREE)
