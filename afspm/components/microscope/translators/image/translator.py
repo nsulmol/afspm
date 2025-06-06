@@ -39,7 +39,6 @@ class ImageTranslator(MicroscopeTranslator):
 
     _DEFAULT_IMG_PATH = (str(Path(__file__).parent.resolve()) + sep + "data" +
                          sep + "peppers.tiff")
-    DEFAULT_SPAWN_DELAY_S = 5.0  # Slow startup.
 
     def __init__(self, physical_origin: tuple[float, float],
                  physical_size: tuple[float, float],
