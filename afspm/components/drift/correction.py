@@ -1,6 +1,6 @@
 """Methods for estimating corrections between scans."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import datetime as dt
 import logging
 
@@ -30,8 +30,8 @@ class CorrectionInfo:
     """Holds information necessary to correct for drift."""
 
     curr_dt: dt.datetime = None
-    vec: np.ndarray = NO_VEC
-    drift_rate: np.ndarray = NO_VEC
+    vec: np.ndarray = field(default_factory=lambda: NO_VEC)
+    drift_rate: np.ndarray = field(default_factory=lambda: NO_VEC)
     unit: str | None = DEFAULT_UNIT
 
 
@@ -42,7 +42,7 @@ class DriftSnapshot:
     dt1: dt.datetime = None  # Time of first scan.
     dt2: dt.datetime = None  # Time of second scan.
     # Translation vector to correct second to first scan CS.
-    vec: np.ndarray = NO_VEC
+    vec: np.ndarray = field(default_factory=lambda: NO_VEC)
     unit: str | None = DEFAULT_UNIT  # Translation vector unit
 
 
