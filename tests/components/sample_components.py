@@ -262,9 +262,11 @@ def cs_corrected_scheduler_routine(psc_url, pub_url, server_url, router_url,
                       update_cache_kwargs=cache_kwargs)
     router = ControlRouter(server_url, router_url, ctx)
 
-    scheduler = CSCorrectedScheduler(name='scheduler',
+    scheduler = CSCorrectedScheduler(channel_id='',
+                                     name='scheduler',
                                      pubsubcache=psc,
-                                     router=router, ctx=ctx)
+                                     router=router, ctx=ctx,
+                                     display_fit=False)
     scheduler.run()
 
     # Forcing closure of bound sockets (for pytests)

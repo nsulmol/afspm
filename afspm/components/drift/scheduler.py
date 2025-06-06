@@ -16,7 +16,6 @@ from google.protobuf.message import Message
 from google.protobuf.message_factory import GetMessageClass
 
 from . import drift, correction
-from .. import component as afspmc
 from ..microscope import scheduler
 from ...utils import csv
 from ...utils import proto_geo
@@ -74,6 +73,7 @@ def get_converted_and_updated_vec(corr_info: correction.CorrectionInfo,
 
     desired_units = (unit, unit)
     corr_units = (corr_info.unit, corr_info.unit)
+
     corr_vec = np.array(convert_list(corr_info.vec.tolist(),
                                      corr_units, desired_units))
     return corr_vec
@@ -146,7 +146,8 @@ def correct_probe_position(proto: spec_pb2.ProbePosition,
     return proto
 
 
-def cs_correct_proto(proto_in: Message, corr_info: correction.CorrectionInfo,
+def cs_correct_proto(proto_in: Message,
+                     corr_info: correction.CorrectionInfo | None,
                      update_weight: float, curr_dt: dt.datetime | None
                      ) -> Message:
     """Recursively go through a protobuf, correcting CS-based fields.
@@ -156,7 +157,8 @@ def cs_correct_proto(proto_in: Message, corr_info: correction.CorrectionInfo,
 
     Args:
         proto_in: Message to update.
-        corr_info: CorrectionInfo associated with current drifting.
+        corr_info: CorrectionInfo associated with current drifting. If None,
+            we do not correct.
         update_weight: weight applied for updating corr_info.
         curr_dt: the current DateTime, used to update the vector for drift.
             If None, do not correct for temporal drift.
@@ -164,6 +166,9 @@ def cs_correct_proto(proto_in: Message, corr_info: correction.CorrectionInfo,
     Returns:
         updated Message.
     """
+    if corr_info is None:  # We cannot do any correction w/o corr_info!
+        return proto_in
+
     proto = copy.deepcopy(proto_in)
     constructor = GetMessageClass(proto.DESCRIPTOR)
     vals_dict = {}
@@ -201,12 +206,11 @@ class CSCorrectedRouter(router.ControlRouter):
                          proto: Message) -> (control_pb2.ControlResponse,
                                              Message | int | None):
         """Override to correct CS data before sending out."""
-        if self._corr_info is not None:
-            # TODO: Should we have an option to determine whether or not we
-            # correct for drift rate? What if our estimate is poop?
-            curr_dt = dt.datetime.now(dt.timezone.utc)
-            proto = cs_correct_proto(proto, self._corr_info,
-                                     self._update_weight, curr_dt)
+        # TODO: Should we have an option to determine whether or not we
+        # correct for drift rate? What if our estimate is poop?
+        curr_dt = dt.datetime.now(dt.timezone.utc)
+        proto = cs_correct_proto(proto, self._corr_info,
+                                 self._update_weight, curr_dt)
 
         # Send out
         return super()._handle_send_req(req, proto)
@@ -227,7 +231,8 @@ class CSCorrectedRouter(router.ControlRouter):
         child.shutdown_was_requested = parent.shutdown_was_requested
         return child
 
-    def update_correction_info(self, corr_info: correction.CorrectionInfo,
+    def update_correction_info(self,
+                               corr_info: correction.CorrectionInfo | None,
                                update_weight: float):
         """Update our correction vector.
 
@@ -237,10 +242,10 @@ class CSCorrectedRouter(router.ControlRouter):
         translation vector.
         """
         self._corr_info = copy.deepcopy(corr_info)
-
-        # We want SCS -> PCS
-        self._corr_info.vec = -self._corr_info.vec
-        self._corr_info.drift_rate = -self._corr_info.drift_rate
+        if self._corr_info is not None:
+            # We want SCS -> PCS
+            self._corr_info.vec = -self._corr_info.vec
+            self._corr_info.drift_rate = -self._corr_info.drift_rate
 
         self._update_weight = update_weight
 
@@ -266,16 +271,16 @@ class CSCorrectedCache(cache.PubSubCache):
             callback(proto)
 
         # Correct CS data of proto
-        if self._corr_info is not None:
-            # Get curr_dt for Scans and Specs, so we ensure their locations
-            # account for drift rate.
-            curr_dt = dt.datetime.now(dt.timezone.utc)
-            if isinstance(proto, scan_pb2.Scan2d):
-                curr_dt = proto.timestamp.ToDatetime(dt.timezone.utc)
-            elif isinstance(proto, spec_pb2.Spec1d):
-                curr_dt = proto.timestamp.ToDateTime(dt.timezone.utc)
-            proto = cs_correct_proto(proto, self._corr_info,
-                                     self._update_weight, curr_dt)
+        # Get curr_dt for Scans and Specs, so we ensure their locations
+        # account for drift rate.
+        curr_dt = dt.datetime.now(dt.timezone.utc)
+        if isinstance(proto, scan_pb2.Scan2d):
+            curr_dt = proto.timestamp.ToDatetime(dt.timezone.utc)
+        elif isinstance(proto, spec_pb2.Spec1d):
+            curr_dt = proto.timestamp.ToDatetime(dt.timezone.utc)
+        proto = cs_correct_proto(proto, self._corr_info,
+                                 self._update_weight, curr_dt)
+
         super().send_message(proto)
 
     @classmethod
@@ -295,7 +300,8 @@ class CSCorrectedCache(cache.PubSubCache):
         child._poller = parent._poller
         return child
 
-    def update_correction_info(self, corr_info: correction.CorrectionInfo,
+    def update_correction_info(self,
+                               corr_info: correction.CorrectionInfo | None,
                                update_weight: float):
         """Update our correction vector."""
         self._corr_info = copy.deepcopy(corr_info)
@@ -421,6 +427,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     def __init__(self, channel_id: str,
                  drift_model: drift.DriftModel | None = None,
                  csv_attribs: csv.CSVAttributes = DEFAULT_CSV_ATTRIBUTES,
+
                  min_intersection_ratio: float = DEFAULT_MIN_INTERSECTION_RATIO,
                  min_spatial_res_ratio: float = DEFAULT_MIN_SPATIAL_RES_RATIO,
                  max_fitting_score: float = DEFAULT_MAX_FITTING_SCORE,
@@ -441,12 +448,15 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         self.rerun_scan = False
         self.rerun_scan_params = None
 
-        # TODO: Should this be a default in constructor of dataclass!?
-        self.total_corr_info = correction.CorrectionInfo()
+        self.total_corr_info = None
 
         self.display_fit = display_fit
-        self.figure = plt.figure(layout=PLT_LAYOUT)
-        plt.show(block=False)  # TODO should this be elsewhere? At start?
+        self.figure = (plt.figure(layout=PLT_LAYOUT) if self.display_fit
+                       else None)
+
+        # Display window on startup, so the user knows to expect it.
+        if self.display_fit:
+            plt.show(block=False)
 
         # Warn user if using default fitting score and not RANSAC fitting
         if (self.max_fitting_score == self.DEFAULT_MAX_FITTING_SCORE and
@@ -460,6 +470,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
             kwargs[scheduler.ROUTER_KEY])
         kwargs[scheduler.CACHE_KEY] = CSCorrectedCache.from_parent(
             kwargs[scheduler.CACHE_KEY])
+
         super().__init__(**kwargs)
 
         # In order to update our logic, we bind update to the
@@ -471,20 +482,21 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     # ----- CSV things ----- #
     @staticmethod
     def _get_metadata_row(scan: scan_pb2.Scan2d,
-                          corr_info: correction.CorrectionInfo,
+                          corr_info: correction.CorrectionInfo | None,
                           estimated_from_vec: bool) -> [str]:
         row_vals = [scan.timestamp.seconds,
                     scan.filename,
-                    corr_info.vec,
-                    corr_info.unit,
-                    corr_info.drift_rate,
+                    corr_info.vec if corr_info is not None else None,
+                    corr_info.unit if corr_info is not None else None,
+                    corr_info.drift_rate if corr_info is not None else None,
                     estimated_from_vec]
         return row_vals
 
     def _get_drift_snapshot(self, new_scan: scan_pb2.Scan2d
                             ) -> correction.DriftSnapshot | None:
         """Estimate drift for the new scan."""
-        self.figure.clear()  # Clear figure before showing
+        if self.figure is not None:
+            self.figure.clear()  # Clear figure before showing
 
         matched_scan = proto_geo.get_latest_intersection(
             self._get_scans_from_cache(), new_scan,
@@ -498,7 +510,8 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
                 self.max_fitting_score, self.display_fit,
                 self.figure)
 
-        plt.show(block=False)  # TODO should this be elsewhere? At start?
+        if self.display_fit:
+            plt.show(block=False)
         return snapshot
 
     def _get_scans_from_cache(self):
@@ -521,8 +534,9 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
                 self.channel_id in proto.channel.upper()):
             self.update(proto)
 
-        if (isinstance(proto, control_pb2.ControlState) or
-                isinstance(proto, scan_pb2.ScopeStateMsg)):
+        if ((isinstance(proto, control_pb2.ControlState) or
+                isinstance(proto, scan_pb2.ScopeStateMsg)) and
+                self.publisher is not None):
             self.publisher.send_msg(proto)
 
     def update(self, new_scan: scan_pb2.Scan2d):
@@ -588,8 +602,15 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         new_tot_corr_info = correction.update_total_correction(
             self.total_corr_info, corr_info, self.update_weight)
 
-        drift_has_changed = not np.all(np.isclose(
-            new_tot_corr_info.vec, self.total_corr_info.vec))
+        # Drift has changed if one of our items is None and the other is
+        # not None, or if both exist and their vectors are different.
+        xor_exists = (new_tot_corr_info is not None !=
+                      self.total_corr_info is not None)
+        both_exist = (new_tot_corr_info is not None and
+                      self.total_corr_info is not None)
+        drift_has_changed = (
+            xor_exists or (both_exist and not np.all(np.isclose(
+                new_tot_corr_info.vec, self.total_corr_info.vec))))
         self.total_corr_info = new_tot_corr_info
 
         # Notify logger if correction vec has changed
@@ -617,8 +638,9 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         self._update_ui()
 
     def _update_ui(self):
-        self.figure.canvas.draw_idle()
-        self.figure.canvas.flush_events()
+        if self.figure is not None:
+            self.figure.canvas.draw_idle()
+            self.figure.canvas.flush_events()
 
     # ----- Scan rerunning logic ----- #
     def _determine_redo_scan(self, uncorrected_scan: scan_pb2.Scan2d,

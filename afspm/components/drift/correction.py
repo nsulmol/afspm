@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_EMPTY_DATETIME = dt.datetime(1, 1, 1)
 
 NO_VEC = np.array([0.0, 0.0])
-DEFAULT_UNIT = 'nm'
+DEFAULT_UNIT = None  # No unit
 
 
 @dataclass
@@ -32,7 +32,7 @@ class CorrectionInfo:
     curr_dt: dt.datetime = None
     vec: np.ndarray = NO_VEC
     drift_rate: np.ndarray = NO_VEC
-    unit: str = DEFAULT_UNIT
+    unit: str | None = DEFAULT_UNIT
 
 
 @dataclass
@@ -43,7 +43,7 @@ class DriftSnapshot:
     dt2: dt.datetime = None  # Time of second scan.
     # Translation vector to correct second to first scan CS.
     vec: np.ndarray = NO_VEC
-    unit: str = DEFAULT_UNIT  # Translation vector unit
+    unit: str | None = DEFAULT_UNIT  # Translation vector unit
 
 
 def compute_drift_snapshot(scan1: scan_pb2.Scan2d,
@@ -99,7 +99,7 @@ def compute_drift_snapshot(scan1: scan_pb2.Scan2d,
             scan1.timestamp.ToDatetime(dt.timezone.utc),
             scan2.timestamp.ToDatetime(dt.timezone.utc),
             -trans,
-            units)
+            units)  # Units from da2
         return drift_snapshot
     return None
 
@@ -132,22 +132,26 @@ def estimate_correction_vec(drift_rate: np.ndarray,
     return drift_rate * (dt2 - dt1).total_seconds()
 
 
-def estimate_correction_no_snapshot(corr_info: CorrectionInfo,
+def estimate_correction_no_snapshot(corr_info: CorrectionInfo | None,
                                     curr_dt: dt.datetime,
-                                    ) -> CorrectionInfo:
+                                    ) -> CorrectionInfo | None:
     """Estimate CorrectionInfo when no snapshot was detected.
 
     We update the CorrectionInfo considering the drift rate and time of
     the prior CorrectionInfo.
 
     Args:
-        corr_info: current CorrectionInfo.
+        corr_info: current CorrectionInfo. If None, we return None.
         curr_dt: datetime when the latest scan occurred (for which we could not
             find a match).
 
     Returns:
-        np.ndarray of the updated correction vector.
+        np.ndarray of the updated correction vector (or None if no corr_info
+        provided).
     """
+    if corr_info is None:
+        return None
+
     drift_vec = estimate_correction_vec(corr_info.drift_rate,
                                         corr_info.curr_dt, curr_dt)
     return CorrectionInfo(curr_dt, drift_vec, corr_info.drift_rate,
@@ -155,7 +159,7 @@ def estimate_correction_no_snapshot(corr_info: CorrectionInfo,
 
 
 def estimate_correction_from_snapshot(drift_snapshot: DriftSnapshot,
-                                      corr_info: CorrectionInfo
+                                      corr_info: CorrectionInfo | None
                                       ) -> CorrectionInfo:
     """Estimate CorrectionInfo from a provided DriftSnapshot.
 
@@ -192,6 +196,10 @@ def estimate_correction_from_snapshot(drift_snapshot: DriftSnapshot,
                                          drift_snapshot.dt1,
                                          drift_snapshot.dt2)
 
+    if corr_info is None:  # No fancy correction needed, snapshot says all
+        return CorrectionInfo(drift_snapshot.dt2, snapshot_vec,
+                              snapshot_drift_rate, drift_snapshot.unit)
+
     # Account for temporal overlap (if applicable)
     if corr_info.curr_dt is not None and drift_snapshot.dt2 is not None:
         overlap_time_delta_s = (corr_info.curr_dt - drift_snapshot.dt2
@@ -213,10 +221,10 @@ def estimate_correction_from_snapshot(drift_snapshot: DriftSnapshot,
                           drift_snapshot.unit)
 
 
-def update_total_correction(total_corr_info: CorrectionInfo,
-                            latest_corr_info: CorrectionInfo,
+def update_total_correction(total_corr_info: CorrectionInfo | None,
+                            latest_corr_info: CorrectionInfo | None,
                             update_weight: float,
-                            ) -> CorrectionInfo:
+                            ) -> CorrectionInfo | None:
     """Update the total correction based on a new estimate.
 
     Our created CorrectionInfos are based on DriftSnapshots, which are
@@ -238,9 +246,11 @@ def update_total_correction(total_corr_info: CorrectionInfo,
 
     Args:
         total_corr_info: total CorrectionInfo from the beginning of the
-            experiment.
+            experiment. If None, we only consider latest_corr_info.
         latest_corr_info: 'local' CorrectionInfo created from the latest
-            estimation.
+            estimation. If None, we return None (latest_corr_info being None
+            implies that total_corr_info must be None, as the former was
+            calculated from the latter).
         update_weight: how much to weight the new drift rate and vector vs.
             the prior one.
 
@@ -248,6 +258,11 @@ def update_total_correction(total_corr_info: CorrectionInfo,
         CorrectionInfo where latest_corr_info's vec has been updated to
             contain that of total_corr_info (additive).
     """
+    if latest_corr_info is None:  # This implies total_corr_info is None
+        return None
+    if total_corr_info is None:  # First time setting corr_info
+        return latest_corr_info
+
     assumed_vec = estimate_correction_vec(total_corr_info.drift_rate,
                                           total_corr_info.curr_dt,
                                           latest_corr_info.curr_dt)
@@ -259,7 +274,7 @@ def update_total_correction(total_corr_info: CorrectionInfo,
                   update_weight * latest_corr_info.drift_rate)
 
     return CorrectionInfo(latest_corr_info.curr_dt,
-                          vec, drift_rate)
+                          vec, drift_rate, latest_corr_info.unit)
 
 
 def extract_patch(da: xr.DataArray,
