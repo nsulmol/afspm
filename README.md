@@ -29,15 +29,16 @@ afspm relies on the following libraries:
 - fire, for argument parsing/handling when invoked from a terminal.
 - pint, for unit conversions.
 - graphviz, to visualize config files (for debugging/validation). (Note that this package expects graphviz to be installed locally and in your PATH. Follow it's documentation for how to do so if not already on your system.)
-- skimage: used for logic for drift estimation (or generic transformation between images).
-
-Additionally, we have the following 'hard' requirements (although they are only used by some components):
-
 - xarray, as a general labeled data format we can convert to/from.
-- imageio, to read images for tests.
 - tk, for some simple UIs with tkinter.
-- scipy, for some data manipulation.
 - matplotlib, for visualizing some data (using xarray data structures).
+
+Additionally, we have the following hard requirements (although they are only used by some components):
+
+- imageio, to read images for tests.
+- skimage: used for logic for drift estimation (or generic transformation between images).
+- sklearn: used for logic for surface fitting.
+- scipy, for some data manipulation (currently feedback analysis).
 
 ## Installation
 
