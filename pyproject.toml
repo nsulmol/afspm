@@ -18,9 +18,9 @@ classifiers = [
   "Operating System :: OS Independent",
 ]
 
-requires-python = ">=3.10, <4"
+requires-python = ">=3.11, <4"
 dependencies = [
-  "xarray (>=2023.7.0, <2024.0.0)",
+  "xarray (>=2025.4.0,<2026.0.0)",
   "pyzmq (>=25.1.0, <26.0.0) ; sys_platform != 'win32'",
   "pyzmq (>=23.2.1, <23.3.0) ; sys_platform == 'win32'",
   "numpy (>=1.25.1, <2.0.0)",
@@ -35,6 +35,7 @@ dependencies = [
   "graphviz (>=0.20.3,<0.21.0)",
   "scikit-image (>=0.25.2,<0.26.0)",
   "scikit-learn (>=1.7.0,<2.0.0)",
+  "netcdf4 (>=1.7.2,<2.0.0)",
 ]
 
 [project.optional-dependencies]
@@ -43,7 +44,7 @@ dev = [
   "pytest (>=7.4.0, <8.0.0)",
 ]
 gxsm = [
-  "gxsmread (>=0.2.2, <0.3.0)",
+  "gxsmread (>=0.2.4,<0.3.0)",
 ]
 asylum = [
   "igor2 (>=0.5.3, <0.6.0)",
