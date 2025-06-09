@@ -29,7 +29,7 @@ def get_next_scan_params(component: AfspmComponent,
     Returns:
         ScanParameters2d of the next scan, None if not yet determined.
     """
-    envelopes = [env for env in list(component.subscriber.keys())
+    envelopes = [env for env in list(component.subscriber.cache.keys())
                  if exp_data.scan_id in env]
 
     if (len(envelopes) == 0):
