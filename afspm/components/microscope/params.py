@@ -513,7 +513,11 @@ def _correct_val_for_sending(val: str, param_info: ParameterInfo,
     NOTE: generic_param is just for logging.
     """
     val = _typify_val(val, param_info.type)
-    val = units.convert(val, curr_unit, param_info.unit)
+    try:
+        val = units.convert(val, curr_unit, param_info.unit)
+    except units.ConversionError:
+        logger.error(f'Error converting for {param_info.uuid}.')
+        raise  # Re-raise exception
     val = _cap_val_in_range(val, param_info.range, generic_param)
     return val
 
