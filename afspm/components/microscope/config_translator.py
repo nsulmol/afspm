@@ -94,7 +94,14 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
     # ----- Parameter Handlers ----- #
     def on_set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
                            ) -> control_pb2.ControlResponse:
-        """Handle a request to change the scan parameters."""
+        """Handle a request to change the scan parameters.
+
+        As a reminder: we do not send data units, because the translator
+        has no concept of the 'units' of data at the 'scan parameter' level.
+        When we read saved scans or specs, we are able to retrieve their
+        data units, but this is not something we concern ourselves with at
+        the MicroscopeTranslator granularity.
+        """
         vals = [scan_params.spatial.roi.top_left.x,
                 scan_params.spatial.roi.top_left.y,
                 scan_params.spatial.roi.size.x,
@@ -106,8 +113,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
                       scan_params.spatial.length_units,
                       scan_params.spatial.length_units,
                       scan_params.spatial.length_units,
-                      scan_params.data.units,
-                      scan_params.data.units,
+                      None, None,
                       scan_params.spatial.angular_units]
 
         try:

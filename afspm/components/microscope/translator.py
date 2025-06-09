@@ -231,6 +231,14 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                            ) -> control_pb2.ControlResponse:
         """Handle a request to change the scan parameters.
 
+        As a reminder: we should not send data units, because the translator
+        has no concept of the 'units' of data at the 'scan parameter' level.
+        When we read saved scans or specs, we are able to retrieve their
+        data units, but this is not something we concern ourselves with at
+        the MicroscopeTranslator granularity. Thus, if you implement this
+        method, ensure that you disregard any data units passed (when
+        converting to Microscope units).
+
         Must support.
         """
 
