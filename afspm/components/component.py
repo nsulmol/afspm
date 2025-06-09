@@ -294,20 +294,3 @@ class AfspmComponentUI(AfspmComponent):
     def _register_loop_step(self):
         """Call per-loop-step after a sleep period."""
         self.root.after(int(self.loop_sleep_s * 1000), self._per_loop_step)
-
-
-# def set_spawn_delay_s_kwargs(kwargs: dict, spawn_delay_s: float) -> dict:
-#     """Set the spawn delay for a component (if not already set).
-
-#     This setting is done on the kwargs dict, before passing to the constructor.
-
-#     Args:
-#         spawn_delay_s: desired spawn delay in seconds.
-#         kwargs: kwargs dict, used to initialize component.
-
-#     Returns:
-#         updated kwargs dict.
-#     """
-#     if SPAWN_DELAY_S_KEY not in kwargs:
-#         kwargs[SPAWN_DELAY_S_KEY] = spawn_delay_s
-#     return kwargs
