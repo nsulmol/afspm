@@ -34,6 +34,16 @@ class CorrectionInfo:
     drift_rate: np.ndarray = field(default_factory=lambda: NO_VEC)
     unit: str | None = DEFAULT_UNIT
 
+    def __eq__(self, other):
+        """Proper comparison operator."""
+        return (self.curr_dt == other.curr_dt and
+                np.all(np.isclose(self.vec, other.vec)) and
+                np.all(np.isclose(self.drift_rate, other.drift_rate)) and
+                self.unit == other.unit)
+
+    def __neq(self, other):
+        return not self.__eq__(other)
+
 
 @dataclass
 class DriftSnapshot:
@@ -44,6 +54,16 @@ class DriftSnapshot:
     # Translation vector to correct second to first scan CS.
     vec: np.ndarray = field(default_factory=lambda: NO_VEC)
     unit: str | None = DEFAULT_UNIT  # Translation vector unit
+
+    def __eq__(self, other):
+        """Proper comparison operator."""
+        return (self.dt1 == other.dt1 and self.dt2 == other.dt2 and
+                np.all(np.isclose(self.vec, other.vec)) and
+                self.unit == other.unit)
+
+    def __neq(self, other):
+        return not self.__eq__(other)
+
 
 
 def compute_drift_snapshot(scan1: scan_pb2.Scan2d,
@@ -111,8 +131,12 @@ def get_drift_rate(vec: np.ndarray, dt1: dt.datetime, dt2: dt.datetime
         return NO_VEC
 
     try:
-        return vec / (dt2 - dt1).total_seconds()
+        rate = vec / (dt2 - dt1).total_seconds()
+        if np.any(np.isinf(rate)):
+            return NO_VEC
+        return rate
     except ZeroDivisionError:
+        logger.warning('zero division error!')
         return NO_VEC
 
 
@@ -161,10 +185,10 @@ def estimate_correction_no_snapshot(corr_info: CorrectionInfo | None,
 def estimate_correction_from_snapshot(drift_snapshot: DriftSnapshot,
                                       corr_info: CorrectionInfo | None
                                       ) -> CorrectionInfo:
-    """Estimate CorrectionInfo from a provided DriftSnapshot.
+    """Update CorrectionInfo from a provided DriftSnapshot.
 
-    Given a DriftSnapshot, we estimate the parameters for CorrectionInfo. This
-    process is somewhat complicated:
+    Given a DriftSnapshot and prior CorrectionInfo, we estimate the parameters
+    for CorrectionInfo. This process is somewhat complicated:
 
     1. We estimate the drift rate based on the correction vector and the
     two timestamps. This is the detected drift rate due to this snapshot.
@@ -181,7 +205,7 @@ def estimate_correction_from_snapshot(drift_snapshot: DriftSnapshot,
     CorrectionInfo's drift rate and the time between the last scan and this
     scan.
     4. The actual drift rate is then calculated considering the 'actual'
-    vector and the dime delta.
+    vector and the time delta.
 
     Args:
         drift_snapshot: DriftSnapshot we are suing to create a CorrectionInfo.
@@ -202,7 +226,7 @@ def estimate_correction_from_snapshot(drift_snapshot: DriftSnapshot,
 
     # Account for temporal overlap (if applicable)
     if corr_info.curr_dt is not None and drift_snapshot.dt2 is not None:
-        overlap_time_delta_s = (corr_info.curr_dt - drift_snapshot.dt2
+        overlap_time_delta_s = (corr_info.curr_dt - drift_snapshot.dt1
                                 ).total_seconds()
         if overlap_time_delta_s > 0:  # There was overlap
             overlap_vec = snapshot_drift_rate * overlap_time_delta_s
@@ -214,6 +238,7 @@ def estimate_correction_from_snapshot(drift_snapshot: DriftSnapshot,
     assumed_vec = estimate_correction_vec(corr_info.drift_rate,
                                           corr_info.curr_dt,
                                           drift_snapshot.dt2)
+
     actual_vec = assumed_vec + snapshot_vec
     actual_rate = get_drift_rate(actual_vec, corr_info.curr_dt,
                                  drift_snapshot.dt2)
