@@ -220,6 +220,8 @@ class AsylumTranslator(ConfigTranslator):
         try:
             self.param_handler.set_param_list(self.SCAN_PARAMS, vals,
                                               attr_units)
+            if not self.detects_moving:  # Send fake SS_MOVING if needed
+                self._handle_sending_fake_move()
         except ParameterNotSupportedError:
             return control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED
         except ParameterError:
