@@ -36,6 +36,8 @@ def get_next_scan_params(component: AfspmComponent,
         ready_to_scan = (time.time() - exp_data.scan_sleep_ts >
                          exp_data.scan_wait_s)
         if not ready_to_scan:
+            logger.debug('Insufficient time has passed between scans. '
+                         'Returning None.')
             return None
 
     envelopes = [env for env in list(component.subscriber.cache.keys())
@@ -50,6 +52,7 @@ def get_next_scan_params(component: AfspmComponent,
         logger.warning(f'No scan has been received with env {env}!')
         return None
 
+    logger.debug('Sending out old scan params to keep scanning.')
     scan_params = component.subscriber.cache[env][-1].params
     exp_data.scan_sleep_ts = time.time()
     return scan_params
