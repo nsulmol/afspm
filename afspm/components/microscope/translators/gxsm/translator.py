@@ -6,7 +6,8 @@ import traceback
 import glob
 import pandas as pd
 
-from afspm.components.microscope.params import ParameterHandler
+from afspm.components.microscope.params import (ParameterHandler,
+                                                MicroscopeParameter)
 from afspm.components.microscope.actions import ActionHandler
 from afspm.components.microscope.translator import (
     get_file_modification_datetime)
@@ -223,6 +224,10 @@ class GxsmTranslator(ConfigTranslator):
 
             # Set ROI angle, timestamp, filename
             scan.params.spatial.roi.angle = ds.attrs[SCAN_ATTRIB_ANGLE]
+            angle_unit = self.param_handler.get_unit(
+                MicroscopeParameter.SCAN_ANGLE)
+            scan.params.spatial.angular_units = angle_unit
+
             scan.timestamp.FromDatetime(ts)
             scan.filename = fname
 

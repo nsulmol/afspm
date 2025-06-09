@@ -285,6 +285,10 @@ class AsylumTranslator(ConfigTranslator):
                     # Set ROI angle, timestamp, file
                     scan.params.spatial.roi.angle = ds.original_metadata[
                         SCAN_ATTRIB_ANGLE]
+                    angle_unit = self.param_handler.get_unit(
+                        MicroscopeParameter.SCAN_ANGLE)
+                    scan.params.spatial.angular_units = angle_unit
+
                     scan.timestamp.FromDatetime(ts)
                     scan.filename = scan_path
                     scans.append(scan)
