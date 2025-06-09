@@ -32,7 +32,7 @@ def get_next_scan_params(component: AfspmComponent,
     envelopes = [env for env in list(component.subscriber.cache.keys())
                  if exp_data.scan_id in env]
 
-    if (len(envelopes) == 0):
+    if len(envelopes) == 0:
         logger.error(f'No protos matching provided scan_id {exp_data.scan_id} '
                      'received.')
         return None
