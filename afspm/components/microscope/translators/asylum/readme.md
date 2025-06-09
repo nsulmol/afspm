@@ -8,7 +8,7 @@ Asylum's UI is built on top of Wavemetrics' Igor Pro, via an Igor extension plug
 
 Follow the instructions at https://github.com/AllenInstitute/ZeroMQ-XOP to install this special XOP module. Ensure you follow the special instructions for Igor Pro 6, as this is the version used by Asylum Research.
 
-In order for spectroscopy to work, we also need to copy a custom Igor Procedure file to the appropriate location. Specifically, copy Spectroscopy.ipf (located in afspm/components/microscope/translators/asylum) to "%HOMEPATH%\\Documents\\WaveMetrics\\Igor Pro 6 User Files\\Igor Procedures".
+In order for spectroscopy to work, we also need to copy a custom Igor Procedure file to the appropriate location. 
 
 ### Spectroscopy Support Installation
 
