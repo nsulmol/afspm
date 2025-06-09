@@ -196,6 +196,12 @@ class AsylumTranslator(ConfigTranslator):
         """Override setting of scan params.
 
         We must set the scan params in a different order from default.
+
+        As a reminder: we do not send data units, because the translator
+        has no concept of the 'units' of data at the 'scan parameter' level.
+        When we read saved scans or specs, we are able to retrieve their
+        data units, but this is not something we concern ourselves with at
+        the MicroscopeTranslator granularity.
         """
         vals = [scan_params.spatial.roi.top_left.x,
                 scan_params.spatial.roi.top_left.y,
@@ -208,8 +214,7 @@ class AsylumTranslator(ConfigTranslator):
                       scan_params.spatial.length_units,
                       scan_params.spatial.length_units,
                       scan_params.spatial.length_units,
-                      scan_params.data.units,
-                      scan_params.data.units,
+                      None, None,
                       scan_params.spatial.angular_units]
 
         try:
