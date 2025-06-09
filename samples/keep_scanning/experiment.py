@@ -29,9 +29,18 @@ def get_next_scan_params(component: AfspmComponent,
     Returns:
         ScanParameters2d of the next scan, None if not yet determined.
     """
-    if (exp_data.scan_id not in component.subscriber.cache or
-            len(component.subscriber.cache[exp_data.scan_id]) == 0):
-        logger.error('No scan has been received! We cannot run.')
+    envelopes = [env for env in list(component.subscriber.keys())
+                 if exp_data.scan_id in env]
 
-    scan_params = component.subscriber.cache[exp_data.scan_id].params
+    if (len(envelopes) == 0):
+        logger.error(f'No protos matching provided scan_id {exp_data.scan_id} '
+                     'received.')
+        return None
+
+    env = envelopes[0]  # Grab first envelope that matches our scan_id
+    if len(component.subscriber.cache[env]) == 0:
+        logger.error(f'No scan has been received with env {env}!')
+        return None
+
+    scan_params = component.subscriber.cache[env][-1].params
     return scan_params
