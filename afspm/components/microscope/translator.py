@@ -562,36 +562,21 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                 else:
                     self.control_server.reply(rep)
 
-    def _handle_sending_fake_move(self, orig_pt: geometry_pb2.Point2d,
-                                  new_pt: geometry_pb2.Point2d):
+    def _handle_sending_fake_move(self):
         """Send a fake SS_MOVING event (if applicable).
 
         This method should be used by translators for controllers that do not
         detect the probe moving. To match our expected state machine, we still
         must send an SS_MOVING event, even if the controller does not have a
         way to indicate it.
-
-        To use this method, pass the original and new points (top-left position
-        for scan_param changes, position for probe_position changes). If the
-        positions are different, we assume a move is done and send out an
-        SS_MOVING event.
-
-        Args:
-            orig_pt: currently stored position. This is either
-                self.scan_params.spatial.roi.top_left (for scan params), or
-                self.probe_pos.point (for probe position).
-            new_pt: the point we are about to set. Same as above, but the
-                provided one (in either on_set_scan_params or
-                on_set_probe_pos).
         """
-        if not check_equal(orig_pt, new_pt, self.float_tolerance):
-            self.scope_state = scan_pb2.ScopeState.SS_MOVING
-            scope_state_msg = scan_pb2.ScopeStateMsg(
-                scope_state=self.scope_state)
-            logger.info("New scope state %s, sending out.",
-                        common.get_enum_str(scan_pb2.ScopeState,
-                                            self.scope_state))
-            self.publisher.send_msg(scope_state_msg)
+        self.scope_state = scan_pb2.ScopeState.SS_MOVING
+        scope_state_msg = scan_pb2.ScopeStateMsg(
+            scope_state=self.scope_state)
+        logger.info("New scope state %s, sending out.",
+                    common.get_enum_str(scan_pb2.ScopeState,
+                                        self.scope_state))
+        self.publisher.send_msg(scope_state_msg)
 
     def run_per_loop(self):
         """Where we monitor for requests and publish results."""

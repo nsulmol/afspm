@@ -120,9 +120,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
             self.param_handler.set_param_list(params.SCAN_PARAMS, vals,
                                               attr_units)
             if not self.detects_moving:  # Send fake SS_MOVING if needed
-                self._handle_sending_fake_move(
-                    self.scan_params.spatial.roi.top_left,
-                    scan_params.spatial.roi.top_left)
+                self._handle_sending_fake_move()
         except params.ParameterNotSupportedError:
             return control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED
         except params.ParameterError:
@@ -164,8 +162,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
             self.param_handler.set_param_list(params.PROBE_POS_PARAMS,
                                               vals, attr_units)
             if not self.detects_moving:  # Send fake SS_MOVING if needed
-                self._handle_sending_fake_move(
-                    self.probe_pos.point, probe_position.point)
+                self._handle_sending_fake_move()
         except params.ParameterNotSupportedError:
             return control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED
         except params.ParameterError:
