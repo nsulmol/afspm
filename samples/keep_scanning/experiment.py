@@ -1,5 +1,6 @@
 """Experiment methods."""
 import logging
+import time
 from dataclasses import dataclass
 
 from afspm.utils.log import LOGGER_ROOT
@@ -16,6 +17,8 @@ class ExperimentData:
     """The data we want to store between calls to get_next_scan_params."""
 
     scan_id: str  # Envelope for scan id.
+    scan_wait_s: float = 300.0  # 30 mins
+    scan_sleep_ts: float = None
 
 
 def get_next_scan_params(component: AfspmComponent,
@@ -29,18 +32,24 @@ def get_next_scan_params(component: AfspmComponent,
     Returns:
         ScanParameters2d of the next scan, None if not yet determined.
     """
+    if exp_data.scan_sleep_ts is not None:
+        ready_to_scan = (time.time() - exp_data.scan_sleep_ts >
+                         exp_data.scan_wait_s)
+        if not ready_to_scan:
+            return None
+
     envelopes = [env for env in list(component.subscriber.cache.keys())
                  if exp_data.scan_id in env]
-
     if len(envelopes) == 0:
-        logger.error(f'No protos matching provided scan_id {exp_data.scan_id} '
-                     'received.')
+        logger.warning('No protos containing provided scan_id '
+                       f'{exp_data.scan_id} received.')
         return None
 
     env = envelopes[0]  # Grab first envelope that matches our scan_id
     if len(component.subscriber.cache[env]) == 0:
-        logger.error(f'No scan has been received with env {env}!')
+        logger.warning(f'No scan has been received with env {env}!')
         return None
 
     scan_params = component.subscriber.cache[env][-1].params
+    exp_data.scan_sleep_ts = time.time()
     return scan_params
