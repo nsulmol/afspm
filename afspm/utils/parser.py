@@ -196,8 +196,9 @@ def construct_and_run_component(params_dict: dict,
     try:
         component = _construct_component(params_dict)
         component.run()
-    except Exception as error:
-        logger.exception(error)
+    except Exception:
+        logger.error('Exception running component. Exiting.')
+        logger.error(traceback.format_exc())
 
 
 def _construct_component(params_dict: dict) -> Any:
