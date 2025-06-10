@@ -8,12 +8,11 @@ pub_url = "tcp://127.0.0.1:9000"
 psc_url = "tcp://127.0.0.1:9001"
 server_url = "tcp://127.0.0.1:6666"
 router_url = "tcp://127.0.0.1:6667"
-
 xop_url = 'tcp://127.0.0.1:5555'  # To be used on zmq-xop server startup in Igor
-
 rescan_url = "tcp://127.0.0.1:9005"
 
 channel_id = 'HeightRetrace'  # TODO: Update as needed.
+request_timeout_ms = 5000  # Need a very long timeout for asylum...
 
 # ----- PubSub ----- #
 [pub]
@@ -46,10 +45,12 @@ url = 'server_url'
 class = 'afspm.io.control.router.ControlRouter'
 server_url = 'server_url'
 router_url = 'router_url'
+request_timeout_ms = 'request_timeout_ms'
 
 [client]
 class = 'afspm.io.control.client.ControlClient'
 url = 'router_url'
+request_timeout_ms = 'request_timeout_ms'
 
 [ui_client]
 class = 'afspm.io.control.client.AdminControlClient'
@@ -60,6 +61,7 @@ url = 'router_url'
 [xopclient]
 class = 'afspm.components.microscope.translators.asylum.client.XopClient'
 url = 'xop_url'
+timeout_s = 20  # 4x the request timeout
 
 # ----- Components ----- #
 [exp_data]  # NOTE: this could have been hardcoded, really.
