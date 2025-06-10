@@ -271,6 +271,16 @@ class AsylumTranslator(ct.ConfigTranslator):
                 for ds in datasets:
                     scan = conv.convert_sidpy_to_scan_pb2(ds)
 
+                    # BUG WORKAROUND: scifireaders does not properly read the
+                    # length units of scans (it puts the data_units). Because
+                    # of this, we get a conversion error when dealing, e.g.
+                    # with the phase channel (it tries to convert 'm' to
+                    # 'deg').
+                    # Until this is fixed, we are just hard-coding the
+                    # length_units as 'm', which is what IBW files appear
+                    # to be anyway.
+                    scan.params.spatial.length_units = 'm'
+
                     # Set ROI angle, timestamp, file
                     scan.params.spatial.roi.angle = ds.original_metadata[
                         SCAN_ATTRIB_ANGLE]
