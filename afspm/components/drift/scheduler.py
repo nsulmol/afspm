@@ -355,7 +355,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     currently estimated drift rate and the time elapsed.
 
     We should also clarify what 'matching' means when we find a match between
-    the latest scan and those in the cache. A scan pair is considered 'matched'
+    the oldest scan and those in the cache. A scan pair is considered 'matched'
     if:
     - The intersection area of the scan's physical scan regions is sufficiently
     large (we use min_intersection_ratio for this).
@@ -367,6 +367,18 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     Note that in order to ensure we are comparing the appropriate scans, you
     must indicate the channel_id to consider. Only the channels that match
     channel_id are considered and compared.
+
+    There are two approaches for matching scans: grabbing the latest scan in
+    the cache that maches the new scan or grabbing the oldest. Grabbing the
+    latest would work best if scans are frequent, such that any change in
+    drift is minimal. It would also make sense if the surface being scanned
+    is not constant. Grabbing the oldest would work best if scans are
+    infrequent. If scans are infrequent, our estimated scan position may be
+    reasonably incorrect from the reality. If we were comparing latest scans,
+    one could run into a problem where we 'correct' only for the latest scan,
+    which has actually drifted from our original position. These errors
+    accumulate. For this setting to make any difference, the cache used must
+    be different from the default (which only holds the last value).
 
     Additionally, this class in conjunction with DriftRescanner allows
     rescanning when the resulting scan is found to have drifted too far
@@ -405,6 +417,9 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
             below this value, we force a rescan. This thresohld allows us to
             ensure our scans have 'enough' of the data we desire.
         display_fit: visualize the fitting while it runs.
+        grab_oldest_match: when trying to match prior scans to the latest
+            match, whether we try to find the oldest match. If False, we look
+            for the youngest match. Defaults to True.
         figure: figure used to visualize (if applicable).
     """
 
@@ -416,6 +431,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     DEFAULT_MAX_FITTING_SCORE = drift.DEFAULT_RESIDUAL_THRESH_PERCENT
     DEFAULT_RESCAN_INTERSECTION_RATIO = 0.75
     DEFAULT_DISPLAY_FIT = True
+    DEFAULT_GRAB_OLDEST = True
 
     CSV_FIELDS = ['timestamp', 'filename', 'pcs_to_scs_trans',
                   'pcs_to_scs_units', 'pcs_to_scs_drift_rate',
@@ -434,7 +450,8 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
                  update_weight: float = DEFAULT_UPDATE_WEIGHT,
                  rescan_intersection_ratio: float =
                  DEFAULT_RESCAN_INTERSECTION_RATIO,
-                 display_fit: bool = DEFAULT_DISPLAY_FIT, **kwargs):
+                 display_fit: bool = DEFAULT_DISPLAY_FIT,
+                 grab_oldest_match: bool = True, **kwargs):
         """Initialize our correction scheduler."""
         self.channel_id = channel_id.upper()
         self.drift_model = (drift.create_drift_model() if drift_model is None
@@ -451,6 +468,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         self.total_corr_info = None
 
         self.display_fit = display_fit
+        self.grab_oldest_match = grab_oldest_match
         self.figure = (plt.figure(layout=PLT_LAYOUT) if self.display_fit
                        else None)
 
@@ -498,17 +516,26 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         if self.figure is not None:
             self.figure.clear()  # Clear figure before showing
 
-        matched_scan = proto_geo.get_latest_intersection(
+        matched_scans = proto_geo.get_intersections(
             self._get_scans_from_cache(), new_scan,
             self.min_intersection_ratio, self.min_spatial_res_ratio)
 
-        scan_was_matched = matched_scan is not None
+        if len(matched_scans) == 0:
+            return None
+
+        # If grabbing youngest, flip from ascending to descending timestamp
+        # order.
+        if not self.grab_oldest_match:
+            matched_scans = matched_scans[::-1]
+
         snapshot = None
-        if scan_was_matched:
+        for matched_scan in matched_scans:
             snapshot = correction.compute_drift_snapshot(
                 matched_scan, new_scan, self.drift_model,
                 self.max_fitting_score, self.display_fit,
                 self.figure)
+            if snapshot is not None:
+                break
 
         if self.display_fit:
             plt.show(block=False)

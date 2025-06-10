@@ -109,6 +109,52 @@ def spatial_resolution_ratio_min_max(a: scan_pb2.Scan2d,
     return min(spatial_resolutions) / max(spatial_resolutions)
 
 
+def get_intersections(scans: list[scan_pb2.Scan2d],
+                      new_scan: scan_pb2.Scan2d,
+                      min_intersection_ratio: float,
+                      min_spatial_res_ratio: float,
+                      ) -> list[scan_pb2.Scan2d]:
+    """Get list of intersections between scans and new_scan.
+
+    This method searches scans for scans that have a 'sufficiently close'
+    intersection with new_scan. By 'sufficiently close' we mean:
+    1. The intersection ratio between the two is not too low; and
+    2. The spatial resolution ratio between two is not too low.
+
+    For (1): if the intersection between the two is too small, analyzing
+    the two scans for matching descriptors is not realistic.
+    For (2): if the spatial resolutions are too different, we simply won't find
+    matching features.
+
+    Args:
+        scans: list of scans to compare new_scan to.
+        new_scan: the scan we are matching.
+        min_intersection_ratio: the minimum ratio to be considered a
+            match.
+        min_spatial_res_ratio: the minimum spatial resolution ratio to
+            be considered a match.
+
+    Returns:
+        A list of matching scans, sorted in ascending order of time.
+    """
+    intersect_scans = []
+    for idx, scan in enumerate(scans):
+        inter_ratio = intersection_ratio(scan.params.spatial.roi,
+                                         new_scan.params.spatial.roi)
+        spatial_res_ratio = spatial_resolution_ratio_min_max(scan, new_scan)
+
+        logger.trace(f'For scan {idx}, inter_ratio: {inter_ratio}, '
+                     f'spatial_res_ratio: {spatial_res_ratio}')
+
+        if (inter_ratio >= min_intersection_ratio and
+                spatial_res_ratio >= min_spatial_res_ratio):
+            intersect_scans.append(scan)
+
+    logger.trace(f'Intersected scans length: {len(intersect_scans)}')
+    intersect_scans.sort(key=lambda scan: scan.timestamp.ToDatetime())
+    return intersect_scans
+
+
 def get_latest_intersection(scans: list[scan_pb2.Scan2d],
                             new_scan: scan_pb2.Scan2d,
                             min_intersection_ratio: float,
@@ -137,23 +183,9 @@ def get_latest_intersection(scans: list[scan_pb2.Scan2d],
     Returns:
         The most recent matching scan or None if none found.
     """
-    intersect_scans = []
-    for idx, scan in enumerate(scans):
-        inter_ratio = intersection_ratio(scan.params.spatial.roi,
-                                         new_scan.params.spatial.roi)
-        spatial_res_ratio = spatial_resolution_ratio_min_max(scan, new_scan)
-
-        logger.trace(f'For scan {idx}, inter_ratio: {inter_ratio}, '
-                     f'spatial_res_ratio: {spatial_res_ratio}')
-
-        if (inter_ratio >= min_intersection_ratio and
-                spatial_res_ratio >= min_spatial_res_ratio):
-            intersect_scans.append(scan)
-
-    logger.trace(f'Intersected scans length: {len(intersect_scans)}')
-
-    if not intersect_scans:
+    intersect_scans = get_intersections(scans, new_scan,
+                                        min_intersection_ratio,
+                                        min_spatial_res_ratio)
+    if len(intersect_scans) == 0:
         return None
-
-    intersect_scans.sort(key=lambda scan: scan.timestamp.ToDatetime())
     return intersect_scans[-1]  # Last value is latest timestamp
