@@ -2,7 +2,6 @@
 
 import os.path
 import logging
-import traceback
 import glob
 import pandas as pd
 
@@ -234,8 +233,7 @@ class GxsmTranslator(ConfigTranslator):
             return scan
         except Exception:
             logger.error(f"Could not read scan fname {fname}, "
-                         f"got error.")
-            logger.error(traceback.format_exc())
+                         f"got error.", exc_info=True)
             return None
 
     def poll_spec(self) -> spec_pb2.Spec1d:
@@ -276,8 +274,7 @@ class GxsmTranslator(ConfigTranslator):
             return spec
         except Exception:
             logger.error(f"Could not read spec fname {fname}, "
-                         f"got error.")
-            logger.error(traceback.format_exc())
+                         f"got error.", exc_info=True)
             return None
 
 

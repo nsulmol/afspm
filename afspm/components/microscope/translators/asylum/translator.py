@@ -3,7 +3,6 @@
 import os
 import logging
 import glob
-import traceback
 import SciFiReaders as sr
 import sidpy
 import numpy as np
@@ -322,8 +321,7 @@ class AsylumTranslator(ConfigTranslator):
             return spec
         except Exception:
             logger.error(f'Could not read spec fname {fname}.'
-                         'Got error.')
-            logger.error(traceback.format_exc())
+                         'Got error.', exc_info=True)
             return None
 
     def on_action_request(self, action: control_pb2.ActionMsg

@@ -10,7 +10,6 @@ All other methods are used within these and thus private.
 import sys
 import os
 import copy
-import traceback
 import logging
 from importlib import import_module
 from typing import Any, Callable
@@ -105,8 +104,8 @@ def _expand_variables_recursively(config_dict: dict, sub_dict: dict) -> dict:
                 logger.trace(f"Keeping {sub_dict[key]} for key {key}.")
                 sub_dict[key] = sub_dict[key]
         except Exception:
-            logger.error(f"Exception for key:val = {key} : {sub_dict[key]}")
-            logger.error(traceback.format_exc())
+            logger.error(f"Exception for key:val = {key} : {sub_dict[key]}",
+                         exc_info=True)
     return sub_dict
 
 
@@ -197,8 +196,7 @@ def construct_and_run_component(params_dict: dict,
         component = _construct_component(params_dict)
         component.run()
     except Exception:
-        logger.error('Exception running component. Exiting.')
-        logger.error(traceback.format_exc())
+        logger.error('Exception running component. Exiting.', exc_info=True)
 
 
 def _construct_component(params_dict: dict) -> Any:
@@ -428,8 +426,7 @@ def import_from_string(obj_path: str) -> Any:
             logger.trace("Received ModuleNotFoundError. Assuming due to the "
                          "requested module not existing. However, it could "
                          "be an import error *within* the requested module. "
-                         "We will print the exception in case.")
-            logger.trace(traceback.format_exc())
+                         "We will print the exception in case.", exc_info=True)
             caught_exc = exc
             continue
 

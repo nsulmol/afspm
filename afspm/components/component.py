@@ -1,7 +1,6 @@
 """Holds base class for all components."""
 
 import logging
-import traceback
 import time
 from typing import Callable
 import zmq
@@ -126,7 +125,7 @@ class AfspmComponentBase:
         except (KeyboardInterrupt, SystemExit):
             logger.warning(f"{self.name}: Interrupt received. Stopping.")
         except Exception:
-            logger.error(traceback.format_exc())
+            logger.error("Component crash: ", exc_info=True)
 
     def _per_loop_step(self):
         self.heartbeater.handle_beat()
