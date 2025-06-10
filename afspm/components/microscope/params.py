@@ -28,6 +28,9 @@ from ...utils.parser import import_from_string
 logger = logging.getLogger(__name__)
 
 
+DEFAULT_PARAMS_FILENAME = 'params.toml'
+
+
 class MicroscopeParameter(str, Enum):
     """Holds generic parameter names that can be set."""
 
@@ -293,7 +296,7 @@ class ParameterHandler(metaclass=ABCMeta):
             getter defined.
     """
 
-    def __init__(self, params_config_path: str):
+    def __init__(self, params_config_path: str = DEFAULT_PARAMS_FILENAME):
         """Init class, loading params config for these purposes."""
         self.param_infos = {}
         self.param_methods = {}

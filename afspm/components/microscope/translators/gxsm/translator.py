@@ -6,11 +6,13 @@ import glob
 import pandas as pd
 
 from afspm.components.microscope.params import (ParameterHandler,
-                                                MicroscopeParameter)
-from afspm.components.microscope.actions import ActionHandler
+                                                MicroscopeParameter,
+                                                DEFAULT_PARAMS_FILENAME)
+from afspm.components.microscope.actions import (ActionHandler,
+                                                 DEFAULT_ACTIONS_FILENAME)
 from afspm.components.microscope.translator import (
     get_file_modification_datetime)
-from afspm.components.microscope.config_translator import ConfigTranslator
+from afspm.components.microscope import config_translator as ct
 from afspm.utils import array_converters as conv
 from afspm.io.protos.generated import geometry_pb2
 from afspm.io.protos.generated import scan_pb2
@@ -31,19 +33,10 @@ logger = logging.getLogger(__name__)
 # Attributes from the read scan file (differs from params.toml, which
 # contains UUIDs for getting/setting parameters).
 SCAN_ATTRIB_ANGLE = 'alpha'
-
-# Default filenames for actions and params config files.
-ACTIONS_FILENAME = 'actions.toml'
-PARAMS_FILENAME = 'params.toml'
-
-# Keys for initializing param and action handleres.
-PARAM_HANDLER_KEY = 'param_handler'
-ACTION_HANDLER_KEY = 'action_handler'
-
 SPEC_EXT_SEARCH = '*.vpdata'
 
 
-class GxsmTranslator(ConfigTranslator):
+class GxsmTranslator(ct.ConfigTranslator):
     """Handles device communication with the gxsm3 controller.
 
     NOTE: GXSM is unable to run spectroscopies *before* a scan has run.
@@ -130,13 +123,13 @@ class GxsmTranslator(ConfigTranslator):
             if zctrl_channel:  # Update Z-Ctrl feedback channel
                 zctrl_enum = params.GxsmFeedbackChannel(zctrl_channel)
                 params.update_zctrl_channel(param_handler, zctrl_enum)
-            kwargs[PARAM_HANDLER_KEY] = param_handler
+            kwargs[ct.PARAM_HANDLER_KEY] = param_handler
         if not action_handler:
             action_handler = _init_action_handler()
             if spec_mode:
                 spec_enum = actions.GxsmSpecMode(spec_mode)
                 actions.update_spec_mode(action_handler, spec_enum)
-            kwargs[ACTION_HANDLER_KEY] = action_handler
+            kwargs[ct.ACTION_HANDLER_KEY] = action_handler
         return kwargs
 
     def _setup_save_spectroscopies(self):
@@ -333,12 +326,12 @@ def get_current_scope_state(param_handler: ParameterHandler
 def _init_action_handler() -> ActionHandler:
     """Initialize GXSM action handler pointing to defulat config."""
     actions_config_path = os.path.join(os.path.dirname(__file__),
-                                       ACTIONS_FILENAME)
+                                       DEFAULT_ACTIONS_FILENAME)
     return ActionHandler(actions_config_path)
 
 
 def _init_param_handler() -> params.GxsmParameterHandler:
     """Initialize GXSM action handler pointing to defulat config."""
     params_config_path = os.path.join(os.path.dirname(__file__),
-                                      PARAMS_FILENAME)
+                                      DEFAULT_PARAMS_FILENAME)
     return params.GxsmParameterHandler(params_config_path)

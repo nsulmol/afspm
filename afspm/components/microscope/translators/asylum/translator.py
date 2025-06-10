@@ -11,7 +11,7 @@ from ...params import (ParameterHandler, ParameterNotSupportedError,
                        ParameterError, MicroscopeParameter)
 from ...actions import (ActionHandler, MicroscopeAction, ActionError)
 from ...translator import get_file_modification_datetime
-from ...config_translator import ConfigTranslator
+from ... import config_translator as ct
 
 from .....utils import array_converters as conv
 from .....io.protos.generated import scan_pb2
@@ -32,25 +32,13 @@ logger = logging.getLogger(__name__)
 FLOAT_TOLERANCE = 1e-05
 FLOAT_TOLERANCE_KEY = 'float_tolerance'
 
-# The Asylm controller does not detect moving, so we tell the parent class
-# that.
-DETECTS_MOVING_KEY = 'detects_moving'
-
-# Keys for initializing param and action handleres.
-PARAM_HANDLER_KEY = 'param_handler'
-ACTION_HANDLER_KEY = 'action_handler'
 
 # Attributes from the read scan file (differs from params.AsylumParameter,
 # which contains UUIDs for getting/setting parameters).
 SCAN_ATTRIB_ANGLE = 'ScanAngle'
 
 
-# Default filenames for actions and params config files.
-ACTIONS_FILENAME = 'actions.toml'
-PARAMS_FILENAME = 'params.toml'
-
-
-class AsylumTranslator(ConfigTranslator):
+class AsylumTranslator(ct.ConfigTranslator):
     """Handles device communication with the asylum controller.
 
     The AsylumTranslator communicates with the Asylum Research software via the
@@ -118,7 +106,7 @@ class AsylumTranslator(ConfigTranslator):
             kwargs[FLOAT_TOLERANCE_KEY] = FLOAT_TOLERANCE
 
         # Tell parent class that Asylum *does not* detect moving
-        kwargs[DETECTS_MOVING_KEY] = False
+        kwargs[ct.DETECTS_MOVING_KEY] = False
         super().__init__(**kwargs)
 
         # Do some setup
@@ -136,10 +124,10 @@ class AsylumTranslator(ConfigTranslator):
             client = XopClient()
         if not param_handler:
             param_handler = _init_param_handler(client)
-            kwargs[PARAM_HANDLER_KEY] = param_handler
+            kwargs[ct.PARAM_HANDLER_KEY] = param_handler
         if not action_handler:
             action_handler = _init_action_handler(client)
-            kwargs[ACTION_HANDLER_KEY] = action_handler
+            kwargs[ct.ACTION_HANDLER_KEY] = action_handler
         return kwargs
 
     def _setup_probe_pos(self):

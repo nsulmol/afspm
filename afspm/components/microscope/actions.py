@@ -22,6 +22,9 @@ from ...utils.parser import _evaluate_values_recursively
 logger = logging.getLogger(__name__)
 
 
+DEFAULT_ACTIONS_FILENAME = 'actions.toml'
+
+
 class MicroscopeAction(str, enum.Enum):
     """Holds generic action names that can be performed."""
 
@@ -186,7 +189,7 @@ class ActionHandler(metaclass=ABCMeta):
             send that action request.
     """
 
-    def __init__(self, actions_config_path: str):
+    def __init__(self, actions_config_path: str = DEFAULT_ACTIONS_FILENAME):
         """Init class, loading actions config for these purposes.
 
         Args:

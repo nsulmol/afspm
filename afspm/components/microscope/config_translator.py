@@ -20,6 +20,11 @@ from . import actions
 logger = logging.getLogger(__name__)
 
 
+DETECTS_MOVING_KEY = 'detects_moving'
+PARAM_HANDLER_KEY = 'param_handler'
+ACTION_HANDLER_KEY = 'action_handler'
+
+
 class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
     """Uses params and actions configs to simplify Microscope communication.
 
