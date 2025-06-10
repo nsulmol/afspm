@@ -109,6 +109,10 @@ class GxsmTranslator(ct.ConfigTranslator):
 
         kwargs = self._init_handlers(param_handler, action_handler,
                                      zctrl_channel, spec_mode, **kwargs)
+
+        # Tell parent class that GXSM *does not* detect moving (although it
+        # does, but not how we would like it to (params.py:poll_scope_state).
+        kwargs[ct.DETECTS_MOVING_KEY] = False
         super().__init__(**kwargs)
         self._setup_save_spectroscopies()
 
@@ -152,6 +156,14 @@ class GxsmTranslator(ct.ConfigTranslator):
         # Note: updating self.scope_state is handled by the calling method
         # in MicroscopeTranslator.
         state = get_current_scope_state(self.param_handler)
+
+        # If we detect moving, simply return the pre-existing state. Since
+        # this controller only detects SS_MOVING on actual probe moves, we
+        # need to fake SS_MOVING so it happens whenever REQ_SET_SCAN_PARAMS
+        # or REQ_SET_PROBE_POS are accepted.
+        if state == scan_pb2.ScopeState.SS_MOVING:
+            return self.scope_state
+
         if (self.scope_state == scan_pb2.ScopeState.SS_SCANNING and
                 state == scan_pb2.ScopeState.SS_FREE):
             gxsm.autosave()  # Save the scans we have recorded

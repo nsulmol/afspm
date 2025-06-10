@@ -51,9 +51,11 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
     MicroscopeTranslatorBase do nothing here (since they are already
     handled by the ActionHandler). Overriding them will not do anything.
 
-    If your controller does not detect probe moving events (SS_MOVING),
-    set self.detects_moving to False. We will automatically handle this
-    in on_set_scan_params() and on_set_probe_pos().
+    NOTE: implementing poll_scope_state() is a bit particular; please
+    review poll_scope_state's pydoc in translator.py. ConfigTranslator uses a
+    variable self.detects_moving to determine if it should call
+    self._handle_sending_fake_move() in on_set_probe_pos() /
+    on_set_scan_params(). Use this in accordance with that pydoc's guidance.
 
     Args:
         publisher: Publisher instance, for publishing data.

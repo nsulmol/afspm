@@ -103,10 +103,9 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
     Notes:
     - we allow providing a subscriber to MicroscopeTranslator (it inherits
     from AspmComponent). If subscribed to the PubSubCache, it will receive
-    kill specs and shutdown appropriately.
-    - if your controller does not detect probe moving events (SS_MOVING),
-    consider using self._handle_sending_fake_move() in your
-    on_set_scan_params() and on_set_probe_pos() methods.
+    kill signals and shutdown appropriately.
+    - there are some intricacies around ScopeState and its functioning; review
+    poll_scope_state() to better understand this.
 
     Attributes:
         publisher: Publisher instance, for publishing data.
@@ -345,6 +344,52 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         """Poll the translator for the current scope state.
 
         Must support. Throw MicroscopeError on failure.
+
+        (NOTE: below we refer to REQ_SET_SCAN_PARAMS / on_set_scan_params(),
+        but the discussion applies equally for REQ_SET_PROBE_POS /
+        on_set_probe_pos()! Please consider and handle both cases.)
+
+        The ScopeState gives components an understanding of what states the
+        microscope has been in. Since there are some inconsistencies in how
+        different microscopes handle representing their state, afspm explicits
+        a standard. Any translator should behave as the afspm expects.
+
+        More specifically, we expect any accepted state change request to
+        result in the microscope passing through said state. So, if a
+        REQ_START_SCAN is received and accepted (we respond REP_SUCCESS), we
+        expect the ScopeState to become SS_SCANNING for the duration of the
+        scan.
+
+        This expectation mostly relates to SS_MOVING. Many microscopes
+        will only pass through SS_MOVING if the probe is *actually* moving. If
+        the user send REQ_SET_SCAN_PARAMS but the parameters are the same as
+        the pre-existing ones, no probe move actually happens. In these
+        systems, the scan param setting behaviour is inconsistent: when
+        REQ_SET_SCAN_PARAMS is called, sometimes the ScopeState changes to
+        SS_MOVING, and sometimes it does not.o
+
+        Here are the 3 potential microscope behaviours and how we suggest
+        implementing them for your controller:
+        1. Microscope does not detect SS_MOVING: in this case, simply use
+        self._handle_sending_fake_move() in on_set_scan_params() and
+        on_set_probe_pos().
+        2. Microscope detects SS_MOVING if the ScanParameters2d change: in this
+        case, you should (a) use self._handle_sending_fake_move() in
+        on_set_scan_params() and on_set_probe_pos(); and (b) in
+        poll_scope_state(), return the *prior* scope state (self.scope_state)
+        if SS_MOVING is detected. This way, we receive a single SS_MOVING event
+        per request.
+        3. Microscope detects SS_MOVING whenever the scan parameters are
+        set, even if they did not actually change. In this case, you do not
+        have to do anything special.
+
+        NOTE: the suggested approach for (2) may not apply if your microscope's
+        scope state is polled too quickly after the request. In this case, the
+        translator may switch quickly from SS_MOVING to SS_FREE while the move
+        is still happening. This may cause new requests to be sent while the
+        microscope is still moving! In such a scenario, consider adding logic
+        to skip polling scope state for N polls, such that you return the prior
+        state N times. This could/should avoid the issue.
         """
 
     @abstractmethod
