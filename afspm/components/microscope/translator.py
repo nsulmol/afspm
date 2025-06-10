@@ -26,13 +26,10 @@ from ...io.pubsub import publisher as pub
 from ...io.pubsub import subscriber as sub
 from ...io.control import server as ctrl_srvr
 
-from ...io.protos.generated import geometry_pb2
 from ...io.protos.generated import scan_pb2
 from ...io.protos.generated import control_pb2
 from ...io.protos.generated import feedback_pb2
 from ...io.protos.generated import spec_pb2
-
-from ...utils.protobuf import check_equal
 
 
 logger = logging.getLogger(__name__)
