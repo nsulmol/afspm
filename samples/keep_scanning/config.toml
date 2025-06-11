@@ -89,14 +89,14 @@ get_next_params = 'experiment.get_next_scan_params'
 next_params_kwargs = {'exp_data'= 'exp_data'}
 
 [ui]
-#component = true
+component = true
 class = 'afspm.components.control_ui.AfspmControlUI'
 
 subscriber = 'sub'
 control_client = 'ui_client'
 
 [visualizer]
-component = true
+#component = true
 class = 'afspm.components.visualizer.Visualizer'
 scan_id = 'Scan2d'
 subscriber = 'sub'
@@ -128,6 +128,6 @@ control_server = 'server'
 subscriber = 'sub'  # To close itself when we tell it to.
 
 [metadata]
-#component = true
+component = true
 class = 'afspm.components.scan.metadata.ScanMetadataWriter'
 subscriber = 'sub'
