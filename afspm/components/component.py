@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 CLIENT_KEY = 'control_client'
 SUBSCRIBER_KEY = 'subscriber'
 SPAWN_DELAY_S_KEY = 'spawn_delay_s'
+BEAT_PERIOD_S_KEY = 'beat_period_s'
 
 
 class AfspmComponentBase:
@@ -66,20 +67,20 @@ class AfspmComponentBase:
         control_client: client to ControlServer, to allow sending requests.
         stay_alive: boolean indicating whether we should continue looping in
             run(). In other words, if False, run() ends.
-        spawn_delay_s: time to delay component on startup, in seconds. Used
-            by components that talk to this component via get_spawn_delay_s().
     """
 
     # See get_default_spawn_delay_s() below.
     DEFAULT_SPAWN_DELAY_S = common.SPAWN_DELAY_S
+    # See get_default_beat_period_s() below.
+    DEFAULT_BEAT_PERIOD_S = common.HEARTBEAT_PERIOD_S
 
     def __init__(self, name: str,
                  subscriber: sub.Subscriber = None,
                  control_client: ctrl_client.ControlClient = None,
                  loop_sleep_s: float = common.LOOP_SLEEP_S,
-                 beat_period_s: float = common.HEARTBEAT_PERIOD_S,
+                 beat_period_s: float = None,
                  override_client_uuid: bool = True,
-                 spawn_delay_s: float = DEFAULT_SPAWN_DELAY_S,
+                 spawn_delay_s: float = None,
                  ctx: zmq.Context = None):
         """Initialize our AfspmComponent.
 
@@ -104,11 +105,18 @@ class AfspmComponentBase:
         self.ctx = ctx
         self.name = name
         hb_url = get_heartbeat_url(self.name)
+
+        # Grab class default beat period if not explicited
+        if not beat_period_s:
+            beat_period_s = self.__class__.get_default_beat_period_s()
+        # Grab class default spawn delay if not explicited
+        if not spawn_delay_s:
+            spawn_delay_s = self.__class__.get_default_spawn_delay_s()
+
         self.heartbeater = Heartbeater(hb_url, beat_period_s, ctx)
         self.loop_sleep_s = loop_sleep_s
         self.subscriber = subscriber
         self.control_client = control_client
-        self.spawn_delay_s = spawn_delay_s
         self.stay_alive = True
 
         # Feed name to all IOs (for logging purposes).
@@ -196,10 +204,29 @@ class AfspmComponentBase:
         heartbeat. If no heartbeat is provided, it will consider that the
         component failed to start up!
 
+        It should be used if the microscope is slow to startup (as
+        as we would assume the component has crashed otherwise.).
+
         Returns:
             Time to delay spawning, in seconds.
         """
         return cls.DEFAULT_SPAWN_DELAY_S
+
+    @classmethod
+    def get_default_beat_period_s(cls) -> float | None:
+        """Return default time between heartbeats, in seconds.
+
+        This is used by external components (particulary, the components
+        monitor) in order to get the default beat period (if the default is
+        not overriden). It is used to startup the listener proper properly.
+
+        It should be used if the component is slow to respond to queries (as
+        this would slow down time between beats).
+
+        Returns:
+            Time between heartbeats, in seconds.
+        """
+        return cls.DEFAULT_BEAT_PERIOD_S
 
 
 class AfspmComponent(AfspmComponentBase):

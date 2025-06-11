@@ -196,6 +196,10 @@ class AfspmComponentsMonitor:
         params_dict['poll_timeout_ms'] = poll_timeout_ms
         params_dict['uuid'] = params_dict['name']
 
+        # Get proper beat period (some components are slow to respond).
+        params_dict[afspmc.BEAT_PERIOD_S_KEY] = get_component_beat_period_s(
+            params_dict)
+
         logger.info(f"Creating listener for component {params_dict['name']}")
         return HeartbeatListener(**params_dict)
 
@@ -292,7 +296,7 @@ def get_component_spawn_delay_s(kwargs: dict) -> float:
     Either the component's kwargs has an explicit spawn delay time, or we
     should use the default spawn delay time. In the latter case, we import
     the class and query its get_default_spawn_delay_s() method (which is
-    static).
+    a class method).
 
     Args:
         kwargs: input kwargs dict to be used to init the class.
@@ -306,3 +310,25 @@ def get_component_spawn_delay_s(kwargs: dict) -> float:
     elif parser.CLASS_KEY in kwargs:
         cls = parser.import_from_string(kwargs[parser.CLASS_KEY])
         return cls.get_default_spawn_delay_s()
+
+
+def get_component_beat_period_s(kwargs: dict) -> float:
+    """Given a components input kwargs, determine its beat period.
+
+    Either the component's kwargs has an explicit beat period, or we
+    should use the default beat period. In the latter case, we import
+    the class and query its get_default_beat_period_s() method (which is
+    a class method).
+
+    Args:
+        kwargs: input kwargs dict to be used to init the class.
+
+    Returns:
+        beat period, in seconds.
+    """
+    if (afspmc.BEAT_PERIOD_S_KEY in kwargs and
+            isinstance(kwargs[afspmc.BEAT_PERIOD_S_KEY], float)):
+        return kwargs[afspmc.BEAT_PERIOD_S_KEY]
+    elif parser.CLASS_KEY in kwargs:
+        cls = parser.import_from_string(kwargs[parser.CLASS_KEY])
+        return cls.get_default_beat_period_s()
