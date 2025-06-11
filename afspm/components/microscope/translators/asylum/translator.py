@@ -8,8 +8,10 @@ import sidpy
 import numpy as np
 
 from ...params import (ParameterHandler, ParameterNotSupportedError,
-                       ParameterError, MicroscopeParameter)
-from ...actions import (ActionHandler, MicroscopeAction, ActionError)
+                       ParameterError, MicroscopeParameter,
+                       DEFAULT_PARAMS_FILENAME)
+from ...actions import (ActionHandler, MicroscopeAction, ActionError,
+                        DEFAULT_ACTIONS_FILENAME)
 from ...translator import get_file_modification_datetime
 from ... import config_translator as ct
 
@@ -350,14 +352,14 @@ class AsylumTranslator(ct.ConfigTranslator):
 def _init_action_handler(client: XopClient) -> actions.AsylumActionHandler:
     """Initialize Asylum action handler pointing to defulat config."""
     actions_config_path = os.path.join(os.path.dirname(__file__),
-                                       ACTIONS_FILENAME)
+                                       DEFAULT_ACTIONS_FILENAME)
     return actions.AsylumActionHandler(actions_config_path, client)
 
 
 def _init_param_handler(client: XopClient) -> params.AsylumParameterHandler:
     """Initialize Asylum action handler pointing to defulat config."""
     params_config_path = os.path.join(os.path.dirname(__file__),
-                                      PARAMS_FILENAME)
+                                      DEFAULT_PARAMS_FILENAME)
     return params.AsylumParameterHandler(params_config_path, client)
 
 
