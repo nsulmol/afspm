@@ -14,6 +14,14 @@ rescan_url = "tcp://127.0.0.1:9005"
 channel_id = 'HeightRetrace'  # TODO: Update as needed.
 request_timeout_ms = 5000  # Need a very long timeout for asylum...
 
+# ----- Cache Logic ----- #
+[pbc_scan_logic]  # Set default scan cache to 3
+class = 'afspm.io.pubsub.logic.pbc_logic.PBCScanLogic'
+default_scan_history = 3
+
+[cache_kwargs]
+cache_logic = 'pbc_scan_logic'
+
 # ----- PubSub ----- #
 [pub]
 class = 'afspm.io.pubsub.publisher.Publisher'
@@ -23,6 +31,7 @@ url = 'pub_url'
 class = 'afspm.io.pubsub.cache.PubSubCache'
 url = 'psc_url'
 sub_url = 'pub_url'
+update_cache_kwargs = 'cache_kwargs'
 
 [sub]
 class = 'afspm.io.pubsub.subscriber.Subscriber'
