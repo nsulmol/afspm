@@ -74,6 +74,7 @@ class PubSubCache:
         _frontend: SUB socket connected to the publisher.
         _backend: XPUB socket, the publisher end
         _poller: zmq Poller, to poll frontend and backend.
+        _uuid: a uuid to differentiate in logs.
     """
 
     def __init__(self, url: str, sub_url: str,
@@ -92,7 +93,8 @@ class PubSubCache:
                  defaults.PUBSUBCACHE_GET_ENVELOPE_KWARGS,
                  update_cache_kwargs: dict =
                  defaults.PUBSUBCACHE_UPDATE_CACHE_KWARGS,
-                 poll_timeout_ms: int = common.POLL_TIMEOUT_MS):
+                 poll_timeout_ms: int = common.POLL_TIMEOUT_MS,
+                 uuid: str = None):
         """Initialize the caching logic and connects our nodes.
 
         Args:
@@ -114,6 +116,7 @@ class PubSubCache:
                 update_cache.
             poll_timeout_ms: the poll timeout, in milliseconds. If None,
                 we do not poll and do a blocking receive instead.
+            uuid: uuid, to be used to differentiate in logs.
         """
         self._sub_extract_proto = sub_extract_proto
         self._extract_proto_kwargs = (extract_proto_kwargs if
@@ -125,6 +128,7 @@ class PubSubCache:
         self._update_cache_kwargs = (update_cache_kwargs if
                                      update_cache_kwargs else {})
         self._poll_timeout_ms = poll_timeout_ms
+        self._uuid = uuid
 
         if not ctx:
             ctx = zmq.Context.instance()
@@ -167,7 +171,7 @@ class PubSubCache:
             for i in range(backend_count):
                 backend_events.append(self._backend.recv(zmq.NOBLOCK))
 
-            logger.debug(f'backend_events: {backend_events}')
+            logger.debug(f'{self._uuid}: backend_events: {backend_events}')
 
             for event in backend_events:
                 # Event is one byte 0=unsub or 1=sub, followed by envelope
@@ -207,7 +211,7 @@ class PubSubCache:
         """
         envelope_log = (common.ALL_ENVELOPE_LOG
                         if envelope == common.ALL_ENVELOPE else envelope)
-        logger.info(f"New subscription to {envelope_log}")
+        logger.info(f"{self._uuid}: New subscription to {envelope_log}")
 
         # If "ALL" subscribed, send all envelopes in our cache.
         # Otherwise, match cache keys to envelope (envelope can be a
@@ -219,7 +223,8 @@ class PubSubCache:
                                    envelope == key[0:len(envelope)]])
 
         for env in envelopes_to_send:
-            logger.info(f"Subscription: cache for {env} being sent out.")
+            logger.info(f"{self._uuid}: Subscription: cache for {env} being "
+                        "sent out.")
             for proto in self.cache[env]:
                 self._backend.send_multipart([env.encode(),
                                               proto.SerializeToString()])
@@ -234,11 +239,15 @@ class PubSubCache:
             proto, **self._get_envelope_kwargs)
         self._update_cache(proto, self.cache,
                            **self._update_cache_kwargs)
-        logger.debug(f"Sending message {envelope}")
+        logger.debug(f"{self._uuid}: Sending message {envelope}")
         self._backend.send_multipart([envelope.encode(),
                                       proto.SerializeToString()])
 
     def send_kill_signal(self):
         """Send a kill signal to subscribers."""
-        logger.debug("Sending kill signal.")
+        logger.debug(f"{self._uuid}: Sending kill signal.")
         self._backend.send_multipart([common.KILL_SIGNAL.encode()])
+
+    def set_uuid(self, uuid: str):
+        """Set id, to differentiate when logging."""
+        self._uuid = uuid

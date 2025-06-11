@@ -82,6 +82,7 @@ class Subscriber(ABCSubscriber):
         _subscriber: the zmq SUB socket for connecting to the publisher.
         _poll_timeout_ms: the poll timeout, in milliseconds. If None,
             we do not poll and do a blocking receive instead.
+        _uuid: a uuid to differentiate subscribers in logs.
     """
 
     def __init__(self, sub_url: str,
@@ -97,7 +98,8 @@ class Subscriber(ABCSubscriber):
                  defaults.SUBSCRIBER_EXTRACT_PROTO_KWARGS,
                  update_cache_kwargs: dict =
                  defaults.SUBSCRIBER_UPDATE_CACHE_KWARGS,
-                 poll_timeout_ms: int = common.POLL_TIMEOUT_MS):
+                 poll_timeout_ms: int = common.POLL_TIMEOUT_MS,
+                 uuid: str = None):
         """Initialize the caching logic and subscribes.
 
         Args:
@@ -118,6 +120,7 @@ class Subscriber(ABCSubscriber):
                 update_cache.
             poll_timeout_ms: the poll timeout, in milliseconds. If None,
                 we do not poll and do a blocking receive instead.
+            uuid: uuid, to be used to differentiate in logs.
         """
         self._cache = {}
         self._shutdown_was_requested = False
@@ -129,6 +132,7 @@ class Subscriber(ABCSubscriber):
         self._update_cache_kwargs = (update_cache_kwargs if
                                      update_cache_kwargs else {})
         self._poll_timeout_ms = poll_timeout_ms
+        self._uuid = uuid
 
         if not ctx:
             ctx = zmq.Context.instance()
@@ -200,15 +204,19 @@ class Subscriber(ABCSubscriber):
         """
         envelope = msg[0].decode()
         if envelope == common.KILL_SIGNAL:
-            logger.info("Shutdown was requested!")
+            logger.info(f"{self._uuid}: Shutdown was requested!")
             self._shutdown_was_requested = True
             return None
 
         proto = self._sub_extract_proto(msg, **self._extract_proto_kwargs)
-        logger.debug(f"Message received {envelope}")
+        logger.debug(f"{self._uuid}: Message received {envelope}")
         self._update_cache(proto, self._cache,
                            **self._update_cache_kwargs)
         return (envelope, proto)
+
+    def set_uuid(self, uuid: str):
+        """Set id, to differentiate when logging."""
+        self._uuid = uuid
 
 
 class ComboSubscriber(ABCSubscriber):
@@ -240,3 +248,8 @@ class ComboSubscriber(ABCSubscriber):
     def cache(self):
         """Overload parent class."""
         return self._cache
+
+    def set_uuid(self, uuid: str):
+        """Set id, to differentiate when logging."""
+        for sub in self._subs:
+            sub.set_uuid(uuid)

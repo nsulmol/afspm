@@ -25,12 +25,15 @@ class ControlServer:
         _server: the REP socket associated with our server
         _poll_timeout_ms: how long to wait when polling for messages.
             If None, we do not poll and do a blocking receive instead.
+        _uuid: a uuid to differentiate in logs.
     """
 
     def __init__(self, url: str, ctx: zmq.Context = None,
-                 poll_timeout_ms: int = common.POLL_TIMEOUT_MS):
+                 poll_timeout_ms: int = common.POLL_TIMEOUT_MS,
+                 uuid: str = None):
         """Initialize controlserver."""
         self._poll_timeout_ms = poll_timeout_ms
+        self._uuid = uuid
         if not ctx:
             ctx = zmq.Context.instance()
 
@@ -63,7 +66,7 @@ class ControlServer:
 
         if msg:
             req, obj = cmd.parse_request(msg)
-            logger.debug("Message received: %s, %s",
+            logger.debug(f"{self._uuid}: Message received: %s, %s",
                          common.get_enum_str(control_pb2.ControlRequest, req),
                          obj)
             return (req, obj)
@@ -82,7 +85,11 @@ class ControlServer:
                 cases,this will be None as there is nothing to add to our
                 response.
         """
-        logger.debug("Sending reply: %s, %s",
+        logger.debug(f"{self._uuid}: Sending reply: %s, %s",
                      common.get_enum_str(control_pb2.ControlResponse, rep),
                      obj)
         self._server.send_multipart(cmd.serialize_response(rep, obj))
+
+    def set_uuid(self, uuid: str):
+        """Set id, to differentiate when logging."""
+        self._uuid = uuid

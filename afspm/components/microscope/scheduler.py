@@ -73,6 +73,11 @@ class MicroscopeScheduler(afspmc.AfspmComponent):
                          ctx=ctx,
                          loop_sleep_s=loop_sleep_s,
                          beat_period_s=beat_period_s, **kwargs)
+        # Feed name to remaining IOs (for logging purposes).
+        if self.router:
+            self.router.set_uuid(self.name)
+        if self.pubsubcache:
+            self.pubsubcache.set_uuid(self.name)
 
     def run_per_loop(self):  # TODO: Change this to be private everywhere!?
         """Check internals to be done per loop in run().

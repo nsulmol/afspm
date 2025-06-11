@@ -27,6 +27,7 @@ class Publisher:
             our desired publisher 'envelope' string.
         _get_envelope_kwargs: any additional arguments to be fed to
             get_envelope_for_proto.
+        _uuid: a uuid to differentiate publishers in logs.
     """
 
     def __init__(self, url: str,
@@ -34,7 +35,8 @@ class Publisher:
                  defaults.PUBLISHER_ENVELOPE_FOR_PROTO,
                  ctx: zmq.Context = None,
                  get_envelope_kwargs: dict =
-                 defaults.PUBLISHER_ENVELOPE_KWARGS):
+                 defaults.PUBLISHER_ENVELOPE_KWARGS,
+                 uuid: str = None):
         """Initialize the publisher.
 
         Args:
@@ -44,10 +46,12 @@ class Publisher:
             ctx: zmq Context; if not provided, we will create a new instance.
             get_envelope_kwargs: any additional arguments to be fed to
                 get_envelope_for_proto.
+            uuid: uuid, to be used to differentiate in logs.
         """
         self._get_envelope_for_proto = get_envelope_for_proto
         self._get_envelope_kwargs = (get_envelope_kwargs if get_envelope_kwargs
                                      else {})
+        self._uuid = uuid
 
         if not ctx:
             ctx = zmq.Context.instance()
@@ -69,11 +73,15 @@ class Publisher:
         """
         envelope = self._get_envelope_for_proto(proto,
                                                 **self._get_envelope_kwargs)
-        logger.debug(f"Sending message {envelope}")
+        logger.debug(f"{self._uuid}: Sending message {envelope}")
         self._publisher.send_multipart([envelope.encode(),
                                        proto.SerializeToString()])
 
     def send_kill_signal(self):
         """Send a kill signal to subscribers."""
-        logger.debug("Sending kill signal.")
+        logger.debug(f"{self._uuid}: Sending kill signal.")
         self._publisher.send_multipart([common.KILL_SIGNAL.encode()])
+
+    def set_uuid(self, uuid: str):
+        """Set id, to differentiate when logging."""
+        self._uuid = uuid

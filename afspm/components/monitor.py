@@ -194,6 +194,7 @@ class AfspmComponentsMonitor:
         params_dict = copy.deepcopy(params_dict)
         params_dict['url'] = get_heartbeat_url(params_dict['name'])
         params_dict['poll_timeout_ms'] = poll_timeout_ms
+        params_dict['uuid'] = params_dict['name']
 
         logger.info(f"Creating listener for component {params_dict['name']}")
         return HeartbeatListener(**params_dict)

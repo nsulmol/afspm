@@ -176,6 +176,11 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         super().__init__(name, subscriber=subscriber, control_client=None,
                          ctx=ctx, loop_sleep_s=loop_sleep_s,
                          beat_period_s=beat_period_s, **kwargs)
+        # Feed name to remaining IOs (for logging purposes).
+        if self.control_server:
+            self.control_server.set_uuid(self.name)
+        if self.publisher:
+            self.publisher.set_uuid(self.name)
 
     def create_req_handler_map(self) -> dict[control_pb2.ControlRequest,
                                              Callable]:

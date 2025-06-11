@@ -54,13 +54,15 @@ class ControlRouter:
            frontend.
         _request_timeout_ms: delay to wait for a reply from a request we send to
             the backend.
+        _uuid: a uuid to differentiate in logs.
         shutdown_was_requested: whether or not a shutdown has been requested.
     """
 
     def __init__(self, server_url: str, router_url: str,
                  ctx: zmq.Context = None,
                  poll_timeout_ms: int = common.POLL_TIMEOUT_MS,
-                 request_timeout_ms: int = common.REQUEST_TIMEOUT_MS):
+                 request_timeout_ms: int = common.REQUEST_TIMEOUT_MS,
+                 uuid: str = None):
         """Init the class.
 
         Args:
@@ -72,6 +74,7 @@ class ControlRouter:
                 frontend.
             request_timeout_ms: delay to wait for a reply from a request we send
                 to the backend.
+            uuid: uuid, to be used to differentiate in logs.
         """
         if not ctx:
             ctx = zmq.Context.instance()
@@ -93,6 +96,7 @@ class ControlRouter:
 
         self._poll_timeout_ms = poll_timeout_ms
         self._request_timeout_ms = request_timeout_ms
+        self._uuid = uuid
         self.shutdown_was_requested = False
 
         common.sleep_on_socket_startup()
@@ -100,8 +104,8 @@ class ControlRouter:
     def _init_backend(self):
         """Startup (or restart) the backend socket."""
         if self._backend and not self._backend.closed:
-            logger.error("Backend init, but exists and is not closed. "
-                         "Do nothing.")
+            logger.error(f"{self._uuid}: Backend init, but exists and is not "
+                         "closed. Do nothing.")
             return
         self._backend = self._ctx.socket(zmq.REQ)
         self._backend.connect(self._backend_url)
@@ -134,8 +138,8 @@ class ControlRouter:
                 currently under.
         """
         if self._client_in_control_id and self._client_in_control_id != client:
-            logger.debug("%s requested control, but already under control",
-                         client)
+            logger.debug(f"{self._uuid}: %s requested control, but already "
+                         "under control", client)
             return control_pb2.ControlResponse.REP_ALREADY_UNDER_CONTROL
 
         in_manual_mode = self._control_mode == control_pb2.ControlMode.CM_MANUAL
@@ -147,7 +151,7 @@ class ControlRouter:
 
         if (not in_manual_mode and no_problems_and_generic_request or
                 solves_problem):
-            logger.info("%s gaining control", client)
+            logger.info(f"{self._uuid}: %s gaining control", client)
             self._client_in_control_id = client
             return control_pb2.ControlResponse.REP_SUCCESS
 
@@ -155,16 +159,17 @@ class ControlRouter:
                                                 prblm)
                             for prblm in self._problems_set}
         if in_manual_mode:
-            logger.debug("Component %s requested control, but in manual mode",
-                         client)
+            logger.debug(f"{self._uuid}: Component %s requested control, but "
+                         "in manual mode", client)
             return control_pb2.ControlResponse.REP_WRONG_CONTROL_MODE
         if generic_request:
-            logger.debug("General component %s requested control, but "
-                         "there are logged problems: %s", client,
+            logger.debug(f"{self._uuid}: General component %s requested "
+                         "control, but there are logged problems: %s", client,
                          problems_set_str)
         else:  # Problems are logged but the presented is not in our set.
-            logger.debug("%s requested control, but resolves problem %s, "
-                         "which is not one of our logged problems: %s", client,
+            logger.debug(f"{self._uuid}: %s requested control, but resolves "
+                         "problem %s, which is not one of our logged "
+                         "problems: %s", client,
                          common.get_enum_str(control_pb2.ExperimentProblem,
                                              problem),
                          problems_set_str)
@@ -184,11 +189,12 @@ class ControlRouter:
                 control to begin with (or no one was under control).
         """
         if self._client_in_control_id and self._client_in_control_id == client:
-            logger.info(f"Releasing control from {client}")
+            logger.info(f"{self._uuid}: Releasing control from {client}")
             self._client_in_control_id = None
             return control_pb2.ControlResponse.REP_SUCCESS
 
-        logger.debug(f"{client} tried to release control, but in control.")
+        logger.debug(f"{self._uuid}: {client} tried to release control, but "
+                     "in control.")
         return control_pb2.ControlResponse.REP_FAILURE
 
     def _handle_experiment_problem(self, add_problem: bool,
@@ -205,12 +211,12 @@ class ControlRouter:
         """
         old_mode = copy.deepcopy(self._control_mode)
         if add_problem:
-            logger.warning("Adding problem %s",
+            logger.warning(f"{self._uuid}: Adding problem %s",
                            common.get_enum_str(control_pb2.ExperimentProblem,
                                                exp_problem))
             self._problems_set.add(exp_problem)
         else:
-            logger.warning("Removing problem %s",
+            logger.warning(f"{self._uuid}: Removing problem %s",
                            common.get_enum_str(control_pb2.ExperimentProblem,
                                                exp_problem))
             self._problems_set.remove(exp_problem)
@@ -218,10 +224,11 @@ class ControlRouter:
         if self._problems_set:
             self._control_mode = control_pb2.ControlMode.CM_PROBLEM
             if old_mode != control_pb2.ControlMode.CM_PROBLEM:
-                logger.warning("Entering problem mode")
+                logger.warning(f"{self._uuid}: Entering problem mode")
                 self._client_in_control_id = None
         elif old_mode == control_pb2.ControlMode.CM_PROBLEM:
-            logger.warning("Exiting problem mode, switching to automated.")
+            logger.warning(f"{self._uuid}: Exiting problem mode, switching to "
+                           "automated.")
             self._control_mode = control_pb2.ControlMode.CM_AUTOMATED
             self._client_in_control_id = None
 
@@ -248,7 +255,7 @@ class ControlRouter:
             in all but a few cases, obj will be None as there is no associated
             obj.
         """
-        logger.debug("Handling send request: %s, %s",
+        logger.debug(f"{self._uuid}: Handling send request: %s, %s",
                      common.get_enum_str(control_pb2.ControlRequest, req), proto)
         msg = cmd.serialize_request(req, proto)  # No need for empty envelope
         self._backend.send_multipart(msg)
@@ -256,8 +263,8 @@ class ControlRouter:
         if (self._backend.poll(self._request_timeout_ms) & zmq.POLLIN) != 0:
             return cmd.parse_response(req, self._backend.recv_multipart())
 
-        logger.error("Backend did not respond in time, likely timeout issue."
-                     "Restarting socket. ")
+        logger.error(f"{self._uuid}: Backend did not respond in time, likely"
+                     "timeout issue. Restarting socket. ")
         self._close_backend()
         self._init_backend()
 
@@ -273,7 +280,7 @@ class ControlRouter:
         Returns:
             ControlResponse indicating success/failure.
         """
-        logger.info(f"Control mode changed to {control_mode}")
+        logger.info(f"{self._uuid}: Control mode changed to {control_mode}")
         self._control_mode = control_mode
         self._client_in_control_id = None
         return control_pb2.ControlResponse.REP_SUCCESS
@@ -285,7 +292,7 @@ class ControlRouter:
         requested. It may be used externally to shutdown/pass the request
         on, etc.
         """
-        logger.info("End of experiment requested.")
+        logger.info(f"{self._uuid}: End of experiment requested.")
         self.shutdown_was_requested = True
         return control_pb2.ControlResponse.REP_SUCCESS
 
@@ -335,13 +342,15 @@ class ControlRouter:
             client_id = self._parse_client_id(client)
             req, obj = cmd.parse_request(msg[2:])  # client, __, ...
 
-            logger.debug("Message received from client %s: %s, %s", client_id,
+            logger.debug(f"{self._uuid}: Message received from client %s: %s, %s",
+                         client_id,
                          common.get_enum_str(control_pb2.ControlRequest, req),
                          obj)
 
             rep, obj = self._on_request(client_id, req, obj)
 
-            logger.debug("Sending reply to %s: %s, %s", client_id,
+            logger.debug(f"{self._uuid}: Sending reply to %s: %s, %s",
+                         client_id,
                          common.get_enum_str(control_pb2.ControlResponse, rep),
                          obj)
             self._frontend.send_multipart([client, b""] +  # Concat lists
@@ -374,3 +383,7 @@ class ControlRouter:
             return msg.decode()  # zmq.IDENTITY used
         except UnicodeDecodeError:
             return str(int.from_bytes(msg, 'big'))
+
+    def set_uuid(self, uuid: str):
+        """Set id, to differentiate when logging."""
+        self._uuid = uuid

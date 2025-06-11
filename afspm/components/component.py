@@ -111,8 +111,13 @@ class AfspmComponentBase:
         self.spawn_delay_s = spawn_delay_s
         self.stay_alive = True
 
+        # Feed name to all IOs (for logging purposes).
         if self.control_client and override_client_uuid:
             self.control_client.set_uuid(self.name)
+        if self.subscriber:
+            self.subscriber.set_uuid(self.name)
+        if self.heartbeater:
+            self.heartbeater.set_uuid(self.name)
 
     def run(self):
         """Loop."""
@@ -234,6 +239,9 @@ class AfspmComponent(AfspmComponentBase):
         self.per_loop_method = per_loop_method
 
         super().__init__(**kwargs)
+        # Feed name to publisher (for logging purposes).
+        if self.publisher:
+            self.publisher.set_uuid(self.name)
 
     def run_per_loop(self):
         """Override run per_loop_method."""

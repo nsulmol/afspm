@@ -34,17 +34,20 @@ class Heartbeater:
         _beat_period_s: how frequently we should send a heartbeat.
         _last_beat_ts: a timestamp of the last time we sent a
             heartbeat.
+        _uuid: a uuid to differentiate beaters in logs.
     """
 
     def __init__(self, url: str,
                  beat_period_s: int = common.HEARTBEAT_PERIOD_S,
-                 ctx: zmq.Context = None, **kwargs):
+                 ctx: zmq.Context = None, uuid: str = None,
+                 **kwargs):
         """Init heartbeater.
 
         Args:
             url: address we will bind to, to send hearbeats.
             beat_period_s: how frequently we should send a hearbeat.
             ctx: zmq context.
+            uuid: uuid, to be used to differentiate in logs.
             kwargs: allows non-used input arguments to be passed (so we can
                 initialize from an unfiltered dict).
         """
@@ -54,6 +57,7 @@ class Heartbeater:
         self._publisher = ctx.socket(zmq.PUB)
         self._publisher.bind(url)
         self._beat_period_s = beat_period_s
+        self._uuid = uuid
 
         self.last_beat_ts = time.time()
 
@@ -73,6 +77,10 @@ class Heartbeater:
     def handle_closing(self):
         """Inform any listeners that we are closing."""
         self._publisher.send(HBMessage.KILL.value.to_bytes(1, 'big'))
+
+    def set_uuid(self, uuid: str):
+        """Set id, to differentiate when logging."""
+        self._uuid = uuid
 
 
 class HeartbeatListener:
@@ -97,12 +105,14 @@ class HeartbeatListener:
             Heartbeater dead.
         _last_beat_ts: the timestamp of the last beat.
         _poll_timeout_ms: the poll timeout, in milliseconds.
+        _uuid: a uuid to differentiate listeners in logs.
     """
 
     def __init__(self, url: str, beat_period_s: int = common.HEARTBEAT_PERIOD_S,
                  missed_beats_before_dead: int = common.BEATS_BEFORE_DEAD,
                  poll_timeout_ms: int = common.POLL_TIMEOUT_MS,
-                 ctx: zmq.Context = None, **kwargs):
+                 ctx: zmq.Context = None,
+                 uuid: str = None, **kwargs):
         """Init listener.
 
         Args:
@@ -110,10 +120,11 @@ class HeartbeatListener:
             beat_period_s: how frequently we expect to receive a heartbeat.
             missed_beats_before_dead: how many missed beats we will allow
                 before we consider the Heartbeater dead.
+            poll_timeout_ms: the poll timeout, in milliseconds.
             ctx: zmq.Context.
+            uuid: uuid, to be used to differentiate in logs.
             kwargs: allows non-used input arguments to be passed (so we can
                 initialize from an unfiltered dict).
-            poll_timeout_ms: the poll timeout, in milliseconds.
         """
         if not ctx:
             ctx = zmq.Context.instance()
@@ -125,6 +136,7 @@ class HeartbeatListener:
         self._time_before_dead_s = missed_beats_before_dead * beat_period_s
         self._poll_timeout_ms = poll_timeout_ms
         self._last_beat_ts = time.time()
+        self._uuid = uuid
 
         self.received_kill_signal = False
         self.received_first_beat = False
@@ -156,7 +168,7 @@ class HeartbeatListener:
                 self._last_beat_ts = curr_ts
             if HBMessage.KILL in messages:
                 self.received_kill_signal = True
-                logger.debug("Listener received kill signal!")
+                logger.debug(f"{self._uuid}: Listener received kill signal!")
 
         if (curr_ts - self._last_beat_ts >= self._time_before_dead_s or
                 self.received_kill_signal):
@@ -167,6 +179,10 @@ class HeartbeatListener:
         """Reset internal logic following a restart of Heartbeater."""
         self._last_beat_ts = time.time()
         self.received_kill_signal = False
+
+    def set_uuid(self, uuid: str):
+        """Set id, to differentiate when logging."""
+        self._uuid = uuid
 
 
 def get_heartbeat_url(name: str):
