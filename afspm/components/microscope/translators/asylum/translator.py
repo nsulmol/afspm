@@ -62,7 +62,7 @@ class AsylumTranslator(ct.ConfigTranslator):
     """
 
     DEFAULT_SPAWN_DELAY_S = 5.0  # Slow startup.
-    DEFAULT_BEAT_DELAY_S = 7.5  # Slow to respond.
+    DEFAULT_BEAT_PERIOD_S = 7.5  # Slow to respond.
 
     IMG_EXT = '.ibw'
     SCAN_PREFIX = 'Image'
