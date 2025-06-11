@@ -17,7 +17,7 @@ class ExperimentData:
     """The data we want to store between calls to get_next_scan_params."""
 
     scan_id: str  # Envelope for scan id.
-    scan_wait_s: float = 300.0  # 30 mins
+    scan_wait_s: float = 900.0  # 15 mins
     scan_sleep_ts: float = None
 
 
