@@ -444,20 +444,17 @@ def test_scan_params(client, default_control_state,
                 "params.")
     last_params = assert_and_return_message(sub_scan_params)
 
-    if (initial_params.spatial.roi.top_left.x != 0 or
-            initial_params.spatial.roi.top_left.y != 0):
-        logger.info('Requested new position of top left point. Expect '
-                    'scope state change too, because we are moving to it.')
-        scope_state_msg = scan_pb2.ScopeStateMsg(
-            scope_state=scan_pb2.ScopeState.SS_MOVING)
-        assert_sub_received_proto(sub_scope_state,
-                                  scope_state_msg)
+    logger.info('Requested new position. Expect scope state change.')
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_MOVING)
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
 
-        logger.info('Next, we should become free (stopped moving).')
-        scope_state_msg = scan_pb2.ScopeStateMsg(
-            scope_state=scan_pb2.ScopeState.SS_FREE)
-        assert_sub_received_proto(sub_scope_state,
-                                  scope_state_msg)
+    logger.info('Next, we should become free (stopped moving).')
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_FREE)
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
 
     assert check_equal(last_params, modified_params, float_tolerance)
 
@@ -591,20 +588,17 @@ def test_probe_pos(client, default_control_state,
     last_probe_pos = assert_and_return_message(sub_probe_pos)
     assert check_equal(last_probe_pos, modified_probe_pos, float_tolerance)
 
-    if (initial_probe_pos.point.x != 0 or
-            initial_probe_pos.point.y != 0):
-        logger.info('Requested new position of probe. Expect '
-                    'scope state change too, because we are moving to it.')
-        scope_state_msg = scan_pb2.ScopeStateMsg(
-            scope_state=scan_pb2.ScopeState.SS_MOVING)
-        assert_sub_received_proto(sub_scope_state,
-                                  scope_state_msg)
+    logger.info('Requested new position. Expect scope state change.')
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_MOVING)
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
 
-        logger.info('Next, we should become free (stopped moving).')
-        scope_state_msg = scan_pb2.ScopeStateMsg(
-            scope_state=scan_pb2.ScopeState.SS_FREE)
-        assert_sub_received_proto(sub_scope_state,
-                                  scope_state_msg)
+    logger.info('Next, we should become free (stopped moving).')
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_FREE)
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
 
     logger.info("Now, return to our initial parameters.")
     rep = client.set_probe_pos(initial_probe_pos)
