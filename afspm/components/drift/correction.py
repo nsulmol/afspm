@@ -41,9 +41,6 @@ class CorrectionInfo:
                 np.all(np.isclose(self.drift_rate, other.drift_rate)) and
                 self.unit == other.unit)
 
-    def __neq(self, other):
-        return not self.__eq__(other)
-
 
 @dataclass
 class DriftSnapshot:
@@ -60,10 +57,6 @@ class DriftSnapshot:
         return (self.dt1 == other.dt1 and self.dt2 == other.dt2 and
                 np.all(np.isclose(self.vec, other.vec)) and
                 self.unit == other.unit)
-
-    def __neq(self, other):
-        return not self.__eq__(other)
-
 
 
 def compute_drift_snapshot(scan1: scan_pb2.Scan2d,
