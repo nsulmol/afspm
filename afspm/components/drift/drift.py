@@ -318,7 +318,7 @@ def estimate_transform(model: DriftModel,
     arrs = [transform.rescale(arr, scale_factor) for arr in arrs]
 
     try:
-        keypoints_lr, descriptors_lr = _get_keypoints_and_descriptors(
+        keypoints_lr, descriptors_lr = _get_keypoints_and_descriptors_for_list(
             model, arrs, scale_factor)
     except (ValueError, RuntimeError) as e:
         msg = ("Error getting keypoints and descriptors when estimating drift, "
@@ -354,19 +354,30 @@ def estimate_transform(model: DriftModel,
     return fit_transform, norm_score
 
 
-def _get_keypoints_and_descriptors(model: DriftModel,
-                                   arrs: list[np.ndarray],
-                                   scale_factor: float
-                                   ) -> (list[np.ndarray], list[np.ndarray]):
+def _get_keypoints_and_descriptors_for_list(model: DriftModel,
+                                            arrs: list[np.ndarray],
+                                            scale_factor: float
+                                            ) -> (list[np.ndarray],
+                                                  list[np.ndarray]):
     """Get keypoints and descriptors for both images."""
     keypoints_lr = []
     descriptors_lr = []
     for arr in arrs:
-        model.descriptor_extractor.detect_and_extract(arr)
-        keypoints_lr.append(model.descriptor_extractor.keypoints
-                            / scale_factor)
-        descriptors_lr.append(model.descriptor_extractor.descriptors)
+        kps, desc = _get_keypoints_and_descriptors(model, arr, scale_factor)
+        keypoints_lr.append(kps)
+        descriptors_lr.append(desc)
     return keypoints_lr, descriptors_lr
+
+
+def _get_keypoints_and_descriptors(model: DriftModel,
+                                   arr: np.ndarray,
+                                   scale_factor: float
+                                   ) -> (np.ndarray, np.ndarray):
+    model.descriptor_extractor.detect_and_extract(arr)
+    keypoints = (model.descriptor_extractor.keypoints
+                 / scale_factor)
+    descriptors = model.descriptor_extractor.descriptors
+    return keypoints, descriptors
 
 
 def _match_descriptors(model: DriftModel,
@@ -463,7 +474,8 @@ def display_estimated_transform(da1: xr.DataArray, da2: xr.DataArray,
     Args:
         da1: First DataArray.
         da2: Second DataArray.
-        keypoints_lr: tuple of keypoints found between da1 and da2.
+        keypoints_lr: list np.ndarray of keypoints found between da1 and da2,
+            (list of size 2, for left and right sides).
         mapping: projective transform estimated.
         inlier_matches: indices of corresponding matches in first and second
             set of descriptors.
@@ -540,10 +552,11 @@ def get_translation(da: xr.DataArray,
     return unit_trans, units
 
 
-def get_drift_vec(da: xr.DataArray,
-                  mapping: transform.ProjectiveTransform,
-                  dt1: dt.datetime, dt2: dt.datetime
-                  ) -> ([float], str):
+# NOTE: This method is deprecated. Instead, use correction.get_drift_rate().
+def get_drift_rate(da: xr.DataArray,
+                   mapping: transform.ProjectiveTransform,
+                   dt1: dt.datetime, dt2: dt.datetime
+                   ) -> ([float], str):
     """Calculate drift vector for a DataArray given computed mapping.
 
     To convert from protobuf Timestamp to Datetime:

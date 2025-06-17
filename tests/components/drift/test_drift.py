@@ -46,7 +46,7 @@ def expected_trans_pix():
 
 
 @pytest.fixture
-def expected_drift_vec():
+def expected_drift_rate():
     return [-2e-07, -6e-08]
 
 
@@ -72,7 +72,7 @@ def get_data_array_from_dataset(fname: str) -> xr.DataArray:
 
 
 def test_transform_real_data(sample1_fname, sample2_fname, dt1, dt2,
-                             expected_trans_pix, expected_drift_vec,
+                             expected_trans_pix, expected_drift_rate,
                              min_pix_trans_residual, min_unit_trans_residual,
                              monkeypatch):
     # Avoid plt.show() happening
@@ -126,10 +126,11 @@ def test_transform_real_data(sample1_fname, sample2_fname, dt1, dt2,
                 unit_trans, units = drift.get_translation(da2, mapping)
                 logger.info(f'Unit trans: {unit_trans} [{units}]')
 
-                drift_vec, units = drift.get_drift_vec(da2, mapping, dt1, dt2)
-                logger.info(f'Drift Vec: {drift_vec} [{units}]')
+                drift_rate, units = drift.get_drift_rate(da2, mapping, dt1, dt2)
+                logger.info(f'Drift Rate: {drift_rate} [{units}]')
 
-                trans_residual = np.linalg.norm(abs(drift_vec - expected_drift_vec))
+                trans_residual = np.linalg.norm(abs(drift_rate -
+                                                    expected_drift_rate))
                 logger.info(f'Drift trans_residual: {trans_residual}')
 
                 # Only validate for special cases
