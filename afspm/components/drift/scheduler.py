@@ -497,19 +497,6 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
 
         csv.init_csv_file(self.csv_attribs, self.CSV_FIELDS)
 
-    # ----- CSV things ----- #
-    @staticmethod
-    def _get_metadata_row(scan: scan_pb2.Scan2d,
-                          corr_info: correction.CorrectionInfo | None,
-                          estimated_from_vec: bool) -> [str]:
-        row_vals = [scan.timestamp.seconds,
-                    scan.filename,
-                    corr_info.vec if corr_info is not None else None,
-                    corr_info.unit if corr_info is not None else None,
-                    corr_info.drift_rate if corr_info is not None else None,
-                    estimated_from_vec]
-        return row_vals
-
     def _get_drift_snapshot(self, new_scan: scan_pb2.Scan2d
                             ) -> correction.DriftSnapshot | None:
         """Estimate drift for the new scan."""
@@ -600,8 +587,8 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         self._determine_redo_scan(new_scan, corrected_scan)
 
         scan_matched = snapshot is not None
-        row_vals = self._get_metadata_row(corrected_scan, self.total_corr_info,
-                                          scan_matched)
+        row_vals = get_metadata_row(corrected_scan, self.total_corr_info,
+                                    scan_matched)
         csv.save_csv_row(self.csv_attribs, self.CSV_FIELDS,
                          row_vals)
         self._update_io()
@@ -699,3 +686,16 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         if self.router.shutdown_was_requested and self.publisher is not None:
             self.publisher.send_kill_signal()
         super()._handle_shutdown()
+
+
+def get_metadata_row(scan: scan_pb2.Scan2d,
+                     corr_info: correction.CorrectionInfo | None,
+                     estimated_from_vec: bool) -> [str]:
+    """Get metadata row for CSV logging current state."""
+    row_vals = [scan.timestamp.seconds,
+                scan.filename,
+                corr_info.vec if corr_info is not None else None,
+                corr_info.unit if corr_info is not None else None,
+                corr_info.drift_rate if corr_info is not None else None,
+                estimated_from_vec]
+    return row_vals
