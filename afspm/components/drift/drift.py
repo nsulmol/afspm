@@ -7,6 +7,7 @@ import logging
 
 import numpy as np
 import xarray as xr
+import copy
 
 
 from skimage import transform
@@ -407,6 +408,8 @@ def _estimate_transform(da1: xr.Dataset, da2: xr.Dataset,
                         cmap: str | None,
                         ) -> (transform.ProjectiveTransform, float):
     """Estimate transform from keypoint matches."""
+    model = copy.deepcopy(model)  # Make sure we are not reusing things!
+
     success = True  # Assume model fitting succeeded
     match model.fitting:
         case FittingMethod.RANSAC:
