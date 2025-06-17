@@ -622,9 +622,10 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
                            self.total_corr_info is None)
         both_exist = (new_tot_corr_info is not None and
                       self.total_corr_info is not None)
-        drift_has_changed = (
-            first_corr_info or (both_exist and not np.all(np.isclose(
-                new_tot_corr_info.vec, self.total_corr_info.vec))))
+
+        drift_has_changed = (first_corr_info or
+                             (both_exist and
+                              new_tot_corr_info != self.total_corr_info))
         self.total_corr_info = new_tot_corr_info
 
         # Notify logger if correction vec has changed
