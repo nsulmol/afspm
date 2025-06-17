@@ -38,6 +38,8 @@ FLOAT_TOLERANCE_KEY = 'float_tolerance'
 # Attributes from the read scan file (differs from params.AsylumParameter,
 # which contains UUIDs for getting/setting parameters).
 SCAN_ATTRIB_ANGLE = 'ScanAngle'
+# Hardcoded, even though it is also in params.toml. For loading scan.
+SCAN_ANGLE_UNIT = 'degrees'
 
 
 class AsylumTranslator(ct.ConfigTranslator):
@@ -258,43 +260,10 @@ class AsylumTranslator(ct.ConfigTranslator):
         if (scan_path and not self._old_scan_path or
                 scan_path != self._old_scan_path):
             self._old_scan_path = scan_path
-            datasets = None
-            try:
-                logger.debug(f"Getting datasets from {scan_path} (each dataset"
-                             " is a channel).")
-                reader = sr.IgorIBWReader(scan_path)
-                datasets = list(reader.read(verbose=False).values())
-            except Exception as exc:
-                logger.error(f"Failure loading scan at {scan_path}: {exc}")
+            scans = load_scans_from_file(scan_path)
+            if not scans:
                 return self._old_scans
-
-            if datasets:
-                scans = []
-                ts = get_file_modification_datetime(scan_path)
-                for ds in datasets:
-                    scan = conv.convert_sidpy_to_scan_pb2(ds)
-
-                    # BUG WORKAROUND: scifireaders does not properly read the
-                    # length units of scans (it puts the data_units). Because
-                    # of this, we get a conversion error when dealing, e.g.
-                    # with the phase channel (it tries to convert 'm' to
-                    # 'deg').
-                    # Until this is fixed, we are just hard-coding the
-                    # length_units as 'm', which is what IBW files appear
-                    # to be anyway.
-                    scan.params.spatial.length_units = 'm'
-
-                    # Set ROI angle, timestamp, file
-                    scan.params.spatial.roi.angle = ds.original_metadata[
-                        SCAN_ATTRIB_ANGLE]
-                    angle_unit = self.param_handler.get_unit(
-                        MicroscopeParameter.SCAN_ANGLE)
-                    scan.params.spatial.angular_units = angle_unit
-
-                    scan.timestamp.FromDatetime(ts)
-                    scan.filename = scan_path
-                    scans.append(scan)
-                self._old_scans = scans
+            self._old_scans = scans
         return self._old_scans
 
     def poll_spec(self) -> spec_pb2.Spec1d:
@@ -303,27 +272,11 @@ class AsylumTranslator(ct.ConfigTranslator):
 
         if (spec_path and not self._old_spec_path or
                 spec_path != self._old_spec_path):
-            spec = self._load_spec(spec_path)
+            spec = self.load_spec_from_file(spec_path)
             if spec:
                 self._old_spec_path = spec_path
                 self._old_spec = spec
         return self._old_spec
-
-    def _load_spec(self, fname: str) -> spec_pb2.Spec1d | None:
-        """Load Spec1d from provided filename (None on failure)."""
-        ts = get_file_modification_datetime(fname)
-        try:
-            reader = sr.IgorIBWReader(fname)
-            ds_dict = reader.read(verbose=False)
-
-            spec = convert_sidpy_to_spec_pb2(ds_dict, self._save_spec_probe_pos)
-            spec.timestamp.FromDatetime(ts)
-            spec.filename = fname
-            return spec
-        except Exception:
-            logger.error(f'Could not read spec fname {fname}.'
-                         'Got error.', exc_info=True)
-            return None
 
     def on_action_request(self, action: control_pb2.ActionMsg
                           ) -> control_pb2.ControlResponse:
@@ -390,3 +343,75 @@ def convert_sidpy_to_spec_pb2(ds_dict: dict[str, sidpy.Dataset],
     spec = spec_pb2.Spec1d(position=probe_pos,
                            data=spec_data)
     return spec
+
+
+def load_scans_from_file(scan_path: str) -> list[scan_pb2] | None:
+    """Load Asylum scan, filling in info possible from file only.
+
+    Args:
+        scan_path: path to the scan.
+
+    Returns:
+        loaded scans in scan_pb2 format (one scan per channel). None if
+        dataset is empty or failure loading scan.
+    """
+    logger.debug(f"Getting datasets from {scan_path} (each dataset"
+                 " is a channel).")
+    try:
+        reader = sr.IgorIBWReader(scan_path)
+        datasets = list(reader.read(verbose=False).values())
+    except Exception as exc:
+        logger.error(f"Failure loading scan at {scan_path}: {exc}")
+        return None
+
+    if datasets:
+        scans = []
+        ts = get_file_modification_datetime(scan_path)
+        for ds in datasets:
+            scan = conv.convert_sidpy_to_scan_pb2(ds)
+
+            # BUG WORKAROUND: scifireaders does not properly read the
+            # length units of scans (it puts the data_units). Because
+            # of this, we get a conversion error when dealing, e.g.
+            # with the phase channel (it tries to convert 'm' to
+            # 'deg').
+            # Until this is fixed, we are just hard-coding the
+            # length_units as 'm', which is what IBW files appear
+            # to be anyway.
+            scan.params.spatial.length_units = 'm'
+
+            # Set ROI angle, timestamp, file
+            scan.params.spatial.roi.angle = ds.original_metadata[
+                SCAN_ATTRIB_ANGLE]
+            scan.params.spatial.angular_units = SCAN_ANGLE_UNIT
+
+            scan.timestamp.FromDatetime(ts)
+            scan.filename = scan_path
+            scans.append(scan)
+        return scans
+    return None
+
+
+def load_spec_from_file(self, fname: str) -> spec_pb2.Spec1d | None:
+    """Load Spec1d from provided filename (None on failure).
+
+    Args:
+        fname: path to spec file.
+
+    Returns:
+        Spec1d if loaded properly, None if spec file was empty or exception
+        thrown when reading.
+    """
+    try:
+        reader = sr.IgorIBWReader(fname)
+        ds_dict = reader.read(verbose=False)
+
+        ts = get_file_modification_datetime(fname)
+        spec = convert_sidpy_to_spec_pb2(ds_dict, self._save_spec_probe_pos)
+        spec.timestamp.FromDatetime(ts)
+        spec.filename = fname
+        return spec
+    except Exception:
+        logger.error(f'Could not read spec fname {fname}.'
+                     'Got error.', exc_info=True)
+        return None

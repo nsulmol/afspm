@@ -33,6 +33,8 @@ logger = logging.getLogger(__name__)
 # Attributes from the read scan file (differs from params.toml, which
 # contains UUIDs for getting/setting parameters).
 SCAN_ATTRIB_ANGLE = 'alpha'
+# Hardcoded, even though it is also in params.toml. For loading scan.
+SCAN_ANGLE_UNIT = 'degrees'
 SPEC_EXT_SEARCH = '*.vpdata'
 
 
@@ -211,41 +213,17 @@ class GxsmTranslator(ct.ConfigTranslator):
 
     def _load_scan(self, fname: str) -> scan_pb2.Scan2d | None:
         """Try to load a scan from a given filename (None on error)."""
-        ts = get_file_modification_datetime(fname)
-        try:
-            ds = read.open_dataset(
-                fname, self.read_channels_config_path,
-                self.read_use_physical_units,
-                self.read_allow_convert_from_metadata,
-                self.read_simplify_metadata,
-                engine='scipy')
-
-            # Grabbing first data variable, since each channel is
-            # stored in its own file (so each file should have only
-            # one data variable).
-            scan = conv.convert_xarray_to_scan_pb2(
-                ds[list(ds.data_vars)[0]])
-
-            # Set ROI angle, timestamp, filename
-            scan.params.spatial.roi.angle = ds.attrs[SCAN_ATTRIB_ANGLE]
-            angle_unit = self.param_handler.get_unit(
-                MicroscopeParameter.SCAN_ANGLE)
-            scan.params.spatial.angular_units = angle_unit
-
-            scan.timestamp.FromDatetime(ts)
-            scan.filename = fname
-
-            return scan
-        except Exception:
-            logger.error(f"Could not read scan fname {fname}, "
-                         f"got error.", exc_info=True)
-            return None
+        return load_scan_from_file(
+            fname, self.read_channels_config_path,
+            self.read_use_physical_units,
+            self.read_allow_convert_from_metadata,
+            self.read_simplify_metadata)
 
     def poll_spec(self) -> spec_pb2.Spec1d:
         """Override spec polling."""
         spec_fname = self._get_latest_spec_filename()
         if spec_fname and spec_fname != self.last_spec_fname:
-            spec = self._load_spec(spec_fname)
+            spec = self.load_spec_from_file(spec_fname)
             if spec:
                 self.last_spec_fname = spec_fname
                 self.old_spec = spec
@@ -266,21 +244,6 @@ class GxsmTranslator(ct.ConfigTranslator):
             logger.warning(f'latest_spec: {latest_spec_filename}')
             return latest_spec_filename
         return None
-
-    def _load_spec(self, fname: str) -> spec_pb2.Spec1d | None:
-        """Load Spec1d from provided filename (None on failure)."""
-        ts = get_file_modification_datetime(fname)
-        try:
-            df = read.open_spec(fname)
-            spec = convert_dataframe_to_spec1d(df)
-
-            spec.timestamp.FromDatetime(ts)
-            spec.filename = fname
-            return spec
-        except Exception:
-            logger.error(f"Could not read spec fname {fname}, "
-                         f"got error.", exc_info=True)
-            return None
 
 
 def convert_dataframe_to_spec1d(df: pd.DataFrame) -> spec_pb2.Spec1d:
@@ -347,3 +310,80 @@ def _init_param_handler() -> params.GxsmParameterHandler:
     params_config_path = os.path.join(os.path.dirname(__file__),
                                       DEFAULT_PARAMS_FILENAME)
     return params.GxsmParameterHandler(params_config_path)
+
+
+def load_scan_from_file(fname: str,
+                        read_channels_config_path: str,
+                        read_use_physical_units: bool = None,
+                        read_allow_convert_from_metadata: bool = None,
+                        read_simplify_metadata: bool = None
+                        ) -> scan_pb2 | None:
+    """Load gxsm scan, filling in info possible from file only.
+
+    Args:
+        fname: path to the scan.
+        read_channels_config_path: path to config file for configuring loading
+            (see gxsmread documentation).
+        read_use_physical_units: whether or not physical units are used to
+            represent the data (see gxsmread documentation).
+        read_allow_convert_from_metadata: allow using hardcoded metadata
+            conversion logic for some default channels (see gxsmread
+            documentation).
+        read_simplify_metadata: move various metadata attributes that are
+            saved as variables but are metadata to be switched to metadata.
+
+    Returns:
+        loaded scan in scan_pb2 format. None if file is empty or failure
+        loading scan.
+    """
+    try:
+        ds = read.open_dataset(
+            fname, read_channels_config_path,
+            read_use_physical_units,
+            read_allow_convert_from_metadata,
+            read_simplify_metadata,
+            engine='scipy')
+
+        # Grabbing first data variable, since each channel is
+        # stored in its own file (so each file should have only
+        # one data variable).
+        scan = conv.convert_xarray_to_scan_pb2(
+            ds[list(ds.data_vars)[0]])
+
+        # Set ROI angle, timestamp, filename
+        scan.params.spatial.roi.angle = ds.attrs[SCAN_ATTRIB_ANGLE]
+        scan.params.spatial.angular_units = SCAN_ANGLE_UNIT
+
+        ts = get_file_modification_datetime(fname)
+        scan.timestamp.FromDatetime(ts)
+        scan.filename = fname
+
+        return scan
+    except Exception:
+        logger.error(f"Could not read scan fname {fname}, "
+                     f"got error.", exc_info=True)
+        return None
+
+
+def load_spec_from_file(self, fname: str) -> spec_pb2.Spec1d | None:
+    """Load Spec1d from provided filename (None on failure).
+
+    Args:
+        fname: path to spec file.
+
+    Returns:
+        Spec1d if loaded properly, None if spec file was empty or exception
+        thrown when reading.
+    """
+    try:
+        df = read.open_spec(fname)
+        spec = convert_dataframe_to_spec1d(df)
+
+        ts = get_file_modification_datetime(fname)
+        spec.timestamp.FromDatetime(ts)
+        spec.filename = fname
+        return spec
+    except Exception:
+        logger.error(f"Could not read spec fname {fname}, "
+                     f"got error.", exc_info=True)
+        return None
