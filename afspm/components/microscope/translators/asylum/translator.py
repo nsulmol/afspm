@@ -272,7 +272,7 @@ class AsylumTranslator(ct.ConfigTranslator):
 
         if (spec_path and not self._old_spec_path or
                 spec_path != self._old_spec_path):
-            spec = load_spec_from_file(spec_path)
+            spec = load_spec_from_file(spec_path, self._save_spec_probe_pos)
             if spec:
                 self._old_spec_path = spec_path
                 self._old_spec = spec
@@ -318,7 +318,7 @@ def _init_param_handler(client: XopClient) -> params.AsylumParameterHandler:
 
 
 def convert_sidpy_to_spec_pb2(ds_dict: dict[str, sidpy.Dataset],
-                              probe_pos: spec_pb2.ProbePosition
+                              probe_pos: spec_pb2.ProbePosition | None
                               ) -> spec_pb2.Spec1d:
     """Convert a dict of sidpy datasets to a single Spec1d.
 
@@ -392,11 +392,15 @@ def load_scans_from_file(scan_path: str) -> list[scan_pb2] | None:
     return None
 
 
-def load_spec_from_file(fname: str) -> spec_pb2.Spec1d | None:
+def load_spec_from_file(fname: str,
+                        probe_pos: spec_pb2.ProbePosition | None
+                        ) -> spec_pb2.Spec1d | None:
     """Load Spec1d from provided filename (None on failure).
 
     Args:
         fname: path to spec file.
+        probe_pos: probe position of the spec. Strangely, this is not stored in
+            the file, so it must be provided if we are to add it to Spec1d.
 
     Returns:
         Spec1d if loaded properly, None if spec file was empty or exception
@@ -407,7 +411,7 @@ def load_spec_from_file(fname: str) -> spec_pb2.Spec1d | None:
         ds_dict = reader.read(verbose=False)
 
         ts = get_file_modification_datetime(fname)
-        spec = convert_sidpy_to_spec_pb2(ds_dict, self._save_spec_probe_pos)
+        spec = convert_sidpy_to_spec_pb2(ds_dict, probe_pos)
         spec.timestamp.FromDatetime(ts)
         spec.filename = fname
         return spec
