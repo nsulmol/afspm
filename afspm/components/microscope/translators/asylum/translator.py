@@ -272,7 +272,7 @@ class AsylumTranslator(ct.ConfigTranslator):
 
         if (spec_path and not self._old_spec_path or
                 spec_path != self._old_spec_path):
-            spec = self.load_spec_from_file(spec_path)
+            spec = load_spec_from_file(spec_path)
             if spec:
                 self._old_spec_path = spec_path
                 self._old_spec = spec

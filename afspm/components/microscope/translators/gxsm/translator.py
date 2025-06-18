@@ -223,7 +223,7 @@ class GxsmTranslator(ct.ConfigTranslator):
         """Override spec polling."""
         spec_fname = self._get_latest_spec_filename()
         if spec_fname and spec_fname != self.last_spec_fname:
-            spec = self.load_spec_from_file(spec_fname)
+            spec = load_spec_from_file(spec_fname)
             if spec:
                 self.last_spec_fname = spec_fname
                 self.old_spec = spec
