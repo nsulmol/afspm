@@ -243,9 +243,9 @@ class ScanHandler:
                         **self.next_params_kwargs)
 
                 if not self._next_params:  # Handle our getter failing
-                    logger.info(f"{self.component_id}: Cannot send params, "
-                                   "because get_next_params returned None."
-                                   "Sleeping and retrying.")
+                    logger.debug(f"{self.component_id}: Cannot send params, "
+                                 "because get_next_params returned None."
+                                 "Sleeping and retrying.")
                     self._handle_rerun()
                     return
 
