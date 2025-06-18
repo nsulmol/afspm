@@ -392,7 +392,7 @@ def load_scans_from_file(scan_path: str) -> list[scan_pb2] | None:
     return None
 
 
-def load_spec_from_file(self, fname: str) -> spec_pb2.Spec1d | None:
+def load_spec_from_file(fname: str) -> spec_pb2.Spec1d | None:
     """Load Spec1d from provided filename (None on failure).
 
     Args:
