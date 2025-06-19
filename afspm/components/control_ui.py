@@ -9,7 +9,7 @@ from google.protobuf.message import Message
 from ..io import common
 from ..io.control import client as ctrl_client
 
-from .component import AfspmComponentUI
+from .component_ui import AfspmComponentUI
 from ..io.protos.generated import control_pb2
 from ..io.protos.generated import scan_pb2
 
