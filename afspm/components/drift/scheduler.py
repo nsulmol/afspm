@@ -437,8 +437,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
                   'pcs_to_scs_units', 'pcs_to_scs_drift_rate',
                   'scan_matched']
     DEFAULT_SPAWN_DELAY_S = 5.0  # Slow startup.
-
-    RERUN_WAIT_S = 30
+    DEFAULT_BEAT_PERIOD_S = 3.0  # Slow beat.
 
     def __init__(self, channel_id: str,
                  drift_model: drift.DriftModel | None = None,
