@@ -148,7 +148,7 @@ def sample_scan():
 @pytest.fixture
 def control_state():
     cs = control_pb2.ControlState()
-    cs.control_mode = control_pb2.ControlMode.CM_PROBLEM
+    cs.control_mode = control_pb2.ControlMode.CM_AUTOMATED
     cs.problems_set.append(
         control_pb2.ExperimentProblem.EP_TIP_SHAPE_CHANGED)
     return cs

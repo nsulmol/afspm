@@ -103,7 +103,7 @@ class AfspmControlUI(AfspmComponentUI):
         # Set up control mode radio buttons
         cm = control_pb2.ControlMode
         control_modes = [common.get_enum_str(cm, mode) for mode in
-                         [cm.CM_MANUAL, cm.CM_AUTOMATED, cm.CM_PROBLEM]]
+                         [cm.CM_MANUAL, cm.CM_AUTOMATED]]
 
         self.cm_frame = tk.Frame(self.frame)
         self.cm_frame.pack(**pack_kwargs)
@@ -213,7 +213,6 @@ class AfspmControlUI(AfspmComponentUI):
         mode = self.control_state.control_mode
         mode_str = common.get_enum_str(ctrl_mode, mode)
         self.cm_variable.set(mode_str)
-        self._update_radio_buttons()
 
     def _handle_client_changed(self):
         client = self.control_state.client_in_control_id
@@ -231,17 +230,3 @@ class AfspmControlUI(AfspmComponentUI):
             log_txt += common.get_enum_str(control_pb2.ExperimentProblem,
                                            problem) + '\n'
         self.labels[PROBLEMS_SET_KEY].config(text=log_txt)
-        self._update_radio_buttons()
-
-    def _update_radio_buttons(self):
-        """Set disabled/enabled state of radio options."""
-        ctrl_mode = control_pb2.ControlMode
-
-        problem_id = common.get_enum_str(ctrl_mode, ctrl_mode.CM_PROBLEM)
-        auto_id = common.get_enum_str(ctrl_mode, ctrl_mode.CM_AUTOMATED)
-
-        problems_logged = len(self.control_state.problems_set) != 0
-        problem_state = tk.DISABLED if not problems_logged else tk.NORMAL
-        self.buttons[problem_id].config(state=problem_state)
-        auto_state = tk.DISABLED if problems_logged else tk.NORMAL
-        self.buttons[auto_id].config(state=auto_state)

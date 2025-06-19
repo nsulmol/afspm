@@ -338,6 +338,7 @@ class FeedbackCorrector(ScanningComponent):
     def __init__(self, analysis_config: AnalysisConfig,
                  correction_config: CorrectionConfig,
                  rerun_wait_s: int, **kwargs):
+        """Init our component."""
         self._aconfig = analysis_config
         self._cconfig = correction_config
 
@@ -348,7 +349,7 @@ class FeedbackCorrector(ScanningComponent):
 
         super().__init__(rerun_wait_s,
                          self._next_scan_params, {'self': self},
-                         control_pb2.ControlMode.CM_PROBLEM,
+                         control_pb2.ExperimentProblem.EP_FEEDBACK_NON_OPTIMAL,
                          **kwargs)
 
     @staticmethod

@@ -47,7 +47,6 @@ enum ControlMode {
   CM_UNDEFINED = 0;
   CM_MANUAL = 1;  // Under manual control
   CM_AUTOMATED = 2;  // Under (standard) automated control
-  CM_PROBLEM = 3;  // There is an issue/problem!
 }
 
 /*

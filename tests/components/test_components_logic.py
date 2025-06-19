@@ -467,7 +467,7 @@ def test_experiment_problems(thread_microscope_translator,
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
     cs = copy.deepcopy(default_control_state)
-    cs.control_mode = control_pb2.ControlMode.CM_PROBLEM
+    cs.control_mode = control_pb2.ControlMode.CM_AUTOMATED
     cs.problems_set.append(problem)
     assert_sub_received_proto(afspm_component.subscriber, cs)
 

@@ -24,11 +24,10 @@ class ControlRouter:
     Particularly:
     - Only one ControlClient can have control at a time. The logic for
         setting who is under control is within here (the client must
-        request with the 'control_mode' it is currently in, and it must
-        not currently be under control).
-    - Any ControlClient can add or remove ExperimentProblems. If there
-        are any problems in the internal list, the system cannot switch to
-        ControlMode.CM_AUTOMATED.
+        request with an ExperimentProblem it solves, and it must
+        be in the current list of _problems_set). If no ExperimentProblems are
+        logged, ControlClients that request with EP_NONE will be accepted.
+    - Any ControlClient can add or remove ExperimentProblems.
     - All other commands are forwarded to the ControlServer *if* the client
         is under control.
 
@@ -41,14 +40,13 @@ class ControlRouter:
         _backend: the REP socket that connects to the ControlServer.
         _frontend: the ROUTER socket that connects with all ControlClients.
         _problems_set: holds the set of problems which have been notified by
-            ControlClients. As long as there are problems in this set, we
-            cannot be in ControlMode.CM_AUTOMATED. However, 'automation'
-            ControlClients that function in ControlMode.CM_PROBLEM will be
-            allowed to take over and 'fix' a given problem.
-        _control_mode: what ControlMode we are currently running under. A
-            ControlClient can only gain control if they request under
-            the current control_mode (and no other client is currently
-            under control).
+            ControlClients. A ControlClient can only gain control if they
+            request with an ExperimentProblem that is in _problems_set (or
+            EP_NONE if an automated component hat is expected to run normally).
+            If another client is already under control, the control request
+            will be rejected.
+        _control_mode: what ControlMode we are currently running under. When in
+            CM_MANUAL, no automation will run.
         _client_in_control_id: a uuid for the client currently under control.
         _poll_timeout_ms: delay to wait when polling for a request from the
            frontend.
@@ -121,8 +119,8 @@ class ControlRouter:
         """Set client in control if possible.
 
         The client will only be placed under control if:
-        - the provided control_mode matches the one this ControlRouter is
-            currently under;
+        - the router is not in CM_MANUAL;
+        - the provided problem is in _problems_set;
         - the ControlRouter is not currently under control.
 
         Args:
@@ -149,8 +147,8 @@ class ControlRouter:
             generic_request and len(self._problems_set) == 0)
         solves_problem = problem in self._problems_set
 
-        if (not in_manual_mode and no_problems_and_generic_request or
-                solves_problem):
+        if (not in_manual_mode and (no_problems_and_generic_request or
+                solves_problem)):
             logger.info(f"{self._uuid}: %s gaining control", client)
             self._client_in_control_id = client
             return control_pb2.ControlResponse.REP_SUCCESS
@@ -209,7 +207,7 @@ class ControlRouter:
         Returns:
             ControlMode.SUCCESS if we were able to add it.
         """
-        old_mode = copy.deepcopy(self._control_mode)
+        old_problems_set = copy.deepcopy(self._problems_set)
         if add_problem:
             logger.warning(f"{self._uuid}: Adding problem %s",
                            common.get_enum_str(control_pb2.ExperimentProblem,
@@ -221,15 +219,9 @@ class ControlRouter:
                                                exp_problem))
             self._problems_set.remove(exp_problem)
 
-        if self._problems_set:
-            self._control_mode = control_pb2.ControlMode.CM_PROBLEM
-            if old_mode != control_pb2.ControlMode.CM_PROBLEM:
-                logger.warning(f"{self._uuid}: Entering problem mode")
-                self._client_in_control_id = None
-        elif old_mode == control_pb2.ControlMode.CM_PROBLEM:
-            logger.warning(f"{self._uuid}: Exiting problem mode, switching to "
-                           "automated.")
-            self._control_mode = control_pb2.ControlMode.CM_AUTOMATED
+        if self._problems_set != old_problems_set:
+            logger.warning(f"{self._uuid}: Problem set changed, removing "
+                           "client in control.")
             self._client_in_control_id = None
 
         # Return success always for now...
@@ -283,6 +275,12 @@ class ControlRouter:
         logger.info(f"{self._uuid}: Control mode changed to {control_mode}")
         self._control_mode = control_mode
         self._client_in_control_id = None
+
+        if control_mode == control_pb2.ControlMode.CM_MANUAL:
+            logger.warning(f"{self._uuid}: Switching to manual, removing "
+                           "client in control.")
+            self._client_in_control_id = None
+
         return control_pb2.ControlResponse.REP_SUCCESS
 
     def _handle_end_experiment(self) -> control_pb2.ControlResponse:

@@ -2,6 +2,7 @@
 
 from enum import Enum
 from typing import Any
+import logging
 import threading
 import pytest
 import zmq
@@ -15,6 +16,9 @@ from afspm.io.control import router as ctrl_rtr
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import control_pb2
 from afspm.io.protos.generated import feedback_pb2
+
+
+logger = logging.getLogger(__name__)
 
 
 # ----- General Test Fixtures ----- #
@@ -95,7 +99,6 @@ class CommMode(str, Enum):
     """Helper to control router."""
     MODE_AUTOMATED = "MODE_AUTOMATED"
     MODE_MANUAL = "MODE_MANUAL"
-    MODE_PROBLEM = "MODE_PROBLEM"
     CLEAR_PROBLEMS = "CLEAR_PROBLEMS"
 
 
@@ -159,9 +162,7 @@ def router_routine(server_url, router_url, comm_url, timeout_ms, ctx):
                 mode = control_pb2.ControlMode.CM_AUTOMATED
                 if rest == CommMode.MODE_MANUAL:
                     mode = control_pb2.ControlMode.CM_MANUAL
-                elif rest == CommMode.MODE_PROBLEM:
-                    mode = control_pb2.ControlMode.CM_PROBLEM
-                router.set_control_mode(mode)
+                router._handle_set_control_mode(mode)
             elif env == CommEnvelope.KILL:
                 break
 
@@ -285,7 +286,7 @@ class TestRouterServerClient:
                                    comm_url, comm_pub, timeout_ms,
                                    thread_srv, thread_rtr, problem, no_problem,
                                    rtr_client, rtr_client_server_methods):
-        """An AUTOMATED client loses control after a PROBLEM is introduced.
+        """An client loses control after a PROBLEM is introduced in AUTO mode.
         (But reconnecting with PROBLEM control works).
         """
         rep = rtr_client.request_control(no_problem)
@@ -299,6 +300,56 @@ class TestRouterServerClient:
             assert_rep(proto, rep,
                        control_pb2.ControlResponse.REP_NOT_IN_CONTROL)
 
+        rep = rtr_client.request_control(problem)
+        assert rep == control_pb2.ControlResponse.REP_SUCCESS
+
+        for method, proto in rtr_client_server_methods:
+            rep = method(proto) if proto else method()
+            assert_rep(proto, rep,
+                       control_pb2.ControlResponse.REP_SUCCESS)
+
+        comm_pub.send_multipart([CommEnvelope.KILL.value.encode(),
+                                 b''])
+
+    def test_control_after_manual(self, ctx, server_url, router_url,
+                                  comm_url, comm_pub, timeout_ms,
+                                  thread_srv, thread_rtr, problem, no_problem,
+                                  rtr_client, rtr_client_server_methods):
+        """A client loses control after a switch to MANUAL mode.
+        (Reconnecting *does not* work while MANUAL).
+        """
+        rep = rtr_client.request_control(no_problem)
+        assert rep == control_pb2.ControlResponse.REP_SUCCESS
+
+        # Switch to manual mode
+        comm_pub.send_multipart([CommEnvelope.MODE.value.encode(),
+                                 CommMode.MODE_MANUAL.value.encode()])
+
+        # Should not be able to do things.
+        for method, proto in rtr_client_server_methods:
+            rep = method(proto) if proto else method()
+            assert_rep(proto, rep,
+                       control_pb2.ControlResponse.REP_NOT_IN_CONTROL)
+
+        # Add experiment problem
+        rep = rtr_client.add_experiment_problem(problem)
+        assert rep == control_pb2.ControlResponse.REP_SUCCESS
+
+        # Request control - should not be able to.
+        rep = rtr_client.request_control(problem)
+        assert rep == control_pb2.ControlResponse.REP_WRONG_CONTROL_MODE
+
+        # Should still not be able to do things.
+        for method, proto in rtr_client_server_methods:
+            rep = method(proto) if proto else method()
+            assert_rep(proto, rep,
+                       control_pb2.ControlResponse.REP_NOT_IN_CONTROL)
+
+        # Switch to auto mode
+        comm_pub.send_multipart([CommEnvelope.MODE.value.encode(),
+                                 CommMode.MODE_AUTOMATED.value.encode()])
+
+        # Request control - should be able to.
         rep = rtr_client.request_control(problem)
         assert rep == control_pb2.ControlResponse.REP_SUCCESS
 

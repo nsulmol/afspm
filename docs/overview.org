@@ -363,7 +363,6 @@ enum ControlMode {
   CM_UNDEFINED = 0;
   CM_MANUAL = 1;
   CM_AUTOMATED = 2;
-  CM_PROBLEM = 3;
 }
 #+end_src
 #+begin_center
