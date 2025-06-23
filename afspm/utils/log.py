@@ -75,7 +75,8 @@ def addLoggingLevel(levelName, levelNum, methodName=None):
 
 def set_up_logging(log_file: str = None, log_to_stdout: bool = True,
                    log_level: str | int = logging.INFO,
-                   log_url: str = None, ctx: zmq.Context = None):
+                   log_url: str = None, ctx: zmq.Context = None,
+                   logger_name: str = LOGGER_ROOT):
     """Set up logging logic.
 
     Args:
@@ -86,8 +87,9 @@ def set_up_logging(log_file: str = None, log_to_stdout: bool = True,
         log_url: if provided, a PUBHandler is used to route logs to the
             provided zmq url.
         ctx: context linked to zmq url, for creating the socket.
+        logger_name: str name of base logger for setting up.
     """
-    root = logging.getLogger(LOGGER_ROOT)
+    root = logging.getLogger(logger_name)
 
     if root.hasHandlers():  # Delete existing handlers before adding ours
         root.handlers.clear()
