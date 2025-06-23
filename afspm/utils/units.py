@@ -2,6 +2,7 @@
 
 import logging
 from typing import Optional, Any
+import numpy as np
 
 import pint
 
@@ -101,3 +102,32 @@ def convert_list(vals: list[Any], units: tuple[str | None],
         res = convert(val, curr_unit, desired_unit)
         converted_vals.append(res)
     return tuple(converted_vals)
+
+
+def convert_np(arr: np.ndarray, unit: str | None,
+               desired_unit: str | None) -> np.ndarray:
+    """Convert a numpy array to desired units using pint.
+
+    Args:
+        arr: numpy array of values.
+        unit: str of current unit.
+        desired_unit: str of desired unit.
+
+    Returns:
+        numpy array of values, converted to desired unit.
+
+    Raises:
+        ConversionError if a conversion fails for some reason. Check the log,
+        we likely have elaborated further.
+    """
+    if ((unit is not None and desired_unit is None) or
+            (unit is None and desired_unit is not None)):
+        reason = ("One of unit/desired_unit was provided but not the other. "
+                  "Cannot convert. Failing.")
+        logger.error(reason)
+        raise ConversionError(reason)
+    if not unit or not desired_unit or unit == desired_unit:
+        return arr
+
+    arr_w_units = Q_(arr, unit)
+    return arr_w_units.to(desired_unit)
