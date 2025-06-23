@@ -112,7 +112,7 @@ def convert_isoformat_to_hours(iso: str) -> float:
     return ts / 3600
 
 
-MARGIN_SCALING = 1.1
+MARGIN_SCALING = 0.1
 DEFAULT_SAVE_FILENAME = 'drift_correction.png'
 DEFAULT_OFFSET_UNIT = 'nm'
 DEFAULT_RATE_UNIT = 'nm/h'
@@ -140,10 +140,18 @@ def draw_drift_rates(drift_data: DriftData, unit: str,
     ax.set_title(DRIFT_RATE_TITLE)
 
     # Quiver is weird, so we need to explicit xlimit and ylimits?
-    ax.set_xlim(MARGIN_SCALING * np.min(drift_data.drift_rates[:, 0]),
-                MARGIN_SCALING * np.max(drift_data.drift_rates[:, 0]))
-    ax.set_ylim(MARGIN_SCALING * np.min(drift_data.drift_rates[:, 1]),
-                MARGIN_SCALING * np.max(drift_data.drift_rates[:, 1]))
+    min_max_x = [np.min(drift_data.drift_rates[:, 0]),
+                 np.max(drift_data.drift_rates[:, 0])]
+    min_max_x = [min(min_max_x), max(min_max_x)]
+    min_max_x = [min(0., min_max_x[0]) - MARGIN_SCALING * abs(min_max_x[0]),
+                 max(0., min_max_x[1]) + MARGIN_SCALING * abs(min_max_x[1])]
+    ax.set_xlim(min_max_x[0], min_max_x[1])
+    min_max_y = [np.min(drift_data.drift_rates[:, 1]),
+                 np.max(drift_data.drift_rates[:, 1])]
+    min_max_y = [min(min_max_y), max(min_max_y)]
+    min_max_y = [min(0., min_max_y[0]) - MARGIN_SCALING * abs(min_max_y[0]),
+                 max(0., min_max_y[1]) + MARGIN_SCALING * abs(min_max_y[1])]
+    ax.set_ylim(min_max_y[0], min_max_y[1])
 
 
 def draw_drift_offsets(drift_data: DriftData, unit: str,
