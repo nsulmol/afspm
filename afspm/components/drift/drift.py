@@ -527,8 +527,6 @@ def display_estimated_transform(da1: xr.DataArray, da2: xr.DataArray,
     # In this mode, we feed (x,y) and (u, v), for (x, x+u, y, y+v).
     axd['D'].quiver(mid_pt[0], mid_pt[1], pix_trans[0], pix_trans[1],
                     angles='xy', scale_units='xy', scale=1)
-    # NOTE: scale=1 is suggested by docs, but it makes the scale 2x the
-    # actual translation.
 
 
 def get_translation(da: xr.DataArray,
