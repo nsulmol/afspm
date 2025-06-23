@@ -179,7 +179,7 @@ class AfspmControlUI(AfspmComponentUI):
     def _on_closing(self):
         logger.info("UI closure clicked, exiting.")
         self.heartbeater.handle_closing()
-        self.destroy()
+        self.root.destroy()
 
     def _send_req(self, req, arg):
         rep = req(arg) if arg is not None else req()
