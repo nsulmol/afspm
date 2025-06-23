@@ -193,10 +193,10 @@ def get_colors_colorbar_for_time(drift_data, cm: str):
 
 def draw_data_axis(x_data: np.ndarray, y_data: np.ndarray,
                    x_meaning: str, y_meaning: str,
-                   x_unit: str, y_unit: str, ax: plt.Axes):
+                   x_unit: str, y_unit: str, ax: plt.Axes, colors: Any):
     """Draw data of a particular axis."""
-    ax.plot(x_data, y_data)
-#    ax.step(x_data, y_data)  # TODO: Consider me instead?
+    ax.scatter(x_data, y_data, c=colors)
+    ax.plot(x_data, y_data, color='lightgrey', linestyle='dashed')
     ax.set_xlabel(f'{x_meaning} [{x_unit}]')
     ax.set_ylabel(f'{y_meaning} [{y_unit}]')
     ax.autoscale
@@ -208,7 +208,7 @@ def draw_drift_data(csv_file: str,
                     time_as_seconds: bool = True,
                     display: bool = True,
                     save_file: str = DEFAULT_SAVE_FILENAME,
-                    cm: str = 'cool'):
+                    cm: str = 'nipy_spectral'):
     """Read a drift CSV file and visualize drift rate and offset.
 
     This method reads a CSV file created by CSCorrectedScheduler, and
@@ -248,22 +248,21 @@ def draw_drift_data(csv_file: str,
     colors, colorbar = get_colors_colorbar_for_time(drift_data, cm)
     draw_drift_offsets(drift_data, desired_offset_unit, axd['A'], colors)
     draw_drift_rates(drift_data, desired_rate_unit, axd['B'], colors)
-    fig.colorbar(colorbar, ax=[axd['A'], axd['B']])
-#    fig.colorbar(colorbar, ax=axd['B'])
-#    fig.colorbar(colorbar, ax=axd['A'])
+
+    fig.colorbar(colorbar, ax=list(axd.values()), shrink=0.6)
 
     draw_data_axis(drift_data.scan_time_hours, drift_data.drift_offsets[:, 0],
                    TIME_NAME, SPATIAL_X_NAME, TIME_UNIT,
-                   desired_offset_unit, axd['C'])
+                   desired_offset_unit, axd['C'], colors)
     draw_data_axis(drift_data.scan_time_hours, drift_data.drift_offsets[:, 1],
                    TIME_NAME, SPATIAL_Y_NAME, TIME_UNIT,
-                   desired_offset_unit, axd['E'])
+                   desired_offset_unit, axd['E'], colors)
     draw_data_axis(drift_data.scan_time_hours, drift_data.drift_rates[:, 0],
                    TIME_NAME, SPATIAL_X_NAME, TIME_UNIT,
-                   desired_rate_unit, axd['D'])
+                   desired_rate_unit, axd['D'], colors)
     draw_data_axis(drift_data.scan_time_hours, drift_data.drift_rates[:, 1],
                    TIME_NAME, SPATIAL_Y_NAME, TIME_UNIT,
-                   desired_rate_unit, axd['F'])
+                   desired_rate_unit, axd['F'], colors)
 
     if display:
         plt.show(block=True)
