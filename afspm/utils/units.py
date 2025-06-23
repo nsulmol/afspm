@@ -130,4 +130,4 @@ def convert_np(arr: np.ndarray, unit: str | None,
         return arr
 
     arr_w_units = Q_(arr, unit)
-    return arr_w_units.to(desired_unit)
+    return arr_w_units.to(desired_unit).magnitude
