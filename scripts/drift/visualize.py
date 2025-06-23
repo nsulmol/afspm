@@ -36,6 +36,7 @@ TIMESTAMP_KEY = 'timestamp'
 OFFSETS_KEY = 'pcs_to_scs_trans'
 UNIT_KEY = 'pcs_to_scs_units'
 RATES_KEY = 'pcs_to_scs_drift_rate'
+EMPTY_STR = ''
 
 
 def load_drift_data(csv_filepath: str, desired_offset_unit: str,
@@ -56,6 +57,9 @@ def load_drift_data(csv_filepath: str, desired_offset_unit: str,
         drift_offsets = []
         drift_rates = []
         for row in reader:
+            if EMPTY_STR in row.values():
+                continue  # Skip this row, missing data.
+
             offset_unit = (row[UNIT_KEY])
             rate_unit = offset_unit + '/s'
 
