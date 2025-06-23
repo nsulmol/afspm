@@ -20,10 +20,10 @@ class CSVAttributes:
     quoting: Any = None
 
 
-def create_dict_writer(csv_file: TextIO,
+def create_dict_kwargs(csv_file: TextIO,
                        csv_attribs: CSVAttributes,
-                       csv_fields: list[str]) -> csv.DictWriter:
-    """Create dict writer from for path given attributes and fields.
+                       csv_fields: list[str]) -> dict:
+    """Create dict kwargs from for path given attributes and fields.
 
     Args:
         csv_file: TextIO of opened file descriptor, for writing.
@@ -32,7 +32,7 @@ def create_dict_writer(csv_file: TextIO,
         csv_fields: list of field names.
 
     Returns:
-        DictWriter associated to this CSV file and config.
+        kwargs dict for creating a DictWriter or DictReader.
     """
     kwargs_dict = {'f': csv_file, 'fieldnames': csv_fields}
     if csv_attribs.delimiter is not None:
@@ -42,7 +42,7 @@ def create_dict_writer(csv_file: TextIO,
     if csv_attribs.quoting is not None:
         kwargs_dict['quoting'] = csv_attribs.quoting
 
-    return csv.DictWriter(**kwargs_dict)
+    return kwargs_dict
 
 
 def init_csv_file(csv_attribs: CSVAttributes,
@@ -60,7 +60,8 @@ def init_csv_file(csv_attribs: CSVAttributes,
     """
     logger.debug("Creating initial csv file, with header.")
     with open(csv_attribs.filepath, 'a', newline='') as csv_file:
-        writer = create_dict_writer(csv_file, csv_attribs, csv_fields)
+        kwargs = create_dict_kwargs(csv_file, csv_attribs, csv_fields)
+        writer = csv.DictWriter(**kwargs)
         writer.writeheader()
 
 
@@ -81,5 +82,6 @@ def save_csv_row(csv_attribs: CSVAttributes,
     row_dict = dict(zip(csv_fields, row_vals))
 
     with open(csv_attribs.filepath, 'a', newline='') as csv_file:
-        writer = create_dict_writer(csv_file, csv_attribs, csv_fields)
+        kwargs = create_dict_kwargs(csv_file, csv_attribs, csv_fields)
+        writer = csv.DictWriter(**kwargs)
         writer.writerow(row_dict)
