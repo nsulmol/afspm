@@ -133,11 +133,7 @@ def draw_drift_rates(drift_data: DriftData, unit: str,
     """Draw drift rates on axis."""
     zeros = np.zeros(drift_data.drift_rates.shape[0])
 
-    alphas = np.sqrt(np.abs(drift_data.drift_rates[:, 0])**2 +
-                     np.abs(drift_data.drift_rates[:, 1])**2)
-    alphas = (alphas.ravel() - alphas.min())/alphas.ptp()
-    alphas = 1 - 0.66 * alphas  # longer are more transparent
-
+    alphas = 0.75 * np.ones(drift_data.drift_rates.shape[0])
     ax.quiver(zeros, zeros,
               drift_data.drift_rates[:, 0],
               drift_data.drift_rates[:, 1],
@@ -255,7 +251,7 @@ def draw_drift_data(csv_file: str,
     draw_drift_offsets(drift_data, desired_offset_unit, axd['A'], colors)
     draw_drift_rates(drift_data, desired_rate_unit, axd['B'], colors)
 
-    fig.colorbar(colorbar, ax=list(axd.values()), shrink=0.6)
+#    fig.colorbar(colorbar, ax=list(axd.values()), shrink=0.6)
 
     draw_data_axis(drift_data.scan_time_hours, drift_data.drift_offsets[:, 0],
                    TIME_NAME, SPATIAL_X_NAME, TIME_UNIT,
