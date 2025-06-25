@@ -136,6 +136,7 @@ def draw_drift_rates(drift_data: DriftData, unit: str,
     ax.quiver(zeros, zeros,
               drift_data.drift_rates[:, 0],
               drift_data.drift_rates[:, 1],
+              units='xy', width=7.5,
               angles='xy', scale_units='xy', scale=1,
               color=colors)
 
