@@ -200,7 +200,7 @@ def draw_data_axis(x_data: np.ndarray, y_data: np.ndarray,
     ax.plot(x_data, y_data, color='lightgrey', linestyle='dashed')
     ax.set_xlabel(f'{x_meaning} [{x_unit}]')
     ax.set_ylabel(f'{y_meaning} [{y_unit}]')
-    ax.autoscale
+    ax.autoscale()
 
 
 def draw_drift_data(csv_file: str,
@@ -238,7 +238,7 @@ def draw_drift_data(csv_file: str,
     drift_data = load_drift_data(csv_file, desired_offset_unit,
                                  desired_rate_unit, time_as_seconds)
 
-    fig = plt.figure(layout='constrained')
+    fig = plt.figure(layout='tight')
     mosaic = """AB
                 AB
                 AB
@@ -250,8 +250,6 @@ def draw_drift_data(csv_file: str,
     colors, colorbar = get_colors_colorbar_for_time(drift_data, cm)
     draw_drift_offsets(drift_data, desired_offset_unit, axd['A'], colors)
     draw_drift_rates(drift_data, desired_rate_unit, axd['B'], colors)
-
-#    fig.colorbar(colorbar, ax=list(axd.values()), shrink=0.6)
 
     draw_data_axis(drift_data.scan_time_hours, drift_data.drift_offsets[:, 0],
                    TIME_NAME, SPATIAL_X_NAME, TIME_UNIT,
