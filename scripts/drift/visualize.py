@@ -133,12 +133,11 @@ def draw_drift_rates(drift_data: DriftData, unit: str,
     """Draw drift rates on axis."""
     zeros = np.zeros(drift_data.drift_rates.shape[0])
 
-    alphas = 0.75 * np.ones(drift_data.drift_rates.shape[0])
     ax.quiver(zeros, zeros,
               drift_data.drift_rates[:, 0],
               drift_data.drift_rates[:, 1],
               angles='xy', scale_units='xy', scale=1,
-              color=colors, alpha=alphas)
+              color=colors)
 
     ax.set_xlabel(f'{SPATIAL_X_NAME} [{unit}]')
     ax.set_ylabel(f'{SPATIAL_Y_NAME} [{unit}]')
