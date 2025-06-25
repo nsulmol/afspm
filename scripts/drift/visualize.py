@@ -232,6 +232,7 @@ def draw_drift_data(csv_file: str,
         save_file: filename to save the drawn plot. This is the filename
             *without* the path, as we use the csv_files path. Defaults to
             'drift_correction.png'.
+        cm: colormap style for visualization. Defaults to 'nipy_spectral'.
     """
     drift_data = load_drift_data(csv_file, desired_offset_unit,
                                  desired_rate_unit, time_as_seconds)
