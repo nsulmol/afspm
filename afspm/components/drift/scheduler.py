@@ -281,7 +281,7 @@ class CSCorrectedCache(cache.PubSubCache):
         proto = cs_correct_proto(proto, self._corr_info,
                                  self._update_weight, curr_dt)
 
-        super().send_message(proto)
+        super().send_message(proto)  # Add to cache after CS switch.
 
     @classmethod
     def from_parent(cls, parent):
