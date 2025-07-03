@@ -20,7 +20,7 @@ import matplotlib as mpl
 from matplotlib import pyplot as plt
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(log.LOGGER_ROOT + '.scripts.drift.' + __name__)
 
 
 @dataclass
@@ -271,6 +271,43 @@ def draw_drift_data(csv_file: str,
     fig.savefig(save_path)
 
 
+def cli_draw_drift_data(csv_file: str,
+                        desired_offset_unit: str = DEFAULT_OFFSET_UNIT,
+                        desired_rate_unit: str = DEFAULT_RATE_UNIT,
+                        time_as_seconds: bool = True,
+                        display: bool = True,
+                        cm: str = 'nipy_spectral',
+                        log_level: str = logging.INFO):
+    """Read a drift CSV file and visualize drift rate and offset.
+
+    This method reads a CSV file created by CSCorrectedScheduler, and
+    plots the drift offset and rates over time so they may be analyzed.
+
+    The data is displayed (in a blocking fashion) if display is True, and
+    saved to filename save_file in the same directory as the CSV file.
+
+    Desired offset units and rate units must be specified. We use these to
+    scale as needed.
+
+    Args:
+        csv_file: path to the csv file we wish to read.
+        desired_offset_unit: desired offset unit. Defaults to 'nm'.
+        desired_rate_unit: desired rate unit. Defaults to 'nm/h'.
+        time_as_seconds: whether the timestamp in the csv file saved a
+            timestamp in seconds, or an iso format str. Default is True,
+            which indicates timestamp in seconds.
+        display: whether or not we show the figure in a blocking fashion.
+            Default is True.
+        save_file: filename to save the drawn plot. This is the filename
+            *without* the path, as we use the csv_files path. Defaults to
+            'drift_correction.png'.
+        cm: colormap style for visualization. Defaults to 'nipy_spectral'.
+        log_level: level to use for logging. Defaults to INFO.
+    """
+    log.set_up_logging(log_level=log_level)
+    draw_drift_data(csv_file, desired_offset_unit, desired_rate_unit,
+                    time_as_seconds, display, cm)
+
+
 if __name__ == '__main__':
-    log.set_up_logging(logger_name=None)  # Log everything!
-    fire.Fire(draw_drift_data)
+    fire.Fire(cli_draw_drift_data)
