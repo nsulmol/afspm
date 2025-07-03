@@ -122,7 +122,8 @@ class OfflineCSScheduler(scheduler.CSCorrectedScheduler):
 
 def run_drift_estimation_on_dir(scan_dir: str, scan_ext: str,
                                 cache_size: int, channel_id: str,
-                                csv_filename: str = DEFAULT_CSV):
+                                csv_filename: str = DEFAULT_CSV,
+                                fake_correction: bool = False):
     """Run drift estimation on scans in directory, outputting results to csv.
 
     This method will grab all scans in scan_dir with extension scan_ext, and
@@ -135,6 +136,10 @@ def run_drift_estimation_on_dir(scan_dir: str, scan_ext: str,
         cache_size: size of prior scans cache, used to determine the first
             scan we compare it to.
         csv_filename: desired output filename of CSV file.
+        fake_correction: whether or not to act as if our feedback loop is
+            working, i.e. the prior correction is used on the current scan.
+            This is not possible with an offline run, so should almost
+            always be False.
     """
     if scan_ext not in MAP_EXT_FILE_LOADER:
         logger.error(f'No file loader in MAP_EXT_FILE_LOADER for {scan_ext}.')
@@ -145,7 +150,8 @@ def run_drift_estimation_on_dir(scan_dir: str, scan_ext: str,
 
     csv_attribs = csv.CSVAttributes(os.path.join(scan_dir, csv_filename))
     scheduler = OfflineCSScheduler(channel_id, cache_size,
-                                   csv_attribs=csv_attribs)
+                                   csv_attribs=csv_attribs,
+                                   fake_correction=fake_correction)
 
     filenames = [f for f in sorted(os.listdir(scan_dir))
                  if f.endswith(scan_ext)]
@@ -161,6 +167,7 @@ def run_drift_estimation_on_dir(scan_dir: str, scan_ext: str,
 def cli_run_drift_estimation_on_dir(scan_dir: str, scan_ext: str,
                                     cache_size: int, channel_id: str,
                                     csv_filename: str = DEFAULT_CSV,
+                                    fake_correction: bool = False,
                                     log_level: str = logging.INFO):
     """Run drift estimation on scans in directory, outputting results to csv.
 
@@ -174,11 +181,15 @@ def cli_run_drift_estimation_on_dir(scan_dir: str, scan_ext: str,
         cache_size: size of prior scans cache, used to determine the first
             scan we compare it to.
         csv_filename: desired output filename of CSV file.
+        fake_correction: whether or not to act as if our feedback loop is
+            working, i.e. the prior correction is used on the current scan.
+            This is not possible with an offline run, so should almost
+            always be False.
         log_level: level to use for logging. Defaults to INFO.
     """
     log.set_up_logging(log_level=log_level)
     run_drift_estimation_on_dir(scan_dir, scan_ext, cache_size, channel_id,
-                                csv_filename)
+                                csv_filename, fake_correction)
 
 
 if __name__ == '__main__':
