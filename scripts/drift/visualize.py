@@ -117,13 +117,12 @@ def convert_isoformat_to_hours(iso: str) -> float:
 
 
 MARGIN_SCALING = 0.1
-DEFAULT_SAVE_FILENAME = 'drift_correction.png'
 DEFAULT_OFFSET_UNIT = 'nm'
 DEFAULT_RATE_UNIT = 'nm/h'
 SPATIAL_X_NAME = 'X'
 SPATIAL_Y_NAME = 'Y'
 TIME_NAME = 'Scan Time'
-TIME_UNIT = 'hrs'
+TIME_UNIT = 'h'
 DRIFT_RATE_TITLE = 'Drift Rate'
 DRIFT_OFFSET_TITLE = 'Drift Offset'
 
@@ -208,7 +207,6 @@ def draw_drift_data(csv_file: str,
                     desired_rate_unit: str = DEFAULT_RATE_UNIT,
                     time_as_seconds: bool = True,
                     display: bool = True,
-                    save_file: str = DEFAULT_SAVE_FILENAME,
                     cm: str = 'nipy_spectral'):
     """Read a drift CSV file and visualize drift rate and offset.
 
@@ -267,7 +265,9 @@ def draw_drift_data(csv_file: str,
     if display:
         plt.show(block=True)
 
-    save_path = os.path.join(os.path.dirname(csv_file), save_file)
+    save_path = os.path.join(os.path.dirname(csv_file),
+                             os.path.splitext(os.path.basename(csv_file))[0]
+                             + '.png')
     fig.savefig(save_path)
 
 
