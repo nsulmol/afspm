@@ -527,7 +527,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
             plt.show(block=False)
         return snapshot
 
-    def _get_scans_from_cache(self):
+    def _get_scans_from_cache(self) -> list[scan_pb2.Scan2d]:
         # The cache is a key:val map of deques of items.
         # So we need to filter through each deque and concat the values
         # if they are scans.
@@ -570,13 +570,29 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
             new_scan: the incoming scan, which we use to update our correction
                 estimates.
         """
-        # First things first: the received scan is in the PCS. Convert to our
-        # *current* SCS.
-        corrected_scan = cs_correct_proto(new_scan, self.total_corr_info,
-                                          self.update_weight,
-                                          new_scan.timestamp.ToDatetime(
-                                              dt.timezone.utc))
+        corrected_scan = self._get_corrected_scan(new_scan)
+        scan_matched = self._update_correction(new_scan, corrected_scan)
+        self._save_metadata(corrected_scan, scan_matched)
+        self._update_io()
 
+    def _get_corrected_scan(self, new_scan: scan_pb2.Scan2d) -> scan_pb2.Scan2d:
+        """Convert current scan from PCS to SCS."""
+        return cs_correct_proto(new_scan, self.total_corr_info,
+                                self.update_weight,
+                                new_scan.timestamp.ToDatetime(
+                                    dt.timezone.utc))
+
+    def _update_correction(self, new_scan: scan_pb2.Scan2d,
+                           corrected_scan: scan_pb2.Scan2d) -> bool:
+        """Estimate snapshot and update correction accordingly.
+
+        Args:
+            new_scan: scan_pb2 in piezo coordinate system (PCS).
+            corrected_scan: scan_pb2 in scan coordinate system (SCS).
+
+        Returns:
+            Whether or not we were able to estimate a snapshot this time step.
+        """
         snapshot = self._get_drift_snapshot(corrected_scan)
         self._update_curr_corr_info(corrected_scan, snapshot)
 
@@ -584,13 +600,15 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         # Note that we feed the original scan, as we will update it with
         # the latest correction info.
         self._determine_redo_scan(new_scan, corrected_scan)
+        return snapshot is not None
 
-        scan_matched = snapshot is not None
+    def _save_metadata(self, corrected_scan: scan_pb2.Scan2d,
+                       scan_matched: bool):
+        """Save current correction info in CSV file."""
         row_vals = get_metadata_row(corrected_scan, self.total_corr_info,
                                     scan_matched)
         csv.save_csv_row(self.csv_attribs, self.CSV_FIELDS,
                          row_vals)
-        self._update_io()
 
     def _update_curr_corr_info(self, new_scan: scan_pb2.Scan2d,
                                snapshot: correction.DriftSnapshot | None):
