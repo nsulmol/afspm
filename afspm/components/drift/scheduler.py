@@ -37,9 +37,8 @@ ANGLE_FIELD = 'angle'  # Used to check if an angle is set in scan_params
 PLT_LAYOUT = 'constrained'
 
 
-# kwarg keys for Scheduler constructor
-
-DEFAULT_UPDATE_WEIGHT = 0.9  # Update weight for averaging new data
+# Update weight for averaging new data, which means no averaging in this case.
+DEFAULT_UPDATE_WEIGHT = 1.0
 
 
 def get_converted_and_updated_vec(corr_info: correction.CorrectionInfo,
@@ -433,9 +432,13 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     DEFAULT_DISPLAY_FIT = True
     DEFAULT_GRAB_OLDEST = True
 
-    CSV_FIELDS = ['timestamp', 'filename', 'pcs_to_scs_trans',
-                  'pcs_to_scs_units', 'pcs_to_scs_drift_rate',
-                  'scan_matched']
+    CSV_FIELDS_V1 = ['timestamp', 'filename', 'pcs_to_scs_trans',
+                     'pcs_to_scs_units', 'pcs_to_scs_drift_rate',
+                     'scan_matched']
+    CSV_FIELDS_V2 = ['datetime', 'filename',
+                     'drift_offset_x', 'drift_offset_y', 'drift_offset_units',
+                     'drift_rate_x', 'drift_rate_y', 'drift_rate_units',
+                     'scan_matched']
     DEFAULT_SPAWN_DELAY_S = 5.0  # Slow startup.
     DEFAULT_BEAT_PERIOD_S = 3.0  # Slow beat.
 
@@ -494,7 +497,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         # cache receiving a message (i.e. updates from the Microscope).
         self.pubsubcache.bind_to(self.cache_received_message)
 
-        csv.init_csv_file(self.csv_attribs, self.CSV_FIELDS)
+        csv.init_csv_file(self.csv_attribs, self.CSV_FIELDS_V2)
 
     def _get_drift_snapshot(self, new_scan: scan_pb2.Scan2d
                             ) -> correction.DriftSnapshot | None:
@@ -605,9 +608,9 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     def _save_metadata(self, corrected_scan: scan_pb2.Scan2d,
                        scan_matched: bool):
         """Save current correction info in CSV file."""
-        row_vals = get_metadata_row(corrected_scan, self.total_corr_info,
-                                    scan_matched)
-        csv.save_csv_row(self.csv_attribs, self.CSV_FIELDS,
+        row_vals = get_metadata_row_v2(corrected_scan, self.total_corr_info,
+                                       scan_matched)
+        csv.save_csv_row(self.csv_attribs, self.CSV_FIELDS_V2,
                          row_vals)
 
     def _update_curr_corr_info(self, new_scan: scan_pb2.Scan2d,
@@ -706,14 +709,30 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         super()._handle_shutdown()
 
 
-def get_metadata_row(scan: scan_pb2.Scan2d,
-                     corr_info: correction.CorrectionInfo | None,
-                     estimated_from_vec: bool) -> [str]:
-    """Get metadata row for CSV logging current state."""
+def get_metadata_row_v1(scan: scan_pb2.Scan2d,
+                        corr_info: correction.CorrectionInfo | None,
+                        estimated_from_vec: bool) -> [str]:
+    """Get metadata row for CSV logging current state (V1)."""
     row_vals = [scan.timestamp.seconds,
                 scan.filename,
                 corr_info.vec if corr_info is not None else None,
                 corr_info.unit if corr_info is not None else None,
                 corr_info.drift_rate if corr_info is not None else None,
+                estimated_from_vec]
+    return row_vals
+
+
+def get_metadata_row_v2(scan: scan_pb2.Scan2d,
+                        corr_info: correction.CorrectionInfo | None,
+                        estimated_from_vec: bool) -> [str]:
+    """Get metadata row for CSV logging current state (V2)."""
+    row_vals = [scan.timestamp.ToDatetime(dt.timezone.utc).isoformat(),
+                scan.filename,
+                corr_info.vec[0] if corr_info is not None else None,
+                corr_info.vec[1] if corr_info is not None else None,
+                corr_info.unit if corr_info is not None else None,
+                corr_info.drift_rate[0] if corr_info is not None else None,
+                corr_info.drift_rate[1] if corr_info is not None else None,
+                corr_info.unit + '/s' if corr_info is not None else None,
                 estimated_from_vec]
     return row_vals

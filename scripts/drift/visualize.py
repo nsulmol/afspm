@@ -23,6 +23,9 @@ from matplotlib import pyplot as plt
 logger = logging.getLogger(log.LOGGER_ROOT + '.scripts.drift.' + __name__)
 
 
+EMPTY_STR = ''
+
+
 @dataclass
 class DriftData:
     """Struct of different drift aspects."""
@@ -32,22 +35,18 @@ class DriftData:
     drift_rates: np.ndarray
 
 
-TIMESTAMP_KEY = 'timestamp'
-OFFSETS_KEY = 'pcs_to_scs_trans'
-UNIT_KEY = 'pcs_to_scs_units'
-RATES_KEY = 'pcs_to_scs_drift_rate'
-EMPTY_STR = ''
-
-
 def load_drift_data(csv_filepath: str, desired_offset_unit: str,
-                    desired_rate_unit: str, time_as_seconds: bool = True
+                    desired_rate_unit: str, uses_v2: bool = True
                     ) -> DriftData:
     """Given a CSV file of drift data, get a DriftData object."""
+    fields = (scheduler.CSCorrectedScheduler.CSV_FIELDS_V2 if uses_v2
+              else scheduler.CSCorrectedScheduler.CSV_FIELDS_V1)
+    extract_metadata_row = (extract_metadata_row_v2 if uses_v2
+                            else extract_metadata_row_v1)
     csv_attribs = utils_csv.CSVAttributes(csv_filepath)
     with open(csv_filepath, 'r', newline='') as csv_file:
         kwargs = utils_csv.create_dict_kwargs(
-            csv_file, csv_attribs,
-            scheduler.CSCorrectedScheduler.CSV_FIELDS)
+            csv_file, csv_attribs, fields)
         reader = csv.DictReader(**kwargs)
 
         next(reader)  # Skip header
@@ -57,21 +56,14 @@ def load_drift_data(csv_filepath: str, desired_offset_unit: str,
         drift_offsets = []
         drift_rates = []
         for row in reader:
-            if EMPTY_STR in row.values():
-                continue  # Skip this row, missing data.
-
-            offset_unit = (row[UNIT_KEY])
-            rate_unit = offset_unit + '/s'
-
-            hrs, zero_hrs = extract_scan_time_hours(float(row[TIMESTAMP_KEY]),
-                                                    zero_hrs,
-                                                    time_as_seconds)
-            scan_time_hours.append(hrs)
-
-            drift_offsets.append(units.convert_np(
-                str_to_np(row[OFFSETS_KEY]), offset_unit, desired_offset_unit))
-            drift_rates.append(units.convert_np(
-                str_to_np(row[RATES_KEY]), rate_unit, desired_rate_unit))
+            try:
+                hours, zero_hrs, offset, rate = extract_metadata_row(
+                    row, desired_offset_unit, desired_rate_unit, zero_hrs)
+            except AssertionError:
+                continue  # Skip row missing data
+            scan_time_hours.append(hours)
+            drift_offsets.append(offset)
+            drift_rates.append(rate)
 
         # Convert all to np arrays
         scan_time_hours = np.array(scan_time_hours)
@@ -79,6 +71,66 @@ def load_drift_data(csv_filepath: str, desired_offset_unit: str,
         drift_rates = np.array(drift_rates)
 
         return DriftData(scan_time_hours, drift_offsets, drift_rates)
+
+
+def extract_metadata_row_v1(row: dict, desired_offset_unit: str,
+                            desired_rate_unit: str, zero_hrs: float | None
+                            ) -> (float, float, np.ndarray, np.ndarray):
+    """Given a metadata read from a CSV row (V1), output data.
+
+    In this case, we only care about:
+        time: in hrs
+        zero_hrs: gets updated
+        offset: as np.ndarray
+        rate: as np.ndarray
+
+    Raises:
+        AssertionError if there is an empty value.
+    """
+    assert EMPTY_STR not in row.values()
+
+    FIELDS = scheduler.CSCorrectedScheduler.CSV_FIELDS_V1
+
+    offset_unit = (row[FIELDS[3]])
+    rate_unit = offset_unit + '/s'
+    hrs, zero_hrs = extract_scan_time_hours(float(row[FIELDS[0]]),
+                                            zero_hrs, True)
+    offset = units.convert_np(str_to_np(row[FIELDS[2]]), offset_unit,
+                              desired_offset_unit)
+    rate = units.convert_np(str_to_np(row[FIELDS[4]]), rate_unit,
+                            desired_rate_unit)
+    return hrs, zero_hrs, offset, rate
+
+
+def extract_metadata_row_v2(row: dict, desired_offset_unit: str,
+                            desired_rate_unit: str, zero_hrs: float
+                            ) -> (float, float, np.ndarray, np.ndarray):
+    """Given a metadata read from a CSV row (V2), output data.
+
+    In this case, we only care about:
+        time: in hrs
+        zero_hrs: gets updated
+        offset: as np.ndarray
+        rate: as np.ndarray
+
+    Raises:
+        AssertionError if there is an empty value.
+    """
+    assert EMPTY_STR not in row.values()
+
+    FIELDS = scheduler.CSCorrectedScheduler.CSV_FIELDS_V2
+
+    offset_unit = (row[FIELDS[4]])
+    rate_unit = offset_unit + '/s'
+    hrs, zero_hrs = extract_scan_time_hours(row[FIELDS[0]],
+                                            zero_hrs, False)
+    offset = np.array([float(row[FIELDS[2]]), float(row[FIELDS[3]])])
+    offset = units.convert_np(offset, offset_unit, desired_offset_unit)
+
+    rate = np.array([float(row[FIELDS[5]]), float(row[FIELDS[6]])])
+    rate = units.convert_np(rate, rate_unit, desired_rate_unit)
+
+    return hrs, zero_hrs, offset, rate
 
 
 def str_to_np(val: str) -> np.ndarray:
@@ -112,7 +164,7 @@ def convert_seconds_to_hours(ts: float) -> float:
 
 def convert_isoformat_to_hours(iso: str) -> float:
     """Given a tiemstamp in isoformat, convert to hours."""
-    ts = dt.datetime.fromisoformat(iso).total_seconds()
+    ts = dt.datetime.fromisoformat(iso).timestamp()
     return ts / 3600
 
 
@@ -205,8 +257,7 @@ def draw_data_axis(x_data: np.ndarray, y_data: np.ndarray,
 def draw_drift_data(csv_file: str,
                     desired_offset_unit: str = DEFAULT_OFFSET_UNIT,
                     desired_rate_unit: str = DEFAULT_RATE_UNIT,
-                    time_as_seconds: bool = True,
-                    display: bool = True,
+                    uses_v2: bool = True, display: bool = True,
                     cm: str = 'nipy_spectral'):
     """Read a drift CSV file and visualize drift rate and offset.
 
@@ -223,9 +274,7 @@ def draw_drift_data(csv_file: str,
         csv_file: path to the csv file we wish to read.
         desired_offset_unit: desired offset unit. Defaults to 'nm'.
         desired_rate_unit: desired rate unit. Defaults to 'nm/h'.
-        time_as_seconds: whether the timestamp in the csv file saved a
-            timestamp in seconds, or an iso format str. Default is True,
-            which indicates timestamp in seconds.
+        uses_v2: whether or not the CSV uses V2 of the format.
         display: whether or not we show the figure in a blocking fashion.
             Default is True.
         save_file: filename to save the drawn plot. This is the filename
@@ -234,7 +283,7 @@ def draw_drift_data(csv_file: str,
         cm: colormap style for visualization. Defaults to 'nipy_spectral'.
     """
     drift_data = load_drift_data(csv_file, desired_offset_unit,
-                                 desired_rate_unit, time_as_seconds)
+                                 desired_rate_unit, uses_v2)
 
     fig = plt.figure(layout='tight')
     mosaic = """AB
@@ -274,8 +323,7 @@ def draw_drift_data(csv_file: str,
 def cli_draw_drift_data(csv_file: str,
                         desired_offset_unit: str = DEFAULT_OFFSET_UNIT,
                         desired_rate_unit: str = DEFAULT_RATE_UNIT,
-                        time_as_seconds: bool = True,
-                        display: bool = True,
+                        uses_v2: bool = True, display: bool = True,
                         cm: str = 'nipy_spectral',
                         log_level: str = logging.INFO):
     """Read a drift CSV file and visualize drift rate and offset.
@@ -293,9 +341,7 @@ def cli_draw_drift_data(csv_file: str,
         csv_file: path to the csv file we wish to read.
         desired_offset_unit: desired offset unit. Defaults to 'nm'.
         desired_rate_unit: desired rate unit. Defaults to 'nm/h'.
-        time_as_seconds: whether the timestamp in the csv file saved a
-            timestamp in seconds, or an iso format str. Default is True,
-            which indicates timestamp in seconds.
+        uses_v2: whether or not the CSV uses V2 of the format.
         display: whether or not we show the figure in a blocking fashion.
             Default is True.
         save_file: filename to save the drawn plot. This is the filename
@@ -306,7 +352,7 @@ def cli_draw_drift_data(csv_file: str,
     """
     log.set_up_logging(log_level=log_level)
     draw_drift_data(csv_file, desired_offset_unit, desired_rate_unit,
-                    time_as_seconds, display, cm)
+                    uses_v2, display, cm)
 
 
 if __name__ == '__main__':

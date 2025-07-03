@@ -91,7 +91,7 @@ class OfflineCSScheduler(scheduler.CSCorrectedScheduler):
                            f'{drift_model.fitting} (i.e. not RANSAC). This '
                            'is probably too low!')
 
-        csv.init_csv_file(self.csv_attribs, self.CSV_FIELDS)
+        csv.init_csv_file(self.csv_attribs, self.CSV_FIELDS_V2)
 
         self.fake_cache = deque(maxlen=cache_size)
 
