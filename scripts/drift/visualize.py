@@ -20,12 +20,26 @@ import matplotlib as mpl
 from matplotlib import pyplot as plt
 
 
+# Force serif family fonts
+plt.rc('font', family='serif')
+
+
 logger = logging.getLogger(log.LOGGER_ROOT + '.scripts.drift.' + __name__)
 
 
 EMPTY_STR = ''
+MARGIN_SCALING = 0.1
+DEFAULT_OFFSET_UNIT = 'nm'
+DEFAULT_RATE_UNIT = 'nm/h'
+OFFSET_X_NAME = r'$\boldsymbol{x}_{tot} \cdot \hat{i}$'
+OFFSET_Y_NAME = r'$\boldsymbol{x}_{tot} \cdot \hat{j}$'
+RATE_X_NAME = r'$\dot{\boldsymbol{x}_{tot}} \cdot \hat{i}$'
+RATE_Y_NAME = r'$\dot{\boldsymbol{x}_{tot}} \cdot \hat{j}$'
+TIME_NAME = 'Scan Time'
+TIME_UNIT = 'h'
 
 
+# ----- Reading logic / methods ----- #
 @dataclass
 class DriftData:
     """Struct of different drift aspects."""
@@ -36,7 +50,8 @@ class DriftData:
 
 
 def load_drift_data(csv_filepath: str, desired_offset_unit: str,
-                    desired_rate_unit: str, uses_v2: bool = True
+                    desired_rate_unit: str = DEFAULT_RATE_UNIT,
+                    uses_v2: bool = True
                     ) -> DriftData:
     """Given a CSV file of drift data, get a DriftData object."""
     fields = (scheduler.CSCorrectedScheduler.CSV_FIELDS_V2 if uses_v2
@@ -168,17 +183,7 @@ def convert_isoformat_to_hours(iso: str) -> float:
     return ts / 3600
 
 
-MARGIN_SCALING = 0.1
-DEFAULT_OFFSET_UNIT = 'nm'
-DEFAULT_RATE_UNIT = 'nm/h'
-SPATIAL_X_NAME = 'X'
-SPATIAL_Y_NAME = 'Y'
-TIME_NAME = 'Scan Time'
-TIME_UNIT = 'h'
-DRIFT_RATE_TITLE = 'Drift Rate'
-DRIFT_OFFSET_TITLE = 'Drift Offset'
-
-
+# ----- Drawing methods ----- #
 def draw_drift_rates(drift_data: DriftData, unit: str,
                      ax: plt.Axes, colors: Any):  # TODO: what is colors?
     """Draw drift rates on axis."""
@@ -191,9 +196,8 @@ def draw_drift_rates(drift_data: DriftData, unit: str,
               units='width', width=0.005,
               color=colors)
 
-    ax.set_xlabel(f'{SPATIAL_X_NAME} [{unit}]')
-    ax.set_ylabel(f'{SPATIAL_Y_NAME} [{unit}]')
-    ax.set_title(DRIFT_RATE_TITLE)
+    ax.set_xlabel(f'{RATE_X_NAME} [{unit}]')
+    ax.set_ylabel(f'{RATE_Y_NAME} [{unit}]')
 
     # Quiver is weird, so we need to explicit xlimit and ylimits?
     min_max_x = [np.min(drift_data.drift_rates[:, 0]),
@@ -220,9 +224,8 @@ def draw_drift_offsets(drift_data: DriftData, unit: str,
             drift_data.drift_offsets[:, 1],
             color='lightgrey', linestyle='dashed')
 
-    ax.set_xlabel(f'{SPATIAL_X_NAME} [{unit}]')
-    ax.set_ylabel(f'{SPATIAL_Y_NAME} [{unit}]')
-    ax.set_title(DRIFT_OFFSET_TITLE)
+    ax.set_xlabel(f'{OFFSET_X_NAME} [{unit}]')
+    ax.set_ylabel(f'{OFFSET_Y_NAME} [{unit}]')
 
     ax.autoscale()
 
@@ -254,11 +257,11 @@ def draw_data_axis(x_data: np.ndarray, y_data: np.ndarray,
     ax.autoscale()
 
 
-def draw_drift_data(csv_file: str,
-                    desired_offset_unit: str = DEFAULT_OFFSET_UNIT,
-                    desired_rate_unit: str = DEFAULT_RATE_UNIT,
-                    uses_v2: bool = True, display: bool = True,
-                    cm: str = 'nipy_spectral'):
+def draw_drift_data_all(csv_file: str,
+                        desired_offset_unit: str = DEFAULT_OFFSET_UNIT,
+                        desired_rate_unit: str = DEFAULT_RATE_UNIT,
+                        uses_v2: bool = True, display: bool = True,
+                        cm: str = 'nipy_spectral'):
     """Read a drift CSV file and visualize drift rate and offset.
 
     This method reads a CSV file created by CSCorrectedScheduler, and
@@ -299,17 +302,73 @@ def draw_drift_data(csv_file: str,
     draw_drift_rates(drift_data, desired_rate_unit, axd['B'], colors)
 
     draw_data_axis(drift_data.scan_time_hours, drift_data.drift_offsets[:, 0],
-                   TIME_NAME, SPATIAL_X_NAME, TIME_UNIT,
+                   TIME_NAME, OFFSET_X_NAME, TIME_UNIT,
                    desired_offset_unit, axd['C'], colors)
     draw_data_axis(drift_data.scan_time_hours, drift_data.drift_offsets[:, 1],
-                   TIME_NAME, SPATIAL_Y_NAME, TIME_UNIT,
+                   TIME_NAME, OFFSET_Y_NAME, TIME_UNIT,
                    desired_offset_unit, axd['E'], colors)
     draw_data_axis(drift_data.scan_time_hours, drift_data.drift_rates[:, 0],
-                   TIME_NAME, SPATIAL_X_NAME, TIME_UNIT,
+                   TIME_NAME, RATE_X_NAME, TIME_UNIT,
                    desired_rate_unit, axd['D'], colors)
     draw_data_axis(drift_data.scan_time_hours, drift_data.drift_rates[:, 1],
-                   TIME_NAME, SPATIAL_Y_NAME, TIME_UNIT,
+                   TIME_NAME, RATE_Y_NAME, TIME_UNIT,
                    desired_rate_unit, axd['F'], colors)
+
+    if display:
+        plt.show(block=True)
+
+    save_path = os.path.join(os.path.dirname(csv_file),
+                             os.path.splitext(os.path.basename(csv_file))[0]
+                             + '.png')
+    fig.savefig(save_path)
+
+
+def draw_drift_data_offsets(csv_file: str,
+                            desired_offset_unit: str = DEFAULT_OFFSET_UNIT,
+                            uses_v2: bool = True, display: bool = True,
+                            cm: str = 'nipy_spectral'):
+    """Read a drift CSV file and visualize drift offsets.
+
+    This method reads a CSV file created by CSCorrectedScheduler, and
+    plots the drift offset over time so they may be analyzed.
+
+    The data is displayed (in a blocking fashion) if display is True, and
+    saved to filename save_file in the same directory as the CSV file.
+
+    Desired offset units. We use these to scale as needed.
+
+    Args:
+        csv_file: path to the csv file we wish to read.
+        desired_offset_unit: desired offset unit. Defaults to 'nm'.
+        uses_v2: whether or not the CSV uses V2 of the format.
+        display: whether or not we show the figure in a blocking fashion.
+            Default is True.
+        save_file: filename to save the drawn plot. This is the filename
+            *without* the path, as we use the csv_files path. Defaults to
+            'drift_correction.png'.
+        cm: colormap style for visualization. Defaults to 'nipy_spectral'.
+    """
+    drift_data = load_drift_data(csv_file, desired_offset_unit,
+                                 uses_v2=uses_v2)
+
+    fig = plt.figure(layout='tight')
+    mosaic = """A
+                A
+                A
+                C
+                E"""
+    axd = fig.subplot_mosaic(mosaic)
+
+    # First, draw 'birds eye view' plots
+    colors, colorbar = get_colors_colorbar_for_time(drift_data, cm)
+    draw_drift_offsets(drift_data, desired_offset_unit, axd['A'], colors)
+
+    draw_data_axis(drift_data.scan_time_hours, drift_data.drift_offsets[:, 0],
+                   TIME_NAME, OFFSET_X_NAME, TIME_UNIT,
+                   desired_offset_unit, axd['C'], colors)
+    draw_data_axis(drift_data.scan_time_hours, drift_data.drift_offsets[:, 1],
+                   TIME_NAME, OFFSET_Y_NAME, TIME_UNIT,
+                   desired_offset_unit, axd['E'], colors)
 
     if display:
         plt.show(block=True)
@@ -323,6 +382,7 @@ def draw_drift_data(csv_file: str,
 def cli_draw_drift_data(csv_file: str,
                         desired_offset_unit: str = DEFAULT_OFFSET_UNIT,
                         desired_rate_unit: str = DEFAULT_RATE_UNIT,
+                        offsets_only: bool = True,
                         uses_v2: bool = True, display: bool = True,
                         cm: str = 'nipy_spectral',
                         log_level: str = logging.INFO):
@@ -341,6 +401,8 @@ def cli_draw_drift_data(csv_file: str,
         csv_file: path to the csv file we wish to read.
         desired_offset_unit: desired offset unit. Defaults to 'nm'.
         desired_rate_unit: desired rate unit. Defaults to 'nm/h'.
+        offsets_only: whether or not we only display offsets. Defaults to
+            True.
         uses_v2: whether or not the CSV uses V2 of the format.
         display: whether or not we show the figure in a blocking fashion.
             Default is True.
@@ -351,8 +413,12 @@ def cli_draw_drift_data(csv_file: str,
         log_level: level to use for logging. Defaults to INFO.
     """
     log.set_up_logging(log_level=log_level)
-    draw_drift_data(csv_file, desired_offset_unit, desired_rate_unit,
-                    uses_v2, display, cm)
+    if offsets_only:
+        draw_drift_data_offsets(csv_file, desired_offset_unit,
+                                uses_v2, display, cm)
+    else:
+        draw_drift_data_all(csv_file, desired_offset_unit, desired_rate_unit,
+                            uses_v2, display, cm)
 
 
 if __name__ == '__main__':
