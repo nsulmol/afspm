@@ -2,7 +2,7 @@
 
 import logging
 import pytest
-import typing
+import tempfile
 
 from afspm.components.scan import metadata
 from afspm.io import common
@@ -48,7 +48,8 @@ def control_state():
 
 @pytest.fixture
 def fake_metadata_writer(control_state):
-    csv_attribs = csv.CSVAttributes(filepath='/tmp/fake_metadata_path.csv')
+    csv_attribs = csv.CSVAttributes(filepath=tempfile.gettempdir() +
+                                    '/fake_metadata_path.csv')
     return FakeMetadataWriter(csv_attribs=csv_attribs,
                               control_state=control_state, name='fakewriter')
 
