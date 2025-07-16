@@ -377,7 +377,7 @@ def load_scans_from_file(scan_path: str) -> list[scan_pb2] | None:
             # To workaround this, we swap the axes back. The more 'proper' fix
             # would be to simple perform an np.flip(m, 0) rather than these
             # operations.
-            ds = ds.swapaxes()
+            ds = ds.swapaxes(0, 1)
 
             scan = conv.convert_sidpy_to_scan_pb2(ds)
 
