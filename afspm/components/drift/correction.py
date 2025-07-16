@@ -183,6 +183,7 @@ def estimate_correction_from_snapshot(drift_snapshot: DriftSnapshot,
     Given a DriftSnapshot and prior CorrectionInfo, we estimate the parameters
     for CorrectionInfo. This process is somewhat complicated:
 
+    # TODO: UPDATE ME.
     1. We estimate the drift rate based on the correction vector and the
     two timestamps. This is the detected drift rate due to this snapshot.
     2. Then, we need to account for any time overlap between our snapshot and
@@ -216,14 +217,6 @@ def estimate_correction_from_snapshot(drift_snapshot: DriftSnapshot,
     if corr_info is None:  # No fancy correction needed, snapshot says all
         return CorrectionInfo(drift_snapshot.dt2, snapshot_vec,
                               snapshot_drift_rate, drift_snapshot.unit)
-
-    # Account for temporal overlap (if applicable)
-    if corr_info.curr_dt is not None and drift_snapshot.dt2 is not None:
-        overlap_time_delta_s = (corr_info.curr_dt - drift_snapshot.dt1
-                                ).total_seconds()
-        if overlap_time_delta_s > 0:  # There was overlap
-            overlap_vec = snapshot_drift_rate * overlap_time_delta_s
-            snapshot_vec -= overlap_vec
 
     # To calculate the proper correction info, we need to estimate the
     # 'actual' vector, by adding the snapshot vector to the assumed vector,
