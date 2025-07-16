@@ -368,6 +368,17 @@ def load_scans_from_file(scan_path: str) -> list[scan_pb2] | None:
         scans = []
         ts = get_file_modification_datetime(scan_path)
         for ds in datasets:
+            # BUG WORKAROUND: scifireaders does not properly load the
+            # scan data! The data is read originally in the same manner
+            # as gwyddion, which causes the origin to be misplaced. In an
+            # attempt to fix this, the IgorIBWReader performs np.rot90(m, 3),
+            # i.e. rotates by 90 \deg 3x counter-clockwise. This *mostly* works,
+            # except that it swaps the axes!
+            # To workaround this, we swap the axes back. The more 'proper' fix
+            # would be to simple perform an np.flip(m, 0) rather than these
+            # operations.
+            ds = ds.swapaxes()
+
             scan = conv.convert_sidpy_to_scan_pb2(ds)
 
             # BUG WORKAROUND: scifireaders does not properly read the
