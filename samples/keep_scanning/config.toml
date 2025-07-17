@@ -85,7 +85,7 @@ url = 'xop_url'
 timeout_s = 20  # 4x the request timeout
 
 # ----- Components ----- #
-[exp_data]  # NOTE: this could have been hardcoded, really.
+[exp_data]
 class = 'experiment.ExperimentData'
 scan_origin = 'full_scan_origin'
 scan_size = 'full_scan_size'
