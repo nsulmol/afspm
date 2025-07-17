@@ -20,6 +20,7 @@ class ExperimentData:
     scan_origin: tuple[float, float]
     scan_size: tuple[float, float]
     length_units: str
+    angular_units: str = 'degrees'
     scan_res: tuple[int, int]
     scan_wait_s: float
 
@@ -49,6 +50,7 @@ def get_next_scan_params(component: AfspmComponent,
     scan_params = create_scan_params_2d(exp_data.scan_origin,
                                         exp_data.scan_size,
                                         exp_data.length_units,
-                                        data_shape=exp_data.scan_res)
+                                        exp_data.angular_units,
+                                        exp_data.scan_res)
     exp_data.scan_sleep_ts = time.time()
     return scan_params
