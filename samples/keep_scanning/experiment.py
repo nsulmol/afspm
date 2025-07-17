@@ -20,9 +20,9 @@ class ExperimentData:
     scan_origin: tuple[float, float]
     scan_size: tuple[float, float]
     length_units: str
-    angular_units: str = 'degrees'
     scan_res: tuple[int, int]
     scan_wait_s: float
+    angular_units: str = 'degrees'
 
     scan_sleep_ts: float = None
 
