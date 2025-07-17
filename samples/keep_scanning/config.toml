@@ -11,13 +11,25 @@ router_url = "tcp://127.0.0.1:6667"
 xop_url = 'tcp://127.0.0.1:5555'  # To be used on zmq-xop server startup in Igor
 rescan_url = "tcp://127.0.0.1:9005"
 
-channel_id = 'HeightRetrace'  # TODO: Update as needed.
 request_timeout_ms = 5000  # Need a very long timeout for asylum...
 
+# --- Experiment Scan Aspects --- #
+# - Physical Stuff - #
+our_phys_units = 'um'
+full_scan_origin = [0, 0]
+full_scan_size = [5, 5]
+
+# - Data Stuff - #
+data_units = 'pixels'
+full_scan_res = [128, 128]
+
+channel_id = 'HeightRetrace'
+
+
 # ----- Cache Logic ----- #
-[pbc_scan_logic]  # Set default scan cache to 3
+[pbc_scan_logic]
 class = 'afspm.io.pubsub.logic.pbc_logic.PBCScanLogic'
-default_scan_history = 3
+default_scan_history = 5
 
 [cache_kwargs]
 cache_logic = 'pbc_scan_logic'
@@ -75,7 +87,10 @@ timeout_s = 20  # 4x the request timeout
 # ----- Components ----- #
 [exp_data]  # NOTE: this could have been hardcoded, really.
 class = 'experiment.ExperimentData'
-scan_id = 'Scan2d'
+scan_origin = 'full_scan_origin'
+scan_size = 'full_scan_size'
+length_units = 'our_phys_units'
+scan_res = 'full_scan_res'
 
 [experiment]
 class = 'afspm.components.scan.handler.ScanningComponent'
@@ -84,7 +99,7 @@ component = true
 subscriber = 'sub'
 control_client = 'client'
 
-rerun_wait_s = 300  # 5 minutes
+rerun_wait_s = 60  # 1 min
 get_next_params = 'experiment.get_next_scan_params'
 next_params_kwargs = {'exp_data'= 'exp_data'}
 
@@ -113,7 +128,7 @@ channel_id = 'channel_id'
 [rescanner]
 component = true
 class = 'afspm.components.drift.rescanner.DriftRescanner'
-rerun_wait_s = 5
+rerun_wait_s = 60  # 1 min
 subscriber = 'rescan_sub'  # Listen to rescan requests
 control_client = 'client'
 
