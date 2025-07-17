@@ -37,8 +37,8 @@ ANGLE_FIELD = 'angle'  # Used to check if an angle is set in scan_params
 PLT_LAYOUT = 'constrained'
 
 
-# Update weight for averaging new data, which means no averaging in this case.
-DEFAULT_UPDATE_WEIGHT = 1.0
+# Update weight for averaging new data
+DEFAULT_UPDATE_WEIGHT = 0.95
 
 
 def get_converted_and_updated_vec(corr_info: correction.CorrectionInfo,
