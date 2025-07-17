@@ -699,8 +699,8 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
             # Tell our scan handler to rescan prior region.
             logger.warning('True vs. expected scans are too far apart. '
                            'Sending scan params out via our publisher.')
-            true_params = true_scan.params
-            self.publisher.send_msg(true_params)
+            scs_params = uncorrected_scan.params
+            self.publisher.send_msg(scs_params)
 
     def _handle_shutdown(self):
         """Override to send kill via publisher (if provided)."""
