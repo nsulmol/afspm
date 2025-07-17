@@ -91,6 +91,7 @@ scan_origin = 'full_scan_origin'
 scan_size = 'full_scan_size'
 length_units = 'our_phys_units'
 scan_res = 'full_scan_res'
+scan_wait_s = 900  # 15 mins
 
 [experiment]
 class = 'afspm.components.scan.handler.ScanningComponent'
