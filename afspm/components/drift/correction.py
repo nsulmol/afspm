@@ -31,14 +31,14 @@ class CorrectionInfo:
 
     curr_dt: dt.datetime = None
     vec: np.ndarray = field(default_factory=lambda: NO_VEC)
-    drift_rate: np.ndarray = field(default_factory=lambda: NO_VEC)
+    rate: np.ndarray = field(default_factory=lambda: NO_VEC)
     unit: str | None = DEFAULT_UNIT
 
     def __eq__(self, other):
         """Proper comparison operator."""
         return (self.curr_dt == other.curr_dt and
                 np.all(np.isclose(self.vec, other.vec)) and
-                np.all(np.isclose(self.drift_rate, other.drift_rate)) and
+                np.all(np.isclose(self.rate, other.rate)) and
                 self.unit == other.unit)
 
 
@@ -102,24 +102,21 @@ def compute_drift_snapshot(scan1: scan_pb2.Scan2d,
     transform, score = drift.estimate_transform(drift_model, patch1, patch2,
                                                 display_fit,
                                                 figure=figure)
-
-    # NOTE: We are doing -trans because we want to *correct* for the drift
-    # detected.
     if score <= max_score:
         trans, units = drift.get_translation(da2, transform)
         trans *= 1 / scale  # Update the transform given the scaling
         drift_snapshot = DriftSnapshot(
             scan1.timestamp.ToDatetime(dt.timezone.utc),
             scan2.timestamp.ToDatetime(dt.timezone.utc),
-            -trans,
+            trans,
             units)  # Units from da2
         return drift_snapshot
     return None
 
 
-def get_drift_rate(vec: np.ndarray, dt1: dt.datetime, dt2: dt.datetime
-                   ) -> np.ndarray:
-    """Estimate drift rate from vector and timestamps."""
+def get_rate(vec: np.ndarray, dt1: dt.datetime, dt2: dt.datetime
+             ) -> np.ndarray:
+    """Estimate vector rate of change given vector and timestamps."""
     if dt2 is None or dt1 is None:
         return NO_VEC
 
@@ -133,11 +130,11 @@ def get_drift_rate(vec: np.ndarray, dt1: dt.datetime, dt2: dt.datetime
         return NO_VEC
 
 
-def estimate_correction_vec(drift_rate: np.ndarray,
+def estimate_correction_vec(rate: np.ndarray,
                             dt1: dt.datetime, dt2: dt.datetime) -> np.ndarray:
-    """Estimate a correction vector given a drift rate and two DateTimes.
+    """Estimate a correction vector given a rate and two DateTimes.
 
-    This is a correction vector *only* considering drift rate. Thus, it only
+    This is a correction vector *only* considering rate. Thus, it only
     gives the 'current snapshot' of drift, and should eventually be combined
     with a running count of the correction vector to get a total correction.
 
@@ -146,7 +143,7 @@ def estimate_correction_vec(drift_rate: np.ndarray,
     if dt1 is None or dt2 is None:
         return NO_VEC
 
-    return drift_rate * (dt2 - dt1).total_seconds()
+    return rate * (dt2 - dt1).total_seconds()
 
 
 def estimate_correction_no_snapshot(corr_info: CorrectionInfo | None,
@@ -154,7 +151,7 @@ def estimate_correction_no_snapshot(corr_info: CorrectionInfo | None,
                                     ) -> CorrectionInfo | None:
     """Estimate CorrectionInfo when no snapshot was detected.
 
-    We update the CorrectionInfo considering the drift rate and time of
+    We update the CorrectionInfo considering the rate and time of
     the prior CorrectionInfo.
 
     Args:
@@ -169,9 +166,9 @@ def estimate_correction_no_snapshot(corr_info: CorrectionInfo | None,
     if corr_info is None:
         return None
 
-    drift_vec = estimate_correction_vec(corr_info.drift_rate,
+    drift_vec = estimate_correction_vec(corr_info.rate,
                                         corr_info.curr_dt, curr_dt)
-    return CorrectionInfo(curr_dt, drift_vec, corr_info.drift_rate,
+    return CorrectionInfo(curr_dt, drift_vec, corr_info.rate,
                           corr_info.unit)
 
 
@@ -183,22 +180,16 @@ def estimate_correction_from_snapshot(drift_snapshot: DriftSnapshot,
     Given a DriftSnapshot and prior CorrectionInfo, we estimate the parameters
     for CorrectionInfo. This process is somewhat complicated:
 
-    # TODO: UPDATE ME.
-    1. We estimate the drift rate based on the correction vector and the
-    two timestamps. This is the detected drift rate due to this snapshot.
-    2. Then, we need to account for any time overlap between our snapshot and
-    the prior CorrectionInfo. It is possible that our snapshot's first scan
-    predates the time of our last CorrectionInfo. We need to subtract the
-    proportion of the vector associated with this time overlap. We accomplish
-    that by using the snapshot drift rate to estimate the overlap vector (and
-    then subtracting it).
-    3. This updated snapshot now represents the proper 'delta' vector on top
+    1. We estimate the rate based on the correction vector and the
+    two timestamps. This is the detected rate due to this snapshot (after
+    negation, since we are *correcting* for the detected drift).
+    2. This snapshot now represents the proper 'delta' vector on top
     of the correction that has already been done. The true vector
     is the snapshot vector + the 'assumed' vector. The assumed vector is the
     correction vector we had already applied based on our prior
-    CorrectionInfo's drift rate and the time between the last scan and this
+    CorrectionInfo's rate and the time between the last scan and this
     scan.
-    4. The actual drift rate is then calculated considering the 'actual'
+    4. The actual rate is then calculated considering the 'actual'
     vector and the time delta.
 
     Args:
@@ -209,25 +200,28 @@ def estimate_correction_from_snapshot(drift_snapshot: DriftSnapshot,
     Returns:
         CorrectionInfo.
     """
-    snapshot_vec = drift_snapshot.vec
-    snapshot_drift_rate = get_drift_rate(snapshot_vec,
-                                         drift_snapshot.dt1,
-                                         drift_snapshot.dt2)
+    # NOTE: we do negative here because we are *correcting* for the detected
+    # drift.
+    snapshot_correction_vec = -drift_snapshot.vec
+    snapshot_correction_rate = get_rate(snapshot_correction_vec,
+                                        drift_snapshot.dt1,
+                                        drift_snapshot.dt2)
 
     if corr_info is None:  # No fancy correction needed, snapshot says all
-        return CorrectionInfo(drift_snapshot.dt2, snapshot_vec,
-                              snapshot_drift_rate, drift_snapshot.unit)
+        return CorrectionInfo(drift_snapshot.dt2, snapshot_correction_vec,
+                              snapshot_correction_rate,
+                              drift_snapshot.unit)
 
     # To calculate the proper correction info, we need to estimate the
     # 'actual' vector, by adding the snapshot vector to the assumed vector,
     # i.e. the translation we already did due to our assumed drift.
-    assumed_vec = estimate_correction_vec(corr_info.drift_rate,
+    assumed_vec = estimate_correction_vec(corr_info.rate,
                                           corr_info.curr_dt,
                                           drift_snapshot.dt2)
 
-    actual_vec = assumed_vec + snapshot_vec
-    actual_rate = get_drift_rate(actual_vec, corr_info.curr_dt,
-                                 drift_snapshot.dt2)
+    actual_vec = assumed_vec + snapshot_correction_vec
+    actual_rate = get_rate(actual_vec, corr_info.curr_dt,
+                           drift_snapshot.dt2)
     return CorrectionInfo(drift_snapshot.dt2, actual_vec, actual_rate,
                           drift_snapshot.unit)
 
@@ -246,12 +240,12 @@ def update_total_correction(total_corr_info: CorrectionInfo | None,
     For the updating, we also consider a 'weight' applied to the new data vs.
     the old data. The operation is essentially:
         updated_val = (1 - weight) * old_val + weight * new_val
-    and is applied both to the drift rate and the update vector. A value of 1.0
-    would mean we completely disregard prior drift rates in our calculations. A
+    and is applied both to the rate and the update vector. A value of 1.0
+    would mean we completely disregard prior rates in our calculations. A
     value of 0.5 would mean we average them with equal weights.
 
     For the vector, our update val considers the prior 'assumed' vector
-    (considering the time delta and old drift rate) and the latest vector.
+    (considering the time delta and old rate) and the latest vector.
     The weighted result is added to the current 'total' vector (which contains
     the total drift vector over the experiment).
 
@@ -262,7 +256,7 @@ def update_total_correction(total_corr_info: CorrectionInfo | None,
             estimation. If None, we return None (latest_corr_info being None
             implies that total_corr_info must be None, as the former was
             calculated from the latter).
-        update_weight: how much to weight the new drift rate and vector vs.
+        update_weight: how much to weight the new rate and vector vs.
             the prior one.
 
     Returns:
@@ -274,18 +268,18 @@ def update_total_correction(total_corr_info: CorrectionInfo | None,
     if total_corr_info is None:  # First time setting corr_info
         return latest_corr_info
 
-    assumed_vec = estimate_correction_vec(total_corr_info.drift_rate,
+    assumed_vec = estimate_correction_vec(total_corr_info.rate,
                                           total_corr_info.curr_dt,
                                           latest_corr_info.curr_dt)
     update_vec = ((1 - update_weight) * assumed_vec +
                   update_weight * latest_corr_info.vec)
     vec = total_corr_info.vec + update_vec
 
-    drift_rate = ((1 - update_weight) * total_corr_info.drift_rate +
-                  update_weight * latest_corr_info.drift_rate)
+    rate = ((1 - update_weight) * total_corr_info.rate +
+            update_weight * latest_corr_info.rate)
 
     return CorrectionInfo(latest_corr_info.curr_dt,
-                          vec, drift_rate, latest_corr_info.unit)
+                          vec, rate, latest_corr_info.unit)
 
 
 def extract_patch(da: xr.DataArray,

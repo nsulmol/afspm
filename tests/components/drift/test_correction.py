@@ -118,7 +118,7 @@ def expected_snapshot():
     return correction.DriftSnapshot(
         dt.datetime(1970, 1, 1, tzinfo=dt.timezone.utc),
         dt.datetime(1970, 1, 1, tzinfo=dt.timezone.utc),
-        np.array([-2.65830923e-07, -4.33944069e-08]),
+        np.array([2.65830923e-07, 4.33944069e-08]),
         'm')
 
 
@@ -167,38 +167,38 @@ def dt2():  # 1 second longer than dt1
     return dt.datetime(1970, 1, 1, 0, 0, 1, tzinfo=dt.timezone.utc)
 
 
-def test_get_drift_rate(test_vec, dt1, dt2):
+def test_get_rate(test_vec, dt1, dt2):
     start_dts = [dt1, None, None]
     end_dts = [None, dt2, None]
 
     logger.info("Assert if we feed one or both dts as None, we get NO_VEC.")
     for start_dt, end_dt in zip(start_dts, end_dts):
-        ret_vec = correction.get_drift_rate(test_vec, start_dt, end_dt)
+        ret_vec = correction.get_rate(test_vec, start_dt, end_dt)
         assert np.all(np.isclose(ret_vec, correction.NO_VEC))
 
     logger.info("Assert if we feed reasonable values we get a reasonable "
                 "drift rate.")
-    ret_vec = correction.get_drift_rate(test_vec, dt1, dt2)
+    ret_vec = correction.get_rate(test_vec, dt1, dt2)
     assert np.all(np.isclose(ret_vec, test_vec))  # test_vec / 1 is test_vec
 
     logger.info("Assert we get NO_VEC for zero division.")
-    ret_vec = correction.get_drift_rate(test_vec, dt1, dt1)
+    ret_vec = correction.get_rate(test_vec, dt1, dt1)
     assert np.all(np.isclose(ret_vec, correction.NO_VEC))
 
 
 def test_estimate_correction_vec(test_vec, dt1, dt2):
-    drift_rate = correction.get_drift_rate(test_vec, dt1, dt2)
+    rate = correction.get_rate(test_vec, dt1, dt2)
 
     start_dts = [dt1, None, None]
     end_dts = [None, dt2, None]
 
     logger.info("Assert if we feed one or both dts as None, we get NO_VEC.")
     for start_dt, end_dt in zip(start_dts, end_dts):
-        ret_vec = correction.estimate_correction_vec(drift_rate, start_dt,
+        ret_vec = correction.estimate_correction_vec(rate, start_dt,
                                                      end_dt)
         assert np.all(np.isclose(ret_vec, correction.NO_VEC))
 
-    ret_vec = correction.estimate_correction_vec(drift_rate, dt1, dt2)
+    ret_vec = correction.estimate_correction_vec(rate, dt1, dt2)
     assert np.all(np.isclose(ret_vec, test_vec))  # vec -> rate -> vec
 
 
@@ -249,36 +249,46 @@ def old_corr_info(dt1, drift_rate, unit):
 
 @pytest.fixture
 def expected_corr_info(dt2, unit):
-    # with 1.0 nm / s drift rate over 0.25 s overlap, we get 0.25 nm,
-    # which we subtract from the snapshot vec to get 0.75 nm.
-    # The assumed vec, given 0.1 nm / s over 0.25 s overlap, is 0.025 nm.
-    # The actual vec then becomes 0.85 nm + 0.025 nm = 0.825 nm.
-    vec = np.array([0.825, 0.0])
-    # The rate is computed as 0.825 nm / (1 s - 0.25 s) = 1.1 nm
-    rate = np.array([1.1, 0.0])
+    # with 1.0 m / s drift rate over 0.75s, we get 0.075 m for the assumed
+    # vec. This gets added to our current correction vec, which is -1.0,
+    # leaving -0.925 m as the actual vec.
+    vec = np.array([-0.925, -0.0])
+    # The computed drift rate of this is -0.925 m / 0.75 s = -1.233 m/s
+    rate = np.array([-1.233333, -0.0])
     return correction.CorrectionInfo(dt2, vec, rate, unit)
 
 
 def test_estimate_correction_from_snapshot(test_vec, dt1, dt2, dt_between,
                                            unit, old_corr_info,
                                            expected_corr_info):
+    # [1.0, 0.0] m over 1 s, so rate should be [1.0, 0.0] m/s
     snapshot = correction.DriftSnapshot(dt1, dt2, test_vec, unit)
 
     logger.info('Test only drift snapshot provided.')
     corr_info = correction.estimate_correction_from_snapshot(snapshot, None)
-    exp_corr_info = correction.CorrectionInfo(snapshot.dt2, snapshot.vec,
-                                              snapshot.vec, snapshot.unit)
+    exp_corr_info = correction.CorrectionInfo(snapshot.dt2, -snapshot.vec,
+                                              -snapshot.vec, snapshot.unit)
     assert corr_info == exp_corr_info
 
     logger.info('Test a case with no time overlap.')
+    # test_vec = [1.0, 0.0] m
+    # old_corr_info = [0.75, 0.0] m with drift rate [0.1, 0.0] m/s
+    # snapshot is [1.0, 0.0] m/s
     corr_info = correction.estimate_correction_from_snapshot(snapshot,
                                                              old_corr_info)
-    expected_vec = old_corr_info.drift_rate + test_vec
+    # Since snapshot becomes negative (because are correcting for it!), we
+    # subtract it here.
+    expected_vec = old_corr_info.rate - test_vec
+    # so  0.1 - 1.0 = -0.9
     exp_corr_info = correction.CorrectionInfo(snapshot.dt2, expected_vec,
                                               expected_vec, snapshot.unit)
     assert corr_info == exp_corr_info
 
     logger.info('Test a case *with* time overlap.')
+    # Time overlap is not an issue for us. We assume we have properly corrected
+    # at each step, so the process for this should be the same as the above.
+    # However, since we are dealing with a less simple time delta (0.75s), the
+    # math gets less pleasant.
     old_corr_info.curr_dt = dt_between
     corr_info = correction.estimate_correction_from_snapshot(snapshot,
                                                              old_corr_info)

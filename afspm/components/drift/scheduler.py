@@ -244,7 +244,7 @@ class CSCorrectedRouter(router.ControlRouter):
         if self._corr_info is not None:
             # We want SCS -> PCS
             self._corr_info.vec = -self._corr_info.vec
-            self._corr_info.drift_rate = -self._corr_info.drift_rate
+            self._corr_info.rate = -self._corr_info.rate
 
         self._update_weight = update_weight
 
@@ -433,11 +433,11 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     DEFAULT_GRAB_OLDEST = True
 
     CSV_FIELDS_V1 = ['timestamp', 'filename', 'pcs_to_scs_trans',
-                     'pcs_to_scs_units', 'pcs_to_scs_drift_rate',
+                     'pcs_to_scs_units', 'pcs_to_scs_rate',
                      'scan_matched']
     CSV_FIELDS_V2 = ['datetime', 'filename',
-                     'drift_offset_x', 'drift_offset_y', 'drift_offset_units',
-                     'drift_rate_x', 'drift_rate_y', 'drift_rate_units',
+                     'corr_offset_x', 'corr_offset_y', 'corr_offset_units',
+                     'corr_rate_x', 'corr_rate_y', 'corr_rate_units',
                      'scan_matched']
     DEFAULT_SPAWN_DELAY_S = 5.0  # Slow startup.
     DEFAULT_BEAT_PERIOD_S = 3.0  # Slow beat.
@@ -653,7 +653,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
             logger.debug('The PCS-to-SCS correction vector has changed'
                          f': {self.total_corr_info.vec} '
                          f'{self.total_corr_info.unit}.')
-            logger.debug(f'With drift rate: {self.total_corr_info.drift_rate} '
+            logger.debug(f'With corr rate: {self.total_corr_info.rate} '
                          f'{self.total_corr_info.unit} / s.')
 
     def _update_io(self):
@@ -717,7 +717,7 @@ def get_metadata_row_v1(scan: scan_pb2.Scan2d,
                 scan.filename,
                 corr_info.vec if corr_info is not None else None,
                 corr_info.unit if corr_info is not None else None,
-                corr_info.drift_rate if corr_info is not None else None,
+                corr_info.rate if corr_info is not None else None,
                 estimated_from_vec]
     return row_vals
 
@@ -731,8 +731,8 @@ def get_metadata_row_v2(scan: scan_pb2.Scan2d,
                 corr_info.vec[0] if corr_info is not None else None,
                 corr_info.vec[1] if corr_info is not None else None,
                 corr_info.unit if corr_info is not None else None,
-                corr_info.drift_rate[0] if corr_info is not None else None,
-                corr_info.drift_rate[1] if corr_info is not None else None,
+                corr_info.rate[0] if corr_info is not None else None,
+                corr_info.rate[1] if corr_info is not None else None,
                 corr_info.unit + '/s' if corr_info is not None else None,
                 estimated_from_vec]
     return row_vals
