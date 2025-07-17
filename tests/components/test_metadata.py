@@ -3,6 +3,7 @@
 import logging
 import pytest
 import tempfile
+import datetime as dt
 
 from afspm.components.scan import metadata
 from afspm.io import common
@@ -21,7 +22,7 @@ class FakeMetadataWriter(metadata.ScanMetadataWriter):
         """Initialize the writer. Same as parent, but no csv stuff."""
         self.csv_attribs = csv_attribs
         super().__init__(csv_attribs, **kwargs)
-        self.control_state = control_state
+        self.official_control_state = control_state
 
 
 # ----- Fixtures ----- #
@@ -59,23 +60,36 @@ def test_writing(fake_metadata_writer, scan_2d, spec_1d, control_state):
     logger.info('Validate that we can write scan params and probe position.')
 
     rows = fake_metadata_writer._get_metadata_row(scan_2d)
-    exp_rows = [0, 'oh bai', 'banana',
-                control_pb2.ControlMode.CM_AUTOMATED,
-                'id0', str([control_pb2.ExperimentProblem.EP_NONE])]
+    exp_rows = [scan_2d.timestamp.ToDatetime(dt.timezone.utc).isoformat(),
+                'oh bai', 'banana',
+                common.get_enum_str(control_pb2.ControlMode,
+                                    control_pb2.ControlMode.CM_AUTOMATED),
+                'id0',
+                common.get_enum_str(control_pb2.ExperimentProblem,
+                                    control_pb2.ExperimentProblem.EP_NONE)]
     assert rows == exp_rows
 
     rows = fake_metadata_writer._get_metadata_row(spec_1d)
-    exp_rows = [0, 'oh hai', 'hammock',
-                control_pb2.ControlMode.CM_AUTOMATED,
-                'id0', str([control_pb2.ExperimentProblem.EP_NONE])]
+    exp_rows = [spec_1d.timestamp.ToDatetime(dt.timezone.utc).isoformat(),
+                'oh hai', 'hammock',
+                common.get_enum_str(control_pb2.ControlMode,
+                                    control_pb2.ControlMode.CM_AUTOMATED),
+                'id0',
+                common.get_enum_str(control_pb2.ExperimentProblem,
+                                    control_pb2.ExperimentProblem.EP_NONE)]
     assert rows == exp_rows
 
     control_state.problems_set[:] =[
         control_pb2.ExperimentProblem.EP_TIP_SHAPE_CHANGED]
     fake_metadata_writer.control_state = control_state
 
-    exp_rows = [0, 'oh hai', 'hammock',
-                control_pb2.ControlMode.CM_AUTOMATED, 'id0',
-                str([control_pb2.ExperimentProblem.EP_TIP_SHAPE_CHANGED])]
+    exp_rows = [spec_1d.timestamp.ToDatetime(dt.timezone.utc).isoformat(),
+                'oh hai', 'hammock',
+                common.get_enum_str(control_pb2.ControlMode,
+                                    control_pb2.ControlMode.CM_AUTOMATED),
+                'id0',
+                common.get_enum_str(
+                    control_pb2.ExperimentProblem,
+                    control_pb2.ExperimentProblem.EP_TIP_SHAPE_CHANGED)]
     rows = fake_metadata_writer._get_metadata_row(spec_1d)
     assert rows == exp_rows
