@@ -14,6 +14,7 @@ from afspm.utils import log
 
 from afspm.io.protos.generated import scan_pb2
 
+
 logger = logging.getLogger(log.LOGGER_ROOT + '.scripts.drift.' + __name__)
 
 
@@ -34,21 +35,13 @@ class OfflineCSScheduler(scheduler.CSCorrectedScheduler):
     position of the next scan. So in principle we are only measuring
     drift snapshots between scans.
 
-    We add two parameters for our 'faking':
+    We add a parameter for our 'faking':
        cache_size: indicate the size of the cache for scans. Note that this
             is the simplest cache, i.e. we are not caching based on regions
             or anything like this.
-       fake_correction: whether or not we allow the correction to occur
-            between scans, *as if* we had corrected the scans. Note that this
-            will give incorrect estimates in most cases, since the correction
-            *did not* occur. The possible exception here would be if you
-            input the exact same parameters as were used during an online run,
-            where correction *was* enabled. Basically, only use this if you
-            *REALLY* know hwat you are doing.
     """
 
     def __init__(self, channel_id: str, cache_size: int,
-                 fake_correction: bool = False,
                  drift_model: drift.DriftModel | None = None,
                  csv_attribs: csv.CSVAttributes =
                  scheduler.CSCorrectedScheduler.DEFAULT_CSV_ATTRIBUTES,
@@ -66,7 +59,6 @@ class OfflineCSScheduler(scheduler.CSCorrectedScheduler):
                  **kwargs):
         """Initialize our correction scheduler."""
         self.channel_id = channel_id.upper()
-        self.fake_correction = fake_correction
         self.drift_model = (drift.create_drift_model() if drift_model is None
                             else drift_model)
         self.csv_attribs = csv_attribs
@@ -81,7 +73,7 @@ class OfflineCSScheduler(scheduler.CSCorrectedScheduler):
         self.total_corr_info = None
         self.grab_oldest_match = grab_oldest_match
         self.figure = None
-        self.display_fit = False
+        self.display_fit = True  # TODO: HACK
         self.publisher = None
 
         # Warn user if using default fitting score and not RANSAC fitting
@@ -109,9 +101,8 @@ class OfflineCSScheduler(scheduler.CSCorrectedScheduler):
         Or at least, this is the default behaviour, since we are offline...
         """
         super().update(new_scan)
-        if not self.fake_correction:
-            # Reset offset every time, since we cannot really fix this...
-            self.total_corr_info = None
+        # Reset offset every time, since we cannot really fix this...
+        self.total_corr_info = None
 
     def _update_io(self):
         pass
@@ -122,8 +113,7 @@ class OfflineCSScheduler(scheduler.CSCorrectedScheduler):
 
 def run_drift_estimation_on_dir(scan_dir: str, scan_ext: str,
                                 cache_size: int, channel_id: str,
-                                csv_filename: str = DEFAULT_CSV,
-                                fake_correction: bool = False):
+                                csv_filename: str = DEFAULT_CSV):
     """Run drift estimation on scans in directory, outputting results to csv.
 
     This method will grab all scans in scan_dir with extension scan_ext, and
@@ -136,10 +126,6 @@ def run_drift_estimation_on_dir(scan_dir: str, scan_ext: str,
         cache_size: size of prior scans cache, used to determine the first
             scan we compare it to.
         csv_filename: desired output filename of CSV file.
-        fake_correction: whether or not to act as if our feedback loop is
-            working, i.e. the prior correction is used on the current scan.
-            This is not possible with an offline run, so should almost
-            always be False.
     """
     if scan_ext not in MAP_EXT_FILE_LOADER:
         logger.error(f'No file loader in MAP_EXT_FILE_LOADER for {scan_ext}.')
@@ -150,8 +136,7 @@ def run_drift_estimation_on_dir(scan_dir: str, scan_ext: str,
 
     csv_attribs = csv.CSVAttributes(os.path.join(scan_dir, csv_filename))
     scheduler = OfflineCSScheduler(channel_id, cache_size,
-                                   csv_attribs=csv_attribs,
-                                   fake_correction=fake_correction)
+                                   csv_attribs=csv_attribs)
 
     filenames = [f for f in sorted(os.listdir(scan_dir))
                  if f.endswith(scan_ext)]
@@ -160,6 +145,7 @@ def run_drift_estimation_on_dir(scan_dir: str, scan_ext: str,
         scans = load_scans(os.path.join(scan_dir, fn))
         desired_scan = [scan for scan in scans
                         if channel_id in scan.channel.upper()][0]
+
         scheduler.update(desired_scan)
         scheduler.update_cache(desired_scan)
 
@@ -167,7 +153,6 @@ def run_drift_estimation_on_dir(scan_dir: str, scan_ext: str,
 def cli_run_drift_estimation_on_dir(scan_dir: str, scan_ext: str,
                                     cache_size: int, channel_id: str,
                                     csv_filename: str = DEFAULT_CSV,
-                                    fake_correction: bool = False,
                                     log_level: str = logging.INFO):
     """Run drift estimation on scans in directory, outputting results to csv.
 
@@ -181,15 +166,11 @@ def cli_run_drift_estimation_on_dir(scan_dir: str, scan_ext: str,
         cache_size: size of prior scans cache, used to determine the first
             scan we compare it to.
         csv_filename: desired output filename of CSV file.
-        fake_correction: whether or not to act as if our feedback loop is
-            working, i.e. the prior correction is used on the current scan.
-            This is not possible with an offline run, so should almost
-            always be False.
         log_level: level to use for logging. Defaults to INFO.
     """
     log.set_up_logging(log_level=log_level)
     run_drift_estimation_on_dir(scan_dir, scan_ext, cache_size, channel_id,
-                                csv_filename, fake_correction)
+                                csv_filename)
 
 
 if __name__ == '__main__':
