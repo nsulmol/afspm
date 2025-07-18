@@ -58,7 +58,10 @@ class AsylumTranslator(ct.ConfigTranslator):
         _old_saving_mode: the prior SavingMode state.
         _old_scanning_mode: the prior state of whether or not we were scanning
             1x per request.
-        _save_spec_probe_pos: ProbePosition of XY position when last spec was
+        _latest_scan_params: ScanParameters2d from when last scan was
+            done. Needed in order to create Scan2d from saved file, as the
+            metadata (oddly) does not appear to store the XY origin.
+        _latest_probe_pos: ProbePosition of XY position when last spec was
             done. Needed in order to create Spec1d from saved file, as the
             metadata (oddly) does not appear to store the XY position.
     """
@@ -98,10 +101,12 @@ class AsylumTranslator(ct.ConfigTranslator):
         self._old_spec_path = None
         self._old_spec = None
 
-        self._save_spec_probe_pos = None
+        self._latest_scan_params = None
+        self._latest_probe_pos = None
 
         self._old_saving_mode = None
         self._old_scanning_mode = None
+
         # Default initialization of handler
         kwargs = self._init_handlers(xop_client, param_handler, action_handler,
                                      **kwargs)
@@ -260,7 +265,8 @@ class AsylumTranslator(ct.ConfigTranslator):
         if (scan_path and not self._old_scan_path or
                 scan_path != self._old_scan_path):
             self._old_scan_path = scan_path
-            scans = load_scans_from_file(scan_path)
+            scans = load_scans_from_file(scan_path,
+                                         self._latest_scan_params)
             if not scans:
                 return self._old_scans
             self._old_scans = scans
@@ -272,7 +278,8 @@ class AsylumTranslator(ct.ConfigTranslator):
 
         if (spec_path and not self._old_spec_path or
                 spec_path != self._old_spec_path):
-            spec = load_spec_from_file(spec_path, self._save_spec_probe_pos)
+            spec = load_spec_from_file(spec_path,
+                                       self._latest_probe_pos)
             if spec:
                 self._old_spec_path = spec_path
                 self._old_spec = spec
@@ -296,10 +303,11 @@ class AsylumTranslator(ct.ConfigTranslator):
         if action.action == MicroscopeAction.START_SCAN:
             self.param_handler._call_method(params.SET_BASENAME_METHOD,
                                             (self.SCAN_PREFIX,))
+            self._latest_scan_params = self.poll_scan_params()
         elif action.action == MicroscopeAction.START_SPEC:
             self.param_handler._call_method(params.SET_BASENAME_METHOD,
                                             (self.SPEC_PREFIX,))
-            self._save_spec_probe_pos = self.poll_probe_pos()
+            self._latest_spec_probe_pos = self.poll_probe_pos()
         return super().on_action_request(action)
 
 
@@ -345,11 +353,14 @@ def convert_sidpy_to_spec_pb2(ds_dict: dict[str, sidpy.Dataset],
     return spec
 
 
-def load_scans_from_file(scan_path: str) -> list[scan_pb2] | None:
+def load_scans_from_file(scan_path: str, scan_params: scan_pb2.ScanParameters2d
+                         ) -> list[scan_pb2] | None:
     """Load Asylum scan, filling in info possible from file only.
 
     Args:
         scan_path: path to the scan.
+        scan_params: latest scan parameters, necessary to update the
+            origin (as the scan does not seem to record this information).
 
     Returns:
         loaded scans in scan_pb2 format (one scan per channel). None if
@@ -392,6 +403,11 @@ def load_scans_from_file(scan_path: str) -> list[scan_pb2] | None:
             # to be anyway.
             scan.params.spatial.length_units = 'm'
 
+            # TODO: Need to add X/Y offset! This does not seem to
+            # be properly recorded in the scan metadata :(.
+            scan.params.spatial.roi.top_left.CopyFrom(
+                scan_params.spatial.roi.top_left)
+
             # Set ROI angle, timestamp, file
             scan.params.spatial.roi.angle = ds.original_metadata[
                 SCAN_ATTRIB_ANGLE]
@@ -426,6 +442,7 @@ def load_spec_from_file(fname: str,
         spec = convert_sidpy_to_spec_pb2(ds_dict, probe_pos)
         spec.timestamp.FromDatetime(ts)
         spec.filename = fname
+
         return spec
     except Exception:
         logger.error(f'Could not read spec fname {fname}.'
