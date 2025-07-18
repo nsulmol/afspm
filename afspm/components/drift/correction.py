@@ -203,11 +203,11 @@ def estimate_correction_from_snapshot(drift_snapshot: DriftSnapshot,
     # NOTE: we do negative here because we are *correcting* for the detected
     # drift.
     snapshot_correction_vec = -drift_snapshot.vec
-    snapshot_correction_rate = get_rate(snapshot_correction_vec,
-                                        drift_snapshot.dt1,
-                                        drift_snapshot.dt2)
 
     if corr_info is None:  # No fancy correction needed, snapshot says all
+        snapshot_correction_rate = get_rate(snapshot_correction_vec,
+                                            drift_snapshot.dt1,
+                                            drift_snapshot.dt2)
         return CorrectionInfo(drift_snapshot.dt2, snapshot_correction_vec,
                               snapshot_correction_rate,
                               drift_snapshot.unit)
