@@ -1,6 +1,7 @@
 """Handles device communication with aslyum research controllers."""
 
 import os
+import copy
 import logging
 import glob
 import SciFiReaders as sr
@@ -265,8 +266,8 @@ class AsylumTranslator(ct.ConfigTranslator):
         if (scan_path and not self._old_scan_path or
                 scan_path != self._old_scan_path):
             self._old_scan_path = scan_path
-            scans = load_scans_from_file(scan_path,
-                                         self._latest_scan_params)
+            scans = load_scans_from_file_and_correct_params(
+                scan_path, self._latest_scan_params)
             if not scans:
                 return self._old_scans
             self._old_scans = scans
@@ -353,14 +354,58 @@ def convert_sidpy_to_spec_pb2(ds_dict: dict[str, sidpy.Dataset],
     return spec
 
 
-def load_scans_from_file(scan_path: str, scan_params: scan_pb2.ScanParameters2d
-                         ) -> list[scan_pb2] | None:
-    """Load Asylum scan, filling in info possible from file only.
+def load_scans_from_file_and_correct_params(scan_path: str,
+                                            scan_params:
+                                            scan_pb2.ScanParameters2d | None
+                                            ) -> list[scan_pb2.Scan2d] | None:
+    """Load Asylum scan and update scan_params.
 
     Args:
         scan_path: path to the scan.
         scan_params: latest scan parameters, necessary to update the
             origin (as the scan does not seem to record this information).
+            If None, we do not update the loaded scan's params.
+
+    Returns:
+        loaded scans in scan_pb2 format (one scan per channel). None if
+        dataset is empty or failure loading scan.
+    """
+    scans = load_scans_from_file(scan_path)
+    if scan_params:
+        return correct_scan_params(scans, scan_params)
+    return scans
+
+
+def correct_scan_params(scans: list[scan_pb2],
+                        scan_params: scan_pb2.ScanParameters2d
+                        ) -> list[scan_pb2.Scan2d]:
+    """Correct the scans with updated scan params.
+
+    Args:
+        scans: list of scan_pb2.Scan2ds to correct.
+        scan_params: latest scan parameters, necessary to update the
+            origin (as the scan does not seem to record this information).
+
+    Returns:
+        corrected scans.
+    """
+    corrected_scans = []
+    for scan in scans:
+        corrected_scan = copy.deepcopy(scan)
+        # TODO: Need to add X/Y offset! This does not seem to
+        # be properly recorded in the scan metadata :(.
+        corrected_scan.params.spatial.roi.top_left.CopyFrom(
+            scan_params.spatial.roi.top_left)
+        corrected_scans.append(corrected_scan)
+    return corrected_scans
+
+
+def load_scans_from_file(scan_path: str
+                         ) -> list[scan_pb2.Scan2d] | None:
+    """Load Asylum scan, filling in info possible from file only.
+
+    Args:
+        scan_path: path to the scan.
 
     Returns:
         loaded scans in scan_pb2 format (one scan per channel). None if
@@ -402,11 +447,6 @@ def load_scans_from_file(scan_path: str, scan_params: scan_pb2.ScanParameters2d
             # length_units as 'm', which is what IBW files appear
             # to be anyway.
             scan.params.spatial.length_units = 'm'
-
-            # TODO: Need to add X/Y offset! This does not seem to
-            # be properly recorded in the scan metadata :(.
-            scan.params.spatial.roi.top_left.CopyFrom(
-                scan_params.spatial.roi.top_left)
 
             # Set ROI angle, timestamp, file
             scan.params.spatial.roi.angle = ds.original_metadata[
