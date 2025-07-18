@@ -73,7 +73,7 @@ class OfflineCSScheduler(scheduler.CSCorrectedScheduler):
         self.total_corr_info = None
         self.grab_oldest_match = grab_oldest_match
         self.figure = None
-        self.display_fit = True  # TODO: HACK
+        self.display_fit = False
         self.publisher = None
 
         # Warn user if using default fitting score and not RANSAC fitting
