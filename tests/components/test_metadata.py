@@ -12,6 +12,7 @@ from afspm.utils import csv
 from afspm.io.protos.generated import control_pb2
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import spec_pb2
+from afspm.io.protos.generated import geometry_pb2
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ class FakeMetadataWriter(metadata.ScanMetadataWriter):
 # ----- Fixtures ----- #
 @pytest.fixture
 def scan_2d():
-    scan_params = common.create_scan_params_2d([0, 0], [200, 300],
+    scan_params = common.create_scan_params_2d([1.0, -5.0], [200, 300],
                                                'nm')
     return scan_pb2.Scan2d(params=scan_params, channel='banana',
                            filename='oh bai')
@@ -36,7 +37,11 @@ def scan_2d():
 
 @pytest.fixture
 def spec_1d():
-    return spec_pb2.Spec1d(type='hammock', filename='oh hai')
+    probe_pos = spec_pb2.ProbePosition(point=geometry_pb2.Point2d(x=-1.0,
+                                                                  y=5.0),
+                                       units='nm')
+    return spec_pb2.Spec1d(position=probe_pos, type='hammock',
+                           filename='oh hai')
 
 
 @pytest.fixture
@@ -62,6 +67,9 @@ def test_writing(fake_metadata_writer, scan_2d, spec_1d, control_state):
     rows = fake_metadata_writer._get_metadata_row(scan_2d)
     exp_rows = [scan_2d.timestamp.ToDatetime(dt.timezone.utc).isoformat(),
                 'oh bai', 'banana',
+                scan_2d.params.spatial.roi.top_left.x,
+                scan_2d.params.spatial.roi.top_left.y,
+                scan_2d.params.spatial.length_units,
                 common.get_enum_str(control_pb2.ControlMode,
                                     control_pb2.ControlMode.CM_AUTOMATED),
                 'id0',
@@ -72,6 +80,8 @@ def test_writing(fake_metadata_writer, scan_2d, spec_1d, control_state):
     rows = fake_metadata_writer._get_metadata_row(spec_1d)
     exp_rows = [spec_1d.timestamp.ToDatetime(dt.timezone.utc).isoformat(),
                 'oh hai', 'hammock',
+                spec_1d.position.point.x, spec_1d.position.point.y,
+                spec_1d.position.units,
                 common.get_enum_str(control_pb2.ControlMode,
                                     control_pb2.ControlMode.CM_AUTOMATED),
                 'id0',
@@ -85,11 +95,14 @@ def test_writing(fake_metadata_writer, scan_2d, spec_1d, control_state):
 
     exp_rows = [spec_1d.timestamp.ToDatetime(dt.timezone.utc).isoformat(),
                 'oh hai', 'hammock',
+                spec_1d.position.point.x, spec_1d.position.point.y,
+                spec_1d.position.units,
                 common.get_enum_str(control_pb2.ControlMode,
                                     control_pb2.ControlMode.CM_AUTOMATED),
                 'id0',
                 common.get_enum_str(
                     control_pb2.ExperimentProblem,
                     control_pb2.ExperimentProblem.EP_TIP_SHAPE_CHANGED)]
+
     rows = fake_metadata_writer._get_metadata_row(spec_1d)
     assert rows == exp_rows

@@ -22,7 +22,7 @@ CLIENT_IN_CONTROL_ID = 'client_in_control_id'
 
 
 class ScanMetadataWriter(afspmc.AfspmComponentBase):
-    """Saves scan info into a metadata file, for later filtering.
+    """Saves scan/spec info into a metadata file, for later filtering.
 
     The ScanMetadataWriter concerns itself with storing the 'context' around
     all scans performed during an experiment. In doing so, it allows filtering
@@ -31,7 +31,7 @@ class ScanMetadataWriter(afspmc.AfspmComponentBase):
     done to fix the PID feedback loop, if it was determined to be faulty).
 
     This data is stored in a single comma-separated value (CSV) file per
-    experiment. Any scripting service could then be used to move/filter the
+    experiment. Any scripting language could then be used to move/filter the
     data of interest accordingly.
 
     Note that we explicitly *do not* interfere with the scan saving procedure
@@ -42,11 +42,17 @@ class ScanMetadataWriter(afspmc.AfspmComponentBase):
     of both of these reasons, we resort to simply logging context.
 
     Currently, we store the following:
-    # datetime, filename, channel, control_mode, client_id, problems_set
-    Note that the datetime is in UTC.
+    # datetime, filename, channel, position_x, position_y, position_units,
+    # control_mode, client_id, problems_set
 
-    Note that problems_set is an array. We convert it into a str when writing.
-    It can be converted back into an array via ast.literal_eval().
+    Note:
+    - The datetime is in UTC.
+    - That problems_set is an array. We convert it into a composite str when
+    writing, so something like [EP_THERMAL_DRIFT, EP_TIP_SHAPE_CHANGED]
+    becomes 'EP_THERMAL_DRIFT-EP_TIP_SHAPE_CHANGED'.
+    - position_x/_y/_units refer to the position of the scan/spec within the
+    piezo scanner range. It appears some microscopes do not store this
+    information when saving scans/specs!
 
     Attributes:
         csv_attribs: attributes associated with the csv file we will be saving
@@ -55,8 +61,9 @@ class ScanMetadataWriter(afspmc.AfspmComponentBase):
             saving.
     """
 
-    CSV_FIELDS = ['datetime', 'filename', 'channel/type', 'control_mode',
-                  'last_client_id', 'problems_set']
+    CSV_FIELDS = ['datetime', 'filename', 'channel/type',
+                  'position_x', 'position_y', 'position_units',
+                  'control_mode', 'last_client_id', 'problems_set']
 
     DEFAULT_CSV_ATTRIBS = csv.CSVAttributes('scan_metadata.csv')
     SCANNING_STATES = [scan_pb2.ScopeState.SS_SCANNING,
@@ -121,9 +128,14 @@ class ScanMetadataWriter(afspmc.AfspmComponentBase):
     @staticmethod
     def _get_scan_metadata(scan: scan_pb2.Scan2d) -> list[Any]:
         return [scan.timestamp.ToDatetime(dt.timezone.utc).isoformat(),
-                scan.filename, scan.channel]
+                scan.filename, scan.channel,
+                scan.params.spatial.roi.top_left.x,
+                scan.params.spatial.roi.top_left.y,
+                scan.params.spatial.length_units]
 
     @staticmethod
     def _get_spec_metadata(spec: spec_pb2.Spec1d) -> list[Any]:
         return [spec.timestamp.ToDatetime(dt.timezone.utc).isoformat(),
-                spec.filename, spec.type]
+                spec.filename, spec.type,
+                spec.position.point.x, spec.position.point.y,
+                spec.position.units]
