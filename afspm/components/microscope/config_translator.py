@@ -2,6 +2,7 @@
 
 from abc import ABCMeta
 import logging
+import copy
 from google.protobuf.message import Message
 
 from ...io.pubsub import publisher as pub
@@ -51,6 +52,15 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
     MicroscopeTranslatorBase do nothing here (since they are already
     handled by the ActionHandler). Overriding them will not do anything.
 
+    For scan/spec reading: many microscopes do not actually store the position
+    in the scanner range where the collection occurred! For our experiments, we
+    want this information. Thus, in this base translator we (a) keep the latest
+    scan_params/probe_pos, and (b) have helpers to update the loaded scan/spec
+    with this info. These are correct_scan() and correct_spec(), respectively;
+    they both also add timestamps. You should use these *even if* your
+    microscope does store this information, since the coordinate system we
+    use to store this info may be different from your microscopes.
+
     NOTE: implementing poll_scope_state() is a bit particular; please
     review poll_scope_state's pydoc in translator.py. ConfigTranslator uses a
     variable self.detects_moving to determine if it should call
@@ -66,6 +76,13 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         detects_moving: whether or not the controller can detect SS_MOVING
             events. If False, we will send 'fake' moving events whenever
             the probe position or scan params top-left position change.
+
+        _latest_scan_params: ScanParameters2d from when last scan was
+            done. Needed in order to create Scan2d from saved file, as the
+            metadata (oddly) does not appear to store the XY origin.
+        _latest_probe_pos: ProbePosition of XY position when last spec was
+            done. Needed in order to create Spec1d from saved file, as the
+            metadata (oddly) does not appear to store the XY position.
     """
 
     def __init__(self, name: str, publisher: pub.Publisher,
@@ -90,6 +107,10 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         self.param_handler = param_handler
         self.action_handler = action_handler
         self.detects_moving = detects_moving
+
+        self._latest_scan_params = None
+        self._latest_probe_pos = None
+
         super().__init__(name, publisher, control_server, **kwargs)
         self._validate_required_actions_exist()
 
@@ -248,6 +269,15 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         """
         self._handle_action_not_in_actions(action)
 
+        # Store scan_params / probe_pos on action start (for setting
+        # later). NOTE: we must do this *here* (rather than on any
+        # poll) because the user may change things via the microscope
+        # controller UI (separate from our scripts and guardrails).
+        if action.action == actions.MicroscopeAction.START_SCAN:
+            self._latest_scan_params = self.poll_scan_params()
+        elif action.action == actions.MicroscopeAction.START_SPEC:
+            self._latest_probe_pos = self.poll_probe_pos()
+
         try:
             self.action_handler.request_action(action.action)
         except actions.ActionNotSupportedError:
@@ -360,3 +390,64 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
     def on_stop_spec(self) -> control_pb2.ControlResponse:
         """Do nothing - handled by ActionHandler."""
         pass
+
+
+# ----- Scan2d / Spec1d Corrector Helper Methods ----- #
+def correct_scan(scan: scan_pb2,
+                 scan_params: scan_pb2.ScanParameters2d
+                 ) -> list[scan_pb2.Scan2d]:
+    """Correct a scan with provided scan params and timestamp info.
+
+    Note that the main attribute we need to correct here is the top-left
+    position of the spatial region of interest, as this is what does not
+    appear to be stored by any microscope scan format. We assume the other
+    parameters (physical size, digital resolution) are stored properly.
+    However, to ensure we do not run into units issues, we copy the full
+    *spatial* portion of the scan.
+
+    Args:
+        scan: scan_pb2.Scan2d to correct.
+        scan_params: latest scan parameters, necessary to update the
+            origin (as the scan does not seem to record this information).
+
+    Returns:
+        corrected scan.
+    """
+    corrected_scan = copy.deepcopy(scan)
+
+    if not scan_params:
+        logger.error('Trying to correct Scan2d without ScanParameters2d!'
+                     'We should not have received a scan without scan params!')
+
+    # Scan params update of spatial info
+    corrected_scan.params.spatial.CopyFrom(scan_params.spatial)
+    # Timestamp update
+    ts = translator.get_file_modification_datetime(scan.filename)
+    corrected_scan.timestamp.FromDatetime(ts)
+    return corrected_scan
+
+
+def correct_spec(spec: spec_pb2.Spec1d,
+                 probe_pos: spec_pb2.ProbePosition | None
+                 ) -> spec_pb2.Spec1d:
+    """Correct a spec with provided probe position and timestamp info.
+
+    Args:
+        spec: spec_pb2.Spec1d to correct.
+        probe_pos: latest probe position, used to update.
+
+    Returns:
+        Corrected spec.
+    """
+    corrected_spec = copy.deepcopy(spec)
+
+    if not probe_pos:
+        logger.error('Trying to correct Spec1d without ProbePosition!'
+                     'We should not have received a spec without a position!')
+
+    # Probe position update
+    corrected_spec.position.CopyFrom(probe_pos)
+    # Timestamp update
+    ts = translator.get_file_modification_datetime(spec.filename)
+    corrected_spec.timestamp.FromDatetime(ts)
+    return spec

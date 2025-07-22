@@ -59,12 +59,6 @@ class AsylumTranslator(ct.ConfigTranslator):
         _old_saving_mode: the prior SavingMode state.
         _old_scanning_mode: the prior state of whether or not we were scanning
             1x per request.
-        _latest_scan_params: ScanParameters2d from when last scan was
-            done. Needed in order to create Scan2d from saved file, as the
-            metadata (oddly) does not appear to store the XY origin.
-        _latest_probe_pos: ProbePosition of XY position when last spec was
-            done. Needed in order to create Spec1d from saved file, as the
-            metadata (oddly) does not appear to store the XY position.
     """
 
     DEFAULT_SPAWN_DELAY_S = 5.0  # Slow startup.
@@ -101,9 +95,6 @@ class AsylumTranslator(ct.ConfigTranslator):
         self._old_scans = []
         self._old_spec_path = None
         self._old_spec = None
-
-        self._latest_scan_params = None
-        self._latest_probe_pos = None
 
         self._old_saving_mode = None
         self._old_scanning_mode = None
@@ -266,8 +257,9 @@ class AsylumTranslator(ct.ConfigTranslator):
         if (scan_path and not self._old_scan_path or
                 scan_path != self._old_scan_path):
             self._old_scan_path = scan_path
-            scans = load_scans_from_file_and_correct_params(
-                scan_path, self._latest_scan_params)
+            scans = load_scans_from_file(scan_path)
+            scans = [ct.correct_scan(scan, self._latest_scan_params)
+                     for scan in scans]
             if not scans:
                 return self._old_scans
             self._old_scans = scans
@@ -279,8 +271,8 @@ class AsylumTranslator(ct.ConfigTranslator):
 
         if (spec_path and not self._old_spec_path or
                 spec_path != self._old_spec_path):
-            spec = load_spec_from_file(spec_path,
-                                       self._latest_probe_pos)
+            spec = load_spec_from_file(spec_path)
+            spec = ct.correct_spec(spec, self._latest_probe_pos)
             if spec:
                 self._old_spec_path = spec_path
                 self._old_spec = spec
@@ -304,11 +296,9 @@ class AsylumTranslator(ct.ConfigTranslator):
         if action.action == MicroscopeAction.START_SCAN:
             self.param_handler._call_method(params.SET_BASENAME_METHOD,
                                             (self.SCAN_PREFIX,))
-            self._latest_scan_params = self.poll_scan_params()
         elif action.action == MicroscopeAction.START_SPEC:
             self.param_handler._call_method(params.SET_BASENAME_METHOD,
                                             (self.SPEC_PREFIX,))
-            self._latest_spec_probe_pos = self.poll_probe_pos()
         return super().on_action_request(action)
 
 
@@ -327,14 +317,8 @@ def _init_param_handler(client: XopClient) -> params.AsylumParameterHandler:
 
 
 def convert_sidpy_to_spec_pb2(ds_dict: dict[str, sidpy.Dataset],
-                              probe_pos: spec_pb2.ProbePosition | None
                               ) -> spec_pb2.Spec1d:
-    """Convert a dict of sidpy datasets to a single Spec1d.
-
-    Bizarrely, the XY position of the spectrum is *not* stored in the
-    metadata! So, we receive this as input (and store it in the translator
-    before the spec collection is called).
-    """
+    """Convert a dict of sidpy datasets to a single Spec1d."""
     names = [ds.dim_0.name for ds in ds_dict.values()]
     units = [ds.dim_0.units for ds in ds_dict.values()]
     num_variables = len(ds_dict)
@@ -349,55 +333,8 @@ def convert_sidpy_to_spec_pb2(ds_dict: dict[str, sidpy.Dataset],
                                   data_per_variable=data_per_variable,
                                   names=names, units=units,
                                   values=values)
-    spec = spec_pb2.Spec1d(position=probe_pos,
-                           data=spec_data)
+    spec = spec_pb2.Spec1d(data=spec_data)
     return spec
-
-
-def load_scans_from_file_and_correct_params(scan_path: str,
-                                            scan_params:
-                                            scan_pb2.ScanParameters2d | None
-                                            ) -> list[scan_pb2.Scan2d] | None:
-    """Load Asylum scan and update scan_params.
-
-    Args:
-        scan_path: path to the scan.
-        scan_params: latest scan parameters, necessary to update the
-            origin (as the scan does not seem to record this information).
-            If None, we do not update the loaded scan's params.
-
-    Returns:
-        loaded scans in scan_pb2 format (one scan per channel). None if
-        dataset is empty or failure loading scan.
-    """
-    scans = load_scans_from_file(scan_path)
-    if scan_params:
-        return correct_scan_params(scans, scan_params)
-    return scans
-
-
-def correct_scan_params(scans: list[scan_pb2],
-                        scan_params: scan_pb2.ScanParameters2d
-                        ) -> list[scan_pb2.Scan2d]:
-    """Correct the scans with updated scan params.
-
-    Args:
-        scans: list of scan_pb2.Scan2ds to correct.
-        scan_params: latest scan parameters, necessary to update the
-            origin (as the scan does not seem to record this information).
-
-    Returns:
-        corrected scans.
-    """
-    corrected_scans = []
-    for scan in scans:
-        corrected_scan = copy.deepcopy(scan)
-        # TODO: Need to add X/Y offset! This does not seem to
-        # be properly recorded in the scan metadata :(.
-        corrected_scan.params.spatial.roi.top_left.CopyFrom(
-            scan_params.spatial.roi.top_left)
-        corrected_scans.append(corrected_scan)
-    return corrected_scans
 
 
 def load_scans_from_file(scan_path: str
@@ -461,14 +398,11 @@ def load_scans_from_file(scan_path: str
 
 
 def load_spec_from_file(fname: str,
-                        probe_pos: spec_pb2.ProbePosition | None
                         ) -> spec_pb2.Spec1d | None:
     """Load Spec1d from provided filename (None on failure).
 
     Args:
         fname: path to spec file.
-        probe_pos: probe position of the spec. Strangely, this is not stored in
-            the file, so it must be provided if we are to add it to Spec1d.
 
     Returns:
         Spec1d if loaded properly, None if spec file was empty or exception
@@ -478,9 +412,7 @@ def load_spec_from_file(fname: str,
         reader = sr.IgorIBWReader(fname)
         ds_dict = reader.read(verbose=False)
 
-        ts = get_file_modification_datetime(fname)
-        spec = convert_sidpy_to_spec_pb2(ds_dict, probe_pos)
-        spec.timestamp.FromDatetime(ts)
+        spec = convert_sidpy_to_spec_pb2(ds_dict)
         spec.filename = fname
 
         return spec
