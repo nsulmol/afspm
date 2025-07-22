@@ -2,6 +2,7 @@
 
 import logging
 import pytest
+import tempfile
 import datetime as dt
 import numpy as np
 import copy
@@ -10,10 +11,9 @@ from google.protobuf.timestamp_pb2 import Timestamp
 
 from afspm.components.drift import scheduler
 from afspm.components.drift import correction
-from afspm.components.drift import drift
-from afspm.io.pubsub import cache as pbc
+from afspm.io.pubsub import publisher, subscriber, cache as pbc
 from afspm.io.control import router as ctrl_rtr
-from afspm.io.protos.generated import scan_pb2
+from afspm.io.protos.generated import scan_pb2, geometry_pb2
 from afspm.utils import csv
 
 
@@ -41,38 +41,8 @@ def dt3():
 
 
 @pytest.fixture(autouse=True)
-def vec1():
+def vec():
     return np.array([0.5, 0.5])
-
-
-@pytest.fixture(autouse=True)
-def vec2(vec1):
-    return -vec1
-
-
-@pytest.fixture(autouse=True)
-def vec3():
-    return np.array([1.0, 0])
-
-
-# @pytest.fixture
-# def correction_infos_cancel_out(dt1, dt2, dt3, vec1, vec2, units):
-#     info1 = correction.CorrectionInfo(dt1, dt2, vec1, units)
-#     info2 = correction.CorrectionInfo(dt2, dt3, vec2, units)
-#     infos = deque(maxlen=2)
-#     infos.append(info1)
-#     infos.append(info2)
-#     return infos
-
-
-# @pytest.fixture
-# def correction_infos_no_cancel(dt1, dt2, dt3, vec1, vec3, units):
-#     info1 = correction.CorrectionInfo(dt1, dt2, vec1, units)
-#     info2 = correction.CorrectionInfo(dt2, dt3, vec3, units)
-#     infos = deque(maxlen=2)
-#     infos.append(info1)
-#     infos.append(info2)
-#     return infos
 
 
 @pytest.fixture
@@ -82,7 +52,8 @@ def channel_id():
 
 @pytest.fixture
 def csv_attribs():
-    return csv.CSVAttributes('/tmp/test_scheduler.csv')
+    return csv.CSVAttributes(filepath=tempfile.gettempdir() +
+                             '/test_scheduler.csv')
 
 
 @pytest.fixture
@@ -110,6 +81,11 @@ def router_url():
     return "tcp://127.0.0.1:1113"
 
 
+@pytest.fixture(scope="module")
+def rescan_url():
+    return "tcp://127.0.0.1:1114"
+
+
 # NOTE: I am not using fixtures here because they appeared to cause issues
 # with my monkeypatching of the corrected_scheduler. Additionally, the child
 # router/cache created by CSCorrectedScheduler has the same...everything as
@@ -123,20 +99,30 @@ def create_router(server_url, router_url, ctx):
     return ctrl_rtr.ControlRouter(server_url, router_url, ctx)
 
 
-def create_scheduler(cache, router, csv_attribs, channel_id):
+def create_publisher(rescan_url, ctx):
+    return publisher.Publisher(rescan_url, ctx=ctx)
+
+
+def create_scheduler(cache, router, publisher, csv_attribs, channel_id):
     return scheduler.CSCorrectedScheduler(channel_id=channel_id,
                                           csv_attribs=csv_attribs,
                                           name='scheduler',
                                           pubsubcache=cache,
                                           router=router,
-                                          display_fit=False)
+                                          display_fit=False,
+                                          publisher=publisher)
 
 
-def create_scheduler_and_ios(pub_url, psc_url, server_url, router_url, ctx,
-                             csv_attribs, channel_id):
+def create_scheduler_and_ios(pub_url, psc_url, server_url, router_url,
+                             rescan_url, ctx,
+                             csv_attribs, channel_id, update_weight):
     my_cache = create_cache(pub_url, psc_url, ctx)
     my_router = create_router(server_url, router_url, ctx)
-    my_scheduler = create_scheduler(my_cache, my_router, csv_attribs, channel_id)
+    my_publisher = create_publisher(rescan_url, ctx) if rescan_url else None
+
+    my_scheduler = create_scheduler(my_cache, my_router, my_publisher,
+                                    csv_attribs, channel_id)
+    my_scheduler.update_weight = update_weight
     return my_scheduler
 
 
@@ -145,162 +131,247 @@ def send_empty_scan(self):
     ts = Timestamp()
     ts.FromDatetime(dt.datetime(2025, 1, 1, second=3))
     scan = scan_pb2.Scan2d(timestamp=ts)
+    # We need length_units to have some unit, so we can do conversions
+    # when updating the Scan2d/ScanParameters2d protos.
+    scan.params.spatial.length_units = 'nm'
     self.send_message(scan)
     self.scan_was_received = True
 
 
 @pytest.fixture
-def corr_info(dt1, vec1, unit):
-    return correction.CorrectionInfo(dt1, vec1, vec1, unit)
+def corr_info(dt1, vec, unit):
+    return correction.CorrectionInfo(dt1, vec, vec, unit)
 
-# manually feeding corr_info instead of proto
+
+@pytest.fixture
+def update_weight():
+    return 0.667
+
+
 def fake_update_scheduler(self, corr_info):
-    """Update the correction vector for the scheduler."""
+    """Manually feed corr_info instead of proto."""
     logger.warning('in update!')
     self.total_corr_info = corr_info
     self._update_io()
 
 
-# TODO: uncomment me!
-# def test_hooks_work(pub_url, psc_url, server_url, router_url, ctx, csv_attribs,
-#                     channel_id, corr_info, monkeypatch):
-#     logger.info("Validate that the hooks between scheduler, router, cache all "
-#                 "work.")
-#     monkeypatch.setattr(pbc.PubSubCache, 'poll', send_empty_scan)
-#     monkeypatch.setattr(scheduler.CSCorrectedScheduler, 'update',
-#                         fake_update_scheduler)
-#     my_scheduler = create_scheduler_and_ios(pub_url, psc_url, server_url,
-#                                             router_url, ctx, csv_attribs,
-#                                             channel_id)
+def test_hooks_work(pub_url, psc_url, server_url, router_url, ctx, csv_attribs,
+                    channel_id, corr_info, monkeypatch, update_weight):
+    logger.info("Validate that the hooks between scheduler, router, cache all "
+                "work.")
+    monkeypatch.setattr(pbc.PubSubCache, 'poll', send_empty_scan)
+    monkeypatch.setattr(scheduler.CSCorrectedScheduler, 'update',
+                        fake_update_scheduler)
+    my_scheduler = create_scheduler_and_ios(pub_url, psc_url, server_url,
+                                            router_url, None, ctx, csv_attribs,
+                                            channel_id, update_weight)
 
-#     # Before running, there should be no 'scan_was_received' in cache
-#     assert not hasattr(my_scheduler.pubsubcache, 'scan_was_received')
+    # Before running, there should be no 'scan_was_received' in cache
+    assert not hasattr(my_scheduler.pubsubcache, 'scan_was_received')
 
-#     logger.warning(f'corr_info: {corr_info}')
-#     my_scheduler.update(corr_info)
-#     my_scheduler.run_per_loop()
+    logger.warning(f'corr_info: {corr_info}')
+    my_scheduler.update(corr_info)
+    my_scheduler.run_per_loop()
 
-#     assert hasattr(my_scheduler.pubsubcache, 'scan_was_received')
-#     assert my_scheduler.total_corr_info == corr_info
-#     assert my_scheduler.pubsubcache._corr_info == corr_info
+    assert hasattr(my_scheduler.pubsubcache, 'scan_was_received')
+    assert my_scheduler.total_corr_info == corr_info
 
-#     # neg_corr_info = copy.deepcopy(corr_info)
-#     # neg_corr_info.vec = -neg_corr_info.vec
-#     # neg_corr_info.drift_rate = -neg_corr_info.drift_rate
-#     # assert my_scheduler.router._corr_info == neg_corr_info
+    # Ensure pubsubcache has updated correction params
+    assert my_scheduler.pubsubcache._corr_info == corr_info
+    assert my_scheduler.pubsubcache._update_weight == update_weight
 
-#     # Kill context (needed due to funky lack of pytest fixture)
-#     ctx.destroy()
+    neg_corr_info = copy.deepcopy(corr_info)
+    neg_corr_info.vec = -neg_corr_info.vec
+    neg_corr_info.rate = -neg_corr_info.rate
+    # Ensure router has updated correction params
+    assert my_scheduler.router._corr_info == neg_corr_info
+    assert my_scheduler.router._update_weight == update_weight
 
-
-# TODO: Consider removing/updating!
-# def fake_get_latest_intersection(scans: list[scan_pb2.Scan2d],
-#                                  new_scan: scan_pb2.Scan2d,
-#                                  min_intersection_ratio: float,
-#                                  min_spatial_res_ratio: float,
-#                                  ) -> scan_pb2.Scan2d | None:
-#     return scan_pb2.Scan2d()
+    # Kill context (needed due to funky lack of pytest fixture)
+    ctx.destroy()
 
 
-# def fake_get_no_intersection(scans: list[scan_pb2.Scan2d],
-#                              new_scan: scan_pb2.Scan2d,
-#                              min_intersection_ratio: float,
-#                              min_spatial_res_ratio: float,
-#                              ) -> scan_pb2.Scan2d | None:
-#     return None
+def test_update_curr_corr_info(pub_url, psc_url, server_url, router_url, ctx,
+                               csv_attribs, channel_id, corr_info,
+                               monkeypatch, update_weight, dt1, dt2, vec,
+                               unit):
+    logger.info("Validate corr_info is updated as expected for all cases.")
+    scan = scan_pb2.Scan2d()
+    # We need length_units to have some unit, so we can do conversions
+    # when updating the Scan2d/ScanParameters2d protos.
+    scan.params.spatial.length_units = 'nm'
+    scan.timestamp.FromDatetime(dt2)  # Update timestamp
+
+    logger.info("If no total_corr_info and no snapshot, total_corr_info "
+                "stays None.")
+    my_scheduler = create_scheduler_and_ios(pub_url, psc_url, server_url,
+                                            router_url, None, ctx, csv_attribs,
+                                            channel_id, update_weight)
+    my_scheduler.total_corr_info = None
+    my_scheduler._update_curr_corr_info(scan, None)
+    assert my_scheduler.total_corr_info is None
+
+    logger.info("If total_corr_info and no snapshot, total_corr_info "
+                "updates considering it's drift rate")
+    my_scheduler.total_corr_info = corr_info
+    my_scheduler._update_curr_corr_info(scan, None)
+    # Delta corr info is vec * (dt2 - dt1) = vec
+    # Therefore, total is vec + vec.
+    expected_corr_info = correction.CorrectionInfo(dt2, vec + vec, vec,
+                                                   unit)
+    assert my_scheduler.total_corr_info == expected_corr_info
+
+    logger.info("If no total_corr_info and a snapshot, total_corr_info "
+                "updates to it")
+    my_scheduler.total_corr_info = None
+    snapshot = correction.DriftSnapshot(dt1, dt2, -vec, unit)
+    my_scheduler._update_curr_corr_info(scan, snapshot)
+    # Delta corr info is the negative of the snapshot, so vec. (Remember, our
+    # correction is the negation of the drift we detect via the snapshot).
+    # Therefore, total is vec.
+    expected_corr_info = correction.CorrectionInfo(dt2, vec, vec,
+                                                   unit)
+    assert my_scheduler.total_corr_info == expected_corr_info
+
+    logger.info("If total_corr_info and a snapshot, total_corr_info "
+                "updates considering it's drift rate and the snapshot")
+    my_scheduler.update_weight = 1.0
+    my_scheduler.total_corr_info = corr_info
+    snapshot = correction.DriftSnapshot(dt1, dt2, vec, unit)
+    my_scheduler._update_curr_corr_info(scan, snapshot)
+    # Drift corr info is the negative of the snapshot, so -vec.
+    # Delta corr info is vec from old rate + new vec, so vec - vec = 0.
+    # The total is old corr vec + new vec = old corr vec.
+    expected_corr_info = correction.CorrectionInfo(dt2, vec, [0, 0],
+                                                   unit)
+
+    logger.info("Same as last, but with update_weight=0.9")
+    my_scheduler.update_weight = 0.9
+    my_scheduler.total_corr_info = corr_info
+    logger.warning(f'corr_info: {corr_info}')  # TODO Remove me
+    snapshot = correction.DriftSnapshot(dt1, dt2, vec, unit)
+    my_scheduler._update_curr_corr_info(scan, snapshot)
+    # Drift corr info is the negative of the snapshot, so -vec.
+    # Delta corr info is vec from old rate + new vec, so vec - vec = 0.
+    # The total is:
+    # a)  update_vec = (1-w) * (old rate * del_t) + w * new vec = 0.1 * vec.
+    # b)  old_vec + update_vec = 1.1 * vec
+    expected_corr_info = correction.CorrectionInfo(dt2, 1.1 * vec, 0.1 * vec,
+                                                   unit)
+    assert my_scheduler.total_corr_info == expected_corr_info
+
+    # Kill context (needed due to funky lack of pytest fixture)
+    ctx.destroy()
 
 
-# def fake_compute_correction_info(scan1: scan_pb2.Scan2d,
-#                                  scan2: scan_pb2.Scan2d,
-#                                  drift_model: drift.DriftModel,
-#                                  min_score: float,
-#                                  ) -> correction.CorrectionInfo:
-#     vec = np.array([1.0, 0.5])
-#     return correction.CorrectionInfo(dt1, dt2, vec, unit)
+@pytest.fixture
+def roi1():
+    tl = geometry_pb2.Point2d(x=0, y=0)
+    size = geometry_pb2.Size2d(x=5, y=5)
+    return geometry_pb2.RotRect2d(top_left=tl, size=size)
 
 
-# def test_correction_vec_with_match(pub_url, psc_url, server_url, router_url,
-#                                    ctx, csv_attribs,  monkeypatch):
-#     logger.info("Validate if a match is found, the internal logic works as "
-#                 "expected.")
-#     monkeypatch.setattr(pbc.PubSubCache, 'poll', send_empty_scan)
-#     monkeypatch.setattr(correction, 'get_latest_intersection',
-#                         fake_get_latest_intersection)
-#     monkeypatch.setattr(scheduler, 'compute_correction_info',
-#                         fake_compute_correction_info)
-
-#     my_scheduler = create_scheduler_and_ios(pub_url, psc_url, server_url,
-#                                             router_url, ctx, csv_attribs)
-#     my_scheduler.run_per_loop()
-#     expected_correction_vec = np.array([1.0, 0.5])
-#     assert np.all(np.isclose(my_scheduler.current_correction_vec,
-#                              expected_correction_vec))
-
-#     # Kill context (needed due to funky lack of pytest fixture)
-#     ctx.destroy()
+@pytest.fixture
+def roi2():  # requires rescan
+    tl = geometry_pb2.Point2d(x=-2.5, y=-2.5)
+    size = geometry_pb2.Size2d(x=5, y=5)
+    return geometry_pb2.RotRect2d(top_left=tl, size=size)
 
 
-# def test_correction_vec_no_match(pub_url, psc_url, server_url, router_url,
-#                                  ctx, csv_attribs,  monkeypatch,
-#                                  correction_infos_cancel_out,
-#                                  correction_infos_no_cancel):
-#     logger.info("Validate if a match is *not* found, the internal logic works "
-#                 "as expected.")
-
-#     monkeypatch.setattr(pbc.PubSubCache, 'poll', send_empty_scan)
-#     monkeypatch.setattr(correction, 'get_latest_intersection',
-#                         fake_get_no_intersection)
-
-#     my_scheduler = create_scheduler_and_ios(pub_url, psc_url, server_url,
-#                                             router_url, ctx, csv_attribs)
-
-#     logger.debug("Validate it doesn't crash if we have no correction infos. ")
-#     my_scheduler.run_per_loop()
-#     expected_correction_vec = np.array([0.0, 0.0])
-#     assert np.all(np.isclose(my_scheduler.current_correction_vec,
-#                              expected_correction_vec))
-
-#     logger.debug("Set correction_infos to vals that cancel out.")
-#     my_scheduler.correction_infos = correction_infos_cancel_out
-#     my_scheduler.run_per_loop()
-#     expected_correction_vec = np.array([0.0, 0.0])
-#     assert np.all(np.isclose(my_scheduler.current_correction_vec,
-#                              expected_correction_vec))
-
-#     logger.debug("Set correction_infos to vals that do not.")
-#     my_scheduler.correction_infos = correction_infos_no_cancel
-#     my_scheduler.run_per_loop()
-#     expected_correction_vec = np.array([0.75, 0.25])
-#     assert np.all(np.isclose(my_scheduler.current_correction_vec,
-#                              expected_correction_vec))
-
-#     # Kill context (needed due to funky lack of pytest fixture)
-#     ctx.destroy()
+@pytest.fixture
+def roi3():  # does not require rescan
+    tl = geometry_pb2.Point2d(x=.5, y=.5)
+    size = geometry_pb2.Size2d(x=5, y=5)
+    return geometry_pb2.RotRect2d(top_left=tl, size=size)
 
 
-# def no_compute_correction_info(scan1: scan_pb2.Scan2d,
-#                                scan2: scan_pb2.Scan2d,
-#                                drift_model: drift.DriftModel,
-#                                min_score: float,
-#                                ) -> correction.CorrectionInfo:
-#     return None
+def test_determine_redo_scan(pub_url, psc_url, server_url, router_url, ctx,
+                             rescan_url, csv_attribs, channel_id, corr_info,
+                             monkeypatch, update_weight, dt1, dt2, vec,
+                             unit, roi1, roi2, roi3):
+    logger.info("Ensure we send out redo scans as needed, and the logic is as "
+                "expected.")
+    my_scheduler = create_scheduler_and_ios(pub_url, psc_url, server_url,
+                                            router_url, rescan_url, ctx,
+                                            csv_attribs,
+                                            channel_id, update_weight)
+    my_scheduler.total_corr_info = correction.CorrectionInfo(
+        dt1, np.array([0, 0]), np.array([0, 0]))
+
+    # Set up original 'scan params' request
+    requested_scan_params = scan_pb2.ScanParameters2d()
+    requested_scan_params.spatial.roi.CopyFrom(roi2)
+    my_scheduler.router._last_scan_params = requested_scan_params
+
+    sub = subscriber.Subscriber(rescan_url, ctx=ctx)
+
+    logger.debug("First, perfect intersection scans should not require a rescan.")
+    # Note: corr_info is [0, 0], so there is no difference b/w uncorrected_scan
+    # and true_scan in code.
+    uncorrected_scan = scan_pb2.Scan2d()
+    uncorrected_scan.params.spatial.roi.CopyFrom(roi1)
+    prior_scan = scan_pb2.Scan2d()
+    prior_scan.params.spatial.roi.CopyFrom(roi1)
+
+    my_scheduler._determine_redo_scan(uncorrected_scan, prior_scan)
+    assert sub.poll_and_store() is None
+
+    logger.debug("If we require a rescan, our subscriber receives it.")
+    prior_scan = scan_pb2.Scan2d()
+    prior_scan.params.spatial.roi.CopyFrom(roi2)
+    my_scheduler._determine_redo_scan(uncorrected_scan, prior_scan)
+    received = sub.poll_and_store()
+    __, proto = received[0]  # first received of list of messages
+    assert proto == requested_scan_params
+
+    logger.debug("If the intersection is big enough, no rescan required.")
+    prior_scan = scan_pb2.Scan2d()
+    prior_scan.params.spatial.roi.CopyFrom(roi3)
+    my_scheduler._determine_redo_scan(uncorrected_scan, prior_scan)
+    assert sub.poll_and_store() is None
+
+    # logger.debug("Go back to a rescan case, but let's ensure we send the data "
+    #              "in the sample coordinate system!")
+    # my_scheduler.total_corr_info = correction.CorrectionInfo(
+    #     dt1, np.array([1, 1]), np.array([0, 0]))
+    # prior_scan = scan_pb2.Scan2d()
+    # prior_scan.params.spatial.roi.CopyFrom(roi2)
+    # my_scheduler._determine_redo_scan(uncorrected_scan, prior_scan)
+
+    # expected_params = uncorrected_scan.params
+    # scs_tl = geometry_pb2.Point2d(x=1.0, y=1.0)
+    # expected_params.spatial.roi.top_left.CopyFrom(scs_tl)
+    # received = sub.poll_and_store()
+    # __, proto = received[0]  # first received of list of messages
+    # assert proto == expected_params
+
+    # Kill context (needed due to funky lack of pytest fixture)
+    ctx.destroy()
 
 
-# def test_compute_correction_info_none(pub_url, psc_url, server_url, router_url,
-#                                       ctx, csv_attribs,  monkeypatch):
-#     logger.info("Validate if compute_correction_info returns None all is good.")
+@pytest.fixture
+def filename():
+    return 'filename'
 
-#     monkeypatch.setattr(pbc.PubSubCache, 'poll', send_empty_scan)
-#     monkeypatch.setattr(scheduler, 'get_latest_intersection',
-#                         fake_get_no_intersection)
-#     monkeypatch.setattr(scheduler, 'compute_correction_info',
-#                         no_compute_correction_info)
 
-#     my_scheduler = create_scheduler_and_ios(pub_url, psc_url, server_url,
-#                                             router_url, ctx, csv_attribs)
+def test_metadata_writing(dt1, vec, unit, roi1, filename):
+    logger.info('Ensuring metadata row writing works.')
 
-#     logger.debug("Validate it doesn't crash if we have no correction infos. ")
-#     my_scheduler.run_per_loop()
-#     expected_correction_vec = np.array([0.0, 0.0])
-#     assert np.all(np.isclose(my_scheduler.current_correction_vec,
-#                              expected_correction_vec))
+    corr_info = correction.CorrectionInfo(dt1, vec, -vec, unit)
+
+    scan = scan_pb2.Scan2d()
+    scan.params.spatial.roi.CopyFrom(roi1)
+    scan.filename = filename
+    scan.timestamp.FromDatetime(dt1)
+
+    row_vals = scheduler.get_metadata_row_v2(scan, corr_info, True)
+    expected_row_vals = [dt1.isoformat(), filename, corr_info.vec[0],
+                         corr_info.vec[1], corr_info.unit, corr_info.rate[0],
+                         corr_info.rate[1], corr_info.unit + '/s',
+                         True]
+    assert row_vals == expected_row_vals
+
+    row_vals = scheduler.get_metadata_row_v2(scan, None, True)
+    expected_row_vals = [dt1.isoformat(), filename, None,
+                         None, None, None, None, None, True]
+    assert row_vals == expected_row_vals
