@@ -6,7 +6,6 @@ import glob
 import pandas as pd
 
 from afspm.components.microscope.params import (ParameterHandler,
-                                                MicroscopeParameter,
                                                 DEFAULT_PARAMS_FILENAME)
 from afspm.components.microscope.actions import (ActionHandler,
                                                  DEFAULT_ACTIONS_FILENAME)
@@ -14,9 +13,10 @@ from afspm.components.microscope.translator import (
     get_file_modification_datetime)
 from afspm.components.microscope import config_translator as ct
 from afspm.utils import array_converters as conv
-from afspm.io.protos.generated import geometry_pb2
+
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import spec_pb2
+from afspm.io.protos.generated import control_pb2
 
 import gxsm  # Dynamic DLL, so not in pyproject.
 from gxsmread import read
@@ -212,18 +212,25 @@ class GxsmTranslator(ct.ConfigTranslator):
         return fnames
 
     def _load_scan(self, fname: str) -> scan_pb2.Scan2d | None:
-        """Try to load a scan from a given filename (None on error)."""
-        return load_scan_from_file(
+        """Try to load a scan from a given filename (None on error).
+
+        We also correct the scan here, to ensure the scan params and timestamp
+        are set properly.
+        """
+        scan = load_scan_from_file(
             fname, self.read_channels_config_path,
             self.read_use_physical_units,
             self.read_allow_convert_from_metadata,
             self.read_simplify_metadata)
+        scan = ct.correct_scan(scan, self._latest_scan_params)
+        return scan
 
     def poll_spec(self) -> spec_pb2.Spec1d:
         """Override spec polling."""
         spec_fname = self._get_latest_spec_filename()
         if spec_fname and spec_fname != self.last_spec_fname:
             spec = load_spec_from_file(spec_fname)
+            spec = ct.correct_spec(spec, self._latest_probe_pos)
             if spec:
                 self.last_spec_fname = spec_fname
                 self.old_spec = spec
@@ -247,12 +254,15 @@ class GxsmTranslator(ct.ConfigTranslator):
 
 
 def convert_dataframe_to_spec1d(df: pd.DataFrame) -> spec_pb2.Spec1d:
-    """Convert pandas DataFrame to spec_pb2.Spec1d."""
+    """Convert pandas DataFrame to spec_pb2.Spec1d.
+
+    NOTE: This does *not* contain the proper ProbePosition! The user must
+    modify the ProbePosition to its appropriate value after calling this.
+    """
     point_2d = geometry_pb2.Point2d(x=float(df.attrs[KEY_PROBE_POS_X]),
                                     y=float(df.attrs[KEY_PROBE_POS_Y]))
     probe_pos = spec_pb2.ProbePosition(point=point_2d,
                                        units=df.attrs[KEY_PROBE_POS_UNITS])
-
     units_dict = df.attrs[KEY_UNITS]
     names = list(units_dict.keys())
     units = list(units_dict.values())
@@ -263,8 +273,7 @@ def convert_dataframe_to_spec1d(df: pd.DataFrame) -> spec_pb2.Spec1d:
                                   names=names, units=units,
                                   values=data.ravel().tolist())
 
-    spec = spec_pb2.Spec1d(position=probe_pos,
-                           data=spec_data)
+    spec = spec_pb2.Spec1d(data=spec_data)
     return spec
 
 
@@ -378,9 +387,6 @@ def load_spec_from_file(fname: str) -> spec_pb2.Spec1d | None:
     try:
         df = read.open_spec(fname)
         spec = convert_dataframe_to_spec1d(df)
-
-        ts = get_file_modification_datetime(fname)
-        spec.timestamp.FromDatetime(ts)
         spec.filename = fname
         return spec
     except Exception:
