@@ -200,19 +200,39 @@ class CSCorrectedRouter(router.ControlRouter):
         """Init - this class requires usage of from_parent."""
         self._corr_info = None
         self._update_weight = DEFAULT_UPDATE_WEIGHT
+        self._last_scan_params = None
 
     def _handle_send_req(self, req: control_pb2.ControlRequest,
                          proto: Message) -> (control_pb2.ControlResponse,
                                              Message | int | None):
-        """Override to correct CS data before sending out."""
+        """Override to correct CS data before sending out.
+
+        We also store the latest scan params on success, so we can
+        use these to send rescans. This is important, because these
+        params are in the Sample CS and are the actual requested region.
+        When grabbing from the cache, our regions are the resultant regions,
+        which may include drift!
+        """
+        scan_params = None
+        if isinstance(proto, scan_pb2.ScanParameters2d):
+            scan_params = proto
+
         # TODO: Should we have an option to determine whether or not we
         # correct for drift rate? What if our estimate is poop?
         curr_dt = dt.datetime.now(dt.timezone.utc)
         proto = cs_correct_proto(proto, self._corr_info,
                                  self._update_weight, curr_dt)
 
+        # Get response
+        response, message = super()._handle_send_req(req, proto)
+
+        # Store SCS scan params if we succeeded at setting them.
+        if scan_params and response == control_pb2.ControlResponse.REP_SUCCESS:
+            self._last_scan_params = scan_params
+
         # Send out
-        return super()._handle_send_req(req, proto)
+        return response, message
+
 
     @classmethod
     def from_parent(cls, parent):
@@ -699,8 +719,12 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
             # Tell our scan handler to rescan prior region.
             logger.warning('True vs. expected scans are too far apart. '
                            'Sending scan params out via our publisher.')
-            scs_params = uncorrected_scan.params
-            self.publisher.send_msg(scs_params)
+            scs_params = self.router._last_scan_params
+            if scs_params is None:
+                logger.error('Could not send out last scan params for a '
+                             'rescan because our stored params are None!')
+            else:
+                self.publisher.send_msg(scs_params)
 
     def _handle_shutdown(self):
         """Override to send kill via publisher (if provided)."""
