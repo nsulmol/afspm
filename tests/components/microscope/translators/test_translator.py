@@ -332,7 +332,9 @@ def set_scan_speed(client: ControlClient, scan_speed_nm_s: float):
 def set_scan_params(client: ControlClient,
                     orig_params: scan_pb2.ScanParameters2d,
                     phys_size_nm: Optional[list[float, float]] = None,
-                    data_shape: Optional[list[int, int]] = None):
+                    data_shape: Optional[list[int, int]] = None
+                    ) -> scan_pb2.ScanParameters2d:
+    """Set scan params to provided vals, return set params."""
     desired_params = copy.deepcopy(orig_params)
     if phys_size_nm:
         desired_params.spatial.roi.size.x = phys_size_nm[0]
@@ -346,6 +348,7 @@ def set_scan_params(client: ControlClient,
                 desired_params)
     rep = client.set_scan_params(desired_params)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
+    return desired_params
 
 
 # -------------------- Tests -------------------- #
@@ -469,27 +472,67 @@ def test_scan_params(client, default_control_state,
     stop_client(client)
 
 
+def setup_faster_scan() -> (list[float], list[scan_pb2.ScanParameters2d]):
+    """Set up a faster scan, if params were provided.
+
+    This is a quite-ugly method, I'm sorry about that. But it will store
+    the original scan speed and scan params, and then change these parameters
+    to those requested in the config file (if any are provided). In the end,
+    it will return a list of scan speeds and one of scan params. If no 'faster'
+    scan speed or scan params are provided, the list will be of size 1 and only
+    contain the original.
+
+    Returns:
+        list of [original_scan_speed, current_scan_speed] (only containing
+            original_scan_speed if we did not change).
+        list of [original_scan_params, current_scan_params] (only containing
+            original_scan_params if we did not change).
+    """
+    logger.info("Check if we provided specific scan parameters "
+                "(so the scan is not super long)")
+    scan_speed_tuple = get_config_scan_speed(config_dict, client)
+
+    scan_speeds = [scan_speed_tuple[1]]
+    if scan_speed_tuple:
+        set_scan_speed(client, scan_speed_tuple[0])
+        scan_speeds.append(scan_speed_tuple[0])
+
+    desired_phys_size_nm = get_config_phys_size_nm(config_dict)
+    desired_data_shape = get_config_data_shape(config_dict)
+
+    orig_scan_params = assert_and_return_message(sub_scan_params)
+    scan_paramses = [orig_scan_params]  # Yuck, what a name -- sorry!
+    if desired_phys_size_nm or desired_data_shape:
+        desired_params = set_scan_params(client, orig_scan_params,
+                                         desired_phys_size_nm,
+                                         desired_data_shape)
+        scan_paramses.append(desired_params)
+
+    return scan_speeds, scan_paramses
+
+
+def return_original_scan_settings(
+        orig_scan_speed: float | None,
+        orig_scan_params: scan_pb2.ScanParameters2d | None):
+    """Return scan speed / scan params to original values.
+
+    Basically, we reset the scan speed and scan params to their 'original'
+    values, where these values are provided as input arguments to the method.
+    """
+    if orig_scan_speed or orig_scan_params:
+        logger.info("Reset scan settings to what they were before the test.")
+        if orig_scan_speed:
+            set_scan_speed(client, orig_scan_speed)
+        if orig_scan_params:
+            set_scan_params(client, orig_scan_params)
+
+
 def test_run_scan(client, default_control_state,
                   sub_scan, sub_scope_state, sub_scan_params, timeout_ms,
                   exp_problem, config_dict):
     logger.info("Validate we can start a scan, and receive one on finish.")
     startup_grab_control(client, exp_problem)
-
-    logger.info("First, check if we provided specific scan parameters "
-                "(so the scan is not super long)")
-    scan_speed_tuple = get_config_scan_speed(config_dict, client)
-    orig_scan_speed = None
-    if scan_speed_tuple:
-        orig_scan_speed = scan_speed_tuple[1]
-        set_scan_speed(client, scan_speed_tuple[0])
-
-    desired_phys_size_nm = get_config_phys_size_nm(config_dict)
-    desired_data_shape = get_config_data_shape(config_dict)
-    orig_scan_params = None
-    if desired_phys_size_nm or desired_data_shape:
-        orig_scan_params = assert_and_return_message(sub_scan_params)
-        set_scan_params(client, orig_scan_params, desired_phys_size_nm,
-                        desired_data_shape)
+    scan_speeds, scan_paramses = setup_faster_scan()
 
     logger.info("Flush any scan we have in the cache, and validate "
                 "that we have an initial scope state of SS_FREE.")
@@ -518,13 +561,7 @@ def test_run_scan(client, default_control_state,
     scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
     assert_sub_received_proto(sub_scope_state, scope_state_msg)
 
-    if orig_scan_speed or orig_scan_params:
-        logger.info("Reset scan settings to what they were before the test.")
-        if orig_scan_speed:
-            set_scan_speed(client, orig_scan_speed)
-        if orig_scan_params:
-            set_scan_params(client, orig_scan_params)
-
+    return_original_scan_settings(scan_speeds[0], scan_paramses[0])
     end_test(client)
     stop_client(client)
 
@@ -624,7 +661,7 @@ def test_cancel_spec(client, default_control_state,
     # Checking no spec (hack around, make poll short for this).
     tmp_timeout_ms = sub_spec._poll_timeout_ms
     sub_spec._poll_timeout_ms = timeout_ms
-    sub_spec.poll_and_store()
+    assert not sub_spec.poll_and_store()
     sub_spec._poll_timeout_ms = tmp_timeout_ms  # Return to prior
 
     assert_sub_received_proto(sub_scope_state,
@@ -685,7 +722,7 @@ def test_run_spec(client, default_control_state,
     # Hack around, make poll short for this.
     tmp_timeout_ms = sub_spec._poll_timeout_ms
     sub_spec._poll_timeout_ms = timeout_ms
-    sub_spec.poll_and_store()
+    assert not sub_spec.poll_and_store()
     assert_sub_received_proto(sub_scope_state,
                               scope_state_msg)
     sub_spec._poll_timeout_ms = tmp_timeout_ms  # Return to prior
@@ -708,6 +745,147 @@ def test_run_spec(client, default_control_state,
     stop_client(client)
 
 
+# ----- 'Full Loop' Tests (on scans and specs) ----- #
+def test_scan_coords(client, default_control_state,
+                     sub_scan_params, sub_scope_state, sub_scan,
+                     exp_problem, float_tolerance):
+    logger.info('Validate our read scan contains the physical region.')
+    logger.info('This test will fail if test_run_scan and test_scan_params '
+                'fail.')
+    startup_grab_control(client, exp_problem)
+    # Set up faster scan params / speeds if in config.
+    scan_speeds, scan_paramses = setup_faster_scan()
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_FREE)
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
+
+    # --- Modify scan params --- #
+    # Grab the last params in scan_paramses, which is either the original
+    # ones or what we changed them to in order to scan faster.
+    modified_params = copy.deepcopy(scan_paramses[-1])
+    modified_params.spatial.roi.top_left.x = (
+        modified_params.spatial.roi.size.x * 0.25)
+    modified_params.spatial.roi.top_left.y = (
+        modified_params.spatial.roi.size.y * 0.25)
+    modified_params.spatial.roi.size.x *= 0.5
+    modified_params.spatial.roi.size.y *= 0.5
+
+    rep = client.set_scan_params(modified_params)
+    assert rep == control_pb2.ControlResponse.REP_SUCCESS
+
+    last_params = assert_and_return_message(sub_scan_params)
+    assert check_equal(last_params, modified_params, float_tolerance)
+
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_MOVING)
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_FREE)
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
+
+    # --- Perform a scan --- #
+    # Hack around, make poll short for this.
+    tmp_timeout_ms = sub_scan._poll_timeout_ms
+    sub_scan._poll_timeout_ms = timeout_ms
+    sub_scan.poll_and_store()
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
+    sub_scan._poll_timeout_ms = tmp_timeout_ms  # Return to prior
+
+    rep = client.start_scan()
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_SCANNING)
+    assert rep == control_pb2.ControlResponse.REP_SUCCESS
+    assert_sub_received_proto(sub_scope_state, scope_state_msg)
+
+    logger.info("Wait for a predetermined 'long-enough' period, "
+                "and validate the scan finishes.")
+    # Ensure the scan params in the Scan2d match those we sent!
+    # NOTE: this is not a good practice if using CSCorrectedSchedulder,
+    # as it will be 'correcting' for drift and thus you cannot guarantee
+    # a perfect match. But for this experiment (where we have the base
+    # scheduler), it is ok.
+    scan = assert_and_return_message(sub_scan)
+    assert scan.params == modified_params
+
+    scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
+    assert_sub_received_proto(sub_scope_state, scope_state_msg)
+
+    # --- Cleanup --- #
+    logger.info("At the end, return to our initial parameters.")
+    return_original_scan_settings(scan_speeds[0], scan_paramses[0])
+
+    end_test(client)
+    stop_client(client)
+
+
+def test_spec_coords(client, default_control_state,
+                     sub_probe_pos, sub_spec, sub_scope_state,
+                     sub_scan_params, exp_problem, float_tolerance):
+    logger.info('Validate our read spec contains the physical position.')
+    logger.info('This test will fail if test_run_spec and test_probe_pos fail.')
+
+    startup_grab_control(client, exp_problem)
+
+    # --- Setup --- #
+    logger.info("First, ensure we receive initial ProbePosition, "
+                "ScanParameters2d and that scope state is free.")
+    initial_probe_pos = assert_and_return_message(sub_probe_pos)
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_FREE)
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
+    scan_params = assert_and_return_message(sub_scan_params)
+
+    # Configure probe pos we want (we use scan_params to get the
+    # size of the scan region and set a position based on this).
+    modified_probe_pos = copy.deepcopy(initial_probe_pos)
+    modified_probe_pos.point.x = (
+        scan_params.spatial.roi.size.x * 0.25)
+    modified_probe_pos.point.y = (
+        scan_params.spatial.roi.size.y * 0.25)
+
+    # Checking no spec (hack around, make poll short for this).
+    tmp_timeout_ms = sub_spec._poll_timeout_ms
+    sub_spec._poll_timeout_ms = timeout_ms
+    assert not sub_spec.poll_and_store()
+    sub_spec._poll_timeout_ms = tmp_timeout_ms  # Return to prior
+
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
+
+    # --- Perform Spec --- #
+    logger.info("Validate that we can start a spec collection and  "
+                "are notified collection has begun.")
+    rep = client.start_spec()
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_SPEC)
+    assert rep == control_pb2.ControlResponse.REP_SUCCESS
+    assert_sub_received_proto(sub_scope_state, scope_state_msg)
+
+    logger.info("Wait for a predetermined 'long-enough' period, "
+                "and validate the spec finishes.")
+    spec = assert_and_return_message(sub_spec)
+    assert spec.position == modified_probe_pos
+
+    scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
+    assert_sub_received_proto(sub_scope_state, scope_state_msg)
+
+    # --- Tear Down --- #
+    logger.info("Now, return to our initial parameters.")
+    rep = client.set_probe_pos(initial_probe_pos)
+    assert rep == control_pb2.ControlResponse.REP_SUCCESS
+    last_probe_pos = assert_and_return_message(sub_probe_pos)
+    assert check_equal(last_probe_pos, initial_probe_pos, float_tolerance)
+
+    end_test(client)
+    stop_client(client)
+
+
+# ----- Checking actions and parameters support ----- #
 def test_parameters(client, exp_problem):
     logger.info("Check which parameters are supported via REQ_PARAM.")
     startup_grab_control(client, exp_problem)
