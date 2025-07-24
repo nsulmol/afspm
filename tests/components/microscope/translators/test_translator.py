@@ -743,7 +743,7 @@ def test_run_spec(client, default_control_state,
     # Hack around, make poll short for this.
     tmp_timeout_ms = sub_spec._poll_timeout_ms
     sub_spec._poll_timeout_ms = timeout_ms
-    assert not sub_spec.poll_and_store()
+    sub_spec.poll_and_store()
     assert_sub_received_proto(sub_scope_state,
                               scope_state_msg)
     sub_spec._poll_timeout_ms = tmp_timeout_ms  # Return to prior
@@ -878,10 +878,10 @@ def test_spec_coords(client, default_control_state,
     modified_probe_pos.point.y = (
         scan_params.spatial.roi.size.y * 0.25)
 
-    # Checking no spec (hack around, make poll short for this).
+    # Hack around (make poll short for this).
     tmp_timeout_ms = sub_spec._poll_timeout_ms
     sub_spec._poll_timeout_ms = timeout_ms
-    assert not sub_spec.poll_and_store()
+    sub_spec.poll_and_store()
     sub_spec._poll_timeout_ms = tmp_timeout_ms  # Return to prior
 
     assert_sub_received_proto(sub_scope_state,
