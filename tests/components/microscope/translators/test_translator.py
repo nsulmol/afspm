@@ -769,7 +769,7 @@ def test_run_spec(client, default_control_state,
 # ----- 'Full Loop' Tests (on scans and specs) ----- #
 def test_scan_coords(client, default_control_state,
                      sub_scan_params, sub_scope_state, sub_scan,
-                     exp_problem, float_tolerance):
+                     exp_problem, float_tolerance, config_dict):
     logger.info('Validate our read scan contains the physical region.')
     logger.info('This test will fail if test_run_scan and test_scan_params '
                 'fail.')
