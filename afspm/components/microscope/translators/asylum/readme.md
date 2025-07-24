@@ -104,6 +104,18 @@ afspm/components/microscope/translators/asylum/params.toml
 
 ### Random Crash Igor
 
-I have witnessed Igor/AR.exe crash while running an experiment. It send no error code, and simply closed. I suspect this *might* have something to do with polling parameters too frequently for Igor's expectations.
+I have witnessed Igor/AR.exe crash while running an experiment. It sent no error code, and simply closed. I suspect this *might* have something to do with polling parameters too frequently for Igor's expectations.
 
 I will look into this further and update once fixed.
+
+### Spectroscopy Testing
+
+When running test_translator, I set the 'Trigger Channel' in the Force panel to 'RawZSensor'. When set to the default, it does not work properly. I suspect this has to do with other parameters/settings one would be familiar with when using spectroscopies on Asylum. For testing purposes, it is sufficient to do the above change.
+
+### X Offset / Y Offset UI Bug
+
+When using afspm, changes to scan-top-left-x or scan-top-left-y show up with the set value (in 'm') in the Parms window in AR.exe, but the units indicate it as 'nm'. This is a UI bug: the actual stored value is proper (i.e. in 'm'), it is just the UI that improperly indicates it as being in 'nm'.
+
+### Save Options Switching Between 'Image' and 'Force'
+
+When alternating between saving scans and spectroscopies, the asylum translator will change the base name accordingly ('Image' for scans, 'Force' for spectroscopies). This is useful because both saves have the same extension. However, the change of basename only occurs when a spec or scan is started. Therefore, if the last save was a spec, the base name will be 'Force'. This may cause confusion for a user ending an automated experiment; please keep this in mind.
