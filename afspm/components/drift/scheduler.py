@@ -38,7 +38,7 @@ PLT_LAYOUT = 'constrained'
 
 
 # Update weight for averaging new data
-DEFAULT_UPDATE_WEIGHT = 0.95
+DEFAULT_UPDATE_WEIGHT = 1.00  # No averaging
 
 
 def get_converted_and_updated_vec(corr_info: correction.CorrectionInfo,
