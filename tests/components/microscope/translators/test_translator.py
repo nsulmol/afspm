@@ -830,7 +830,10 @@ def test_scan_coords(client, default_control_state,
     # a perfect match. But for this experiment (where we have the base
     # scheduler), it is ok.
     scan = assert_and_return_message(sub_scan)
-    assert scan.params == modified_params
+    # Confirm parameters match, BUT remember that the received params
+    # have data units set. So we will test everything *except* that.
+    assert scan.params.spatial == modified_params.spatial
+    assert scan.params.data.shape == modified_params.data.shape
 
     scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
     assert_sub_received_proto(sub_scope_state, scope_state_msg)
