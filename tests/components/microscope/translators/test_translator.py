@@ -273,7 +273,7 @@ def assert_and_return_message(sub: Subscriber):
 # ----- test_run_scan specific methods ----- #
 def get_config_scan_speed(config_dict: dict,
                           client: ControlClient
-                          ) -> Optional[tuple[float, float]]:
+                          ) -> list[float]| None:
     """Determines if we are initing scan speed (for a faster scan).
 
     Checks if a desired scan speed was provided via the config, and the client
@@ -285,23 +285,29 @@ def get_config_scan_speed(config_dict: dict,
         client: ControlClient we use to query the MicroscopeTranslator.
 
     Returns:
-        (float, float) tuple, containing (desired_val, init_val).
+        list[float], containing [init_val, desired_val] or [init_val]
+            (if no scan speed key found).
+            If we are unable to even get the init_val, we return None.
     """
+    scan_speeds = []
+
+    # Get init val
+    param_msg = control_pb2.ParameterMsg(
+        parameter=params.MicroscopeParameter.SCAN_SPEED)
+    rep, init_scan_msg = client.request_parameter(param_msg)
+    if rep != control_pb2.ControlResponse.REP_SUCCESS:
+        logger.debug('Unable to get scan speed! Returning None.')
+        return None
+
+    init_val_nm = units.convert(float(init_scan_msg.value),
+                                init_scan_msg.units, 'nm/s')
+    scan_speeds.append(init_val_nm)
+
+    # Get config val
     if SCAN_SPEED_KEY in config_dict:
         desired_param = config_dict[SCAN_SPEED_KEY]
-        param_msg = control_pb2.ParameterMsg(
-            parameter=params.MicroscopeParameter.SCAN_SPEED)
-        rep, init_scan_msg = client.request_parameter(param_msg)
-        if rep == control_pb2.ControlResponse.REP_SUCCESS:
-            init_val_nm = units.convert(float(init_scan_msg.value),
-                                        init_scan_msg.units, 'nm/s')
-            return desired_param, init_val_nm
-        msg = ("Translator failed setting/getting scan speed, "
-               "returned response: ",
-               common.get_enum_str(control_pb2.ControlResponse, rep))
-        logger.error(msg)
-        raise Exception(msg)
-    return None
+        scan_speeds.append(desired_param)
+    return scan_speeds
 
 
 def get_config_phys_size_nm(config_dict: dict) -> Optional[list[float, float]]:
@@ -472,7 +478,8 @@ def test_scan_params(client, default_control_state,
     stop_client(client)
 
 
-def setup_faster_scan() -> (list[float], list[scan_pb2.ScanParameters2d]):
+def setup_faster_scan(config_dict: dict
+                      ) -> (list[float], list[scan_pb2.ScanParameters2d]):
     """Set up a faster scan, if params were provided.
 
     This is a quite-ugly method, I'm sorry about that. But it will store
@@ -490,12 +497,9 @@ def setup_faster_scan() -> (list[float], list[scan_pb2.ScanParameters2d]):
     """
     logger.info("Check if we provided specific scan parameters "
                 "(so the scan is not super long)")
-    scan_speed_tuple = get_config_scan_speed(config_dict, client)
-
-    scan_speeds = [scan_speed_tuple[1]]
-    if scan_speed_tuple:
-        set_scan_speed(client, scan_speed_tuple[0])
-        scan_speeds.append(scan_speed_tuple[0])
+    scan_speeds = get_config_scan_speed(config_dict, client)
+    if len(scan_speeds) == 2:  # We received a desired speed, try to set
+        set_scan_speed(client, scan_speeds[1])
 
     desired_phys_size_nm = get_config_phys_size_nm(config_dict)
     desired_data_shape = get_config_data_shape(config_dict)
@@ -507,11 +511,10 @@ def setup_faster_scan() -> (list[float], list[scan_pb2.ScanParameters2d]):
                                          desired_phys_size_nm,
                                          desired_data_shape)
         scan_paramses.append(desired_params)
-
     return scan_speeds, scan_paramses
 
 
-def return_original_scan_settings(
+def revert_original_scan_settings(
         orig_scan_speed: float | None,
         orig_scan_params: scan_pb2.ScanParameters2d | None):
     """Return scan speed / scan params to original values.
@@ -532,7 +535,7 @@ def test_run_scan(client, default_control_state,
                   exp_problem, config_dict):
     logger.info("Validate we can start a scan, and receive one on finish.")
     startup_grab_control(client, exp_problem)
-    scan_speeds, scan_paramses = setup_faster_scan()
+    scan_speeds, scan_paramses = setup_faster_scan(config_dict)
 
     logger.info("Flush any scan we have in the cache, and validate "
                 "that we have an initial scope state of SS_FREE.")
@@ -561,7 +564,10 @@ def test_run_scan(client, default_control_state,
     scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
     assert_sub_received_proto(sub_scope_state, scope_state_msg)
 
-    return_original_scan_settings(scan_speeds[0], scan_paramses[0])
+    # Return to original scan settings
+    init_scan_speed = scan_speeds[0] if scan_speeds else None
+    init_scan_params = scan_paramses[0] if scan_paramses else None
+    revert_original_scan_settings(init_scan_speed, init_scan_params)
     end_test(client)
     stop_client(client)
 
@@ -754,7 +760,7 @@ def test_scan_coords(client, default_control_state,
                 'fail.')
     startup_grab_control(client, exp_problem)
     # Set up faster scan params / speeds if in config.
-    scan_speeds, scan_paramses = setup_faster_scan()
+    scan_speeds, scan_paramses = setup_faster_scan(config_dict)
     scope_state_msg = scan_pb2.ScopeStateMsg(
         scope_state=scan_pb2.ScopeState.SS_FREE)
     assert_sub_received_proto(sub_scope_state,
@@ -816,7 +822,9 @@ def test_scan_coords(client, default_control_state,
 
     # --- Cleanup --- #
     logger.info("At the end, return to our initial parameters.")
-    return_original_scan_settings(scan_speeds[0], scan_paramses[0])
+    init_scan_speed = scan_speeds[0] if scan_speeds else None
+    init_scan_params = scan_paramses[0] if scan_paramses else None
+    revert_original_scan_settings(init_scan_speed, init_scan_params)
 
     end_test(client)
     stop_client(client)
