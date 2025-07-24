@@ -554,13 +554,13 @@ def test_run_scan(client, default_control_state,
                 "that we have an initial scope state of SS_FREE.")
     scope_state_msg = scan_pb2.ScopeStateMsg(
         scope_state=scan_pb2.ScopeState.SS_FREE)
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
 
     # Hack around, make poll short for this.
     tmp_timeout_ms = sub_scan._poll_timeout_ms
     sub_scan._poll_timeout_ms = timeout_ms
     sub_scan.poll_and_store()
-    assert_sub_received_proto(sub_scope_state,
-                              scope_state_msg)
     sub_scan._poll_timeout_ms = tmp_timeout_ms  # Return to prior
 
     logger.info("Validate that we can start a scan and are notified "
@@ -814,8 +814,6 @@ def test_scan_coords(client, default_control_state,
     tmp_timeout_ms = sub_scan._poll_timeout_ms
     sub_scan._poll_timeout_ms = timeout_ms
     sub_scan.poll_and_store()
-    assert_sub_received_proto(sub_scope_state,
-                              scope_state_msg)
     sub_scan._poll_timeout_ms = tmp_timeout_ms  # Return to prior
 
     rep = client.start_scan()
