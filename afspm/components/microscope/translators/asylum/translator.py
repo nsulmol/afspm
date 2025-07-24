@@ -256,13 +256,12 @@ class AsylumTranslator(ct.ConfigTranslator):
         scan_path = self._get_latest_file(self.SCAN_PREFIX)
         if (scan_path and not self._old_scan_path or
                 scan_path != self._old_scan_path):
-            self._old_scan_path = scan_path
             scans = load_scans_from_file(scan_path)
             scans = [ct.correct_scan(scan, self._latest_scan_params)
                      for scan in scans]
-            if not scans:
-                return self._old_scans
-            self._old_scans = scans
+            if scans:
+                self._old_scan_path = scan_path
+                self._old_scans = scans
         return self._old_scans
 
     def poll_spec(self) -> spec_pb2.Spec1d:
