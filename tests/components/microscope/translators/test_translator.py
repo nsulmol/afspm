@@ -273,7 +273,7 @@ def assert_and_return_message(sub: Subscriber):
 # ----- test_run_scan specific methods ----- #
 def get_config_scan_speed(config_dict: dict,
                           client: ControlClient
-                          ) -> list[float]| None:
+                          ) -> list[float] | None:
     """Determines if we are initing scan speed (for a faster scan).
 
     Checks if a desired scan speed was provided via the config, and the client
@@ -478,7 +478,7 @@ def test_scan_params(client, default_control_state,
     stop_client(client)
 
 
-def setup_faster_scan(config_dict: dict
+def setup_faster_scan(config_dict: dict, client: ControlClient
                       ) -> (list[float], list[scan_pb2.ScanParameters2d]):
     """Set up a faster scan, if params were provided.
 
@@ -488,6 +488,10 @@ def setup_faster_scan(config_dict: dict
     it will return a list of scan speeds and one of scan params. If no 'faster'
     scan speed or scan params are provided, the list will be of size 1 and only
     contain the original.
+
+    Args:
+        config_dict: configuration file, as a dict.
+        client: ControlClient used to communicate with microscope.
 
     Returns:
         list of [original_scan_speed, current_scan_speed] (only containing
@@ -535,7 +539,7 @@ def test_run_scan(client, default_control_state,
                   exp_problem, config_dict):
     logger.info("Validate we can start a scan, and receive one on finish.")
     startup_grab_control(client, exp_problem)
-    scan_speeds, scan_paramses = setup_faster_scan(config_dict)
+    scan_speeds, scan_paramses = setup_faster_scan(config_dict, client)
 
     logger.info("Flush any scan we have in the cache, and validate "
                 "that we have an initial scope state of SS_FREE.")
@@ -760,7 +764,7 @@ def test_scan_coords(client, default_control_state,
                 'fail.')
     startup_grab_control(client, exp_problem)
     # Set up faster scan params / speeds if in config.
-    scan_speeds, scan_paramses = setup_faster_scan(config_dict)
+    scan_speeds, scan_paramses = setup_faster_scan(config_dict, client)
     scope_state_msg = scan_pb2.ScopeStateMsg(
         scope_state=scan_pb2.ScopeState.SS_FREE)
     assert_sub_received_proto(sub_scope_state,
