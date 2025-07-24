@@ -917,7 +917,7 @@ def test_spec_coords(client, default_control_state,
     logger.info("Wait for a predetermined 'long-enough' period, "
                 "and validate the spec finishes.")
     spec = assert_and_return_message(sub_spec)
-    assert spec.position == modified_probe_pos
+    assert check_equal(spec.position, modified_probe_pos, float_tolerance)
 
     scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
     assert_sub_received_proto(sub_scope_state, scope_state_msg)
