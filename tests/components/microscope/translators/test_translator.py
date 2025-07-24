@@ -478,7 +478,8 @@ def test_scan_params(client, default_control_state,
     stop_client(client)
 
 
-def setup_faster_scan(config_dict: dict, client: ControlClient
+def setup_faster_scan(config_dict: dict, client: ControlClient,
+                      sub_scan_params: Subscriber,
                       ) -> (list[float], list[scan_pb2.ScanParameters2d]):
     """Set up a faster scan, if params were provided.
 
@@ -492,6 +493,7 @@ def setup_faster_scan(config_dict: dict, client: ControlClient
     Args:
         config_dict: configuration file, as a dict.
         client: ControlClient used to communicate with microscope.
+        sub_scan_params: Subscriber to ScanParameters2d.
 
     Returns:
         list of [original_scan_speed, current_scan_speed] (only containing
@@ -519,12 +521,18 @@ def setup_faster_scan(config_dict: dict, client: ControlClient
 
 
 def revert_original_scan_settings(
+        client: ControlClient,
         orig_scan_speed: float | None,
         orig_scan_params: scan_pb2.ScanParameters2d | None):
     """Return scan speed / scan params to original values.
 
     Basically, we reset the scan speed and scan params to their 'original'
     values, where these values are provided as input arguments to the method.
+
+    Args:
+        client: ControlClient used to communicate with microscope.
+        orig_scan_speed: original scan speed we wish to return to.
+        orig_scan_params: original ScanParameters2d we wish to return to.
     """
     if orig_scan_speed or orig_scan_params:
         logger.info("Reset scan settings to what they were before the test.")
@@ -539,7 +547,8 @@ def test_run_scan(client, default_control_state,
                   exp_problem, config_dict):
     logger.info("Validate we can start a scan, and receive one on finish.")
     startup_grab_control(client, exp_problem)
-    scan_speeds, scan_paramses = setup_faster_scan(config_dict, client)
+    scan_speeds, scan_paramses = setup_faster_scan(config_dict, client,
+                                                   sub_scan_params)
 
     logger.info("Flush any scan we have in the cache, and validate "
                 "that we have an initial scope state of SS_FREE.")
@@ -571,7 +580,7 @@ def test_run_scan(client, default_control_state,
     # Return to original scan settings
     init_scan_speed = scan_speeds[0] if scan_speeds else None
     init_scan_params = scan_paramses[0] if scan_paramses else None
-    revert_original_scan_settings(init_scan_speed, init_scan_params)
+    revert_original_scan_settings(client, init_scan_speed, init_scan_params)
     end_test(client)
     stop_client(client)
 
@@ -764,7 +773,8 @@ def test_scan_coords(client, default_control_state,
                 'fail.')
     startup_grab_control(client, exp_problem)
     # Set up faster scan params / speeds if in config.
-    scan_speeds, scan_paramses = setup_faster_scan(config_dict, client)
+    scan_speeds, scan_paramses = setup_faster_scan(config_dict, client,
+                                                   sub_scan_params)
     scope_state_msg = scan_pb2.ScopeStateMsg(
         scope_state=scan_pb2.ScopeState.SS_FREE)
     assert_sub_received_proto(sub_scope_state,
@@ -828,7 +838,7 @@ def test_scan_coords(client, default_control_state,
     logger.info("At the end, return to our initial parameters.")
     init_scan_speed = scan_speeds[0] if scan_speeds else None
     init_scan_params = scan_paramses[0] if scan_paramses else None
-    revert_original_scan_settings(init_scan_speed, init_scan_params)
+    revert_original_scan_settings(client, init_scan_speed, init_scan_params)
 
     end_test(client)
     stop_client(client)
