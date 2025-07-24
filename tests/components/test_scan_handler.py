@@ -165,6 +165,7 @@ def test_experiment_problem(publisher, server, thread_scan_handler,
         assert msg == (None, None)
 
     publisher.send_kill_signal()
+    time.sleep(4*common.REQUEST_TIMEOUT_MS / 1000)
 
 
 def test_scanning(publisher, server, thread_scan_handler,
