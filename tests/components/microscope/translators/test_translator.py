@@ -878,6 +878,27 @@ def test_spec_coords(client, default_control_state,
     modified_probe_pos.point.y = (
         scan_params.spatial.roi.size.y * 0.25)
 
+    logger.info("Next, set new ProbePosition. We expect a success.")
+    rep = client.set_probe_pos(modified_probe_pos)
+    assert rep == control_pb2.ControlResponse.REP_SUCCESS
+
+    logger.info("Next, validate that our subscriber receives these new "
+                "params.")
+    last_probe_pos = assert_and_return_message(sub_probe_pos)
+    assert check_equal(last_probe_pos, modified_probe_pos, float_tolerance)
+
+    logger.info('Requested new position. Expect scope state change.')
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_MOVING)
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
+
+    logger.info('Next, we should become free (stopped moving).')
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_FREE)
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
+
     # Hack around (make poll short for this).
     tmp_timeout_ms = sub_spec._poll_timeout_ms
     sub_spec._poll_timeout_ms = timeout_ms
