@@ -450,4 +450,4 @@ def correct_spec(spec: spec_pb2.Spec1d,
     # Timestamp update
     ts = translator.get_file_modification_datetime(spec.filename)
     corrected_spec.timestamp.FromDatetime(ts)
-    return spec
+    return corrected_spec
