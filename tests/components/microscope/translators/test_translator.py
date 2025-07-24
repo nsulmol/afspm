@@ -840,10 +840,11 @@ def test_scan_coords(client, default_control_state,
 
     # --- Cleanup --- #
     logger.info("At the end, return to our initial parameters.")
-    init_scan_speed = (scan_speeds[0] if scan_speeds and
-                       len(scan_speeds) == 2 else None)
-    init_scan_params = (scan_paramses[0] if scan_paramses and
-                        len(scan_paramses) == 2 else None)
+    # Here, we need to return to our initial parameters *even* if we did
+    # not change to the 'faster' ones from our config file. Thus, we reset
+    # to original as long as we were able to get them.
+    init_scan_speed = (scan_speeds[0] if scan_speeds else None)
+    init_scan_params = (scan_paramses[0] if scan_paramses else None)
     revert_original_scan_settings(client, init_scan_speed, init_scan_params)
 
     end_test(client)
