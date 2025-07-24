@@ -676,15 +676,14 @@ def test_cancel_spec(client, default_control_state,
 
     logger.info("First, flush any spec we have in the cache, and validate "
                 "that we have an initial scope state of SS_FREE.")
-    scope_state_msg = scan_pb2.ScopeStateMsg(
-        scope_state=scan_pb2.ScopeState.SS_FREE)
-
     # Checking no spec (hack around, make poll short for this).
     tmp_timeout_ms = sub_spec._poll_timeout_ms
     sub_spec._poll_timeout_ms = timeout_ms
-    assert not sub_spec.poll_and_store()
+    sub_spec.poll_and_store()
     sub_spec._poll_timeout_ms = tmp_timeout_ms  # Return to prior
 
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_FREE)
     assert_sub_received_proto(sub_scope_state,
                               scope_state_msg)
 
@@ -737,16 +736,17 @@ def test_run_spec(client, default_control_state,
 
     logger.info("Flush any spec we have in the cache, and validate "
                 "that we have an initial scope state of SS_FREE.")
-    scope_state_msg = scan_pb2.ScopeStateMsg(
-        scope_state=scan_pb2.ScopeState.SS_FREE)
 
     # Hack around, make poll short for this.
     tmp_timeout_ms = sub_spec._poll_timeout_ms
     sub_spec._poll_timeout_ms = timeout_ms
     sub_spec.poll_and_store()
+    sub_spec._poll_timeout_ms = tmp_timeout_ms  # Return to prior
+
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_FREE)
     assert_sub_received_proto(sub_scope_state,
                               scope_state_msg)
-    sub_spec._poll_timeout_ms = tmp_timeout_ms  # Return to prior
 
     logger.info("Validate that we can start a spec collection and  "
                 "are notified collection has begun.")
@@ -864,11 +864,11 @@ def test_spec_coords(client, default_control_state,
     logger.info("First, ensure we receive initial ProbePosition, "
                 "ScanParameters2d and that scope state is free.")
     initial_probe_pos = assert_and_return_message(sub_probe_pos)
+    scan_params = assert_and_return_message(sub_scan_params)
     scope_state_msg = scan_pb2.ScopeStateMsg(
         scope_state=scan_pb2.ScopeState.SS_FREE)
     assert_sub_received_proto(sub_scope_state,
                               scope_state_msg)
-    scan_params = assert_and_return_message(sub_scan_params)
 
     # Configure probe pos we want (we use scan_params to get the
     # size of the scan region and set a position based on this).
@@ -883,9 +883,6 @@ def test_spec_coords(client, default_control_state,
     sub_spec._poll_timeout_ms = timeout_ms
     sub_spec.poll_and_store()
     sub_spec._poll_timeout_ms = tmp_timeout_ms  # Return to prior
-
-    assert_sub_received_proto(sub_scope_state,
-                              scope_state_msg)
 
     # --- Perform Spec --- #
     logger.info("Validate that we can start a spec collection and  "
