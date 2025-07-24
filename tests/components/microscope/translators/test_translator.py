@@ -577,9 +577,11 @@ def test_run_scan(client, default_control_state,
     scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
     assert_sub_received_proto(sub_scope_state, scope_state_msg)
 
-    # Return to original scan settings
-    init_scan_speed = scan_speeds[0] if scan_speeds else None
-    init_scan_params = scan_paramses[0] if scan_paramses else None
+    logger.info("At the end, return to our initial parameters.")
+    init_scan_speed = (scan_speeds[0] if scan_speeds and
+                       len(scan_speeds) == 2 else None)
+    init_scan_params = (scan_paramses[0] if scan_paramses and
+                        len(scan_paramses) == 2 else None)
     revert_original_scan_settings(client, init_scan_speed, init_scan_params)
     end_test(client)
     stop_client(client)
@@ -836,8 +838,10 @@ def test_scan_coords(client, default_control_state,
 
     # --- Cleanup --- #
     logger.info("At the end, return to our initial parameters.")
-    init_scan_speed = scan_speeds[0] if scan_speeds else None
-    init_scan_params = scan_paramses[0] if scan_paramses else None
+    init_scan_speed = (scan_speeds[0] if scan_speeds and
+                       len(scan_speeds) == 2 else None)
+    init_scan_params = (scan_paramses[0] if scan_paramses and
+                        len(scan_paramses) == 2 else None)
     revert_original_scan_settings(client, init_scan_speed, init_scan_params)
 
     end_test(client)
