@@ -853,7 +853,8 @@ def test_scan_coords(client, default_control_state,
 
 def test_spec_coords(client, default_control_state,
                      sub_probe_pos, sub_spec, sub_scope_state,
-                     sub_scan_params, exp_problem, float_tolerance):
+                     sub_scan_params, exp_problem, float_tolerance,
+                     timeout_ms):
     logger.info('Validate our read spec contains the physical position.')
     logger.info('This test will fail if test_run_spec and test_probe_pos fail.')
 
