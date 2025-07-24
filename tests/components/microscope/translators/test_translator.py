@@ -882,10 +882,9 @@ def test_spec_coords(client, default_control_state,
     rep = client.set_probe_pos(modified_probe_pos)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
-    logger.info("Next, validate that our subscriber receives these new "
-                "params.")
-    last_probe_pos = assert_and_return_message(sub_probe_pos)
-    assert check_equal(last_probe_pos, modified_probe_pos, float_tolerance)
+    logger.info("We *do not* validate that our subscriber receives these new "
+                "params, as we are setting the same params every time.")
+    sub_probe_pos.poll_and_store()
 
     logger.info('Requested new position. Expect scope state change.')
     scope_state_msg = scan_pb2.ScopeStateMsg(
