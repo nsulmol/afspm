@@ -1,7 +1,7 @@
 """Holds logic for a drift-corrected scheduler.
 
 The scheduler in here will use logic from drift.py in order to automatically
-convert from the piezo coordinate system (PCS) to the 'true' sample coordinate
+convert from the tip coordinate system (TCS) to the 'true' sample coordinate
 system (SCS). The idea is to track drift and from it determine the correction
 vector needed to perform on any incoming request or outgoing message such that
 it is always in the estimated SCS.
@@ -233,7 +233,6 @@ class CSCorrectedRouter(router.ControlRouter):
         # Send out
         return response, message
 
-
     @classmethod
     def from_parent(cls, parent):
         """Actual construction method, given a parent instance."""
@@ -255,14 +254,14 @@ class CSCorrectedRouter(router.ControlRouter):
                                update_weight: float):
         """Update our correction vector.
 
-        The correction vector is PCS -> SCS. The router is receiving
+        The correction vector is TCS -> SCS. The router is receiving
         requests from components in the SCS, to be sent to the Microscope.
-        Thus, we want to go SCS -> PCS, which means we must invert our
+        Thus, we want to go SCS -> TCS, which means we must invert our
         translation vector.
         """
         self._corr_info = copy.deepcopy(corr_info)
         if self._corr_info is not None:
-            # We want SCS -> PCS
+            # We want SCS -> TCS
             self._corr_info.vec = -self._corr_info.vec
             self._corr_info.rate = -self._corr_info.rate
 
@@ -334,14 +333,14 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     MicroscopeScheduler, where it additionally attempts to estimate drift
     in the system and correct for it. Thus:
     - any coordinate data that is sent to the Microscope will be 'corrected'
-    such that it is in the piezo coordinate system (PCS).
+    such that it is in the tip coordinate system (TCS).
     - any coordinate data published by the Microscope will be 'corrected' such
     that it is in the sample coordinate system (SCS).
 
     We (as developers/researchers) would like to think in a drift-free SCS.
     In reality the sample and tip are drifting over time due to thermal
     effects of all atoms in the system. To correct for it, we must determine
-    the mapping from our piezo coordinate system (the CS tied to the voltage
+    the mapping from our tip coordinate system (the CS tied to the voltage
     we apply to the piezoelectric material and the associated change in its
     position) to the 'true' sample coordinate system (where the tip is relative
     to a sample origin).
@@ -351,13 +350,13 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     tells us the translation drift that occurred between the two scans over
     that time period. By holding a correction vector that is updated from
     the start of the experiment, we can maintain an appropriate mapping from
-    SCS to PCS (and vice-versa).
+    SCS to TCS (and vice-versa).
 
     For post-experiment usage, we save a csv file containing the correction
     vector and drift rate computed over time at filepath.
 
     In order to determine correction vectors, the DriftModel needs to compare
-    each current scan with a prior scan that intersects over the same PCS. To
+    each current scan with a prior scan that intersects over the same TCS. To
     do so, we consider the scans available in the current cache *before*
     updating. Thus, it is important that the cache is set up such that we
     are likely to have a prior scan to compare to.
@@ -416,7 +415,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         drift_model: the DriftModel used to estimate a correction vector
             between two scans.
         total_corr_info: total CorrectionInfo, fed to IO nodes so they can
-            correct for the PCS-SCS transform.
+            correct for the TCS-SCS transform.
         update_weight: weight used to update total_corr_info with a new
             estimate.
         filepath: path where we save our csv file containing all correction
@@ -599,7 +598,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         self._update_io()
 
     def _get_corrected_scan(self, new_scan: scan_pb2.Scan2d) -> scan_pb2.Scan2d:
-        """Convert current scan from PCS to SCS."""
+        """Convert current scan from TCS to SCS."""
         return cs_correct_proto(new_scan, self.total_corr_info,
                                 self.update_weight,
                                 new_scan.timestamp.ToDatetime(
@@ -610,7 +609,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
         """Estimate snapshot and update correction accordingly.
 
         Args:
-            new_scan: scan_pb2 in piezo coordinate system (PCS).
+            new_scan: scan_pb2 in tip coordinate system (TCS).
             corrected_scan: scan_pb2 in scan coordinate system (SCS).
 
         Returns:
@@ -670,7 +669,7 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
 
         # Notify logger if correction vec has changed
         if drift_has_changed:
-            logger.debug('The PCS-to-SCS correction vector has changed'
+            logger.debug('The TCS-to-SCS correction vector has changed'
                          f': {self.total_corr_info.vec} '
                          f'{self.total_corr_info.unit}.')
             logger.debug(f'With corr rate: {self.total_corr_info.rate} '
