@@ -115,7 +115,7 @@ class TranslationTransform(transform.EuclideanTransform):
 
         We simply do a mean on our residuals.
         """
-        trans = np.mean(dst - src, axis=0)  # TODO: Return to mean
+        trans = np.mean(dst - src, axis=0)
         self.params[0:2, 2] = trans
         return True
 
