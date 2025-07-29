@@ -211,7 +211,7 @@ def cli_find_matching_keypoints(scan1_fname: str, scan2_fname: str,
         log_level: level to use for logging.
     """
     log.set_up_logging(log_level=log_level)
-    find_matching_keypoints(scan1_fname, scan2_fname, out_path, channel_id,
+    find_matching_keypoints(scan1_fname, scan2_fname, channel_id, out_path,
                             cmap)
 
 
