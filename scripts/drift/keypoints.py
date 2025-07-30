@@ -1,4 +1,8 @@
-"""Script to save drift estimates run offline on two scans."""
+"""Script to save matched keypoints run offline on two scans.
+
+This code is very ugly, very hacked up, and a general embarrassment.
+I apolgize to anyone who is forced to make changes to it :(.
+"""
 
 import os
 import logging
