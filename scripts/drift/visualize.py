@@ -39,7 +39,7 @@ TIME_NAME = 'Scan Time'
 TIME_UNIT = 'h'
 
 A0_WIDTH = 21.0  # in cm
-HEIGHT = 1.0 * A0_WIDTH  # random factor
+HEIGHT = 0.75 * A0_WIDTH  # random factor
 CM = 1/2.54  # cm in inches
 FIG_SIZE = (A0_WIDTH * CM, HEIGHT * CM)
 
