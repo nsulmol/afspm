@@ -33,7 +33,8 @@ MAP_EXT_FILE_LOADER = {ASYLUM_EXT: asylum.load_scans_from_file}
 
 def find_matching_keypoints(scan1_fname: str, scan2_fname: str,
                             channel_id: str, out_path: str,
-                            cmap: str):
+                            draw_keypoints: bool = True,
+                            cmap: str = 'gray'):
     """Perform keypoint matching and outlier estimation and visualize.
 
     Args:
@@ -41,6 +42,7 @@ def find_matching_keypoints(scan1_fname: str, scan2_fname: str,
         scan2_fname: filepath to the second scan.
         channel_id: str id of the channel we are running estimation on.
         out_path: path to save visualized data.
+        draw_keypoints: whether or not to draw keypoints in figures.
         cmap: str name of colormap to use to visualize the scan data.
     """
     # ----- Setup ----- #
@@ -178,8 +180,9 @@ def find_matching_keypoints(scan1_fname: str, scan2_fname: str,
         xr.plot.imshow(da, cmap=cmap, add_colorbar=False, add_labels=False,
                        robust=True)
 
-        # NOTE: x- and y- swapped due to how XArray plots...
-        ax.scatter(keypoints[:, 0], keypoints[:, 1], c=colors)
+        if draw_keypoints:
+            # NOTE: x- and y- swapped due to how XArray plots...
+            ax.scatter(keypoints[:, 0], keypoints[:, 1], c=colors)
 
         # Add scale bar
         scalebar = AnchoredSizeBar(ax.transData,
@@ -214,24 +217,26 @@ def find_matching_keypoints(scan1_fname: str, scan2_fname: str,
         fig, ax = plt.subplots(layout='constrained')
         ax.imshow(composite_img, cmap=cmap)
 
-        # Save left keypoints
-        ax.scatter(keypoints0[:, 0], keypoints0[:, 1], c=colors)
-        # Save right keypoints
-        ax.scatter(keypoints1[:, 0] + da1.shape[1], keypoints1[:, 1], c=colors)
+        if draw_keypoints:
+            # Save left keypoints
+            ax.scatter(keypoints0[:, 0], keypoints0[:, 1], c=colors)
+            # Save right keypoints
+            ax.scatter(keypoints1[:, 0] + da1.shape[1], keypoints1[:, 1],
+                       c=colors)
 
-        # Save lines
-        for idx, this_match in enumerate(matches):
-            if this_match not in desired_matches:
-                continue
-            idx0, idx1 = this_match
-            # This takes in (x0, x1), (y0, y1).
-            # Also, the index of matches is linked to keypoints_lr, *not*
-            # the filtered keypoints0/keypoints1.
-            ax.plot((keypoints_lr[0][idx0, 1],
-                     keypoints_lr[1][idx1, 1] + da1.shape[1]),
-                    (keypoints_lr[0][idx0, 0],
-                     keypoints_lr[1][idx1, 0]),
-                    '-', color=colors[idx])
+            # Save lines
+            for idx, this_match in enumerate(matches):
+                if this_match not in desired_matches:
+                    continue
+                idx0, idx1 = this_match
+                # This takes in (x0, x1), (y0, y1).
+                # Also, the index of matches is linked to keypoints_lr, *not*
+                # the filtered keypoints0/keypoints1.
+                ax.plot((keypoints_lr[0][idx0, 1],
+                        keypoints_lr[1][idx1, 1] + da1.shape[1]),
+                        (keypoints_lr[0][idx0, 0],
+                        keypoints_lr[1][idx1, 0]),
+                        '-', color=colors[idx])
 
         plt.axis('off')  # Remove axis
         plt.gca().set_aspect('equal')  # Force equal aspect ratio
@@ -245,6 +250,7 @@ def find_matching_keypoints(scan1_fname: str, scan2_fname: str,
 
 def cli_find_matching_keypoints(scan1_fname: str, scan2_fname: str,
                                 channel_id: str, out_path: str,
+                                draw_keypoints: bool = True,
                                 cmap: str = 'gray',
                                 log_level: str = logging.INFO):
     """Perform keypoint matching and outlier estimation and visualize.
@@ -254,12 +260,13 @@ def cli_find_matching_keypoints(scan1_fname: str, scan2_fname: str,
         scan2_fname: filepath to the second scan.
         channel_id: str id of the channel we are running estimation on.
         out_path: path to save visualized data.
+        draw_keypoints: whether or not to draw keypoints in figures.
         cmap: str name of colormap to use to visualize the scan data.
         log_level: level to use for logging.
     """
     log.set_up_logging(log_level=log_level)
     find_matching_keypoints(scan1_fname, scan2_fname, channel_id, out_path,
-                            cmap)
+                            draw_keypoints, cmap)
 
 
 if __name__ == '__main__':
