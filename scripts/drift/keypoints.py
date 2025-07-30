@@ -25,6 +25,10 @@ from skimage.measure import ransac
 logger = logging.getLogger(log.LOGGER_ROOT + '.scripts.drift.' + __name__)
 
 
+# Use sans-serif font family!
+plt.rc('font', family='sans-serif')
+
+
 ASYLUM_EXT = '.ibw'
 
 # Mapping from extension to file loader.
