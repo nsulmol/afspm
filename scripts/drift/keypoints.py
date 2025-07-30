@@ -5,22 +5,25 @@ import logging
 import fire
 
 import numpy as np
+import xarray as xr
 
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
+from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 
-from afspm.components.drift import drift, correction
-from afspm.utils import array_converters as ac, proto_geo
+from afspm.components.drift import drift
+from afspm.utils import array_converters as ac
 import afspm.components.microscope.translators.asylum.translator as asylum
 
 from afspm.utils import log
 
 from skimage import transform
-from skimage import feature
 from skimage import exposure
 from skimage.measure import ransac
 
 
 logger = logging.getLogger(log.LOGGER_ROOT + '.scripts.drift.' + __name__)
+
 
 ASYLUM_EXT = '.ibw'
 
@@ -55,21 +58,13 @@ def find_matching_keypoints(scan1_fname: str, scan2_fname: str,
     both_scans = []
     for fname in [scan1_fname, scan2_fname]:
         scans = load_scans(fname)
-        desired_scan = [scan for scan in scans
-                        if channel_id in scan.channel.upper()][0]
+        desired_scan = [scan for scan in scans if not channel_id or
+                        channel_id in scan.channel.upper()][0]
         both_scans.append(desired_scan)
 
     da1 = ac.convert_scan_pb2_to_xarray(both_scans[0])
     da2 = ac.convert_scan_pb2_to_xarray(both_scans[1])
     model = drift.create_drift_model()
-
-    # Get intersection patches (scaled to scan2, as the transform is
-    # for da2 to move to da1's position).
-    inter_rect = proto_geo.rect_intersection(both_scans[0].params.spatial.roi,
-                                             both_scans[1].params.spatial.roi)
-
-    patch1, patch2, scale = correction.extract_and_scale_patches(da1, da2,
-                                                                 inter_rect)
 
     # For computation purposes, need to change all NaN to 0
     da1 = da1.fillna(0)
@@ -157,13 +152,22 @@ def find_matching_keypoints(scan1_fname: str, scan2_fname: str,
     logger.debug(f'Drift estimate fitting score (normalized): {norm_score}')
 
     # ----- Drawing / Saving ----- #
+    fontprops = fm.FontProperties(size=18)
     rng = np.random.default_rng(seed=0)
-    colors = [rng.random(3) for _ in range(len(inlier_matches))]
+    colors = [rng.random(3) for _ in range(len(matches))]
 
-    keypoints0 = np.array([keypoints_lr[0][idx, :]
-                           for idx, _ in inlier_matches])
-    keypoints1 = np.array([keypoints_lr[1][idx, :]
-                           for _, idx in inlier_matches])
+    # Filtered points are our main keypoints
+    keypoints0 = points_lr[0]
+    keypoints1 = points_lr[1]
+
+    # Scale points / keypoints to be in xarray format!
+    scale_factor = np.array(
+        [(np.max(da1.y) - np.min(da1.y)).to_numpy() / da1.shape[1],
+         (np.max(da1.x) - np.min(da1.x)).to_numpy() / da1.shape[0]])
+    keypoints0 *= scale_factor
+    keypoints1 *= scale_factor
+    keypoints_lr[0] *= scale_factor
+    keypoints_lr[1] *= scale_factor
 
     # --- Individual images --- #
     for da, keypoints, fname in zip(
@@ -171,26 +175,68 @@ def find_matching_keypoints(scan1_fname: str, scan2_fname: str,
             [keypoints0, keypoints1],
             [scan1_fname, scan2_fname]):
         fig, ax = plt.subplots(layout='constrained')
-        ax.imshow(da, cmap=cmap)
-        ax.scatter(keypoints[:, 1], keypoints[:, 0], edgecolors=colors, facecolors='none')
+        xr.plot.imshow(da, cmap=cmap, add_colorbar=False, add_labels=False,
+                       robust=True)
+
+        # NOTE: x- and y- swapped due to how XArray plots...
+        ax.scatter(keypoints[:, 0], keypoints[:, 1], c=colors)
+
+        # Add scale bar
+        scalebar = AnchoredSizeBar(ax.transData,
+                                   2e-6, '2 $\mu$m', 'lower right',
+                                   pad=1.0,
+                                   color='white',
+                                   frameon=False,
+                                   fontproperties=fontprops,)
+
+        ax.add_artist(scalebar)
+
+        plt.axis('off')  # Remove axis
+        plt.gca().set_aspect('equal')  # Force equal aspect ratio
         plt.savefig(os.path.join(out_path,
                                  os.path.splitext(
-                                     os.path.basename(fname))[0]))
+                                     os.path.basename(fname))[0]),
+                    bbox_inches='tight', transparent=True, pad_inches=0)
         plt.clf()
 
+    # Undo scale factor to return to image coords:
+    keypoints0 /= scale_factor
+    keypoints1 /= scale_factor
+    keypoints_lr[0] /= scale_factor
+    keypoints_lr[1] /= scale_factor
+
     # --- Composite images --- #
-    for matches, matches_color, basename in zip(
+    composite_img = np.concatenate([da1.to_numpy(),
+                                    da2.to_numpy()], axis=1)  # concat along cols
+    for desired_matches, basename in zip(
             [inlier_matches, outlier_matches],
-            [None, 'tab:red'],
             ['inliers', 'outliers']):
         fig, ax = plt.subplots(layout='constrained')
-        feature.plot_matched_features(da1, da2,
-                                      keypoints0=keypoints_lr[0],
-                                      keypoints1=keypoints_lr[1],
-                                      matches=matches,
-                                      ax=ax, only_matches=True,
-                                      matches_color=matches_color)
-        plt.savefig(os.path.join(out_path, basename))
+        # Flipping image along y-axis to match prior plot.
+        ax.imshow(np.flip(composite_img, axis=0), cmap=cmap)
+
+        # Save left keypoints
+        ax.scatter(keypoints0[:, 0], keypoints0[:, 1], c=colors)
+        # Save right keypoints
+        ax.scatter(keypoints1[:, 0] + da1.shape[1], keypoints1[:, 1], c=colors)
+
+        # Save lines
+        for idx, this_match in enumerate(matches):
+            if this_match not in desired_matches:
+                continue
+            idx0, idx1 = this_match
+            # This takes in (x0, x1), (y0, y1).
+            # Also, the index of matches is linked to keypoints_lr, *not*
+            # the filtered keypoints0/keypoints1.
+            ax.plot((keypoints_lr[0][idx0, 1],
+                     keypoints_lr[1][idx1, 1] + da1.shape[1]),
+                    (keypoints_lr[0][idx0, 0],
+                     keypoints_lr[1][idx1, 0]),
+                    '-', color=colors[idx])
+        plt.axis('off')  # Remove axis
+        plt.gca().set_aspect('equal')  # Force equal aspect ratio
+        plt.savefig(os.path.join(out_path, basename),
+                    bbox_inches='tight', transparent=True, pad_inches=0)
         plt.clf()
 
     return
