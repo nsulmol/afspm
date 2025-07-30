@@ -20,8 +20,8 @@ import matplotlib as mpl
 from matplotlib import pyplot as plt
 
 
-# Force serif family fonts
-plt.rc('font', family='serif')
+# Force sans serif family fonts
+plt.rc('font', family='sans-serif')
 
 
 logger = logging.getLogger(log.LOGGER_ROOT + '.scripts.drift.' + __name__)
@@ -37,6 +37,11 @@ RATE_X_NAME = r'X Offset Rate'
 RATE_Y_NAME = r'Y Offset Rate'
 TIME_NAME = 'Scan Time'
 TIME_UNIT = 'h'
+
+A0_WIDTH = 21.0  # in cm
+HEIGHT = 1.0 * A0_WIDTH  # random factor
+CM = 1/2.54  # cm in inches
+FIG_SIZE = (A0_WIDTH * CM, HEIGHT * CM)
 
 
 # ----- Reading logic / methods ----- #
@@ -314,13 +319,15 @@ def draw_drift_data_all(csv_file: str,
                    TIME_NAME, RATE_Y_NAME, TIME_UNIT,
                    desired_rate_unit, axd['F'], colors)
 
-    if display:
-        plt.show(block=True)
-
     save_path = os.path.join(os.path.dirname(csv_file),
                              os.path.splitext(os.path.basename(csv_file))[0]
                              + '.png')
+    fig.set_size_inches(FIG_SIZE)
     fig.savefig(save_path)
+
+    if display:
+        plt.show(block=True)
+
 
 
 def draw_drift_data_offsets(csv_file: str,
@@ -370,13 +377,14 @@ def draw_drift_data_offsets(csv_file: str,
                    TIME_NAME, OFFSET_Y_NAME, TIME_UNIT,
                    desired_offset_unit, axd['E'], colors)
 
-    if display:
-        plt.show(block=True)
-
     save_path = os.path.join(os.path.dirname(csv_file),
                              os.path.splitext(os.path.basename(csv_file))[0]
                              + '.png')
+    fig.set_size_inches(FIG_SIZE)
     fig.savefig(save_path)
+
+    if display:
+        plt.show(block=True)
 
 
 def cli_draw_drift_data(csv_file: str,
