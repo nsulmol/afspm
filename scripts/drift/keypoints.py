@@ -212,8 +212,7 @@ def find_matching_keypoints(scan1_fname: str, scan2_fname: str,
             [inlier_matches, outlier_matches],
             ['inliers', 'outliers']):
         fig, ax = plt.subplots(layout='constrained')
-        # Flipping image along y-axis to match prior plot.
-        ax.imshow(np.flip(composite_img, axis=0), cmap=cmap)
+        ax.imshow(composite_img, cmap=cmap)
 
         # Save left keypoints
         ax.scatter(keypoints0[:, 0], keypoints0[:, 1], c=colors)
@@ -233,8 +232,10 @@ def find_matching_keypoints(scan1_fname: str, scan2_fname: str,
                     (keypoints_lr[0][idx0, 0],
                      keypoints_lr[1][idx1, 0]),
                     '-', color=colors[idx])
+
         plt.axis('off')  # Remove axis
         plt.gca().set_aspect('equal')  # Force equal aspect ratio
+        plt.gca().invert_yaxis()  # Invert y-axis to match prior plot
         plt.savefig(os.path.join(out_path, basename),
                     bbox_inches='tight', transparent=True, pad_inches=0)
         plt.clf()
