@@ -326,7 +326,7 @@ def load_scan_from_file(fname: str,
                         read_use_physical_units: bool = None,
                         read_allow_convert_from_metadata: bool = None,
                         read_simplify_metadata: bool = None
-                        ) -> scan_pb2 | None:
+                        ) -> scan_pb2.Scan2d | None:
     """Load gxsm scan, filling in info possible from file only.
 
     Args:
