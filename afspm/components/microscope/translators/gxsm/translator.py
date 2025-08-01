@@ -16,7 +16,7 @@ from afspm.utils import array_converters as conv
 
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import spec_pb2
-from afspm.io.protos.generated import control_pb2
+from afspm.io.protos.generated import geometry_pb2
 
 import gxsm  # Dynamic DLL, so not in pyproject.
 from gxsmread import read
