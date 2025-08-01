@@ -521,7 +521,7 @@ def setup_faster_scan(config_dict: dict, client: ControlClient,
 
 
 def revert_original_scan_settings(
-        client: ControlClient,
+        client: ControlClient, sub_scope_state: Subscriber,
         orig_scan_speed: float | None,
         orig_scan_params: scan_pb2.ScanParameters2d | None):
     """Return scan speed / scan params to original values.
@@ -531,6 +531,7 @@ def revert_original_scan_settings(
 
     Args:
         client: ControlClient used to communicate with microscope.
+        sub_scope_state: ScopeState subscriber.
         orig_scan_speed: original scan speed we wish to return to.
         orig_scan_params: original ScanParameters2d we wish to return to.
     """
@@ -540,6 +541,7 @@ def revert_original_scan_settings(
             set_scan_speed(client, orig_scan_speed)
         if orig_scan_params:
             set_scan_params(client, orig_scan_params)
+            sub_scope_state.poll_and_store()  # Grab an SS_MOVING if sent
 
 
 def test_run_scan(client, default_control_state,
@@ -582,7 +584,8 @@ def test_run_scan(client, default_control_state,
                        len(scan_speeds) == 2 else None)
     init_scan_params = (scan_paramses[0] if scan_paramses and
                         len(scan_paramses) == 2 else None)
-    revert_original_scan_settings(client, init_scan_speed, init_scan_params)
+    revert_original_scan_settings(client, sub_scope_state,
+                                  init_scan_speed, init_scan_params)
     end_test(client)
     stop_client(client)
 
@@ -845,7 +848,8 @@ def test_scan_coords(client, default_control_state,
     # to original as long as we were able to get them.
     init_scan_speed = (scan_speeds[0] if scan_speeds else None)
     init_scan_params = (scan_paramses[0] if scan_paramses else None)
-    revert_original_scan_settings(client, init_scan_speed, init_scan_params)
+    revert_original_scan_settings(client, sub_scope_state,
+                                  init_scan_speed, init_scan_params)
 
     end_test(client)
     stop_client(client)
