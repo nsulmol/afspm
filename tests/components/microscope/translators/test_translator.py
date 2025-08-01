@@ -541,7 +541,8 @@ def revert_original_scan_settings(
             set_scan_speed(client, orig_scan_speed)
         if orig_scan_params:
             set_scan_params(client, orig_scan_params)
-            sub_scope_state.poll_and_store()  # Grab an SS_MOVING if sent
+            sub_scope_state.poll_and_store()  # Grab an SS_MOVING
+            sub_scope_state.poll_and_store()  # Grab an SS_FREE
 
 
 def test_run_scan(client, default_control_state,
