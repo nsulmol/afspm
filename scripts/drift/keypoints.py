@@ -51,7 +51,7 @@ class SingleImageDrawOption(str, Enum):
     VECTOR = 'vector'  # Draw translation vector
 
 
-SINGLE_COLOR = 'blue'  # One color drawing for 'all'
+SINGLE_COLOR = 'orange'  # One color drawing for 'all'
 
 
 def find_matching_keypoints(scan1_fname: str, scan2_fname: str,
