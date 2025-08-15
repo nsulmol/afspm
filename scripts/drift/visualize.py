@@ -350,7 +350,6 @@ def draw_drift_data_all(csv_file: str,
                        TIME_NAME, RATE_Y_NAME, TIME_UNIT,
                        pix_rate_unit, axd['F'].twinx(), colors)
 
-
     save_path = os.path.join(os.path.dirname(csv_file),
                              os.path.splitext(os.path.basename(csv_file))[0]
                              + '.png')
@@ -359,7 +358,6 @@ def draw_drift_data_all(csv_file: str,
 
     if display:
         plt.show(block=True)
-
 
 
 def draw_drift_data_offsets(csv_file: str,
