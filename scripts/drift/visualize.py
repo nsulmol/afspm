@@ -2,6 +2,7 @@
 
 import os
 from typing import Any
+from enum import Enum
 import logging
 import fire
 import datetime as dt
@@ -53,6 +54,13 @@ class DriftData:
     scan_time_hours: np.ndarray
     drift_offsets: np.ndarray
     drift_rates: np.ndarray
+
+
+class VizChoice(str, Enum):
+    """Choice of what to visualize."""
+    OFFSETS_AND_RATES = 'OFFSETS_AND_RATES'
+    OFFSETS_ONLY = 'OFFSETS_ONLY'
+    HISTOGRAM = 'HISTOGRAM'
 
 
 def load_drift_data(csv_filepath: str, desired_offset_unit: str,
@@ -434,10 +442,63 @@ def draw_drift_data_offsets(csv_file: str,
         plt.show(block=True)
 
 
+def _draw_hist(x: np.ndarray, ax: plt.Axes, x_meaning: str, x_unit: str):
+    ax.hist(x)  # uses 'auto', which defaults to 'sturges' if len(x) ~ 1000
+    ax.set_xlabel(f'{x_meaning} [{x_unit}]')
+    ax.set_ylabel('Count')
+    ax.autoscale()
+
+
+def draw_drift_offset_hist(csv_file: str,
+                           desired_offset_unit: str = DEFAULT_OFFSET_UNIT,
+                           uses_v2: bool = True, display: bool = True,
+                           desired_offset_unit_per_pixel: float = None):
+    """Draw a histogram of the X- and Y- axes separately.
+
+    Args:
+        csv_file: path to the csv file we wish to read.
+        desired_offset_unit: desired offset unit. Defaults to 'nm'.
+        uses_v2: whether or not the CSV uses V2 of the format.
+        display: whether or not we show the figure in a blocking fashion.
+            Default is True.
+        desired_offset_unit_per_pixel: ratio of scan size to resolution in
+            desired_offset_unit. If not None, we add an extra set of ticks
+            for pixels (for the rate graphs).
+    """
+    drift_data = load_drift_data(csv_file, desired_offset_unit,
+                                 uses_v2=uses_v2)
+
+    fig = plt.figure(layout='tight')
+    mosaic = """A
+                B"""
+    axd = fig.subplot_mosaic(mosaic)
+
+    _draw_hist(drift_data.drift_offsets[:, 0], axd['A'],
+               OFFSET_X_NAME, desired_offset_unit)
+    _draw_hist(drift_data.drift_offsets[:, 1], axd['B'],
+               OFFSET_Y_NAME, desired_offset_unit)
+
+    if desired_offset_unit_per_pixel:
+        pix_offsets = drift_data.drift_offsets / desired_offset_unit_per_pixel
+        _draw_hist(pix_offsets[:, 0], axd['A'].twiny(),
+                   OFFSET_X_NAME, PIX_OFFSET_UNIT)
+        _draw_hist(pix_offsets[:, 1], axd['B'].twiny(),
+                   OFFSET_Y_NAME, PIX_OFFSET_UNIT)
+
+    save_path = os.path.join(os.path.dirname(csv_file),
+                             os.path.splitext(os.path.basename(csv_file))[0]
+                             + '_hist.png')
+    fig.set_size_inches(FIG_SIZE)
+    fig.savefig(save_path)
+
+    if display:
+        plt.show(block=True)
+
+
 def cli_draw_drift_data(csv_file: str,
                         desired_offset_unit: str = DEFAULT_OFFSET_UNIT,
                         desired_rate_unit: str = DEFAULT_RATE_UNIT,
-                        offsets_only: bool = True,
+                        viz_choice: str = VizChoice.OFFSETS_ONLY, #VizChoice = VizChoice.OFFSETS_ONLY,
                         uses_v2: bool = True, display: bool = True,
                         cm: str = 'nipy_spectral',
                         desired_offset_unit_per_pixel: float = None,
@@ -459,8 +520,8 @@ def cli_draw_drift_data(csv_file: str,
         csv_file: path to the csv file we wish to read.
         desired_offset_unit: desired offset unit. Defaults to 'nm'.
         desired_rate_unit: desired rate unit. Defaults to 'nm/h'.
-        offsets_only: whether or not we only display offsets. Defaults to
-            True.
+        viz_choice: what to visualize, one of VizChoice strs. Defaults to
+            OFFSETS_ONLY.
         uses_v2: whether or not the CSV uses V2 of the format.
         display: whether or not we show the figure in a blocking fashion.
             Default is True.
@@ -473,19 +534,25 @@ def cli_draw_drift_data(csv_file: str,
             for pixels (for the offset graphs).
         log_level: level to use for logging. Defaults to INFO.
     """
+    viz_choice = VizChoice(viz_choice.upper())
+
     log.set_up_logging(log_level=log_level)
-    if offsets_only:
+    if viz_choice == VizChoice.OFFSETS_ONLY:
         draw_drift_data_offsets(csv_file, desired_offset_unit,
                                 uses_v2, display,
                                 desired_offset_unit_per_pixel,
                                 cm)
-    else:
+    elif viz_choice == VizChoice.OFFSETS_AND_RATES:
         draw_drift_data_all(csv_file, desired_offset_unit,
                             desired_rate_unit,
                             uses_v2, display,
                             desired_offset_unit_per_pixel,
                             desired_rate_unit_per_pixel,
                             cm)
+    elif viz_choice == VizChoice.HISTOGRAM:
+        draw_drift_offset_hist(csv_file, desired_offset_unit,
+                               uses_v2, display,
+                               desired_offset_unit_per_pixel)
 
 
 if __name__ == '__main__':
