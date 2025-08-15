@@ -276,7 +276,8 @@ def draw_drift_data_all(csv_file: str,
     plots the drift offset and rates over time so they may be analyzed.
 
     The data is displayed (in a blocking fashion) if display is True, and
-    saved to filename save_file in the same directory as the CSV file.
+    saved to a filename with the same base name in the same directory as the
+    CSV file.
 
     Desired offset units and rate units must be specified. We use these to
     scale as needed.
@@ -448,7 +449,8 @@ def cli_draw_drift_data(csv_file: str,
     plots the drift offset and rates over time so they may be analyzed.
 
     The data is displayed (in a blocking fashion) if display is True, and
-    saved to filename save_file in the same directory as the CSV file.
+    saved to a filename with the same base name in the same directory as the
+    CSV file.
 
     Desired offset units and rate units must be specified. We use these to
     scale as needed.
