@@ -352,6 +352,22 @@ def draw_drift_data_all(csv_file: str,
     if desired_offset_unit_per_pixel:
         # Offset figures
         pix_offsets = drift_data.drift_offsets / desired_offset_unit_per_pixel
+
+        # Draw pixel units on top diagram (X/Y together)
+        draw_data_axis(drift_data.drift_offsets[:, 0],
+                       pix_offsets[:, 1],
+                       OFFSET_X_NAME, OFFSET_Y_NAME,
+                       desired_offset_unit, PIX_OFFSET_UNIT,
+                       axd['A'].twinx(), colors,
+                       PIX_COLOR, PIX_COLOR)
+        draw_data_axis(pix_offsets[:, 0],
+                       drift_data.drift_offsets[:, 1],
+                       OFFSET_X_NAME, OFFSET_Y_NAME,
+                       PIX_OFFSET_UNIT, desired_offset_unit,
+                       axd['A'].twiny(), colors,
+                       PIX_COLOR, PIX_COLOR)
+
+        # Draw pixel units on bottom graphs (X- and Y- separate)
         draw_data_axis(drift_data.scan_time_hours, pix_offsets[:, 0],
                        TIME_NAME, OFFSET_X_NAME, TIME_UNIT,
                        PIX_OFFSET_UNIT, axd['C'].twinx(), colors,
@@ -365,6 +381,12 @@ def draw_drift_data_all(csv_file: str,
         pix_rates = drift_data.drift_rates / desired_rate_unit_per_pixel
         pix_time_unit = desired_rate_unit.split('/')[1]
         pix_rate_unit = PIX_OFFSET_UNIT + '/' + pix_time_unit
+
+        # Note: not drawing pixel units on top diagram (X/Y together).
+        # Mostly because it requires writing an extra method and I'm lazy
+        # (and don't see the need).
+
+        # Draw pixel units on bottom graphs (X- and Y- separate)
         draw_data_axis(drift_data.scan_time_hours, pix_rates[:, 0],
                        TIME_NAME, RATE_X_NAME, TIME_UNIT,
                        pix_rate_unit, axd['D'].twinx(), colors,
@@ -441,6 +463,22 @@ def draw_drift_data_offsets(csv_file: str,
     if desired_offset_unit_per_pixel:
         # Offset figures
         pix_offsets = drift_data.drift_offsets / desired_offset_unit_per_pixel
+
+        # Draw pixel units on top diagram (X/Y together)
+        draw_data_axis(drift_data.drift_offsets[:, 0],
+                       pix_offsets[:, 1],
+                       OFFSET_X_NAME, OFFSET_Y_NAME,
+                       desired_offset_unit, PIX_OFFSET_UNIT,
+                       axd['A'].twinx(), colors,
+                       PIX_COLOR, PIX_COLOR)
+        draw_data_axis(pix_offsets[:, 0],
+                       drift_data.drift_offsets[:, 1],
+                       OFFSET_X_NAME, OFFSET_Y_NAME,
+                       PIX_OFFSET_UNIT, desired_offset_unit,
+                       axd['A'].twiny(), colors,
+                       PIX_COLOR, PIX_COLOR)
+
+        # Draw pixel units on bottom graphs (X- and Y- separate)
         draw_data_axis(drift_data.scan_time_hours, pix_offsets[:, 0],
                        TIME_NAME, OFFSET_X_NAME, TIME_UNIT,
                        PIX_OFFSET_UNIT, axd['C'].twinx(), colors,
