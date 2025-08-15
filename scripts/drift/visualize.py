@@ -59,6 +59,7 @@ class DriftData:
 
 class VizChoice(str, Enum):
     """Choice of what to visualize."""
+
     OFFSETS_AND_RATES = 'OFFSETS_AND_RATES'
     OFFSETS_ONLY = 'OFFSETS_ONLY'
     HISTOGRAM = 'HISTOGRAM'
@@ -349,8 +350,8 @@ def draw_drift_data_all(csv_file: str,
 
     # Show extra ticks for units in pixels (if provided)
     if desired_offset_unit_per_pixel:
-        pix_offsets = drift_data.drift_offsets / desired_offset_unit_per_pixel
         # Offset figures
+        pix_offsets = drift_data.drift_offsets / desired_offset_unit_per_pixel
         draw_data_axis(drift_data.scan_time_hours, pix_offsets[:, 0],
                        TIME_NAME, OFFSET_X_NAME, TIME_UNIT,
                        PIX_OFFSET_UNIT, axd['C'].twinx(), colors,
@@ -360,8 +361,8 @@ def draw_drift_data_all(csv_file: str,
                        PIX_OFFSET_UNIT, axd['E'].twinx(), colors,
                        PIX_COLOR, PIX_COLOR)
     if desired_rate_unit_per_pixel:
-        pix_rates = drift_data.drift_rates / desired_rate_unit_per_pixel
         # Rate figures
+        pix_rates = drift_data.drift_rates / desired_rate_unit_per_pixel
         pix_time_unit = desired_rate_unit.split('/')[1]
         pix_rate_unit = PIX_OFFSET_UNIT + '/' + pix_time_unit
         draw_data_axis(drift_data.scan_time_hours, pix_rates[:, 0],
@@ -438,8 +439,8 @@ def draw_drift_data_offsets(csv_file: str,
 
     # Show extra ticks for units in pixels (if provided)
     if desired_offset_unit_per_pixel:
-        pix_offsets = drift_data.drift_offsets / desired_offset_unit_per_pixel
         # Offset figures
+        pix_offsets = drift_data.drift_offsets / desired_offset_unit_per_pixel
         draw_data_axis(drift_data.scan_time_hours, pix_offsets[:, 0],
                        TIME_NAME, OFFSET_X_NAME, TIME_UNIT,
                        PIX_OFFSET_UNIT, axd['C'].twinx(), colors,
