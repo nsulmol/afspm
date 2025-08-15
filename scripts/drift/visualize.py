@@ -199,14 +199,14 @@ def convert_isoformat_to_hours(iso: str) -> float:
 
 
 # ----- Drawing methods ----- #
-def draw_drift_rates(drift_data: DriftData, unit: str,
+def draw_drift_rates(drift_rates: np.ndarray, unit: str,
                      ax: plt.Axes, colors: Any):  # TODO: what is colors?
     """Draw drift rates on axis."""
-    zeros = np.zeros(drift_data.drift_rates.shape[0])
+    zeros = np.zeros(drift_rates.shape[0])
 
     ax.quiver(zeros, zeros,
-              drift_data.drift_rates[:, 0],
-              drift_data.drift_rates[:, 1],
+              drift_rates[:, 0],
+              drift_rates[:, 1],
               angles='xy', scale_units='xy', scale=1,
               units='width', width=0.005,
               color=colors)
@@ -215,28 +215,28 @@ def draw_drift_rates(drift_data: DriftData, unit: str,
     ax.set_ylabel(f'{RATE_Y_NAME} [{unit}]')
 
     # Quiver is weird, so we need to explicit xlimit and ylimits?
-    min_max_x = [np.min(drift_data.drift_rates[:, 0]),
-                 np.max(drift_data.drift_rates[:, 0])]
+    min_max_x = [np.min(drift_rates[:, 0]),
+                 np.max(drift_rates[:, 0])]
     min_max_x = [min(min_max_x), max(min_max_x)]
     min_max_x = [min(0., min_max_x[0]) - MARGIN_SCALING * abs(min_max_x[0]),
                  max(0., min_max_x[1]) + MARGIN_SCALING * abs(min_max_x[1])]
     ax.set_xlim(min_max_x[0], min_max_x[1])
-    min_max_y = [np.min(drift_data.drift_rates[:, 1]),
-                 np.max(drift_data.drift_rates[:, 1])]
+    min_max_y = [np.min(drift_rates[:, 1]),
+                 np.max(drift_rates[:, 1])]
     min_max_y = [min(min_max_y), max(min_max_y)]
     min_max_y = [min(0., min_max_y[0]) - MARGIN_SCALING * abs(min_max_y[0]),
                  max(0., min_max_y[1]) + MARGIN_SCALING * abs(min_max_y[1])]
     ax.set_ylim(min_max_y[0], min_max_y[1])
 
 
-def draw_drift_offsets(drift_data: DriftData, unit: str,
+def draw_drift_offsets(drift_offsets: np.ndarray, unit: str,
                        ax: plt.Axes, colors: Any):  # TODO: What is colors?
     """Draw drift offsets on axis."""
-    ax.scatter(drift_data.drift_offsets[:, 0],
-               drift_data.drift_offsets[:, 1],
+    ax.scatter(drift_offsets[:, 0],
+               drift_offsets[:, 1],
                c=colors)
-    ax.plot(drift_data.drift_offsets[:, 0],
-            drift_data.drift_offsets[:, 1],
+    ax.plot(drift_offsets[:, 0],
+            drift_offsets[:, 1],
             color='lightgrey', linestyle='dashed')
 
     ax.set_xlabel(f'{OFFSET_X_NAME} [{unit}]')
@@ -328,7 +328,8 @@ def draw_drift_data_all(csv_file: str,
     colors, colorbar = get_colors_colorbar_for_time(drift_data, cm)
 
     # Draw offset figures
-    draw_drift_offsets(drift_data, desired_offset_unit, axd['A'], colors)
+    draw_drift_offsets(drift_data.drift_offsets, desired_offset_unit,
+                       axd['A'], colors)
     draw_data_axis(drift_data.scan_time_hours, drift_data.drift_offsets[:, 0],
                    TIME_NAME, OFFSET_X_NAME, TIME_UNIT,
                    desired_offset_unit, axd['C'], colors)
@@ -337,7 +338,8 @@ def draw_drift_data_all(csv_file: str,
                    desired_offset_unit, axd['E'], colors)
 
     # Draw rate figures
-    draw_drift_rates(drift_data, desired_rate_unit, axd['B'], colors)
+    draw_drift_rates(drift_data.drift_rates, desired_rate_unit,
+                     axd['B'], colors)
     draw_data_axis(drift_data.scan_time_hours, drift_data.drift_rates[:, 0],
                    TIME_NAME, RATE_X_NAME, TIME_UNIT,
                    desired_rate_unit, axd['D'], colors)
@@ -424,7 +426,8 @@ def draw_drift_data_offsets(csv_file: str,
 
     # First, draw 'birds eye view' plots
     colors, colorbar = get_colors_colorbar_for_time(drift_data, cm)
-    draw_drift_offsets(drift_data, desired_offset_unit, axd['A'], colors)
+    draw_drift_offsets(drift_data.drift_offsets, desired_offset_unit,
+                       axd['A'], colors)
 
     draw_data_axis(drift_data.scan_time_hours, drift_data.drift_offsets[:, 0],
                    TIME_NAME, OFFSET_X_NAME, TIME_UNIT,
