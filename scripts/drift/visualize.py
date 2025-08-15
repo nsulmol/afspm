@@ -458,7 +458,7 @@ def draw_drift_data_offsets(csv_file: str,
 
 def _draw_hist(x: np.ndarray, ax: plt.Axes, x_meaning: str, x_unit: str,
                x_axis_color: str = 'black', y_axis_color: str = 'black'):
-    ax.hist(x)  # uses 'auto', which defaults to 'sturges' if len(x) ~ 1000
+    ax.hist(x, 'fd')  # uses 'Freedman-Diaconis' rule.
     ax.set_xlabel(f'{x_meaning} [{x_unit}]', color=x_axis_color)
     ax.set_ylabel('Count', color=y_axis_color)
 
