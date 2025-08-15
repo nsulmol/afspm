@@ -285,9 +285,6 @@ def draw_drift_data_all(csv_file: str,
         uses_v2: whether or not the CSV uses V2 of the format.
         display: whether or not we show the figure in a blocking fashion.
             Default is True.
-        save_file: filename to save the drawn plot. This is the filename
-            *without* the path, as we use the csv_files path. Defaults to
-            'drift_correction.png'.
         cm: colormap style for visualization. Defaults to 'nipy_spectral'.
     """
     drift_data = load_drift_data(csv_file, desired_offset_unit,
@@ -340,7 +337,8 @@ def draw_drift_data_offsets(csv_file: str,
     plots the drift offset over time so they may be analyzed.
 
     The data is displayed (in a blocking fashion) if display is True, and
-    saved to filename save_file in the same directory as the CSV file.
+    saved to a filename with the same base name in the same directory as the
+    CSV file.
 
     Desired offset units. We use these to scale as needed.
 
@@ -414,9 +412,6 @@ def cli_draw_drift_data(csv_file: str,
         uses_v2: whether or not the CSV uses V2 of the format.
         display: whether or not we show the figure in a blocking fashion.
             Default is True.
-        save_file: filename to save the drawn plot. This is the filename
-            *without* the path, as we use the csv_files path. Defaults to
-            'drift_correction.png'.
         cm: colormap style for visualization. Defaults to 'nipy_spectral'.
         log_level: level to use for logging. Defaults to INFO.
     """
