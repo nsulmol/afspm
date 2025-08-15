@@ -39,6 +39,7 @@ RATE_Y_NAME = r'Y Offset Rate'
 TIME_NAME = 'Scan Time'
 TIME_UNIT = 'h'
 PIX_OFFSET_UNIT = 'pix'
+PIX_COLOR = 'dimgray'
 
 A0_WIDTH = 21.0  # in cm
 HEIGHT = 0.75 * A0_WIDTH  # random factor
@@ -262,12 +263,19 @@ def get_colors_colorbar_for_time(drift_data, cm: str):
 
 def draw_data_axis(x_data: np.ndarray, y_data: np.ndarray,
                    x_meaning: str, y_meaning: str,
-                   x_unit: str, y_unit: str, ax: plt.Axes, colors: Any):
+                   x_unit: str, y_unit: str, ax: plt.Axes, colors: Any,
+                   x_axis_color: str = 'black', y_axis_color: str = 'black'):
     """Draw data of a particular axis."""
     ax.scatter(x_data, y_data, c=colors)
     ax.plot(x_data, y_data, color='lightgrey', linestyle='dashed')
-    ax.set_xlabel(f'{x_meaning} [{x_unit}]')
-    ax.set_ylabel(f'{y_meaning} [{y_unit}]')
+    ax.set_xlabel(f'{x_meaning} [{x_unit}]', color=x_axis_color)
+    ax.set_ylabel(f'{y_meaning} [{y_unit}]', color=y_axis_color)
+
+    # Set axis colors (tick lines and labels)
+    for axis, color in zip([ax.xaxis, ax.yaxis],
+                           [x_axis_color, y_axis_color]):
+        [t.set_color(color) for t in axis.get_ticklines()]
+        [t.set_color(color) for t in axis.get_ticklabels()]
     ax.autoscale()
 
 
@@ -343,10 +351,12 @@ def draw_drift_data_all(csv_file: str,
         # Offset figures
         draw_data_axis(drift_data.scan_time_hours, pix_offsets[:, 0],
                        TIME_NAME, OFFSET_X_NAME, TIME_UNIT,
-                       PIX_OFFSET_UNIT, axd['C'].twinx(), colors)
+                       PIX_OFFSET_UNIT, axd['C'].twinx(), colors,
+                       PIX_COLOR, PIX_COLOR)
         draw_data_axis(drift_data.scan_time_hours, pix_offsets[:, 1],
                        TIME_NAME, OFFSET_Y_NAME, TIME_UNIT,
-                       PIX_OFFSET_UNIT, axd['E'].twinx(), colors)
+                       PIX_OFFSET_UNIT, axd['E'].twinx(), colors,
+                       PIX_COLOR, PIX_COLOR)
     if desired_rate_unit_per_pixel:
         pix_rates = drift_data.drift_rates / desired_rate_unit_per_pixel
         # Rate figures
@@ -354,10 +364,12 @@ def draw_drift_data_all(csv_file: str,
         pix_rate_unit = PIX_OFFSET_UNIT + '/' + pix_time_unit
         draw_data_axis(drift_data.scan_time_hours, pix_rates[:, 0],
                        TIME_NAME, RATE_X_NAME, TIME_UNIT,
-                       pix_rate_unit, axd['D'].twinx(), colors)
+                       pix_rate_unit, axd['D'].twinx(), colors,
+                       PIX_COLOR, PIX_COLOR)
         draw_data_axis(drift_data.scan_time_hours, pix_rates[:, 1],
                        TIME_NAME, RATE_Y_NAME, TIME_UNIT,
-                       pix_rate_unit, axd['F'].twinx(), colors)
+                       pix_rate_unit, axd['F'].twinx(), colors,
+                       PIX_COLOR, PIX_COLOR)
 
     save_path = os.path.join(os.path.dirname(csv_file),
                              os.path.splitext(os.path.basename(csv_file))[0]
@@ -427,10 +439,12 @@ def draw_drift_data_offsets(csv_file: str,
         # Offset figures
         draw_data_axis(drift_data.scan_time_hours, pix_offsets[:, 0],
                        TIME_NAME, OFFSET_X_NAME, TIME_UNIT,
-                       PIX_OFFSET_UNIT, axd['C'].twinx(), colors)
+                       PIX_OFFSET_UNIT, axd['C'].twinx(), colors,
+                       PIX_COLOR, PIX_COLOR)
         draw_data_axis(drift_data.scan_time_hours, pix_offsets[:, 1],
                        TIME_NAME, OFFSET_Y_NAME, TIME_UNIT,
-                       PIX_OFFSET_UNIT, axd['E'].twinx(), colors)
+                       PIX_OFFSET_UNIT, axd['E'].twinx(), colors,
+                       PIX_COLOR, PIX_COLOR)
 
     save_path = os.path.join(os.path.dirname(csv_file),
                              os.path.splitext(os.path.basename(csv_file))[0]
@@ -442,10 +456,17 @@ def draw_drift_data_offsets(csv_file: str,
         plt.show(block=True)
 
 
-def _draw_hist(x: np.ndarray, ax: plt.Axes, x_meaning: str, x_unit: str):
+def _draw_hist(x: np.ndarray, ax: plt.Axes, x_meaning: str, x_unit: str,
+               x_axis_color: str = 'black', y_axis_color: str = 'black'):
     ax.hist(x)  # uses 'auto', which defaults to 'sturges' if len(x) ~ 1000
-    ax.set_xlabel(f'{x_meaning} [{x_unit}]')
-    ax.set_ylabel('Count')
+    ax.set_xlabel(f'{x_meaning} [{x_unit}]', color=x_axis_color)
+    ax.set_ylabel('Count', color=y_axis_color)
+
+    # Set axis colors (tick lines and labels)
+    for axis, color in zip([ax.xaxis, ax.yaxis],
+                           [x_axis_color, y_axis_color]):
+        [t.set_color(color) for t in axis.get_ticklines()]
+        [t.set_color(color) for t in axis.get_ticklabels()]
     ax.autoscale()
 
 
@@ -481,9 +502,11 @@ def draw_drift_offset_hist(csv_file: str,
     if desired_offset_unit_per_pixel:
         pix_offsets = drift_data.drift_offsets / desired_offset_unit_per_pixel
         _draw_hist(pix_offsets[:, 0], axd['A'].twiny(),
-                   OFFSET_X_NAME, PIX_OFFSET_UNIT)
+                   OFFSET_X_NAME, PIX_OFFSET_UNIT,
+                   PIX_COLOR, PIX_COLOR)
         _draw_hist(pix_offsets[:, 1], axd['B'].twiny(),
-                   OFFSET_Y_NAME, PIX_OFFSET_UNIT)
+                   OFFSET_Y_NAME, PIX_OFFSET_UNIT,
+                   PIX_COLOR, PIX_COLOR)
 
     save_path = os.path.join(os.path.dirname(csv_file),
                              os.path.splitext(os.path.basename(csv_file))[0]
