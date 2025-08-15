@@ -47,14 +47,6 @@ CM = 1/2.54  # cm in inches
 FIG_SIZE = (A0_WIDTH * CM, HEIGHT * CM)
 
 
-def fmt_two_digits(x, pos):
-    """Format to two digits."""
-    return f'{x:.2f}'
-
-
-FORMATTER = mpl.ticker.FuncFormatter(fmt_two_digits)
-
-
 # ----- Reading logic / methods ----- #
 @dataclass
 class DriftData:
@@ -237,9 +229,6 @@ def draw_drift_rates(drift_rates: np.ndarray, unit: str,
                  max(0., min_max_y[1]) + MARGIN_SCALING * abs(min_max_y[1])]
     ax.set_ylim(min_max_y[0], min_max_y[1])
 
-    for axis in [ax.xaxis, ax.yaxis]:
-        axis.set_major_formatter(FORMATTER)
-
     ax.autoscale()
 
 
@@ -255,8 +244,6 @@ def draw_drift_offsets(drift_offsets: np.ndarray, unit: str,
 
     ax.set_xlabel(f'{OFFSET_X_NAME} [{unit}]')
     ax.set_ylabel(f'{OFFSET_Y_NAME} [{unit}]')
-    for axis in [ax.xaxis, ax.yaxis]:
-        axis.set_major_formatter(FORMATTER)
 
     ax.autoscale()
 
@@ -292,7 +279,6 @@ def draw_data_axis(x_data: np.ndarray, y_data: np.ndarray,
                            [x_axis_color, y_axis_color]):
         [t.set_color(color) for t in axis.get_ticklines()]
         [t.set_color(color) for t in axis.get_ticklabels()]
-        axis.set_major_formatter(FORMATTER)
 
     ax.autoscale()
 
