@@ -37,6 +37,7 @@ RATE_X_NAME = r'X Offset Rate'
 RATE_Y_NAME = r'Y Offset Rate'
 TIME_NAME = 'Scan Time'
 TIME_UNIT = 'h'
+PIX_OFFSET_UNIT = 'pix'
 
 A0_WIDTH = 21.0  # in cm
 HEIGHT = 0.75 * A0_WIDTH  # random factor
@@ -266,6 +267,8 @@ def draw_drift_data_all(csv_file: str,
                         desired_offset_unit: str = DEFAULT_OFFSET_UNIT,
                         desired_rate_unit: str = DEFAULT_RATE_UNIT,
                         uses_v2: bool = True, display: bool = True,
+                        desired_offset_unit_per_pixel: float = None,
+                        desired_rate_unit_per_pixel: float = None,
                         cm: str = 'nipy_spectral'):
     """Read a drift CSV file and visualize drift rate and offset.
 
@@ -285,6 +288,12 @@ def draw_drift_data_all(csv_file: str,
         uses_v2: whether or not the CSV uses V2 of the format.
         display: whether or not we show the figure in a blocking fashion.
             Default is True.
+        desired_offset_unit_per_pixel: ratio of scan size to resolution in
+            desired_offset_unit. If not None, we add an extra set of ticks
+            for pixels (for the rate graphs).
+        desired_rate_unit_per_pixel: ratio of scan size to resolution in
+            desired_rate_unit. If not None, we add an extra set of ticks
+            for pixels (for the offset graphs).
         cm: colormap style for visualization. Defaults to 'nipy_spectral'.
     """
     drift_data = load_drift_data(csv_file, desired_offset_unit,
@@ -300,21 +309,47 @@ def draw_drift_data_all(csv_file: str,
 
     # First, draw 'birds eye view' plots
     colors, colorbar = get_colors_colorbar_for_time(drift_data, cm)
-    draw_drift_offsets(drift_data, desired_offset_unit, axd['A'], colors)
-    draw_drift_rates(drift_data, desired_rate_unit, axd['B'], colors)
 
+    # Draw offset figures
+    draw_drift_offsets(drift_data, desired_offset_unit, axd['A'], colors)
     draw_data_axis(drift_data.scan_time_hours, drift_data.drift_offsets[:, 0],
                    TIME_NAME, OFFSET_X_NAME, TIME_UNIT,
                    desired_offset_unit, axd['C'], colors)
     draw_data_axis(drift_data.scan_time_hours, drift_data.drift_offsets[:, 1],
                    TIME_NAME, OFFSET_Y_NAME, TIME_UNIT,
                    desired_offset_unit, axd['E'], colors)
+
+    # Draw rate figures
+    draw_drift_rates(drift_data, desired_rate_unit, axd['B'], colors)
     draw_data_axis(drift_data.scan_time_hours, drift_data.drift_rates[:, 0],
                    TIME_NAME, RATE_X_NAME, TIME_UNIT,
                    desired_rate_unit, axd['D'], colors)
     draw_data_axis(drift_data.scan_time_hours, drift_data.drift_rates[:, 1],
                    TIME_NAME, RATE_Y_NAME, TIME_UNIT,
                    desired_rate_unit, axd['F'], colors)
+
+    # Show extra ticks for units in pixels (if provided)
+    if desired_offset_unit_per_pixel:
+        pix_offsets = drift_data.drift_offsets / desired_offset_unit_per_pixel
+        # Offset figures
+        draw_data_axis(drift_data.scan_time_hours, pix_offsets[:, 0],
+                       TIME_NAME, OFFSET_X_NAME, TIME_UNIT,
+                       PIX_OFFSET_UNIT, axd['C'].twinx(), colors)
+        draw_data_axis(drift_data.scan_time_hours, pix_offsets[:, 1],
+                       TIME_NAME, OFFSET_Y_NAME, TIME_UNIT,
+                       PIX_OFFSET_UNIT, axd['E'].twinx(), colors)
+    if desired_rate_unit_per_pixel:
+        pix_rates = drift_data.drift_rates / desired_rate_unit_per_pixel
+        # Rate figures
+        pix_time_unit = desired_rate_unit.split('/')[1]
+        pix_rate_unit = PIX_OFFSET_UNIT + '/' + pix_time_unit
+        draw_data_axis(drift_data.scan_time_hours, pix_rates[:, 0],
+                       TIME_NAME, RATE_X_NAME, TIME_UNIT,
+                       pix_rate_unit, axd['D'].twinx(), colors)
+        draw_data_axis(drift_data.scan_time_hours, pix_rates[:, 1],
+                       TIME_NAME, RATE_Y_NAME, TIME_UNIT,
+                       pix_rate_unit, axd['F'].twinx(), colors)
+
 
     save_path = os.path.join(os.path.dirname(csv_file),
                              os.path.splitext(os.path.basename(csv_file))[0]
@@ -330,6 +365,7 @@ def draw_drift_data_all(csv_file: str,
 def draw_drift_data_offsets(csv_file: str,
                             desired_offset_unit: str = DEFAULT_OFFSET_UNIT,
                             uses_v2: bool = True, display: bool = True,
+                            desired_offset_unit_per_pixel: float = None,
                             cm: str = 'nipy_spectral'):
     """Read a drift CSV file and visualize drift offsets.
 
@@ -351,6 +387,9 @@ def draw_drift_data_offsets(csv_file: str,
         save_file: filename to save the drawn plot. This is the filename
             *without* the path, as we use the csv_files path. Defaults to
             'drift_correction.png'.
+        desired_offset_unit_per_pixel: ratio of scan size to resolution in
+            desired_offset_unit. If not None, we add an extra set of ticks
+            for pixels (for the rate graphs).
         cm: colormap style for visualization. Defaults to 'nipy_spectral'.
     """
     drift_data = load_drift_data(csv_file, desired_offset_unit,
@@ -375,6 +414,17 @@ def draw_drift_data_offsets(csv_file: str,
                    TIME_NAME, OFFSET_Y_NAME, TIME_UNIT,
                    desired_offset_unit, axd['E'], colors)
 
+    # Show extra ticks for units in pixels (if provided)
+    if desired_offset_unit_per_pixel:
+        pix_offsets = drift_data.drift_offsets / desired_offset_unit_per_pixel
+        # Offset figures
+        draw_data_axis(drift_data.scan_time_hours, pix_offsets[:, 0],
+                       TIME_NAME, OFFSET_X_NAME, TIME_UNIT,
+                       PIX_OFFSET_UNIT, axd['C'].twinx(), colors)
+        draw_data_axis(drift_data.scan_time_hours, pix_offsets[:, 1],
+                       TIME_NAME, OFFSET_Y_NAME, TIME_UNIT,
+                       PIX_OFFSET_UNIT, axd['E'].twinx(), colors)
+
     save_path = os.path.join(os.path.dirname(csv_file),
                              os.path.splitext(os.path.basename(csv_file))[0]
                              + '.png')
@@ -391,6 +441,8 @@ def cli_draw_drift_data(csv_file: str,
                         offsets_only: bool = True,
                         uses_v2: bool = True, display: bool = True,
                         cm: str = 'nipy_spectral',
+                        desired_offset_unit_per_pixel: float = None,
+                        desired_rate_unit_per_pixel: float = None,
                         log_level: str = logging.INFO):
     """Read a drift CSV file and visualize drift rate and offset.
 
@@ -413,15 +465,27 @@ def cli_draw_drift_data(csv_file: str,
         display: whether or not we show the figure in a blocking fashion.
             Default is True.
         cm: colormap style for visualization. Defaults to 'nipy_spectral'.
+        desired_offset_unit_per_pixel: ratio of scan size to resolution in
+            desired_offset_unit. If not None, we add an extra set of ticks
+            for pixels (for the rate graphs).
+        desired_rate_unit_per_pixel: ratio of scan size to resolution in
+            desired_rate_unit. If not None, we add an extra set of ticks
+            for pixels (for the offset graphs).
         log_level: level to use for logging. Defaults to INFO.
     """
     log.set_up_logging(log_level=log_level)
     if offsets_only:
         draw_drift_data_offsets(csv_file, desired_offset_unit,
-                                uses_v2, display, cm)
+                                uses_v2, display,
+                                desired_offset_unit_per_pixel,
+                                cm)
     else:
-        draw_drift_data_all(csv_file, desired_offset_unit, desired_rate_unit,
-                            uses_v2, display, cm)
+        draw_drift_data_all(csv_file, desired_offset_unit,
+                            desired_rate_unit,
+                            uses_v2, display,
+                            desired_offset_unit_per_pixel,
+                            desired_rate_unit_per_pixel,
+                            cm)
 
 
 if __name__ == '__main__':
