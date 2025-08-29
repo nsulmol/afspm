@@ -23,7 +23,6 @@ from .. import component as afspmc
 
 from ...io import common
 from ...io.pubsub import publisher as pub
-from ...io.pubsub import subscriber as sub
 from ...io.control import server as ctrl_srvr
 
 from ...io.protos.generated import scan_pb2
