@@ -24,7 +24,7 @@ These methods are 'responses' to specific requests. For example, ```on_start_sca
 - Try to perform the action requested.
 - Send a ControlResponse indicating the resolution of the request. For example, if you were unable to start a scan because the scanner is not in an ```SS_FREE``` state, you would respond with ```REP_NOT_FREE```.
 
-Note that some of these methods are not *strictly* necessary. For example, ```on_set_zctrl_params()``` can return ```REP_CMD_NOT_SUPPORTED``` if it is not. Check the documentation in afspm/components/microscope/translator.py to see if a particular method *must* be supported or not.
+Note that some of these methods are not *strictly* necessary. For example, ```on_set_zctrl_params()``` can return ```REP_CMD_NOT_SUPPORTED``` if it is not. Check the documentation in ```afspm/components/microscope/translator.py``` to see if a particular method *must* be supported or not.
 
 If a method fails, return an appropriate response (e.g. ```$REP_PARAM_ERROR$```). If no specific response exists, either (a) create a new one in control.proto (preferred), or (b) use the generic ```$REP_FAILURE$``` response. Note that we do not expect an ```$on_XXX()$``` method to throw an exception, as we are responding to an explicit request. Because of this, returning that an error occurred (and why) should be fine; the experiment can continue running.
 
@@ -50,7 +50,7 @@ Note that this method *does not* need to be supported if you are inheriting from
 
 ### ```on_action_request()``` Support
 
-This method exists to support 'generic' actions requested, as defined in afspm/components/microscope/actions.py (MicroscopeAction). Actions are defined solely by these generic IDs and do not take any parameters.
+This method exists to support 'generic' actions requested, as defined in ```afspm/components/microscope/actions.py``` (MicroscopeAction). Actions are defined solely by these generic IDs and do not take any parameters.
 
 Note that this method *does not* need to be supported if you are inheriting from the base MicroscopeTranslator. However, if inheriting from ConfigTranslator, this method is necessary for the rest of the logic to run.
 
@@ -65,8 +65,8 @@ Note that MapTranslator is *not* recommended as a parent class for new Microscop
 The ConfigTranslator class attempts to simplify implementing new translators by: (a) introducing config files to simplify parameter and action handling; (b) overriding the composite ```on_XXX()``` and ```poll_XXX()``` methods to use ```on_param_request()``` for these; and (c) overriding the 'base' actions to use ```on_action_request()``` for these.
 
 Regarding the config files: 
-- In afspm/components/microscope/params.py, the ParameterHandler class reads a TOML-based config file that maps generic parameter IDs to SPM-specific IDs, units, types, and accepted parameter ranges. In doing so, it makes it relatively easy to support many parameters for a given microscope: as long as the ```get_param_spm()``` and ```set_param_spm()``` methods are implemented (abstract methods in ParameterHandler), the handler will use the SPM-specific config file to perform set and get calls.
-- In afspm/components/microscope/actions.py, The ActionHandler class reads a TOML-based config file that maps generic action IDs to an appropriate method to call (and parameters to pass) in order to perform said action.
+- In ```afspm/components/microscope/params.py```, the ParameterHandler class reads a TOML-based config file that maps generic parameter IDs to SPM-specific IDs, units, types, and accepted parameter ranges. In doing so, it makes it relatively easy to support many parameters for a given microscope: as long as the ```get_param_spm()``` and ```set_param_spm()``` methods are implemented (abstract methods in ParameterHandler), the handler will use the SPM-specific config file to perform set and get calls.
+- In ```afspm/components/microscope/actions.py```, The ActionHandler class reads a TOML-based config file that maps generic action IDs to an appropriate method to call (and parameters to pass) in order to perform said action.
 
 With the appropriate base parameters settable/gettable via ParameterHandler, the class then implements defaults for the ```on_XXX()``` and ```poll_XXX()``` methods which involve composite parameters (such as ScanParameters2d, i.e. ```on_set_scan_params()``` / ```poll_scan_params()```. Similarly, the base actions (e.g. ```REQ_START_SCAN```) are handled automatically using the ActionHandler. 
 
@@ -82,4 +82,4 @@ Once a specific MicroscopeTranslator has been implemented, its basic functionali
 ## Usage
 
 Similar to above, each SPM may have particulars in terms of how to set it up to run. As such, we expect each SPM implementation to have a short README.md describing this process.
-These should be located in the specific SPM's subdirectory (e.g. afspm/components/microscope/translators/gxsm for the GxsmTranslator).
+These should be located in the specific SPM's subdirectory (e.g. ```afspm/components/microscope/translators/gxsm``` for the GxsmTranslator).
