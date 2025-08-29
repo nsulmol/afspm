@@ -26,7 +26,7 @@ ASYLUM_EXT = '.ibw'
 MAP_EXT_FILE_LOADER = {ASYLUM_EXT: asylum.load_scans_from_file}
 
 
-class OfflineCSScheduler(scheduler.CSCorrectedScheduler):
+class OfflineDCScheduler(scheduler.DriftCompensatedScheduler):
     """Run drift estimation like the scheduler, offline.
 
     The biggest difference here is that our 'feedback loop' (of updating
@@ -41,22 +41,23 @@ class OfflineCSScheduler(scheduler.CSCorrectedScheduler):
             or anything like this.
     """
 
-    def __init__(self, channel_id: str, cache_size: int,
-                 drift_model: drift.DriftModel | None = None,
-                 csv_attribs: csv.CSVAttributes =
-                 scheduler.CSCorrectedScheduler.DEFAULT_CSV_ATTRIBUTES,
-                 min_intersection_ratio: float =
-                 scheduler.CSCorrectedScheduler.DEFAULT_MIN_INTERSECTION_RATIO,
-                 min_spatial_res_ratio: float =
-                 scheduler.CSCorrectedScheduler.DEFAULT_MIN_SPATIAL_RES_RATIO,
-                 max_fitting_score: float =
-                 scheduler.CSCorrectedScheduler.DEFAULT_MAX_FITTING_SCORE,
-                 update_weight: float =
-                 scheduler.DEFAULT_UPDATE_WEIGHT,
-                 rescan_intersection_ratio: float =
-                 scheduler.CSCorrectedScheduler.DEFAULT_RESCAN_INTERSECTION_RATIO,
-                 grab_oldest_match: bool = True,
-                 **kwargs):
+    def __init__(
+            self, channel_id: str, cache_size: int,
+            drift_model: drift.DriftModel | None = None,
+            csv_attribs: csv.CSVAttributes =
+            scheduler.DriftCompensatedScheduler.DEFAULT_CSV_ATTRIBUTES,
+            min_intersection_ratio: float =
+            scheduler.DriftCompensatedScheduler.DEFAULT_MIN_INTERSECTION_RATIO,
+            min_spatial_res_ratio: float =
+            scheduler.DriftCompensatedScheduler.DEFAULT_MIN_SPATIAL_RES_RATIO,
+            max_fitting_score: float =
+            scheduler.DriftCompensatedScheduler.DEFAULT_MAX_FITTING_SCORE,
+            update_weight: float =
+            scheduler.DEFAULT_UPDATE_WEIGHT,
+            rescan_intersection_ratio: float =
+            scheduler.DriftCompensatedScheduler.DEFAULT_RESCAN_INTERSECTION_RATIO,
+            grab_oldest_match: bool = True,
+            **kwargs):
         """Initialize our correction scheduler."""
         self.channel_id = channel_id.upper()
         self.drift_model = (drift.create_drift_model() if drift_model is None
@@ -135,7 +136,7 @@ def run_drift_estimation_on_dir(scan_dir: str, scan_ext: str,
     channel_id = channel_id.upper()
 
     csv_attribs = csv.CSVAttributes(os.path.join(scan_dir, csv_filename))
-    scheduler = OfflineCSScheduler(channel_id, cache_size,
+    scheduler = OfflineDCScheduler(channel_id, cache_size,
                                    csv_attribs=csv_attribs)
 
     filenames = [f for f in sorted(os.listdir(scan_dir))

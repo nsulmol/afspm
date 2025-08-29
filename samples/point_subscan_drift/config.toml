@@ -210,7 +210,7 @@ scan_id = 'Scan2d'
 
 [scheduler]
 component = true
-class = 'afspm.components.drift.scheduler.CSCorrectedScheduler'
+class = 'afspm.components.drift.scheduler.DriftCompensatedScheduler'
 
 pubsubcache = 'scheduler_psc'
 router = 'scheduler_router'

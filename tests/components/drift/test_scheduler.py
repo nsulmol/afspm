@@ -88,7 +88,7 @@ def rescan_url():
 
 # NOTE: I am not using fixtures here because they appeared to cause issues
 # with my monkeypatching of the corrected_scheduler. Additionally, the child
-# router/cache created by CSCorrectedScheduler has the same...everything as
+# router/cache created by DriftCompensatedScheduler has the same...everything as
 # the parent, so the fixtures lasting the lifetime of the test *could*  in
 # theory cause issues.
 def create_cache(pub_url, psc_url, ctx):
@@ -104,7 +104,7 @@ def create_publisher(rescan_url, ctx):
 
 
 def create_scheduler(cache, router, publisher, csv_attribs, channel_id):
-    return scheduler.CSCorrectedScheduler(channel_id=channel_id,
+    return scheduler.DriftCompensatedScheduler(channel_id=channel_id,
                                           csv_attribs=csv_attribs,
                                           name='scheduler',
                                           pubsubcache=cache,
@@ -160,7 +160,7 @@ def test_hooks_work(pub_url, psc_url, server_url, router_url, ctx, csv_attribs,
     logger.info("Validate that the hooks between scheduler, router, cache all "
                 "work.")
     monkeypatch.setattr(pbc.PubSubCache, 'poll', send_empty_scan)
-    monkeypatch.setattr(scheduler.CSCorrectedScheduler, 'update',
+    monkeypatch.setattr(scheduler.DriftCompensatedScheduler, 'update',
                         fake_update_scheduler)
     my_scheduler = create_scheduler_and_ios(pub_url, psc_url, server_url,
                                             router_url, None, ctx, csv_attribs,

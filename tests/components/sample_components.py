@@ -12,7 +12,7 @@ from afspm.components.microscope.params import (MicroscopeParameter,
                                                 ParameterError)
 from afspm.components.microscope.actions import MicroscopeAction
 from afspm.components.microscope.scheduler import MicroscopeScheduler
-from afspm.components.drift.scheduler import CSCorrectedScheduler
+from afspm.components.drift.scheduler import DriftCompensatedScheduler
 
 from afspm.io import common
 from afspm.io.pubsub.subscriber import Subscriber
@@ -262,7 +262,7 @@ def cs_corrected_scheduler_routine(psc_url, pub_url, server_url, router_url,
                       update_cache_kwargs=cache_kwargs)
     router = ControlRouter(server_url, router_url, ctx)
 
-    scheduler = CSCorrectedScheduler(channel_id='',
+    scheduler = DriftCompensatedScheduler(channel_id='',
                                      name='scheduler',
                                      pubsubcache=psc,
                                      router=router, ctx=ctx,

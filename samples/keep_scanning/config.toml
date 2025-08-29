@@ -120,7 +120,7 @@ control_client = 'ui_client'  # TODO: Do we need this?
 
 [scheduler]
 component = true
-class = 'afspm.components.drift.scheduler.CSCorrectedScheduler'
+class = 'afspm.components.drift.scheduler.DriftCompensatedScheduler'
 pubsubcache = 'psc'
 router = 'router'
 publisher = 'rescan_pub'  # Publish rescan requests

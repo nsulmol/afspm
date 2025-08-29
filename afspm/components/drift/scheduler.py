@@ -326,10 +326,10 @@ class CSCorrectedCache(cache.PubSubCache):
         self._update_weight = update_weight
 
 
-class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
+class DriftCompensatedScheduler(scheduler.MicroscopeScheduler):
     """Corrects coordinate system data in addition to being a scheduler.
 
-    The CSCorrectedScheduler is a wrapper on top of a standard
+    The DriftCompensatedScheduler is a wrapper on top of a standard
     MicroscopeScheduler, where it additionally attempts to estimate drift
     in the system and correct for it. Thus:
     - any coordinate data that is sent to the Microscope will be 'corrected'
@@ -402,12 +402,12 @@ class CSCorrectedScheduler(scheduler.MicroscopeScheduler):
     rescanning when the resulting scan is found to have drifted too far
     from the desired location. This is measured by the
     rescan intersection ratio (intersection area / scan area). When this ratio
-    is above self.rescan_intersection_ratio, this CSCorrectedScheduler sends
+    is above self.rescan_intersection_ratio, this DriftCompensatedScheduler sends
     out the desired ScanParameters2d via its publisher. If the DriftRescanner's
     subscriber is listening to the same url as the publisher, it will receive
     it, log an EP_THERMAL_DRIFT problem, take control, and rerun the scan. Once
     the scan has run, it will release control and the experiment will continue.
-    Note that this CSCorrectedScheduler also publishes ControlState and
+    Note that this DriftCompensatedScheduler also publishes ControlState and
     ScopeState messages, as these are necessary for DriftRescanner to function.
 
     Attributes:

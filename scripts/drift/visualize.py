@@ -70,8 +70,8 @@ def load_drift_data(csv_filepath: str, desired_offset_unit: str,
                     uses_v2: bool = True
                     ) -> DriftData:
     """Given a CSV file of drift data, get a DriftData object."""
-    fields = (scheduler.CSCorrectedScheduler.CSV_FIELDS_V2 if uses_v2
-              else scheduler.CSCorrectedScheduler.CSV_FIELDS_V1)
+    fields = (scheduler.DriftCompensatedScheduler.CSV_FIELDS_V2 if uses_v2
+              else scheduler.DriftCompensatedScheduler.CSV_FIELDS_V1)
     extract_metadata_row = (extract_metadata_row_v2 if uses_v2
                             else extract_metadata_row_v1)
     csv_attribs = utils_csv.CSVAttributes(csv_filepath)
@@ -120,7 +120,7 @@ def extract_metadata_row_v1(row: dict, desired_offset_unit: str,
     """
     assert EMPTY_STR not in row.values()
 
-    FIELDS = scheduler.CSCorrectedScheduler.CSV_FIELDS_V1
+    FIELDS = scheduler.DriftCompensatedScheduler.CSV_FIELDS_V1
 
     offset_unit = (row[FIELDS[3]])
     rate_unit = offset_unit + '/s'
@@ -149,7 +149,7 @@ def extract_metadata_row_v2(row: dict, desired_offset_unit: str,
     """
     assert EMPTY_STR not in row.values()
 
-    FIELDS = scheduler.CSCorrectedScheduler.CSV_FIELDS_V2
+    FIELDS = scheduler.DriftCompensatedScheduler.CSV_FIELDS_V2
 
     offset_unit = (row[FIELDS[4]])
     rate_unit = offset_unit + '/s'
@@ -292,7 +292,7 @@ def draw_drift_data_all(csv_file: str,
                         cm: str = 'nipy_spectral'):
     """Read a drift CSV file and visualize drift rate and offset.
 
-    This method reads a CSV file created by CSCorrectedScheduler, and
+    This method reads a CSV file created by DriftCompensatedScheduler, and
     plots the drift offset and rates over time so they may be analyzed.
 
     The data is displayed (in a blocking fashion) if display is True, and
@@ -416,7 +416,7 @@ def draw_drift_data_offsets(csv_file: str,
                             cm: str = 'nipy_spectral'):
     """Read a drift CSV file and visualize drift offsets.
 
-    This method reads a CSV file created by CSCorrectedScheduler, and
+    This method reads a CSV file created by DriftCompensatedScheduler, and
     plots the drift offset over time so they may be analyzed.
 
     The data is displayed (in a blocking fashion) if display is True, and
@@ -574,7 +574,7 @@ def cli_draw_drift_data(csv_file: str,
                         log_level: str = logging.INFO):
     """Read a drift CSV file and visualize drift rate and offset.
 
-    This method reads a CSV file created by CSCorrectedScheduler, and
+    This method reads a CSV file created by DriftCompensatedScheduler, and
     plots the drift offset and rates over time so they may be analyzed.
 
     The data is displayed (in a blocking fashion) if display is True, and
