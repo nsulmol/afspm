@@ -1,5 +1,5 @@
-#+title: A Manufacturer-Agnostic Automation Framework for SPM
-#+author: Nick Sullivan Molina$^1$, Peter Grutter$^2$, Kirk H. Bevan$^1$
+#+title: \texttt{afspm}: A Manufacturer-Agnostic Automation Framework for SPM
+#+author: Nicholas J. Sullivan$^{1,2}$, Julio J. Valdés$^3$, Kirk H. Bevan$^{1,2}$, Peter Grutter$^2$
 #+date:
 
 #+startup: beamer
@@ -12,7 +12,7 @@
 #+options: h:2 toc:1
 
 # Set institute
-#+beamer_header:\institute{Materials and Mining Engineering Department$^1$, McGill University \newline Physics Department$^2$, McGill University\newline\bigskip\includegraphics[width=0.2\paperwidth]{./images/mcgill_sig_red.png}}
+#+beamer_header:\institute{Division of Materials Engineering, Faculty of Engineering,McGill University$^1$ \newline Department of Physics,McGill University$^2$ \newline National Research Council Canada, Digital Technologies Research Centre$^3$ \newline \bigskip\includegraphics[width=0.2\paperwidth]{./images/mcgill_sig_red.png}}
 
 # Add mcgill logo to title slide
 # #+beamer_header: \usebackgroundtemplate{\includegraphics[width=0.25\paperwidth]{./images/mcgill_sig_red.png}}
@@ -183,7 +183,7 @@ Any experiment must contain:
 :BEAMER_env: ignoreheading
 :END:
 #+attr_org: :width 50%
-#+attr_latex: :width 0.5\linewidth
+#+attr_latex: :width 0.35\linewidth
 [[./images/network_framework.png]]
 
 *** Notes :B_ignoreheading:
@@ -465,22 +465,24 @@ control_server = 'translator_server'
 #+end_center
 ** Expandability
 #+begin_center
-/We defined a *'basis'* set of schemas we believe are standard./
+/We defined a *`basis'* set of schemas we believe are standard./
 
 /But this is quite arbitrary! Here are ways you can expand upon them./
 #+end_center
 #+beamer:\pause
-*** Operating Modes
-- Defined as an SPM config describing cantilever control during a scan.
-- We assume experiment has scan and spectroscopy modes configured.
-- Can change by providing *op. mode* id and =<key:value>= *params* map.
+*** Parameters
+- Can add generic *parameter* IDs and/or create `composite' parameters (e.g. ScanParameters2d).
 #+beamer:\pause
 *** Actions
-- Many manufacturers provide some automation tasks (e.g. approach tip).
-- Can send these by providing *action* id and =<key:value>= *params* map.
+- Can send these by providing generic *action* ID linked to method.
 #+beamer:\pause
 *** Custom Messages
 - Any user may create custom messages or expand existing ones.
+#+beamer:\pause
+*** Operating Modes
+- If switching between operating modes with presets, use actions.
+- If needing to explicit parameters, add new `composite' parameter request.
+
 ** The End :BMCOL:
 :PROPERTIES:
 :BEAMER_col: 1.0

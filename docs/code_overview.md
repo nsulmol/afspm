@@ -34,14 +34,18 @@ In the top-level readme, you will see that these protos must be *compiled* into 
 Of note, the main protobuffer data structures are found in:
 - ```control.proto```: this defines control requests/responses, control modes, experiment problems, and the structures by which these are all sent (e.g. the ControlState). These protos are sent/received via the 'control' i/o path.
 - ```geometry.proto```: these are base structures for dealing with geometric data, such as points and rectangles associated with scans. They are used by other protos.
-- ```scan.proto```: these are the main messages/structures sent out by the MicroscopeTranslator (i.e., sent out via the 'pubsub' i/o path). The 2d scans are defined here, as is the scope state, and parameters associated with a given scan.
+- ```scan.proto```: these are structures sent out by the MicroscopeTranslator (i.e., sent out via the 'pubsub' i/o path) tied to performing scans, as well as parameters sent to change scan parameters before a scan. The scope state is also defined here, used to determine the state of the microscope.
+- ```spec.proto```: these are structures sent out by the MicroscopeTranslator tied to spectroscopies, as well as the structures sent to change the position where a spectroscopy should be run.
 - ```analysis.proto```: these are some pre-defined structures for sending analysis results between components.
+- ```feedback.proto```: these are structures tied to z-height feedback control.
 
 ## Utils
 
 This contains a number of helper scripts. Of note are:
 - array_converters.py
 - parser.py
+- graphify.py
+- units.py
 
 ### Array Converters
 
@@ -51,6 +55,13 @@ This file contains methods for converting between common scan data structures an
 
 This file contains the main logic by which we 'spawn' components. All the components that need to be spawned in an experiment are defined in a single TOML config file. This file should also contain all arguments and arg values to spawn them. The parser is responsible for taking this TOML structure and parsing it into a list of component dicts to be created (via AfspmComponentsMonitor). Please see example config files in the samples directory, for reference.
 
+### Graphify
+
+This is a script for visualizing a configuration file. It can be used to ensure your components are connected as desired, as a sanity check.
+
+### Units
+
+This file contains methods to convert between various units, using pint as its backend. All components that need to deal with data -- and therefore likely convert them into desired units -- should use these.
 
 # Tests and Samples
 
